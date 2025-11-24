@@ -1,0 +1,32 @@
+[
+  {
+    "id": "pc-001",
+    "date": "2025-10-15",
+    "requester": "Yousef Qasem",
+    "purpose": "Video analysis software add-on",
+    "amount": 320,
+    "currency": "JOD",
+    "approvedBy": "Rami Al-Farsi",
+    "status": "Approved"
+  },
+  {
+    "id": "pc-002",
+    "date": "2025-10-22",
+    "requester": "Layla Haddad",
+    "purpose": "Facility maintenance supplies",
+    "amount": 180,
+    "currency": "JOD",
+    "status": "Requested"
+  },
+  {
+    "id": "pc-003",
+    "date": "2025-09-10",
+    "requester": "Sara Al-Khatib",
+    "purpose": "Team meals - away friendly",
+    "amount": 450,
+    "currency": "JOD",
+    "approvedBy": "Rami Al-Farsi",
+    "status": "Reimbursed"
+  }
+]
+

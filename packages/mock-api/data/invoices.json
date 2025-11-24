@@ -1,0 +1,43 @@
+[
+  {
+    "id": "inv-001",
+    "number": "INV-2025-031",
+    "vendor": "Jordan Sports Council",
+    "amount": 8450,
+    "currency": "JOD",
+    "status": "Sent",
+    "issueDate": "2025-10-05",
+    "dueDate": "2025-11-05",
+    "notes": "Seasonal facility lease"
+  },
+  {
+    "id": "inv-002",
+    "number": "INV-2025-032",
+    "vendor": "ProCoach Analytics",
+    "amount": 12600,
+    "currency": "USD",
+    "status": "Draft",
+    "issueDate": "2025-10-28"
+  },
+  {
+    "id": "inv-003",
+    "number": "INV-2025-033",
+    "vendor": "Fitness Supplies Co.",
+    "amount": 5400,
+    "currency": "JOD",
+    "status": "Paid",
+    "issueDate": "2025-09-18",
+    "dueDate": "2025-10-18"
+  },
+  {
+    "id": "inv-004",
+    "number": "INV-2025-034",
+    "vendor": "Elite Travel Partners",
+    "amount": 18950,
+    "currency": "USD",
+    "status": "Overdue",
+    "issueDate": "2025-08-30",
+    "dueDate": "2025-09-30"
+  }
+]
+

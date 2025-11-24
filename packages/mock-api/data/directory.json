@@ -1,0 +1,38 @@
+[
+  {
+    "id": "staff-001",
+    "fullName": "Layla Haddad",
+    "roleTitle": "Director of Operations",
+    "department": "Operations",
+    "email": "layla.haddad@infinitysports.jo",
+    "phone": "+962-7-9000-2201",
+    "avatarUrl": "https://i.pravatar.cc/150?img=5"
+  },
+  {
+    "id": "staff-002",
+    "fullName": "Rami Al-Farsi",
+    "roleTitle": "Head of Finance",
+    "department": "Finance",
+    "email": "rami.alfarsi@infinitysports.jo",
+    "phone": "+962-7-9000-2212",
+    "avatarUrl": "https://i.pravatar.cc/150?img=12"
+  },
+  {
+    "id": "staff-003",
+    "fullName": "Sara Al-Khatib",
+    "roleTitle": "Head Coach - Basketball",
+    "department": "Coaching",
+    "email": "sara.alkhatib@infinitysports.jo",
+    "avatarUrl": "https://i.pravatar.cc/150?img=31"
+  },
+  {
+    "id": "staff-004",
+    "fullName": "Yousef Qasem",
+    "roleTitle": "Performance Analyst",
+    "department": "Sport Science",
+    "email": "yousef.qasem@infinitysports.jo",
+    "phone": "+962-7-9000-2256",
+    "avatarUrl": "https://i.pravatar.cc/150?img=24"
+  }
+]
+

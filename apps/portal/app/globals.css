@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Infinity Sport Brand Colors */
+  --brand-primary-blue: #1D48FF;
+  --brand-primary-green: #29C461;
+  --brand-teal-accent: #00A3A3;
+  --brand-dark-navy: #071427;
+  
+  /* UI Colors */
+  --ui-soft-bg: #F4F6FA;
+  --ui-card-bg: #FFFFFF;
+  --ui-border: #E1E5EF;
+  --ui-text-primary: #0F172A;
+  --ui-text-muted: #6B7280;
+  --ui-danger: #EF4444;
+  --ui-warning: #F97316;
+  --ui-success: #22C55E;
+  
+  /* Legacy (for backward compatibility) */
+  --bg-base: #F4F6FA;
+  --bg-panel: #FFFFFF;
+  --bg-muted: #F4F6FA;
+  --bg-glass: rgba(255, 255, 255, 0.95);
+  --text-primary: #0F172A;
+  --text-muted: #6B7280;
+  --brand-blue: #1D48FF;
+  --brand-lightblue: #69FFDB;
+  --brand-green: #29C461;
+  --brand-green-dark: #1C934E;
+}
+
+@layer base {
+  * {
+    @apply scroll-smooth;
+  }
+
+  body {
+    font-family: var(--font-sans), system-ui, sans-serif;
+    background: var(--ui-soft-bg);
+    color: var(--ui-text-primary);
+  }
+
+  ::selection {
+    background: rgba(97, 255, 69, 0.35);
+    color: #0f1a2b;
+  }
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes pulse-glow {
+    0% {
+      box-shadow: 0 0 20px rgba(20, 38, 255, 0.15);
+    }
+    50% {
+      box-shadow: 0 0 40px rgba(20, 38, 255, 0.3);
+    }
+    100% {
+      box-shadow: 0 0 20px rgba(20, 38, 255, 0.15);
+    }
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply rounded-2xl border border-[#e3e8f2] bg-[var(--bg-glass)] shadow-[0_12px_30px_rgba(15,23,42,0.08)];
+  }
+  .glass-panel-hover {
+    @apply transition-transform duration-300 hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(15,23,42,0.14)];
+  }
+
+  .pill {
+    @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold;
+  }
+
+  .btn-gradient {
+    @apply rounded-full bg-gradient-to-r from-[#1426ff] via-[#69ffdb] to-[#61ff45] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(20,38,255,0.35)] transition hover:scale-105;
+  }
+
+  .btn-outline {
+    @apply rounded-full border border-[#e3e8f2] px-5 py-2.5 text-sm font-semibold text-[#1426ff] transition hover:border-[#1426ff] hover:bg-white;
+  }
+}

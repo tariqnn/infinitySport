@@ -1,0 +1,33 @@
+[
+  {
+    "id": "doc-2025-training-plan",
+    "name": "2025 Training Plan Template",
+    "url": "https://example.com/docs/training-plan.pdf",
+    "folder": "Programs",
+    "tags": ["template", "coaching"],
+    "access": ["staff", "coach", "admin"],
+    "uploadedBy": "coach.mohammad",
+    "uploadedAt": "2025-08-15T09:00:00.000Z"
+  },
+  {
+    "id": "doc-safety-manual",
+    "name": "Facility Safety Manual",
+    "url": "https://example.com/docs/safety-manual.pdf",
+    "folder": "Compliance",
+    "tags": ["safety"],
+    "access": ["staff", "coach", "accountant", "admin"],
+    "uploadedBy": "ops.layla",
+    "uploadedAt": "2025-09-04T15:30:00.000Z"
+  },
+  {
+    "id": "doc-budget-policy",
+    "name": "Budget Control Policy",
+    "url": "https://example.com/docs/budget-policy.pdf",
+    "folder": "Finance",
+    "tags": ["policy", "finance"],
+    "access": ["accountant", "admin"],
+    "uploadedBy": "finance.rami",
+    "uploadedAt": "2025-07-22T12:45:00.000Z"
+  }
+]
+

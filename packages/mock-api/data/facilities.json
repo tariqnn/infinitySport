@@ -1,0 +1,43 @@
+[
+  {
+    "id": "arena",
+    "name": "Infinity Arena",
+    "specs": [
+      "2,500 spectator seating",
+      "FIBA regulation hardwood court",
+      "360° performance analytics cameras"
+    ],
+    "mediaUrl": "https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=1400&q=80"
+  },
+  {
+    "id": "performance-lab",
+    "name": "Performance Lab",
+    "specs": [
+      "Biomechanics lab",
+      "Hydrotherapy recovery pools",
+      "Altitude simulation room"
+    ],
+    "mediaUrl": "https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?auto=format&fit=crop&w=1400&q=80"
+  },
+  {
+    "id": "padel-complex",
+    "name": "Padel Complex",
+    "specs": [
+      "6 indoor padel courts",
+      "Full glass enclosures",
+      "Climate controlled"
+    ],
+    "mediaUrl": "https://images.unsplash.com/photo-1507252443568-1c66ed2d1e3f?auto=format&fit=crop&w=1400&q=80"
+  },
+  {
+    "id": "dance-studios",
+    "name": "Dance Studios",
+    "specs": [
+      "Sprung Harlequin floors",
+      "Wall-to-wall mirrors",
+      "Live pianist accompaniment"
+    ],
+    "mediaUrl": "https://images.unsplash.com/photo-1496307042754-b4aa456c4a2d?auto=format&fit=crop&w=1400&q=80"
+  }
+]
+

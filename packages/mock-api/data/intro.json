@@ -1,0 +1,17 @@
+{
+  "heroTitle": "Elevating Jordanian Athletes",
+  "heroSubtitle": "Infinity Sports delivers elite training programs, professional coaching, and world-class facilities for teams and individuals across the region.",
+  "ctas": [
+    { "label": "Explore Programs", "href": "/sports" },
+    { "label": "Book a Tour", "href": "/contact" }
+  ],
+  "highlights": [
+    { "title": "12,500 sq m multi-sport campus", "description": "Purpose-built arenas, indoor courts, recovery suites, and analysis labs." },
+    { "title": "National-level coaching", "description": "UEFA, FIBA, and FIG certified coaches with pro experience." },
+    { "title": "Scholarships & partnerships", "description": "Corporate and community scholarships for youth development." }
+  ],
+  "heroMediaUrl": "https://images.unsplash.com/photo-1546519638-68e109498ffc",
+  "lastUpdatedBy": "Sara Al-Khatib",
+  "updatedAt": "2025-10-25T08:45:00.000Z"
+}
+

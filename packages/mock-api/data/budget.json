@@ -1,0 +1,45 @@
+[
+  {
+    "id": "budget-ops-q1",
+    "department": "Operations",
+    "period": "Q1",
+    "planned": 42000,
+    "actual": 39850
+  },
+  {
+    "id": "budget-ops-q2",
+    "department": "Operations",
+    "period": "Q2",
+    "planned": 43000,
+    "actual": 44500
+  },
+  {
+    "id": "budget-coaching-q1",
+    "department": "Coaching",
+    "period": "Q1",
+    "planned": 38000,
+    "actual": 36200
+  },
+  {
+    "id": "budget-coaching-q2",
+    "department": "Coaching",
+    "period": "Q2",
+    "planned": 39000,
+    "actual": 38500
+  },
+  {
+    "id": "budget-marketing-q1",
+    "department": "Marketing",
+    "period": "Q1",
+    "planned": 21000,
+    "actual": 18750
+  },
+  {
+    "id": "budget-marketing-q2",
+    "department": "Marketing",
+    "period": "Q2",
+    "planned": 22000,
+    "actual": 23100
+  }
+]
+

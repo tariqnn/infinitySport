@@ -1,0 +1,468 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model HeroSection {
+  id                String   @id @default(cuid())
+  title             String
+  subtitle          String
+  primaryCta        String
+  primaryUrl        String
+  secondaryCta      String?
+  secondaryUrl      String?
+  backgroundImageUrl String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Program {
+  id          String    @id @default(cuid())
+  name        String
+  description String
+  level       String?
+  slug        String    @unique
+  highlight   Boolean   @default(false)
+  order       Int       @default(0)
+  bookings    Booking[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Offer {
+  id            String         @id @default(cuid())
+  name          String
+  pricePerMonth Int
+  badge         String?
+  description   String
+  features      String[]
+  order         Int            @default(0)
+  subscriptions Subscription[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Event {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  date        DateTime
+  location    String
+  highlight   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Announcement {
+  id          String    @id @default(cuid())
+  title       String
+  body        String
+  imageUrl    String?
+  publishedAt DateTime  @default(now())
+  isPinned    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model FacilityHighlight {
+  id          String    @id @default(cuid())
+  name        String
+  description String
+  imageUrl    String?
+  bookings    Booking[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model FooterLink {
+  id        String   @id @default(cuid())
+  label     String
+  url       String
+  group     String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Portal Models
+enum CompanyStatus {
+  ACTIVE
+  TRIAL
+  SUSPENDED
+  INACTIVE
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  FROZEN
+  EXPIRED
+}
+
+enum CoachStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ClassStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  PENDING
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum InventoryStatus {
+  AVAILABLE
+  LOW
+  OUT_OF_STOCK
+  RETIRED
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+}
+
+enum CashFlowType {
+  INFLOW
+  OUTFLOW
+}
+
+enum PettyCashType {
+  ISSUE
+  REPLENISH
+}
+
+model Company {
+  id            String         @id @default(cuid())
+  name          String
+  contactName   String
+  contactEmail  String
+  phone         String?
+  industry      String?
+  size          String?
+  status        CompanyStatus  @default(ACTIVE)
+  members       Member[]
+  coaches       Coach[]
+  classes       Class[]
+  bookings      Booking[]
+  subscriptions Subscription[]
+  invoices      Invoice[]
+  inventory     InventoryItem[]
+  staffTasks    StaffTask[]
+  settings      CompanySettings?
+  budgetCategories BudgetCategory[]
+  budgetEntries   BudgetEntry[]
+  cashFlowEntries CashFlowEntry[]
+  pettyCashTransactions PettyCashTransaction[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Member {
+  id            String         @id @default(cuid())
+  companyId     String
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  firstName     String
+  lastName      String
+  email         String?
+  phone         String?
+  dateOfBirth   DateTime?
+  status        MemberStatus   @default(ACTIVE)
+  notes         String?
+  guardianName  String?
+  guardianPhone String?
+  enrollments   ClassEnrollment[]
+  bookings      Booking[]
+  subscriptions Subscription[]
+  invoices      Invoice[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([companyId])
+  @@index([email])
+}
+
+model Booking {
+  id          String        @id @default(cuid())
+  companyId   String
+  company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  classId     String?
+  class       Class?        @relation(fields: [classId], references: [id], onDelete: SetNull)
+  coachId     String?
+  coach       Coach?        @relation(fields: [coachId], references: [id], onDelete: SetNull)
+  programId   String?
+  program     Program?      @relation(fields: [programId], references: [id], onDelete: SetNull)
+  facilityId  String?
+  facility    FacilityHighlight? @relation(fields: [facilityId], references: [id], onDelete: SetNull)
+  memberId    String?
+  member      Member?       @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  facilityArea String?      // e.g. Court 1, Padel Court B
+  startTime   DateTime
+  endTime     DateTime
+  status      BookingStatus @default(PENDING)
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([companyId])
+  @@index([startTime])
+  @@index([status])
+  @@index([classId])
+  @@index([coachId])
+}
+
+model Subscription {
+  id          String             @id @default(cuid())
+  companyId   String
+  company     Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  offerId     String
+  offer       Offer              @relation(fields: [offerId], references: [id], onDelete: Restrict)
+  memberId    String?
+  member      Member?            @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  startDate   DateTime
+  endDate     DateTime?
+  status      SubscriptionStatus @default(ACTIVE)
+  invoices    Invoice[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([companyId])
+  @@index([memberId])
+  @@index([status])
+}
+
+model Invoice {
+  id          String        @id @default(cuid())
+  companyId   String
+  company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  memberId    String?
+  member      Member?       @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  subscriptionId String?
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  number      String        @unique
+  amount      Int
+  currency    String        @default("JOD")
+  status      InvoiceStatus @default(DRAFT)
+  dueDate     DateTime?
+  issuedAt    DateTime      @default(now())
+  paidAt      DateTime?
+  description String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  cashFlowEntries CashFlowEntry[]
+  @@index([companyId])
+  @@index([memberId])
+  @@index([status])
+  @@index([number])
+}
+
+model BudgetCategory {
+  id          String        @id @default(cuid())
+  companyId   String
+  company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  order       Int           @default(0)
+  budgets     BudgetEntry[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([companyId])
+  @@index([order])
+}
+
+model BudgetEntry {
+  id            String          @id @default(cuid())
+  companyId     String
+  company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  categoryId    String
+  category      BudgetCategory  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  periodStart   DateTime
+  periodEnd     DateTime
+  plannedAmount Int
+  actualAmount  Int             @default(0)
+  currency      String          @default("JOD")
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([companyId])
+  @@index([categoryId])
+  @@index([periodStart])
+  @@index([periodEnd])
+}
+
+model CashFlowEntry {
+  id              String        @id @default(cuid())
+  companyId       String
+  company         Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  date            DateTime
+  type            CashFlowType
+  category        String?       // e.g. "Memberships", "Salaries"
+  amount          Int
+  currency        String        @default("JOD")
+  relatedInvoiceId String?
+  relatedInvoice  Invoice?      @relation(fields: [relatedInvoiceId], references: [id], onDelete: SetNull)
+  description     String?
+  createdAt       DateTime      @default(now())
+
+  @@index([companyId])
+  @@index([date])
+  @@index([type])
+  @@index([relatedInvoiceId])
+}
+
+model PettyCashTransaction {
+  id            String          @id @default(cuid())
+  companyId     String
+  company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  date          DateTime
+  item          String
+  staff         String?
+  amount        Int
+  currency      String          @default("JOD")
+  type          PettyCashType
+  balanceAfter  Int             // balance after this transaction
+  reference     String?         // receipt #, note
+  description   String?
+  createdAt     DateTime        @default(now())
+
+  @@index([companyId])
+  @@index([date])
+  @@index([type])
+}
+
+model Coach {
+  id         String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  firstName String
+  lastName  String
+  email     String?
+  phone     String?
+  specialty String?  // e.g. Basketball / Padel etc.
+  bio       String?
+  status    CoachStatus @default(ACTIVE)
+  classes   Class[]
+  bookings  Booking[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([status])
+}
+
+model Class {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  coachId     String?
+  coach       Coach?   @relation(fields: [coachId], references: [id], onDelete: SetNull)
+  startTime   DateTime
+  endTime     DateTime
+  capacity    Int
+  status      ClassStatus @default(SCHEDULED)
+  enrollments ClassEnrollment[]
+  bookings    Booking[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([coachId])
+  @@index([startTime])
+  @@index([status])
+}
+
+model ClassEnrollment {
+  id        String   @id @default(cuid())
+  classId   String
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  memberId  String
+  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([classId])
+  @@index([memberId])
+  @@unique([classId, memberId])
+}
+
+model InventoryItem {
+  id         String   @id @default(cuid())
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name       String
+  category   String?
+  quantity   Int
+  location   String?  // e.g. Equipment room, Court 1
+  status     InventoryStatus @default(AVAILABLE)
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([status])
+  @@index([category])
+}
+
+model StaffTask {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  assignedTo  String?  // free-text or later link to staff user
+  dueDate     DateTime?
+  status      TaskStatus @default(OPEN)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([status])
+  @@index([assignedTo])
+}
+
+model CompanySettings {
+  id              String   @id @default(cuid())
+  companyId       String   @unique
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  timezone        String?  // e.g. "Asia/Amman"
+  bookingWindowDays Int?   // how far in advance bookings allowed
+  notifyEmail     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([companyId])
+}

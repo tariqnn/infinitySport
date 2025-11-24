@@ -1,0 +1,195 @@
+{
+  "hero": {
+    "title": "Elevating Jordanian Athletes",
+    "subtitle": "Infinity Sports delivers elite training programs, professional coaching, and world-class facilities for teams and individuals across the region.",
+    "badge": "Infinity Elite",
+    "primaryCtaLabel": "Explore Programs",
+    "primaryCtaLink": "/contact",
+    "secondaryCtaLabel": "Book a Tour",
+    "secondaryCtaLink": "/contact",
+    "backgroundImageUrl": "https://images.unsplash.com/photo-1461897104016-0b3b00cc81ee?auto=format&fit=crop&w=2000&q=80",
+    "backgroundVideoUrl": "https://www.youtube.com/embed/TOWEdazDzzE"
+  },
+  "highlights": [
+    {
+      "id": "highlight-1",
+      "title": "Scholarships awarded",
+      "description": "38 regional athletes received elite development financing in 2024."
+    },
+    {
+      "id": "highlight-2",
+      "title": "Pro coaching staff",
+      "description": "22 internationally certified coaches across court, field, and strength."
+    },
+    {
+      "id": "highlight-3",
+      "title": "Global tournaments",
+      "description": "Partnership pathways with 14 global academies and leagues."
+    }
+  ],
+  "programs": [
+    {
+      "id": "program-1",
+      "title": "Elite Court Lab",
+      "description": "High-tempo basketball development with pro analytics and skill labs.",
+      "sportType": "basketball",
+      "badge": "Pro tier",
+      "link": "/sports",
+      "mediaUrl": "https://images.unsplash.com/photo-1521412644187-c49fa049e84d?auto=format&fit=crop&w=900&q=80",
+      "isFeatured": true
+    },
+    {
+      "id": "program-2",
+      "title": "Padel League",
+      "description": "Tournament-style match play with coach feedback and match analytics.",
+      "sportType": "padel",
+      "badge": "Sold out",
+      "link": "/sports",
+      "mediaUrl": "https://images.unsplash.com/photo-1508908324153-d1a219719814?auto=format&fit=crop&w=900&q=80",
+      "isActive": true
+    },
+    {
+      "id": "program-3",
+      "title": "Swim Sprint Academy",
+      "description": "Olympic pool conditioning, underwater video analysis, and strength labs.",
+      "sportType": "swim",
+      "link": "/sports",
+      "mediaUrl": "https://images.unsplash.com/photo-1471295253337-3ceaaedca402?auto=format&fit=crop&w=900&q=80"
+    },
+    {
+      "id": "program-4",
+      "title": "Junior Performance Lab",
+      "description": "Age-specific multi-sport conditioning for power, agility, and recovery.",
+      "sportType": "multi",
+      "link": "/sports",
+      "mediaUrl": "https://images.unsplash.com/photo-1508609349937-5ec4ae374ebf?auto=format&fit=crop&w=900&q=80"
+    }
+  ],
+  "offers": [
+    {
+      "id": "offer-1",
+      "name": "Court Flex",
+      "price": "JD 220/mo",
+      "badge": "Popular",
+      "description": "Unlimited court access, group sessions, and recovery pods.",
+      "features": [
+        "Unlimited basketball & padel slots",
+        "Weekly performance labs",
+        "Priority event booking"
+      ],
+      "link": "/offers",
+      "isFeatured": true
+    },
+    {
+      "id": "offer-2",
+      "name": "Elite Family",
+      "price": "JD 360/mo",
+      "badge": "New",
+      "description": "Family-wide membership with concierge booking and junior academy.",
+      "features": [
+        "4 family members included",
+        "Junior academy track",
+        "Concierge scheduling"
+      ],
+      "link": "/offers"
+    },
+    {
+      "id": "offer-3",
+      "name": "Corporate Performance",
+      "price": "Custom",
+      "description": "Executive wellness, off-sites, and bespoke event programming.",
+      "features": [
+        "Corporate wellness labs",
+        "Leadership off-sites",
+        "Dedicated account lead"
+      ],
+      "link": "/offers"
+    }
+  ],
+  "events": [
+    {
+      "id": "event-1",
+      "title": "Regional Combine",
+      "date": "2025-01-24T17:00:00.000Z",
+      "location": "Infinity Arena",
+      "description": "Scouting combine for U18 athletes with pro metrics.",
+      "link": "/events",
+      "isActive": true
+    },
+    {
+      "id": "event-2",
+      "title": "Padel Invitational",
+      "date": "2025-02-12T09:00:00.000Z",
+      "location": "Padel Dome",
+      "description": "Teams from KSA, UAE, and Jordan compete for the Infinity Cup.",
+      "link": "/events",
+      "isActive": true
+    },
+    {
+      "id": "event-3",
+      "title": "Corporate Wellness Lab",
+      "date": "2025-03-07T08:30:00.000Z",
+      "location": "Studio B",
+      "description": "Invite-only executive session with performance diagnostics.",
+      "link": "/events",
+      "isActive": true
+    }
+  ],
+  "announcements": [
+    {
+      "id": "announce-1",
+      "title": "New Infinity Arena reveal",
+      "message": "Book a private walkthrough of the 2025 expansion with the pro locker wing.",
+      "isPinned": true,
+      "isActive": true,
+      "startDate": "2024-12-01",
+      "endDate": "2025-02-01",
+      "link": "/contact"
+    },
+    {
+      "id": "announce-2",
+      "title": "Scholarship submissions",
+      "message": "Applications for the 2025 Elite Scholarship close January 30.",
+      "isPinned": false,
+      "isActive": true,
+      "startDate": "2024-11-15",
+      "endDate": "2025-01-30",
+      "link": "/contact"
+    }
+  ],
+  "facilityHighlights": [
+    {
+      "id": "facility-1",
+      "name": "Infinity Arena",
+      "description": "NBA-length courts, LED tracking, and 1,200-seat showcase bowl.",
+      "mediaUrl": "https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=1600&q=80",
+      "badge": "Flagship"
+    },
+    {
+      "id": "facility-2",
+      "name": "Padel Dome",
+      "description": "Climate-controlled courts with broadcast-grade lighting.",
+      "mediaUrl": "https://images.unsplash.com/photo-1519861155734-94c5852b1b64?auto=format&fit=crop&w=1200&q=80"
+    },
+    {
+      "id": "facility-3",
+      "name": "Performance Lab",
+      "description": "Strength pods, cold plunge suites, and recovery tech.",
+      "mediaUrl": "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=1200&q=80"
+    }
+  ],
+  "footer": {
+    "address": "Infinity Campus, Airport Road, Amman, Jordan",
+    "phone": "+962 6 555 8899",
+    "email": "hello@infinitysport.jo",
+    "contactRecipientEmail": "hello@infinitysport.jo",
+    "socialLinks": [
+      { "id": "social-ig", "label": "Instagram", "href": "https://instagram.com/infinitysport" },
+      { "id": "social-li", "label": "LinkedIn", "href": "https://linkedin.com/company/infinitysport" },
+      { "id": "social-yt", "label": "YouTube", "href": "https://youtube.com/@infinitysport" }
+    ]
+  },
+  "updatedAt": "2024-11-15T10:00:00.000Z",
+  "updatedBy": "System"
+}
+

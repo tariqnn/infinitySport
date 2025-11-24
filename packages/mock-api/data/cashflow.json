@@ -1,0 +1,11 @@
+[
+  { "id": "cf-jan-income", "date": "2025-01-31", "category": "Income", "description": "Memberships", "amount": 28500, "currency": "JOD" },
+  { "id": "cf-jan-expense", "date": "2025-01-31", "category": "Expense", "description": "Salaries & wages", "amount": 22100, "currency": "JOD" },
+  { "id": "cf-feb-income", "date": "2025-02-28", "category": "Income", "description": "Corporate rentals", "amount": 14200, "currency": "JOD" },
+  { "id": "cf-feb-expense", "date": "2025-02-28", "category": "Expense", "description": "Utilities", "amount": 7200, "currency": "JOD" },
+  { "id": "cf-mar-income", "date": "2025-03-31", "category": "Income", "description": "Academy programs", "amount": 32800, "currency": "JOD" },
+  { "id": "cf-mar-expense", "date": "2025-03-31", "category": "Expense", "description": "Equipment upgrades", "amount": 15200, "currency": "JOD" },
+  { "id": "cf-apr-income", "date": "2025-04-30", "category": "Income", "description": "Events & sponsorships", "amount": 24900, "currency": "JOD" },
+  { "id": "cf-apr-expense", "date": "2025-04-30", "category": "Expense", "description": "Event production", "amount": 18600, "currency": "JOD" }
+]
+

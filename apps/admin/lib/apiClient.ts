@@ -1,0 +1,233 @@
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+
+class ApiClient {
+  private baseUrl: string;
+
+  constructor() {
+    this.baseUrl = API_BASE_URL;
+  }
+
+  private async request<T>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<T> {
+    const url = `${this.baseUrl}${endpoint}`;
+    
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => response.statusText);
+        throw new Error(`API error: ${response.status} ${errorText}`);
+      }
+
+      if (response.status === 204) {
+        return null as T;
+      }
+
+      return response.json();
+    } catch (error) {
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new Error(
+          `Cannot connect to API at ${url}. Make sure the API server is running on ${this.baseUrl}`
+        );
+      }
+      throw error;
+    }
+  }
+
+  // Hero
+  async getHero() {
+    return this.request('/api/admin/hero');
+  }
+
+  async updateHero(data: any) {
+    return this.request('/api/admin/hero', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Programs
+  async getPrograms() {
+    return this.request('/api/admin/programs');
+  }
+
+  async getProgram(id: string) {
+    return this.request(`/api/admin/programs/${id}`);
+  }
+
+  async createProgram(data: any) {
+    return this.request('/api/admin/programs', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateProgram(id: string, data: any) {
+    return this.request(`/api/admin/programs/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteProgram(id: string) {
+    return this.request(`/api/admin/programs/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Offers
+  async getOffers() {
+    return this.request('/api/admin/offers');
+  }
+
+  async getOffer(id: string) {
+    return this.request(`/api/admin/offers/${id}`);
+  }
+
+  async createOffer(data: any) {
+    return this.request('/api/admin/offers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateOffer(id: string, data: any) {
+    return this.request(`/api/admin/offers/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteOffer(id: string) {
+    return this.request(`/api/admin/offers/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Events
+  async getEvents() {
+    return this.request('/api/admin/events');
+  }
+
+  async getEvent(id: string) {
+    return this.request(`/api/admin/events/${id}`);
+  }
+
+  async createEvent(data: any) {
+    return this.request('/api/admin/events', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateEvent(id: string, data: any) {
+    return this.request(`/api/admin/events/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteEvent(id: string) {
+    return this.request(`/api/admin/events/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Announcements
+  async getAnnouncements() {
+    return this.request('/api/admin/announcements');
+  }
+
+  async getAnnouncement(id: string) {
+    return this.request(`/api/admin/announcements/${id}`);
+  }
+
+  async createAnnouncement(data: any) {
+    return this.request('/api/admin/announcements', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateAnnouncement(id: string, data: any) {
+    return this.request(`/api/admin/announcements/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteAnnouncement(id: string) {
+    return this.request(`/api/admin/announcements/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Facilities
+  async getFacilities() {
+    return this.request('/api/admin/facilities');
+  }
+
+  async getFacility(id: string) {
+    return this.request(`/api/admin/facilities/${id}`);
+  }
+
+  async createFacility(data: any) {
+    return this.request('/api/admin/facilities', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateFacility(id: string, data: any) {
+    return this.request(`/api/admin/facilities/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteFacility(id: string) {
+    return this.request(`/api/admin/facilities/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Footer Links
+  async getFooterLinks() {
+    return this.request('/api/admin/footer-links');
+  }
+
+  async getFooterLink(id: string) {
+    return this.request(`/api/admin/footer-links/${id}`);
+  }
+
+  async createFooterLink(data: any) {
+    return this.request('/api/admin/footer-links', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateFooterLink(id: string, data: any) {
+    return this.request(`/api/admin/footer-links/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteFooterLink(id: string) {
+    return this.request(`/api/admin/footer-links/${id}`, {
+      method: 'DELETE',
+    });
+  }
+}
+
+export const apiClient = new ApiClient();
+

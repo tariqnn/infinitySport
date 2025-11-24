@@ -1,0 +1,24 @@
+[
+  {
+    "id": "elite-hoops-weekend",
+    "title": "Elite Hoops Weekend",
+    "date": "2025-12-05T09:00:00.000Z",
+    "location": "Infinity Arena",
+    "description": "Regional invitational camp featuring pro coaches and analytics combine testing."
+  },
+  {
+    "id": "winter-padel-open",
+    "title": "Winter Padel Open",
+    "date": "2026-01-12T18:00:00.000Z",
+    "location": "Padel Complex",
+    "description": "Mixed doubles tournament with corporate and community brackets."
+  },
+  {
+    "id": "youth-sports-summit",
+    "title": "Youth Sports Summit",
+    "date": "2026-02-20T08:30:00.000Z",
+    "location": "Performance Theatre",
+    "description": "Keynotes, workshops, and scholarship showcases for youth academies."
+  }
+]
+

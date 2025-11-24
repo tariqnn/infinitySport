@@ -1,0 +1,93 @@
+'use client';
+
+import { Fragment, ReactNode, useEffect } from 'react';
+import { Dialog, Transition } from '@headlessui/react';
+import { XMarkIcon } from '@heroicons/react/24/outline';
+import clsx from 'clsx';
+
+export interface ModalProps {
+  title?: string;
+  description?: string;
+  open: boolean;
+  onClose: () => void;
+  children: ReactNode;
+  footer?: ReactNode;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+}
+
+export function Modal({ title, description, open, onClose, children, footer, size = 'md' }: ModalProps) {
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [open]);
+
+  const sizeClasses = {
+    sm: 'max-w-md',
+    md: 'max-w-lg',
+    lg: 'max-w-2xl',
+    xl: 'max-w-4xl',
+  };
+
+  return (
+    <Transition appear show={open} as={Fragment}>
+      <Dialog as="div" className="relative z-[9999]" onClose={onClose}>
+        <Transition.Child
+          as={Fragment}
+          enter="ease-out duration-200"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-150"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+        </Transition.Child>
+
+        <div className="fixed inset-0 z-[10000] overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <Transition.Child
+              as={Fragment}
+              enter="ease-out duration-200"
+              enterFrom="opacity-0 scale-95"
+              enterTo="opacity-100 scale-100"
+              leave="ease-in duration-150"
+              leaveFrom="opacity-100 scale-100"
+              leaveTo="opacity-0 scale-95"
+            >
+              <Dialog.Panel
+                className={clsx(
+                  'relative z-[10001] w-full transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-2xl transition-all',
+                  sizeClasses[size]
+                )}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-start justify-between gap-6 mb-6">
+                  <div>
+                    {title && <Dialog.Title className="text-xl font-semibold text-textPrimary">{title}</Dialog.Title>}
+                    {description && <Dialog.Description className="mt-2 text-sm text-textMuted">{description}</Dialog.Description>}
+                  </div>
+                  <button
+                    aria-label="Close modal"
+                    className="rounded-full p-2 text-textMuted transition hover:bg-softBackground hover:text-textPrimary"
+                    onClick={onClose}
+                  >
+                    <XMarkIcon className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="max-h-[calc(100vh-200px)] overflow-y-auto">{children}</div>
+                {footer && <div className="mt-6 flex justify-end gap-3 border-t border-borderColor pt-4">{footer}</div>}
+              </Dialog.Panel>
+            </Transition.Child>
+          </div>
+        </div>
+      </Dialog>
+    </Transition>
+  );
+}
+

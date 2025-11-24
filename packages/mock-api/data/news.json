@@ -1,0 +1,29 @@
+[
+  {
+    "id": "news-001",
+    "title": "Infinity Sports Launches Women’s High-Performance Program",
+    "body": "Infinity Sports introduced a dedicated high-performance pathway for women’s basketball and volleyball, featuring new scholarships and international friendly tours.",
+    "author": "Media Team",
+    "tags": ["programs", "women-in-sport"],
+    "createdAt": "2025-10-12T07:30:00.000Z",
+    "pinned": true
+  },
+  {
+    "id": "news-002",
+    "title": "Padel Complex Certified for International Events",
+    "body": "The Infinity Padel Complex received full certification for international ranking events, making it the first venue of its kind in Jordan.",
+    "author": "Coaching Staff",
+    "tags": ["facilities", "padel"],
+    "createdAt": "2025-09-30T10:00:00.000Z",
+    "updatedAt": "2025-10-02T14:15:00.000Z"
+  },
+  {
+    "id": "news-003",
+    "title": "Finance Team Rolls Out Cashless Petty Cash Workflow",
+    "body": "Infinity Sports accounting has moved all petty cash requests and reimbursement workflows to the portal with instant approvals and digital receipts.",
+    "author": "Finance Office",
+    "tags": ["finance", "process"],
+    "createdAt": "2025-11-01T11:00:00.000Z"
+  }
+]
+

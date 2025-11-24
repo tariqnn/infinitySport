@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://infinitysport.onrender.com';
 
 // Get company ID from localStorage or context (you may need to adjust this)
 function getCompanyId(): string | undefined {

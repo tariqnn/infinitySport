@@ -75,7 +75,7 @@ const db: MockDatabase = {
   facilities: structuredClone(facilitiesSeed),
   events: structuredClone(eventsSeed),
   news: structuredClone(newsSeed),
-  docs: structuredClone(docsSeed),
+  docs: structuredClone(docsSeed).map((doc) => docItemSchema.parse(doc)),
   directory: structuredClone(directorySeed),
   budget: structuredClone(budgetSeed),
   invoices: structuredClone(invoicesSeed),

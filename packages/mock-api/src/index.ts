@@ -88,7 +88,7 @@ const db: MockDatabase = {
     category: entry.category as CashFlowEntry['category'],
     currency: entry.currency as CashFlowEntry['currency'],
   })),
-  pettycash: structuredClone(pettyCashSeed),
+  pettycash: structuredClone(pettyCashSeed).map((txn) => pettyCashTxnSchema.parse(txn)),
   landing: landingContentSchema.parse(structuredClone(landingSeed))
 };
 

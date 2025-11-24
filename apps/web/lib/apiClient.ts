@@ -128,17 +128,33 @@ export async function fetchAnnouncements(): Promise<AnnouncementResponse[]> {
 export async function fetchLandingContent(): Promise<LandingContent> {
   try {
     const data = await jsonFetch<LandingApiResponse>(`${API_BASE_URL}/api/public/landing`);
+
+    const defaultHero: LandingContent['hero'] = {
+      title: 'Elevating Jordanian Athletes',
+      subtitle: 'Infinity Sports delivers elite training programs, professional coaching, and world-class facilities for teams and individuals across the region.',
+      primaryCtaLabel: 'Explore Programs',
+      primaryCtaLink: '/contact',
+      secondaryCtaLabel: 'Book a Tour',
+      secondaryCtaLink: '/contact',
+      backgroundImageUrl: undefined,
+      backgroundVideoUrl: undefined,
+    };
+
+    const hero: LandingContent['hero'] = data.hero
+      ? {
+          title: data.hero.title,
+          subtitle: data.hero.subtitle,
+          primaryCtaLabel: data.hero.primaryCta,
+          primaryCtaLink: data.hero.primaryUrl,
+          secondaryCtaLabel: data.hero.secondaryCta || undefined,
+          secondaryCtaLink: data.hero.secondaryUrl || undefined,
+          backgroundImageUrl: data.hero.backgroundImageUrl || undefined,
+          backgroundVideoUrl: undefined,
+        }
+      : defaultHero;
+
     const transformed: LandingContent = {
-      hero: data.hero ? {
-        title: data.hero.title,
-        subtitle: data.hero.subtitle,
-        primaryCtaLabel: data.hero.primaryCta,
-        primaryCtaLink: data.hero.primaryUrl,
-        secondaryCtaLabel: data.hero.secondaryCta || undefined,
-        secondaryCtaLink: data.hero.secondaryUrl || undefined,
-        backgroundImageUrl: data.hero.backgroundImageUrl || undefined,
-        backgroundVideoUrl: undefined, // Not in current schema
-      } : null,
+      hero,
       highlights: [], // Not in current schema, can be added later
       programs: (data.programs || []).map((p): LandingProgram => ({
         id: p.id,
@@ -196,19 +212,6 @@ export async function fetchLandingContent(): Promise<LandingContent> {
       updatedAt: new Date().toISOString(),
       updatedBy: 'System',
     };
-    
-    // Ensure hero is never null
-    if (!transformed.hero) {
-      transformed.hero = {
-        title: 'Elevating Jordanian Athletes',
-        subtitle: 'Infinity Sports delivers elite training programs, professional coaching, and world-class facilities for teams and individuals across the region.',
-        primaryCtaLabel: 'Explore Programs',
-        primaryCtaLink: '/contact',
-        secondaryCtaLabel: 'Book a Tour',
-        secondaryCtaLink: '/contact',
-        backgroundImageUrl: undefined,
-      };
-    }
     
     return transformed;
   } catch (error) {

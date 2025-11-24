@@ -5,11 +5,23 @@ export const metadata = {
   title: 'Offers & Memberships'
 };
 
+type OfferCard = {
+  id: string;
+  title: string;
+  price: string;
+  description: string;
+  perks: string[];
+  badge?: string;
+  isFeatured?: boolean;
+  isActive: boolean;
+  link: string;
+};
+
 export default async function OffersPage() {
   const offersData = await fetchOffers();
   
   // Transform API data to match UI structure
-  const offers = offersData.map((offer) => ({
+  const offers: OfferCard[] = offersData.map((offer) => ({
     id: offer.id,
     title: offer.name,
     price: offer.pricePerMonth === 0 ? 'Custom' : `JD ${offer.pricePerMonth}/mo`,
@@ -18,6 +30,7 @@ export default async function OffersPage() {
     badge: offer.badge,
     isFeatured: offer.isFeatured,
     isActive: offer.isActive !== false,
+    link: offer.link || '/contact',
   })).filter((offer) => offer.isActive);
 
   return (

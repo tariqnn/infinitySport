@@ -78,7 +78,11 @@ const db: MockDatabase = {
   docs: structuredClone(docsSeed).map((doc) => docItemSchema.parse(doc)),
   directory: structuredClone(directorySeed),
   budget: structuredClone(budgetSeed),
-  invoices: structuredClone(invoicesSeed),
+  invoices: structuredClone(invoicesSeed).map((invoice) => ({
+    ...invoice,
+    status: invoice.status as Invoice['status'],
+    currency: invoice.currency as Invoice['currency'],
+  })),
   cashflow: structuredClone(cashflowSeed),
   pettycash: structuredClone(pettyCashSeed),
   landing: landingContentSchema.parse(structuredClone(landingSeed))

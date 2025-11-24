@@ -198,7 +198,7 @@ export async function fetchLandingContent(): Promise<LandingContent> {
       facilityHighlights: (data.facilities || []).map((f): LandingFacilityHighlight => ({
         id: f.id,
         name: f.name,
-        description: f.description,
+        description: f.description ?? '',
         mediaUrl: f.imageUrl || undefined,
         badge: undefined,
       })),

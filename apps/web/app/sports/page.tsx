@@ -10,7 +10,7 @@ export default async function SportsPage() {
   const [programsData, facilitiesData] = await Promise.all([fetchPrograms(), fetchFacilities()]);
   
   // Transform programs to match sports structure
-  const sports = programsData.map((program: any) => ({
+  const sports = programsData.map((program) => ({
     id: program.id,
     name: program.name,
     description: program.description || '',
@@ -24,7 +24,7 @@ export default async function SportsPage() {
   const additionalSports = sports.filter((sport) => !sport.featured);
   
   // Transform facilities data
-  const facilities = facilitiesData.map((facility: any) => ({
+  const facilities = facilitiesData.map((facility) => ({
     id: facility.id,
     name: facility.name,
     description: facility.description || '',

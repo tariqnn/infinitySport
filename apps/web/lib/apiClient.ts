@@ -1,85 +1,134 @@
+import type {
+  LandingAnnouncement,
+  LandingContent,
+  LandingEvent,
+  LandingFacilityHighlight,
+  LandingOffer,
+  LandingProgram,
+} from '@infinity/types';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
-// Individual endpoint fetchers
-export async function fetchPrograms() {
+export type ProgramResponse = {
+  id: string;
+  name: string;
+  description?: string;
+  slug?: string;
+  highlight?: boolean;
+  level?: string;
+};
+
+export type OfferResponse = {
+  id: string;
+  name: string;
+  pricePerMonth: number;
+  description?: string;
+  features?: string[];
+  badge?: string;
+  isFeatured?: boolean;
+  isActive?: boolean;
+  link?: string;
+};
+
+export type EventResponse = {
+  id: string;
+  title: string;
+  date: string;
+  location?: string;
+  description?: string;
+  link?: string;
+  highlight?: boolean;
+};
+
+export type FacilityResponse = {
+  id: string;
+  name: string;
+  description?: string;
+  imageUrl?: string;
+  specs?: string[];
+};
+
+export type AnnouncementResponse = {
+  id: string;
+  title: string;
+  body: string;
+  isPinned?: boolean;
+};
+
+type LandingApiResponse = {
+  hero?: {
+    title: string;
+    subtitle: string;
+    primaryCta: string;
+    primaryUrl: string;
+    secondaryCta?: string;
+    secondaryUrl?: string;
+    backgroundImageUrl?: string;
+  };
+  programs?: ProgramResponse[];
+  offers?: OfferResponse[];
+  events?: EventResponse[];
+  announcements?: AnnouncementResponse[];
+  facilities?: FacilityResponse[];
+};
+
+async function jsonFetch<T>(endpoint: string): Promise<T> {
+  const response = await fetch(endpoint, { cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}
+
+export async function fetchPrograms(): Promise<ProgramResponse[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/public/programs`, {
-      cache: 'no-store',
-    });
-    if (!response.ok) throw new Error(`API error: ${response.status}`);
-    return response.json();
+    return await jsonFetch<ProgramResponse[]>(`${API_BASE_URL}/api/public/programs`);
   } catch (error) {
     console.error('Failed to fetch programs:', error);
     return [];
   }
 }
 
-export async function fetchOffers() {
+export async function fetchOffers(): Promise<OfferResponse[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/public/offers`, {
-      cache: 'no-store',
-    });
-    if (!response.ok) throw new Error(`API error: ${response.status}`);
-    return response.json();
+    return await jsonFetch<OfferResponse[]>(`${API_BASE_URL}/api/public/offers`);
   } catch (error) {
     console.error('Failed to fetch offers:', error);
     return [];
   }
 }
 
-export async function fetchEvents() {
+export async function fetchEvents(): Promise<EventResponse[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/public/events`, {
-      cache: 'no-store',
-    });
-    if (!response.ok) throw new Error(`API error: ${response.status}`);
-    return response.json();
+    return await jsonFetch<EventResponse[]>(`${API_BASE_URL}/api/public/events`);
   } catch (error) {
     console.error('Failed to fetch events:', error);
     return [];
   }
 }
 
-export async function fetchFacilities() {
+export async function fetchFacilities(): Promise<FacilityResponse[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/public/facilities`, {
-      cache: 'no-store',
-    });
-    if (!response.ok) throw new Error(`API error: ${response.status}`);
-    return response.json();
+    return await jsonFetch<FacilityResponse[]>(`${API_BASE_URL}/api/public/facilities`);
   } catch (error) {
     console.error('Failed to fetch facilities:', error);
     return [];
   }
 }
 
-export async function fetchAnnouncements() {
+export async function fetchAnnouncements(): Promise<AnnouncementResponse[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/public/announcements`, {
-      cache: 'no-store',
-    });
-    if (!response.ok) throw new Error(`API error: ${response.status}`);
-    return response.json();
+    return await jsonFetch<AnnouncementResponse[]>(`${API_BASE_URL}/api/public/announcements`);
   } catch (error) {
     console.error('Failed to fetch announcements:', error);
     return [];
   }
 }
 
-export async function fetchLandingContent() {
+export async function fetchLandingContent(): Promise<LandingContent> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/public/landing`, {
-      cache: 'no-store', // Always fetch fresh data
-    });
-
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    
-    // Transform API response to match LandingContent type
-    const transformed = {
+    const data = await jsonFetch<LandingApiResponse>(`${API_BASE_URL}/api/public/landing`);
+    const transformed: LandingContent = {
       hero: data.hero ? {
         title: data.hero.title,
         subtitle: data.hero.subtitle,
@@ -91,10 +140,10 @@ export async function fetchLandingContent() {
         backgroundVideoUrl: undefined, // Not in current schema
       } : null,
       highlights: [], // Not in current schema, can be added later
-      programs: (data.programs || []).map((p: any) => ({
+      programs: (data.programs || []).map((p): LandingProgram => ({
         id: p.id,
         title: p.name,
-        description: p.description,
+        description: p.description ?? '',
         sportType: p.level || 'multi',
         badge: p.level || undefined,
         link: `/sports#${p.slug}`,
@@ -102,7 +151,7 @@ export async function fetchLandingContent() {
         isFeatured: p.highlight || false,
         isActive: true,
       })),
-      offers: (data.offers || []).map((o: any) => ({
+      offers: (data.offers || []).map((o): LandingOffer => ({
         id: o.id,
         name: o.name,
         price: o.pricePerMonth === 0 ? 'Custom' : `JD ${o.pricePerMonth}/mo`,
@@ -113,7 +162,7 @@ export async function fetchLandingContent() {
         isFeatured: false,
         isActive: true,
       })),
-      events: (data.events || []).map((e: any) => ({
+      events: (data.events || []).map((e): LandingEvent => ({
         id: e.id,
         title: e.title,
         date: e.date,
@@ -122,7 +171,7 @@ export async function fetchLandingContent() {
         link: '/events',
         isActive: e.highlight !== false,
       })),
-      announcements: (data.announcements || []).map((a: any) => ({
+      announcements: (data.announcements || []).map((a): LandingAnnouncement => ({
         id: a.id,
         title: a.title,
         message: a.body,
@@ -130,7 +179,7 @@ export async function fetchLandingContent() {
         isActive: true,
         link: '/contact',
       })),
-      facilityHighlights: (data.facilities || []).map((f: any) => ({
+      facilityHighlights: (data.facilities || []).map((f): LandingFacilityHighlight => ({
         id: f.id,
         name: f.name,
         description: f.description,
@@ -190,7 +239,7 @@ export async function fetchLandingContent() {
       },
       updatedAt: new Date().toISOString(),
       updatedBy: 'System',
-    };
+    } as LandingContent;
   }
 }
 

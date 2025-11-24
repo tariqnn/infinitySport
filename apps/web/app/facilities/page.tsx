@@ -10,7 +10,7 @@ export default async function FacilitiesPage() {
   const facilitiesData = await fetchFacilities();
   
   // Transform API data to match UI structure
-  const facilities = facilitiesData.map((facility: any) => ({
+  const facilities = facilitiesData.map((facility) => ({
     id: facility.id,
     name: facility.name,
     description: facility.description || '',

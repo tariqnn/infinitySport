@@ -9,7 +9,7 @@ export default async function OffersPage() {
   const offersData = await fetchOffers();
   
   // Transform API data to match UI structure
-  const offers = offersData.map((offer: any) => ({
+  const offers = offersData.map((offer) => ({
     id: offer.id,
     title: offer.name,
     price: offer.pricePerMonth === 0 ? 'Custom' : `JD ${offer.pricePerMonth}/mo`,
@@ -18,7 +18,7 @@ export default async function OffersPage() {
     badge: offer.badge,
     isFeatured: offer.isFeatured,
     isActive: offer.isActive !== false,
-  })).filter((offer: any) => offer.isActive);
+  })).filter((offer) => offer.isActive);
 
   return (
     <div className="bg-white py-24">

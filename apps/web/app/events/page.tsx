@@ -9,7 +9,7 @@ export default async function EventsPage() {
   const eventsData = await fetchEvents();
   
   // Transform API data to match UI structure
-  const events = eventsData.map((event: any) => ({
+  const events = eventsData.map((event) => ({
     id: event.id,
     title: event.title,
     date: event.date,

@@ -36,7 +36,6 @@ export function HomeContent({ content }: HomeContentProps) {
     : { href: "/contact", label: "Book a Tour" };
 
   const facilityHighlight = content.facilityHighlights[0];
-  const showcaseFacilities = content.facilityHighlights.slice(0, 3);
   const sportHighlights = content.programs.slice(0, 4);
   const upcomingEvents = content.events.filter((event) => event.isActive !== false).slice(0, 3);
   const offerCards = content.offers;

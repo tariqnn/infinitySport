@@ -661,7 +661,14 @@ export function Footer() {
             </p>
             <p className="text-sm text-gray-500">
               Created by{' '}
-              <span className="font-semibold text-black">Creative Networks</span>
+              <a
+                href="https://creative-networks.tech/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-black transition-colors hover:text-brand-blue-primary"
+              >
+                Creative Networks
+              </a>
             </p>
           </div>
         </div>

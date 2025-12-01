@@ -20,10 +20,10 @@ const HERO_VIDEO_START_SECONDS = 6; // start the clip at 0:06 as requested
 
 export function HomeContent({ content }: HomeContentProps) {
   const hero = content.hero;
-  const heroTitle = hero.title?.trim() || "Elevating Jordanian Athletes";
+  const heroTitle = hero.title?.trim() || "Infinity Sport – Learn, Adapt, Evolve";
   const heroSubtitle =
     hero.subtitle?.trim() ||
-    "Infinity Sports delivers elite training programs, professional coaching, and world-class facilities for teams and individuals across the region.";
+    "Infinity features a modern sports facility designed for both leisure and competitive environments. It's a place where athletes and parents can watch kids learn, adapt, and evolve into modern-day players. Learn, adapt, and evolve with cutting-edge innovation focused on youth development and high-performance training.";
   const primaryCta = {
     href: hero.primaryCtaLink || "/contact",
     label: hero.primaryCtaLabel || "Explore Programs"
@@ -175,6 +175,11 @@ export function HomeContent({ content }: HomeContentProps) {
                 {heroTitle}
               </AnimatedText>
               
+              {/* Tagline */}
+              <AnimatedText delay={100} className="text-sm text-white/90 max-w-2xl leading-relaxed font-semibold uppercase tracking-[0.2em] sm:text-base md:text-lg">
+                Learn. Adapt. Evolve. Built for the next generation of athletes.
+              </AnimatedText>
+              
               {/* Subheading */}
               <AnimatedText delay={150} className="text-base text-white/95 max-w-2xl leading-relaxed font-medium sm:text-lg md:text-xl lg:text-2xl">
                 {heroSubtitle}
@@ -292,36 +297,417 @@ export function HomeContent({ content }: HomeContentProps) {
           <ScrollAnimation direction="up">
             <div className="flex flex-col gap-3 sm:gap-4">
               <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Facility Highlights</p>
-              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Spaces engineered for high output</h2>
+              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Our Facility & Venues</h2>
               <p className="max-w-2xl text-base text-gray-600 leading-relaxed sm:text-lg">
-                Explore the Infinity campus: Olympic lifting bays, indoor turf, padel domes, and studio environments built for focus.
+                Infinity offers multiple premium spaces for training, events, and private sessions.
               </p>
             </div>
           </ScrollAnimation>
           <div className="mt-8 grid gap-6 sm:mt-12 sm:gap-8 md:grid-cols-2 lg:mt-16 lg:grid-cols-3">
-            {showcaseFacilities.map((facility, index) => (
-              <ScrollAnimation key={facility.id} direction="up" delay={index * 100}>
-                <div className="group rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-4 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2),0_0_0_1px_rgba(96,208,102,0.1)] sm:p-6">
-                  <div className="relative h-48 overflow-hidden rounded-xl sm:h-56">
-                    <Image
-                      src={facility.mediaUrl || heroImage}
-                      alt={facility.name}
-                      fill
-                      className="object-cover transition-transform duration-700 group-hover:scale-110"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-br from-[#141AFF]/30 via-[#6BA5E8]/20 to-[#60D066]/30 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+            {/* Paddle Court */}
+            <ScrollAnimation direction="up" delay={0}>
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
+                <h3 className="text-2xl font-black text-brand-black">Paddle Court</h3>
+                <p className="mt-3 text-sm text-gray-600 leading-relaxed">
+                  Premium paddle court facility for training and competitive play.
+                </p>
+              </div>
+            </ScrollAnimation>
+
+            {/* 3x3 Basketball Court */}
+            <ScrollAnimation direction="up" delay={100}>
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
+                <h3 className="text-2xl font-black text-brand-black">3x3 Basketball Court</h3>
+                <p className="mt-3 text-sm text-gray-600 leading-relaxed">
+                  Dedicated 3x3 basketball court for fast-paced games and training sessions.
+                </p>
+              </div>
+            </ScrollAnimation>
+
+            {/* 5x5 Basketball Court */}
+            <ScrollAnimation direction="up" delay={200}>
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
+                <h3 className="text-2xl font-black text-brand-black">5x5 Basketball Court</h3>
+                <p className="mt-3 text-sm text-gray-600 leading-relaxed">
+                  Full-size basketball court for complete games and team training.
+                </p>
+              </div>
+            </ScrollAnimation>
+
+            {/* Multipurpose Hall */}
+            <ScrollAnimation direction="up" delay={300}>
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
+                <h3 className="text-2xl font-black text-brand-black">Multipurpose Hall</h3>
+                <p className="mt-3 text-sm text-gray-600 leading-relaxed mb-4">
+                  Versatile space for private lessons and specialized training.
+                </p>
+                <div className="mt-4 pt-4 border-t border-brand-lightBlue/20">
+                  <p className="text-xs font-semibold text-gray-700 mb-2">Available for:</p>
+                  <ul className="space-y-1.5 text-sm text-gray-600">
+                    <li className="flex items-center gap-2">
+                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                      Boxing
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                      Muay Thai
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                      MMA
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                      Ballet
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                      Yoga
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                      Pilates
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </ScrollAnimation>
+
+            {/* Training Center - Basketball */}
+            <ScrollAnimation direction="up" delay={400}>
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
+                <h3 className="text-2xl font-black text-brand-black">Basketball Training Center</h3>
+                <p className="mt-3 text-sm text-gray-600 leading-relaxed">
+                  Dedicated training facility for youth competitive basketball programs.
+                </p>
+              </div>
+            </ScrollAnimation>
+
+            {/* Training Center - Volleyball */}
+            <ScrollAnimation direction="up" delay={500}>
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
+                <h3 className="text-2xl font-black text-brand-black">Volleyball Training Center</h3>
+                <p className="mt-3 text-sm text-gray-600 leading-relaxed">
+                  Specialized facility for youth competitive volleyball training.
+                </p>
+              </div>
+            </ScrollAnimation>
+
+            {/* Training Center - Gymnastics */}
+            <ScrollAnimation direction="up" delay={600}>
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
+                <h3 className="text-2xl font-black text-brand-black">Gymnastics Training Center</h3>
+                <p className="mt-3 text-sm text-gray-600 leading-relaxed">
+                  Professional gymnastics facility for youth competitive programs.
+                </p>
+              </div>
+            </ScrollAnimation>
+          </div>
+        </div>
+      </section>
+
+      {/* Premium Coaches Section */}
+      <section id="coaches" className="bg-gray-50 py-12 sm:py-16 md:py-20 lg:py-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <ScrollAnimation direction="up">
+            <div className="flex flex-col gap-3 sm:gap-4">
+              <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Team</p>
+              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Our Coaching Team</h2>
+            </div>
+          </ScrollAnimation>
+          <div className="mt-8 grid gap-6 sm:mt-12 sm:gap-8 md:grid-cols-2 lg:mt-16 lg:grid-cols-3">
+            {/* Coach 1 - Basketball - Coach Samer Nino */}
+            <ScrollAnimation direction="up" delay={0}>
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
+                <p className="text-xs uppercase tracking-[0.35em] text-brand-green-dark font-bold">Basketball</p>
+                <h3 className="mt-3 text-2xl font-black text-brand-black">Coach Samer Nino</h3>
+                <p className="mt-4 text-sm text-gray-600 leading-relaxed">
+                  FIBA-licensed coach providing top-quality coaching to grow your kids into complete basketball players using FIBA skills and development techniques. He has coached multiple clubs at both pro and youth levels and has experience with Youth National Teams and assisting the Jordanian National Teams.
+                </p>
+                <p className="mt-4 text-xs italic text-gray-500 leading-relaxed">
+                  &ldquo;Learn the details of the fundamentals of the basketball game offensively and defensively to compete on club and national team level.&rdquo;
+                </p>
+              </div>
+            </ScrollAnimation>
+
+            {/* Coach 2 - Basketball - Coach Abdulla Abu Kura */}
+            <ScrollAnimation direction="up" delay={100}>
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
+                <p className="text-xs uppercase tracking-[0.35em] text-brand-green-dark font-bold">Basketball</p>
+                <h3 className="mt-3 text-2xl font-black text-brand-black">Coach Abdulla Abu Kura</h3>
+                <p className="mt-4 text-sm text-gray-600 leading-relaxed">
+                  A passionate and results-driven sports leader with 20+ years of experience as a national-level basketball player and coach. He has a proven record in winning championships, leading high-performance teams, and launching youth development programs. Highly skilled in team management, coaching, and event organization. Adept at working under pressure with diverse teams and committed to continuous growth and impact in the sports industry.
+                </p>
+                <ul className="mt-4 space-y-1.5 text-xs text-gray-600">
+                  <li className="flex items-start gap-2">
+                    <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-brand-green-primary" />
+                    <span>Assistant Coach – Jordan Men&apos;s National Basketball Team (2022–2024)</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-brand-green-primary" />
+                    <span>Head Coach – Amman United Men&apos;s 1st Team: Won the Jordanian Basketball League (2024–2025)</span>
+                  </li>
+                </ul>
+                <p className="mt-4 text-xs text-gray-600 leading-relaxed">
+                  One of the top experienced coaches in the country for youth and men, continuously adapting coaching techniques to raise the level of players.
+                </p>
+              </div>
+            </ScrollAnimation>
+
+            {/* Coach 3 - Gymnastics - Coach Raya Abu Jamous */}
+            <ScrollAnimation direction="up" delay={200}>
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
+                <p className="text-xs uppercase tracking-[0.35em] text-brand-green-dark font-bold">Gymnastics</p>
+                <h3 className="mt-3 text-2xl font-black text-brand-black">Coach Raya Abu Jamous</h3>
+                <p className="mt-4 text-sm text-gray-600 leading-relaxed">
+                  Gymnastics Head Coach for our program with deep knowledge of the sport. Longtime member of the Jordanian National Gymnastics Team. Her experience has expanded into athletics training and strength and conditioning environments.
+                </p>
+                <p className="mt-4 text-xs italic text-gray-500 leading-relaxed">
+                  &ldquo;I have developed a strong foundation in gymnastics training to excel youth to the next level.&rdquo;
+                </p>
+              </div>
+            </ScrollAnimation>
+
+            {/* Coach 4 - Assistant Gymnastics Coach – Ahmad Aldarawish */}
+            <ScrollAnimation direction="up" delay={300}>
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
+                <p className="text-xs uppercase tracking-[0.35em] text-brand-green-dark font-bold">Gymnastics</p>
+                <h3 className="mt-3 text-2xl font-black text-brand-black">Assistant Gymnastics Coach – Ahmad Aldarawish</h3>
+                <p className="mt-4 text-sm text-gray-600 leading-relaxed">
+                  Dedicated to creating strong athletes through strength and conditioning while aligning them with the core gymnastics program.
+                </p>
+              </div>
+            </ScrollAnimation>
+
+            {/* Coach 5 - Assistant Gymnastics Coach – Ammar Salman */}
+            <ScrollAnimation direction="up" delay={400}>
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
+                <p className="text-xs uppercase tracking-[0.35em] text-brand-green-dark font-bold">Gymnastics</p>
+                <h3 className="mt-3 text-2xl font-black text-brand-black">Assistant Gymnastics Coach – Ammar Salman</h3>
+                <p className="mt-4 text-sm text-gray-600 leading-relaxed">
+                  An athlete who maintains an active lifestyle through squash, badminton, swimming, and strength training. Over the years, he has built strong athletic ability supported by discipline, consistency, and a genuine passion for sports. His diverse training background has developed solid endurance, strength, and an understanding of effective performance techniques. He is committed to continuous self-improvement and maintaining a healthy, balanced lifestyle.
+                </p>
+              </div>
+            </ScrollAnimation>
+          </div>
+        </div>
+      </section>
+
+      {/* Basketball Programs & Pricing Section */}
+      <section id="basketball-programs" className="bg-white py-12 sm:py-16 md:py-20 lg:py-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <ScrollAnimation direction="up">
+            <div className="flex flex-col gap-3 sm:gap-4 text-center mb-12">
+              <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Programs</p>
+              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Basketball Programs & Pricing</h2>
+              <p className="max-w-2xl mx-auto text-base text-gray-600 leading-relaxed sm:text-lg">
+                All basketball programs include 12 sessions over three weeks.
+              </p>
+            </div>
+          </ScrollAnimation>
+          <div className="grid gap-6 md:grid-cols-3">
+            {/* Program 1 - 6-9 years */}
+            <ScrollAnimation direction="up" delay={0}>
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
+                <div className="mb-4">
+                  <span className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold">Age Group</span>
+                  <h3 className="mt-2 text-xl font-black text-brand-black">6–9 years – Jumpstarters</h3>
+                </div>
+                <div className="mb-4">
+                  <span className="text-3xl font-black text-brand-black">110 JD</span>
+                </div>
+                <div className="space-y-2 text-sm text-gray-600">
+                  <p className="font-semibold text-gray-700">Schedule:</p>
+                  <ul className="space-y-1.5">
+                    <li className="flex items-center gap-2">
+                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                      Monday: 5–6 PM
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                      Wednesday: 5–6 PM
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                      Friday: 11–12 AM
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                      Saturday: 4–5 PM
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </ScrollAnimation>
+
+            {/* Program 2 - 10-13 years */}
+            <ScrollAnimation direction="up" delay={100}>
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
+                <div className="mb-4">
+                  <span className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold">Age Group</span>
+                  <h3 className="mt-2 text-xl font-black text-brand-black">10–13 years – Fastbreakers</h3>
+                </div>
+                <div className="mb-4">
+                  <span className="text-3xl font-black text-brand-black">120 JD</span>
+                </div>
+                <div className="space-y-2 text-sm text-gray-600">
+                  <p className="font-semibold text-gray-700">Schedule:</p>
+                  <ul className="space-y-1.5">
+                    <li className="flex items-center gap-2">
+                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                      Monday: 6–7 PM
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                      Wednesday: 6–7 PM
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                      Friday: 12–1 PM
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                      Saturday: 5–6 PM
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </ScrollAnimation>
+
+            {/* Program 3 - 13-16 years */}
+            <ScrollAnimation direction="up" delay={200}>
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
+                <div className="mb-4">
+                  <span className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold">Age Group</span>
+                  <h3 className="mt-2 text-xl font-black text-brand-black">13–16 years – Slam Squads</h3>
+                </div>
+                <div className="mb-4">
+                  <span className="text-3xl font-black text-brand-black">130 JD</span>
+                </div>
+                <div className="space-y-2 text-sm text-gray-600">
+                  <p className="font-semibold text-gray-700">Schedule:</p>
+                  <ul className="space-y-1.5">
+                    <li className="flex items-center gap-2">
+                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                      Monday: 7–8 PM
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                      Wednesday: 7–8 PM
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                      Friday: 1–2 PM
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                      Saturday: 6–7 PM
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </ScrollAnimation>
+          </div>
+        </div>
+      </section>
+
+      {/* Gymnastics Packages Section */}
+      <section id="gymnastics-packages" className="bg-gray-50 py-12 sm:py-16 md:py-20 lg:py-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <ScrollAnimation direction="up">
+            <div className="flex flex-col gap-3 sm:gap-4 text-center mb-12">
+              <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Packages</p>
+              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Gymnastics Packages</h2>
+            </div>
+          </ScrollAnimation>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {/* Package A */}
+            <ScrollAnimation direction="up" delay={0}>
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
+                <h3 className="text-xl font-black text-brand-black mb-4">Package A</h3>
+                <div className="mb-4">
+                  <span className="text-3xl font-black text-brand-black">120 JD</span>
+                </div>
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li className="flex items-center gap-2">
+                    <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                    3 days per week
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                    1 hour per session
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                    12 hours total
+                  </li>
+                </ul>
+              </div>
+            </ScrollAnimation>
+
+            {/* Package B */}
+            <ScrollAnimation direction="up" delay={100}>
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
+                <h3 className="text-xl font-black text-brand-black mb-4">Package B</h3>
+                <div className="mb-4">
+                  <span className="text-3xl font-black text-brand-black">100 JD</span>
+                </div>
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li className="flex items-center gap-2">
+                    <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                    2 days per week
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                    1 hour per session
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                    8 hours total
+                  </li>
+                </ul>
+              </div>
+            </ScrollAnimation>
+
+            {/* Package C */}
+            <ScrollAnimation direction="up" delay={200}>
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
+                <h3 className="text-xl font-black text-brand-black mb-4">Package C</h3>
+                <div className="mb-4">
+                  <span className="text-3xl font-black text-brand-black">140 JD</span>
                   </div>
-                  <div className="mt-6 space-y-3">
-                    <h3 className="text-2xl font-black text-brand-black">{facility.name}</h3>
-                    <p className="text-sm text-gray-600 leading-relaxed">{facility.description}</p>
-                    <Link href="/facilities" className="group/link inline-flex items-center gap-2 text-sm font-bold text-brand-blue-primary transition-colors duration-300 hover:text-brand-green-primary">
-                      Tour facility
-                      <ArrowRightIcon className="h-4 w-4 transition-transform duration-300 group-hover/link:translate-x-1" />
-                    </Link>
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li className="flex items-center gap-2">
+                    <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                    3 days per week
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                    1.5 hours per session
+                  </li>
+                </ul>
                   </div>
+            </ScrollAnimation>
+
+            {/* Package D */}
+            <ScrollAnimation direction="up" delay={300}>
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
+                <h3 className="text-xl font-black text-brand-black mb-4">Package D</h3>
+                <div className="mb-4">
+                  <span className="text-3xl font-black text-brand-black">120 JD</span>
+                </div>
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li className="flex items-center gap-2">
+                    <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                    2 days per week
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                    1.5 hours per session
+                  </li>
+                </ul>
                 </div>
               </ScrollAnimation>
-            ))}
           </div>
         </div>
       </section>

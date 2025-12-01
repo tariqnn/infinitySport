@@ -43,6 +43,199 @@ export default async function SportsPage() {
         </p>
       </div>
 
+      {/* Basketball Programs & Pricing */}
+      <div className="mx-auto mt-16 max-w-5xl px-6 lg:px-8">
+        <div className="mb-8 text-center">
+          <h2 className="text-3xl font-bold text-brand-black">Basketball Programs & Pricing</h2>
+          <p className="mt-2 text-sm text-gray-600">All basketball programs include 12 sessions over three weeks.</p>
+        </div>
+        <div className="grid gap-6 md:grid-cols-3">
+          {/* Program 1 - 6-9 years */}
+          <div className="rounded-card border border-brand-lightBlue/20 bg-white p-6 shadow-card transition duration-500 hover:-translate-y-2 hover:border-brand-green-primary/50 hover:shadow-card-hover">
+            <div className="mb-4">
+              <span className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold">Age Group</span>
+              <h3 className="mt-2 text-xl font-bold text-brand-black">6–9 years – Jumpstarters</h3>
+            </div>
+            <div className="mb-4">
+              <span className="text-3xl font-bold text-brand-black">110 JD</span>
+            </div>
+            <div className="space-y-2 text-sm text-gray-600">
+              <p className="font-semibold text-gray-700">Schedule:</p>
+              <ul className="space-y-1.5">
+                <li className="flex items-center gap-2">
+                  <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                  Monday: 5–6 PM
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                  Wednesday: 5–6 PM
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                  Friday: 11–12 AM
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                  Saturday: 4–5 PM
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Program 2 - 10-13 years */}
+          <div className="rounded-card border border-brand-lightBlue/20 bg-white p-6 shadow-card transition duration-500 hover:-translate-y-2 hover:border-brand-green-primary/50 hover:shadow-card-hover">
+            <div className="mb-4">
+              <span className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold">Age Group</span>
+              <h3 className="mt-2 text-xl font-bold text-brand-black">10–13 years – Fastbreakers</h3>
+            </div>
+            <div className="mb-4">
+              <span className="text-3xl font-bold text-brand-black">120 JD</span>
+            </div>
+            <div className="space-y-2 text-sm text-gray-600">
+              <p className="font-semibold text-gray-700">Schedule:</p>
+              <ul className="space-y-1.5">
+                <li className="flex items-center gap-2">
+                  <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                  Monday: 6–7 PM
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                  Wednesday: 6–7 PM
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                  Friday: 12–1 PM
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                  Saturday: 5–6 PM
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Program 3 - 13-16 years */}
+          <div className="rounded-card border border-brand-lightBlue/20 bg-white p-6 shadow-card transition duration-500 hover:-translate-y-2 hover:border-brand-green-primary/50 hover:shadow-card-hover">
+            <div className="mb-4">
+              <span className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold">Age Group</span>
+              <h3 className="mt-2 text-xl font-bold text-brand-black">13–16 years – Slam Squads</h3>
+            </div>
+            <div className="mb-4">
+              <span className="text-3xl font-bold text-brand-black">130 JD</span>
+            </div>
+            <div className="space-y-2 text-sm text-gray-600">
+              <p className="font-semibold text-gray-700">Schedule:</p>
+              <ul className="space-y-1.5">
+                <li className="flex items-center gap-2">
+                  <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                  Monday: 7–8 PM
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                  Wednesday: 7–8 PM
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                  Friday: 1–2 PM
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                  Saturday: 6–7 PM
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Gymnastics Packages */}
+      <div className="mx-auto mt-24 max-w-5xl px-6 lg:px-8">
+        <div className="mb-8 text-center">
+          <h2 className="text-3xl font-bold text-brand-black">Gymnastics Packages</h2>
+        </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {/* Package A */}
+          <div className="rounded-card border border-brand-lightBlue/20 bg-white p-6 shadow-card transition duration-500 hover:-translate-y-2 hover:border-brand-green-primary/50 hover:shadow-card-hover">
+            <h3 className="text-xl font-bold text-brand-black mb-4">Package A</h3>
+            <div className="mb-4">
+              <span className="text-3xl font-bold text-brand-black">120 JD</span>
+            </div>
+            <ul className="space-y-2 text-sm text-gray-600">
+              <li className="flex items-center gap-2">
+                <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                3 days per week
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                1 hour per session
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                12 hours total
+              </li>
+            </ul>
+          </div>
+
+          {/* Package B */}
+          <div className="rounded-card border border-brand-lightBlue/20 bg-white p-6 shadow-card transition duration-500 hover:-translate-y-2 hover:border-brand-green-primary/50 hover:shadow-card-hover">
+            <h3 className="text-xl font-bold text-brand-black mb-4">Package B</h3>
+            <div className="mb-4">
+              <span className="text-3xl font-bold text-brand-black">100 JD</span>
+            </div>
+            <ul className="space-y-2 text-sm text-gray-600">
+              <li className="flex items-center gap-2">
+                <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                2 days per week
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                1 hour per session
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                8 hours total
+              </li>
+            </ul>
+          </div>
+
+          {/* Package C */}
+          <div className="rounded-card border border-brand-lightBlue/20 bg-white p-6 shadow-card transition duration-500 hover:-translate-y-2 hover:border-brand-green-primary/50 hover:shadow-card-hover">
+            <h3 className="text-xl font-bold text-brand-black mb-4">Package C</h3>
+            <div className="mb-4">
+              <span className="text-3xl font-bold text-brand-black">140 JD</span>
+            </div>
+            <ul className="space-y-2 text-sm text-gray-600">
+              <li className="flex items-center gap-2">
+                <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                3 days per week
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                1.5 hours per session
+              </li>
+            </ul>
+          </div>
+
+          {/* Package D */}
+          <div className="rounded-card border border-brand-lightBlue/20 bg-white p-6 shadow-card transition duration-500 hover:-translate-y-2 hover:border-brand-green-primary/50 hover:shadow-card-hover">
+            <h3 className="text-xl font-bold text-brand-black mb-4">Package D</h3>
+            <div className="mb-4">
+              <span className="text-3xl font-bold text-brand-black">120 JD</span>
+            </div>
+            <ul className="space-y-2 text-sm text-gray-600">
+              <li className="flex items-center gap-2">
+                <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                2 days per week
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
+                1.5 hours per session
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
       {/* Featured Programs */}
       {featuredSports.length > 0 && (
         <div className="mx-auto mt-16 max-w-7xl px-6 lg:px-8">

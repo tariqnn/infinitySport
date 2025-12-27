@@ -290,6 +290,49 @@ export function HomeContent({ content }: HomeContentProps) {
         </div>
       </section>
 
+      {/* Who We Are Section */}
+      <section id="who-we-are" className="bg-white py-12 sm:py-16 md:py-20 lg:py-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <ScrollAnimation direction="up">
+            <div className="flex flex-col gap-3 sm:gap-4 text-center mb-12">
+              <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">About Us</p>
+              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Who We Are</h2>
+            </div>
+          </ScrollAnimation>
+          <div className="max-w-4xl mx-auto">
+            <ScrollAnimation direction="up" delay={100}>
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-8 shadow-[0_8px_32px_rgba(0,0,0,0.08)] sm:p-12">
+                <p className="text-base text-gray-600 leading-relaxed sm:text-lg md:text-xl">
+                  Infinity Sport is a modern sports facility designed for both leisure and competitive environments. We are a place where athletes and parents can watch kids learn, adapt, and evolve into modern-day players. Our mission is to provide cutting-edge innovation focused on youth development and high-performance training.
+                </p>
+                <p className="mt-6 text-base text-gray-600 leading-relaxed sm:text-lg md:text-xl">
+                  We believe in the power of sports to transform lives. Through our comprehensive programs, world-class facilities, and expert coaching team, we create an environment where every athlete can reach their full potential.
+                </p>
+              </div>
+            </ScrollAnimation>
+          </div>
+        </div>
+      </section>
+
+      {/* Logo Section */}
+      <section id="logo" className="bg-gray-50 py-12 sm:py-16 md:py-20 lg:py-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <ScrollAnimation direction="up">
+            <div className="flex flex-col items-center gap-6">
+              <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Our Brand</p>
+              <div className="relative w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96">
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#1426FF] via-[#69FFDB] to-[#61FF45] flex items-center justify-center shadow-[0_8px_32px_rgba(20,38,255,0.3)]">
+                  <h2 className="text-4xl font-black text-white sm:text-5xl md:text-6xl">INFINITY</h2>
+                </div>
+              </div>
+              <p className="text-base text-gray-600 text-center max-w-2xl leading-relaxed sm:text-lg">
+                Learn. Adapt. Evolve. Built for the next generation of athletes.
+              </p>
+            </div>
+          </ScrollAnimation>
+        </div>
+      </section>
+
       {/* Premium Facilities Section */}
       <section id="facilities" className="bg-white py-12 sm:py-16 md:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -305,38 +348,65 @@ export function HomeContent({ content }: HomeContentProps) {
           <div className="mt-8 grid gap-6 sm:mt-12 sm:gap-8 md:grid-cols-2 lg:mt-16 lg:grid-cols-3">
             {/* Paddle Court */}
             <ScrollAnimation direction="up" delay={0}>
-              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
-                <h3 className="text-2xl font-black text-brand-black">Paddle Court</h3>
-                <p className="mt-3 text-sm text-gray-600 leading-relaxed">
-                  Premium paddle court facility for training and competitive play.
-                </p>
+              <div className="group rounded-2xl border-2 border-brand-lightBlue/20 bg-white overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)]">
+                <div className="relative h-48 bg-gradient-to-br from-gray-200 to-gray-300">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-gray-400 text-sm font-semibold">Paddle Court Photo</span>
+                  </div>
+                </div>
+                <div className="p-6 sm:p-8">
+                  <h3 className="text-2xl font-black text-brand-black">Paddle Court</h3>
+                  <p className="mt-3 text-sm text-gray-600 leading-relaxed">
+                    Premium paddle court facility for training and competitive play.
+                  </p>
+                </div>
               </div>
             </ScrollAnimation>
 
             {/* 3x3 Basketball Court */}
             <ScrollAnimation direction="up" delay={100}>
-              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
-                <h3 className="text-2xl font-black text-brand-black">3x3 Basketball Court</h3>
-                <p className="mt-3 text-sm text-gray-600 leading-relaxed">
-                  Dedicated 3x3 basketball court for fast-paced games and training sessions.
-                </p>
+              <div className="group rounded-2xl border-2 border-brand-lightBlue/20 bg-white overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)]">
+                <div className="relative h-48 bg-gradient-to-br from-gray-200 to-gray-300">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-gray-400 text-sm font-semibold">3x3 Basketball Court Photo</span>
+                  </div>
+                </div>
+                <div className="p-6 sm:p-8">
+                  <h3 className="text-2xl font-black text-brand-black">3x3 Basketball Court</h3>
+                  <p className="mt-3 text-sm text-gray-600 leading-relaxed">
+                    Dedicated 3x3 basketball court for fast-paced games and training sessions.
+                  </p>
+                </div>
               </div>
             </ScrollAnimation>
 
             {/* 5x5 Basketball Court */}
             <ScrollAnimation direction="up" delay={200}>
-              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
-                <h3 className="text-2xl font-black text-brand-black">5x5 Basketball Court</h3>
-                <p className="mt-3 text-sm text-gray-600 leading-relaxed">
-                  Full-size basketball court for complete games and team training.
-                </p>
+              <div className="group rounded-2xl border-2 border-brand-lightBlue/20 bg-white overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)]">
+                <div className="relative h-48 bg-gradient-to-br from-gray-200 to-gray-300">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-gray-400 text-sm font-semibold">5x5 Basketball Court Photo</span>
+                  </div>
+                </div>
+                <div className="p-6 sm:p-8">
+                  <h3 className="text-2xl font-black text-brand-black">5x5 Basketball Court</h3>
+                  <p className="mt-3 text-sm text-gray-600 leading-relaxed">
+                    Full-size basketball court for complete games and team training.
+                  </p>
+                </div>
               </div>
             </ScrollAnimation>
 
             {/* Multipurpose Hall */}
             <ScrollAnimation direction="up" delay={300}>
-              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
-                <h3 className="text-2xl font-black text-brand-black">Multipurpose Hall</h3>
+              <div className="group rounded-2xl border-2 border-brand-lightBlue/20 bg-white overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)]">
+                <div className="relative h-48 bg-gradient-to-br from-gray-200 to-gray-300">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-gray-400 text-sm font-semibold">Multipurpose Hall Photo</span>
+                  </div>
+                </div>
+                <div className="p-6 sm:p-8">
+                  <h3 className="text-2xl font-black text-brand-black">Multipurpose Hall</h3>
                 <p className="mt-3 text-sm text-gray-600 leading-relaxed mb-4">
                   Versatile space for private lessons and specialized training.
                 </p>
@@ -369,49 +439,86 @@ export function HomeContent({ content }: HomeContentProps) {
                     </li>
                   </ul>
                 </div>
+                </div>
               </div>
             </ScrollAnimation>
 
             {/* Training Center - Basketball */}
             <ScrollAnimation direction="up" delay={400}>
-              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
-                <h3 className="text-2xl font-black text-brand-black">Basketball Training Center</h3>
+              <div className="group rounded-2xl border-2 border-brand-lightBlue/20 bg-white overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)]">
+                <div className="relative h-48 bg-gradient-to-br from-gray-200 to-gray-300">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-gray-400 text-sm font-semibold">Basketball Training Center Photo</span>
+                  </div>
+                </div>
+                <div className="p-6 sm:p-8">
+                  <h3 className="text-2xl font-black text-brand-black">Basketball Training Center</h3>
                 <p className="mt-3 text-sm text-gray-600 leading-relaxed">
                   Dedicated training facility for youth competitive basketball programs.
                 </p>
+                </div>
               </div>
             </ScrollAnimation>
 
             {/* Training Center - Volleyball */}
             <ScrollAnimation direction="up" delay={500}>
-              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
-                <h3 className="text-2xl font-black text-brand-black">Volleyball Training Center</h3>
+              <div className="group rounded-2xl border-2 border-brand-lightBlue/20 bg-white overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)]">
+                <div className="relative h-48 bg-gradient-to-br from-gray-200 to-gray-300">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-gray-400 text-sm font-semibold">Volleyball Training Center Photo</span>
+                  </div>
+                </div>
+                <div className="p-6 sm:p-8">
+                  <h3 className="text-2xl font-black text-brand-black">Volleyball Training Center</h3>
                 <p className="mt-3 text-sm text-gray-600 leading-relaxed">
                   Specialized facility for youth competitive volleyball training.
                 </p>
+                </div>
               </div>
             </ScrollAnimation>
 
             {/* Training Center - Gymnastics */}
             <ScrollAnimation direction="up" delay={600}>
-              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
-                <h3 className="text-2xl font-black text-brand-black">Gymnastics Training Center</h3>
-                <p className="mt-3 text-sm text-gray-600 leading-relaxed">
-                  Professional gymnastics facility for youth competitive programs.
-                </p>
+              <div className="group rounded-2xl border-2 border-brand-lightBlue/20 bg-white overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)]">
+                <div className="relative h-48 bg-gradient-to-br from-gray-200 to-gray-300">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-gray-400 text-sm font-semibold">Gymnastics Training Center Photo</span>
+                  </div>
+                </div>
+                <div className="p-6 sm:p-8">
+                  <h3 className="text-2xl font-black text-brand-black">Gymnastics Training Center</h3>
+                  <p className="mt-3 text-sm text-gray-600 leading-relaxed">
+                    Professional gymnastics facility for youth competitive programs.
+                  </p>
+                </div>
               </div>
             </ScrollAnimation>
           </div>
         </div>
       </section>
 
-      {/* Premium Coaches Section */}
-      <section id="coaches" className="bg-gray-50 py-12 sm:py-16 md:py-20 lg:py-24">
+      {/* Trainer Section - Coaches & About */}
+      <section id="trainer" className="bg-gray-50 py-12 sm:py-16 md:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <ScrollAnimation direction="up">
-            <div className="flex flex-col gap-3 sm:gap-4">
-              <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Team</p>
+            <div className="flex flex-col gap-3 sm:gap-4 text-center mb-12">
+              <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Trainer</p>
               <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Our Coaching Team</h2>
+            </div>
+          </ScrollAnimation>
+          
+          {/* About Subsection */}
+          <ScrollAnimation direction="up" delay={50}>
+            <div className="max-w-4xl mx-auto mb-16">
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-8 shadow-[0_8px_32px_rgba(0,0,0,0.08)] sm:p-12">
+                <h3 className="text-2xl font-black text-brand-black mb-4">About Our Coaches</h3>
+                <p className="text-base text-gray-600 leading-relaxed sm:text-lg">
+                  Our coaching team consists of experienced professionals who are passionate about developing young athletes. Each coach brings unique expertise, from FIBA-licensed basketball coaches to national team gymnastics coaches, all dedicated to helping athletes reach their full potential.
+                </p>
+                <p className="mt-4 text-base text-gray-600 leading-relaxed sm:text-lg">
+                  We believe in a holistic approach to training, combining technical skills, physical conditioning, and mental preparation to create well-rounded athletes ready to compete at the highest levels.
+                </p>
+              </div>
             </div>
           </ScrollAnimation>
           <div className="mt-8 grid gap-6 sm:mt-12 sm:gap-8 md:grid-cols-2 lg:mt-16 lg:grid-cols-3">
@@ -802,6 +909,64 @@ export function HomeContent({ content }: HomeContentProps) {
         </div>
       </section>
 
+      {/* Booking Section */}
+      <section id="booking" className="bg-gray-50 py-12 sm:py-16 md:py-20 lg:py-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <ScrollAnimation direction="up">
+            <div className="flex flex-col gap-3 sm:gap-4 text-center mb-12">
+              <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Reservations</p>
+              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Book Your Session</h2>
+              <p className="max-w-2xl mx-auto text-base text-gray-600 leading-relaxed sm:text-lg">
+                Reserve your court, training session, or facility space today.
+              </p>
+            </div>
+          </ScrollAnimation>
+          <div className="max-w-3xl mx-auto">
+            <ScrollAnimation direction="up" delay={100}>
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-8 shadow-[0_8px_32px_rgba(0,0,0,0.08)] sm:p-12">
+                <div className="grid gap-6 sm:grid-cols-2">
+                  <div>
+                    <h3 className="text-xl font-black text-brand-black mb-4">Court Bookings</h3>
+                    <p className="text-sm text-gray-600 leading-relaxed mb-4">
+                      Reserve basketball courts, paddle courts, or multipurpose halls for your training sessions or events.
+                    </p>
+                    <Link
+                      href="/contact"
+                      className="inline-flex items-center gap-2 text-sm font-bold text-brand-blue-primary transition-colors duration-300 hover:text-brand-green-primary"
+                    >
+                      Book a Court
+                      <ArrowRightIcon className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                    </Link>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-brand-black mb-4">Training Sessions</h3>
+                    <p className="text-sm text-gray-600 leading-relaxed mb-4">
+                      Book private training sessions with our expert coaches for personalized instruction.
+                    </p>
+                    <Link
+                      href="/contact"
+                      className="inline-flex items-center gap-2 text-sm font-bold text-brand-blue-primary transition-colors duration-300 hover:text-brand-green-primary"
+                    >
+                      Book Training
+                      <ArrowRightIcon className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                    </Link>
+                  </div>
+                </div>
+                <div className="mt-8 pt-8 border-t border-brand-lightBlue/20">
+                  <Link
+                    href="/contact"
+                    className="group inline-flex w-full items-center justify-center rounded-full bg-gradient-button px-6 py-3.5 text-sm font-black text-white shadow-[0_8px_24px_rgba(20,26,255,0.35)] transition-all duration-300 hover:scale-105 hover:shadow-[0_12px_32px_rgba(20,26,255,0.5),0_0_24px_rgba(96,208,102,0.3)] sm:w-auto sm:px-10 sm:py-4 sm:text-base"
+                  >
+                    Contact Us to Book
+                    <ArrowRightIcon className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1 sm:h-5 sm:w-5" />
+                  </Link>
+                </div>
+              </div>
+            </ScrollAnimation>
+          </div>
+        </div>
+      </section>
+
       {/* Premium What We Offer Section */}
       <section id="services" className="bg-gray-50 py-12 sm:py-16 md:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -831,13 +996,13 @@ export function HomeContent({ content }: HomeContentProps) {
         </div>
       </section>
 
-      {/* Premium Events Section */}
-      <section id="trainer" className="bg-white py-12 sm:py-16 md:py-20 lg:py-24">
+      {/* Coming Events Section */}
+      <section id="events" className="bg-white py-12 sm:py-16 md:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <ScrollAnimation direction="up">
             <div className="flex flex-col gap-3 sm:gap-4">
-              <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Events & Highlights</p>
-              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">On the calendar</h2>
+              <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Events</p>
+              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Coming Events</h2>
             </div>
           </ScrollAnimation>
           <div className="mt-8 grid gap-6 sm:mt-12 sm:gap-8 md:grid-cols-2 lg:mt-16 lg:grid-cols-3">

@@ -1,10 +1,13 @@
 // Use deployed API URL by default, allow override via environment variable
 const getApiBaseUrl = () => {
-  // In production or if explicitly set, use the environment variable
-  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
-    return process.env.NEXT_PUBLIC_API_BASE_URL;
+  const envUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  
+  // If environment variable is set and it's NOT localhost, use it
+  if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
+    return envUrl;
   }
-  // Default to deployed API
+  
+  // Always default to deployed API (ignore localhost URLs)
   return 'https://infinitysport.onrender.com';
 };
 

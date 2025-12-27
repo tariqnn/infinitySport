@@ -22,7 +22,15 @@ export function FileUpload({
   const [preview, setPreview] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://infinitysport.onrender.com';
+  // Use deployed API URL by default, ignore localhost URLs
+  const getApiBaseUrl = () => {
+    const envUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+    if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
+      return envUrl;
+    }
+    return 'https://infinitysport.onrender.com';
+  };
+  const API_BASE_URL = getApiBaseUrl();
 
   useEffect(() => {
     setMounted(true);

@@ -7,15 +7,10 @@ import type {
   LandingProgram,
 } from '@infinity/types';
 
-// Default to localhost for local development, deployed API for production
+// Default to deployed API, allow override via environment variable
 const getApiBaseUrl = () => {
   if (process.env.NEXT_PUBLIC_API_BASE_URL) {
     return process.env.NEXT_PUBLIC_API_BASE_URL;
-  }
-  // In development, default to localhost
-  if (process.env.NODE_ENV === 'development' || 
-      (typeof window !== 'undefined' && window.location.hostname === 'localhost')) {
-    return 'http://localhost:4000';
   }
   return 'https://infinitysport.onrender.com';
 };

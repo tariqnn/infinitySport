@@ -86,7 +86,7 @@ export function HeroPageClient() {
       <div className="p-6">
         <div className="text-center">
           <p className="text-lg font-semibold">Loading hero data...</p>
-          <p className="text-sm text-gray-500 mt-2">Connecting to API at http://localhost:4000</p>
+          <p className="text-sm text-gray-500 mt-2">Connecting to API...</p>
         </div>
       </div>
     );

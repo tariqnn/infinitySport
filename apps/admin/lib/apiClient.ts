@@ -1,17 +1,34 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://infinitysport.onrender.com';
+// Use deployed API URL by default, allow override via environment variable
+const getApiBaseUrl = () => {
+  // In production or if explicitly set, use the environment variable
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    return process.env.NEXT_PUBLIC_API_BASE_URL;
+  }
+  // Default to deployed API
+  return 'https://infinitysport.onrender.com';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 class ApiClient {
   private baseUrl: string;
 
   constructor() {
     this.baseUrl = API_BASE_URL;
+    // Log the API URL in development for debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Admin API Client initialized with base URL:', this.baseUrl);
+    }
   }
 
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`;
+    // Ensure baseUrl doesn't have trailing slash and endpoint starts with /
+    const baseUrl = this.baseUrl.replace(/\/$/, '');
+    const endpointPath = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const url = `${baseUrl}${endpointPath}`;
     
     try {
       const response = await fetch(url, {

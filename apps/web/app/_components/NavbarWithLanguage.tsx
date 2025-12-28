@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import { LanguageToggle } from "./LanguageToggle";
 import { Bars3Icon, MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { usePathname } from "next/navigation";
@@ -7,12 +8,11 @@ import { useState } from "react";
 
 const navLinks = [
   { label: "Home", href: "/#home" },
-  { label: "Game's", href: "/#games" },
-  { label: "Trainer", href: "/#trainer" },
   { label: "Facilities", href: "/facilities" },
+  { label: "Trainer", href: "/#trainer" },
+  { label: "Events", href: "/events" },
   { label: "Offers", href: "/offers" },
-  { label: "What We Offer", href: "/offerings" },
-  { label: "Contact", href: "/contact" }
+  { label: "Booking", href: "/booking" }
 ];
 
 export function NavbarWithLanguage() {
@@ -34,7 +34,14 @@ export function NavbarWithLanguage() {
           >
             <Bars3Icon className="h-6 w-6 transition-transform duration-300" />
           </button>
-          <Link href="/" className="font-display text-base font-black tracking-[0.2em] text-brand-black transition-all duration-300 hover:scale-105 sm:text-lg sm:tracking-[0.3em] md:text-xl">
+          <Link href="/" className="flex items-center gap-3 font-display text-base font-black tracking-[0.2em] text-brand-black transition-all duration-300 hover:scale-105 sm:text-lg sm:tracking-[0.3em] md:text-xl">
+            <Image 
+              src="/infinity-logo.png" 
+              alt="Infinity Sport Logo" 
+              width={40} 
+              height={40} 
+              className="h-8 w-8 sm:h-10 sm:w-10 object-contain"
+            />
             INFINITY SPORT
           </Link>
         </div>

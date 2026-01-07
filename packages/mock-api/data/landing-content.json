@@ -8,7 +8,7 @@
     "secondaryCtaLabel": "Book a Tour",
     "secondaryCtaLink": "/contact",
     "backgroundImageUrl": "https://images.unsplash.com/photo-1461897104016-0b3b00cc81ee?auto=format&fit=crop&w=2000&q=80",
-    "backgroundVideoUrl": "https://www.youtube.com/embed/TOWEdazDzzE"
+    "backgroundVideoUrl": "/background-main.mp4"
   },
   "highlights": [
     {

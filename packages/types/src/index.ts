@@ -156,7 +156,7 @@ export const landingHeroSchema = z.object({
   secondaryCtaLabel: z.string().optional(),
   secondaryCtaLink: z.string().optional(),
   backgroundImageUrl: z.string().url().optional(),
-  backgroundVideoUrl: z.string().url().optional(),
+  backgroundVideoUrl: z.string().optional(), // Can be URL or local path (e.g., /background-main.mp4)
 });
 export type LandingHero = z.infer<typeof landingHeroSchema>;
 

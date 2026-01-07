@@ -15,8 +15,303 @@ interface HomeContentProps {
 }
 
 const HERO_IMAGE = "/hero-basketball.jpg";
-const HERO_VIDEO_FALLBACK = "https://www.youtube.com/watch?v=TOWEdazDzzE";
 const HERO_VIDEO_START_SECONDS = 6; // start the clip at 0:06 as requested
+const HERO_VIDEO_PATH = "/background-main.mp4"; // Hardcoded video path
+
+// Coach data structure
+interface Coach {
+  id: string;
+  sport: string;
+  name: string;
+  description: string;
+  quote?: string;
+  achievements?: string[];
+  imageUrl?: string;
+}
+
+const COACHES_DATA: Coach[] = [
+  {
+    id: '1',
+    sport: 'Basketball',
+    name: 'Coach Samer Nino',
+    description: 'Coach Samer Nino has immense experience in the basketball field and has shown great passion for youth sports. He has several accomplishments as a player; in 1995, he was part of the U18 National Boys Basketball Team, which received the bronze medal at the Asia Cup. He continued his basketball career earning four national titles, as well as several championships. He served as Head Coach for several clubs, and in 2014, he was assistant Coach for the U18 National Team for the Asia games in Qatar. He later was assistant coach and manager for the Men\'s National Team. Coach Samer was head coach for several years for different age groups at the Orthodox Club, where he received multiple titles. He also coached the Jordanian National 3x3 Team at the World Cup in Mongolia. Recently, he was an assistant coach to U16 National Boys Team and travelled to Serbia, Hungary, and Turkey, participating in various international camps. He has further physical education experience, having completed coaching courses with one of the top seven sports academies in the United States, the DME academy. Another accomplishment includes completing a Canadian Olympic Committee licensed course for sports at the first division and second division levels. Coach Samer has additionally held several camps, with International Organizations including Athlete+, and events that provide youth with exposure to develop and enhance their athletic skills at the national and international level. His most recent accomplishment is founding Infinity Sports Academy, with the purpose of further expanding youth athletics.',
+    achievements: [
+      '1995: U18 National Boys Basketball Team - Bronze Medal at Asia Cup',
+      'Earned four national titles and several championships as a player',
+      '2014: Assistant Coach for U18 National Team at Asia Games in Qatar',
+      'Assistant Coach and Manager for the Men\'s National Team',
+      'Head Coach for several years at Orthodox Club - Multiple titles',
+      'Coached Jordanian National 3x3 Team at World Cup in Mongolia',
+      'Assistant Coach to U16 National Boys Team - Traveled to Serbia, Hungary, and Turkey',
+      'Completed coaching courses with DME Academy (Top 7 sports academies in USA)',
+      'Completed Canadian Olympic Committee licensed course for sports',
+      'Founded Infinity Sports Academy'
+    ],
+    quote: 'Coach Samer Nino\'s dedication, elite experience, and commitment to developing young athletes places him as a driving force in shaping the next generation of athletes.',
+    imageUrl: '/samer.png'
+  },
+  {
+    id: '2',
+    sport: 'Basketball',
+    name: 'Coach Abdulla Abu Kura',
+    description: 'A passionate and results-driven sports leader with 20+ years of experience as a national-level basketball player and coach. He has a proven record in winning championships, leading high-performance teams, and launching youth development programs. Highly skilled in team management, coaching, and event organization. Adept at working under pressure with diverse teams and committed to continuous growth and impact in the sports industry.',
+    achievements: [
+      'Assistant Coach – Jordan Men\'s National Basketball Team (2022–2024)',
+      'Head Coach – Amman United Men\'s 1st Team: Won the Jordanian Basketball League (2024–2025)'
+    ],
+    quote: 'One of the top experienced coaches in the country for youth and men, continuously adapting coaching techniques to raise the level of players.'
+  },
+  {
+    id: '3',
+    sport: 'Gymnastics',
+    name: 'Coach Raya Abu Jamous',
+    description: 'Gymnastics Head Coach for our program with deep knowledge of the sport. Longtime member of the Jordanian National Gymnastics Team. Her experience has expanded into athletics training and strength and conditioning environments.',
+    quote: 'I have developed a strong foundation in gymnastics training to excel youth to the next level.'
+  },
+  {
+    id: '4',
+    sport: 'Gymnastics',
+    name: 'Assistant Gymnastics Coach – Ahmad Aldarawish',
+    description: 'Dedicated to creating strong athletes through strength and conditioning while aligning them with the core gymnastics program.'
+  },
+  {
+    id: '5',
+    sport: 'Gymnastics',
+    name: 'Assistant Gymnastics Coach – Ammar Salman',
+    description: 'An athlete who maintains an active lifestyle through squash, badminton, swimming, and strength training. Over the years, he has built strong athletic ability supported by discipline, consistency, and a genuine passion for sports. His diverse training background has developed solid endurance, strength, and an understanding of effective performance techniques. He is committed to continuous self-improvement and maintaining a healthy, balanced lifestyle.'
+  },
+  {
+    id: '6',
+    sport: 'Volleyball',
+    name: 'Coach Abdelwahab',
+    description: 'Coach Abdelwahab aims to share his extensive experience and passion for developing new volleyball talent, drawing on his previous background as a former member of the Jordanian National team. He began his athletic career at Shabab Al-Hussein Club and continued with various clubs, actively competing in the Premier and First Divisions and contributing to team achievements. He founded Spikers Academy in 2018 with the objective of developing fundamental and advanced skills across all age groups. He has organized and managed training programs to enhance player performances. Coach Abdelwahab specializes in volleyball training courses and demonstrates strong leadership and effective communication skills. He is highly committed to player development and consistently applies strategic planning in training programs.',
+    achievements: [
+      'Former member of the Jordanian National Volleyball Team',
+      'Founded Spikers Academy in 2018',
+      'Competed in Premier and First Divisions with various clubs'
+    ],
+    quote: 'Coach Abdelwahab exemplifies excellence in volleyball coaching through experience, vision, and leadership.'
+  },
+  {
+    id: '7',
+    sport: 'Volleyball',
+    name: 'Coach Leen',
+    description: 'Coach Leen has previously been a team player on the Jordanian National Volleyball team, supported by a degree in Physical Education and three years of experience coaching at Spikers Academy, along with coaching at Al-Choueifat School and various summer camps. She has completed several physical education courses, including a volleyball refereeing course and an international volleyball coaches\' program.',
+    achievements: [
+      'Former team player on the Jordanian National Volleyball Team',
+      'Degree in Physical Education',
+      'FIVB Certified - Certificate in volleyball coaching and refereeing from the International Volleyball Federation',
+      'Three years of coaching experience at Spikers Academy'
+    ],
+    imageUrl: '/leen.jpeg'
+  },
+  {
+    id: '8',
+    sport: 'Volleyball',
+    name: 'Coach Rahaf',
+    description: 'Coach Rahaf is highly experienced as a team leader with strong communication skills. She is a former player on the Jordanian National Volleyball Team and has experience in professional training, coaching, and youth mentorship in sports. Coach Rahaf has a broad skill set, which she utilizes off and on the court, to support athlete development and foster team growth.',
+    achievements: [
+      'Former player on the Jordanian National Volleyball Team',
+      'Experience in professional training and youth mentorship'
+    ]
+  },
+  {
+    id: '9',
+    sport: 'Volleyball',
+    name: 'Coach Raghad',
+    description: 'Coach Raghad has extensive experience in volleyball. She is a volleyball coach for Abd Alhammed Sharaf International School, where she prepares athletes for professional competitions and tournaments. She is a professional volleyball player with the Al-Nassr club and is also part of the Jordanian National Team. Overall, Coach Raghad demonstrates passion and ambition through her dedication and skill, achieving strong connections with both coaches and players.',
+    achievements: [
+      'Volleyball coach at Abd Alhammed Sharaf International School',
+      'Professional volleyball player with Al-Nassr club',
+      'Member of the Jordanian National Volleyball Team'
+    ]
+  },
+  {
+    id: '10',
+    sport: 'Volleyball',
+    name: 'Coach Ayham',
+    description: 'Player for Shabab Al-Hussein Club and the Jordanian Men\'s National Team, and a coach at Spikers Academy for youth age groups. Holds an official coaching certificate from the International Volleyball Federation (FIVB).',
+    achievements: [
+      'Player for Shabab Al-Hussein Club',
+      'Player for the Jordanian Men\'s National Team',
+      'Coach at Spikers Academy for youth age groups',
+      'FIVB Official Coaching Certificate'
+    ],
+    imageUrl: '/ayham.jpeg'
+  }
+];
+
+function CoachesSection() {
+  const [selectedSport, setSelectedSport] = useState<string>('All');
+  const [expandedCoaches, setExpandedCoaches] = useState<Set<string>>(new Set());
+  
+  // Get unique sports from coaches data
+  const sports = ['All', ...Array.from(new Set(COACHES_DATA.map(coach => coach.sport)))];
+  
+  // Filter coaches based on selected sport
+  const filteredCoaches = selectedSport === 'All' 
+    ? COACHES_DATA 
+    : COACHES_DATA.filter(coach => coach.sport === selectedSport);
+
+  // Toggle coach expansion
+  const toggleCoach = (coachId: string) => {
+    setExpandedCoaches(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(coachId)) {
+        newSet.delete(coachId);
+      } else {
+        newSet.add(coachId);
+      }
+      return newSet;
+    });
+  };
+
+  // Truncate description to 150 characters
+  const truncateDescription = (text: string, maxLength: number = 150) => {
+    if (text.length <= maxLength) return text;
+    return text.slice(0, maxLength) + '...';
+  };
+
+  return (
+    <section id="trainer" className="bg-gray-50 py-12 sm:py-16 md:py-20 lg:py-24">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <ScrollAnimation direction="up">
+          <div className="flex flex-col gap-3 sm:gap-4 text-center mb-12">
+            <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Trainer</p>
+            <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Our Coaching Team</h2>
+          </div>
+        </ScrollAnimation>
+        
+        {/* About Subsection */}
+        <ScrollAnimation direction="up" delay={50}>
+          <div className="max-w-4xl mx-auto mb-16">
+            <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-8 shadow-[0_8px_32px_rgba(0,0,0,0.08)] sm:p-12">
+              <h3 className="text-2xl font-black text-brand-black mb-4">About Our Coaches</h3>
+              <p className="text-base text-gray-600 leading-relaxed sm:text-lg">
+                Our coaching team consists of experienced professionals who are passionate about developing young athletes. Each coach brings unique expertise, from FIBA-licensed basketball coaches to national team gymnastics coaches, all dedicated to helping athletes reach their full potential.
+              </p>
+              <p className="mt-4 text-base text-gray-600 leading-relaxed sm:text-lg">
+                We believe in a holistic approach to training, combining technical skills, physical conditioning, and mental preparation to create well-rounded athletes ready to compete at the highest levels.
+              </p>
+            </div>
+          </div>
+        </ScrollAnimation>
+
+        {/* Sport Filter Buttons */}
+        <ScrollAnimation direction="up" delay={100}>
+          <div className="flex flex-wrap justify-center gap-3 mb-8 sm:mb-12">
+            {sports.map((sport) => (
+              <button
+                key={sport}
+                onClick={() => setSelectedSport(sport)}
+                className={`px-6 py-3 rounded-full text-sm font-semibold transition-all duration-300 ${
+                  selectedSport === sport
+                    ? 'bg-brand-green-primary text-white shadow-lg transform scale-105'
+                    : 'bg-white text-brand-black border-2 border-brand-lightBlue/20 hover:border-brand-green-primary/60 hover:shadow-md'
+                }`}
+              >
+                {sport}
+              </button>
+            ))}
+          </div>
+        </ScrollAnimation>
+
+        {/* Coaches Grid */}
+        {filteredCoaches.length > 0 ? (
+          <div className="mt-8 grid gap-6 sm:mt-12 sm:gap-8 md:grid-cols-2 lg:mt-16 lg:grid-cols-3">
+            {filteredCoaches.map((coach, index) => {
+              const isExpanded = expandedCoaches.has(coach.id);
+              const description = isExpanded 
+                ? coach.description 
+                : truncateDescription(coach.description);
+              const showReadMore = coach.description.length > 150;
+
+              return (
+                <ScrollAnimation key={coach.id} direction="up" delay={index * 100}>
+                  <div 
+                    className="flex flex-col rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8 cursor-pointer h-full"
+                    onClick={() => toggleCoach(coach.id)}
+                  >
+                    {coach.imageUrl && (
+                      <div className="mb-4 -mt-2 -mx-2 sm:-mt-4 sm:-mx-4 flex-shrink-0">
+                        <div className="relative h-48 w-full overflow-hidden rounded-t-2xl">
+                          <Image
+                            src={coach.imageUrl}
+                            alt={coach.name}
+                            fill
+                            className="object-cover"
+                            style={
+                              coach.id === '10' 
+                                ? { objectPosition: 'center 15%' } 
+                                : coach.id === '7' 
+                                ? { objectPosition: 'center 15%' } 
+                                : undefined
+                            }
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex-shrink-0">
+                      <p className="text-xs uppercase tracking-[0.35em] text-brand-green-dark font-bold">{coach.sport}</p>
+                      <h3 className="mt-3 text-2xl font-black text-brand-black">{coach.name}</h3>
+                    </div>
+                    <div className="flex-grow flex flex-col min-h-0">
+                      <div 
+                        className="mt-4 text-sm text-gray-600 leading-relaxed"
+                        style={!isExpanded ? {
+                          display: '-webkit-box',
+                          WebkitLineClamp: 4,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        } : {}}
+                      >
+                        {description}
+                      </div>
+                      {showReadMore && (
+                        <button 
+                          className="mt-2 text-xs font-semibold text-brand-green-primary hover:text-brand-green-dark transition-colors self-start"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleCoach(coach.id);
+                          }}
+                        >
+                          {isExpanded ? 'Read less' : 'Read more'}
+                        </button>
+                      )}
+                      {isExpanded && coach.achievements && coach.achievements.length > 0 && (
+                        <ul className="mt-4 space-y-1.5 text-xs text-gray-600">
+                          {coach.achievements.map((achievement, idx) => (
+                            <li key={idx} className="flex items-start gap-2">
+                              <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-brand-green-primary" />
+                              <span>{achievement}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {isExpanded && coach.quote && (
+                        <p className="mt-4 text-xs italic text-gray-500 leading-relaxed">
+                          &ldquo;{coach.quote}&rdquo;
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </ScrollAnimation>
+              );
+            })}
+          </div>
+        ) : (
+          <ScrollAnimation direction="up" delay={200}>
+            <div className="text-center py-12">
+              <p className="text-lg text-gray-600">No coaches found for this sport.</p>
+            </div>
+          </ScrollAnimation>
+        )}
+      </div>
+    </section>
+  );
+}
 
 export function HomeContent({ content }: HomeContentProps) {
   const hero = content.hero;
@@ -43,28 +338,6 @@ export function HomeContent({ content }: HomeContentProps) {
   const announcements = content.announcements?.filter((announcement) => announcement.isActive !== false) ?? [];
   const footer = content.footer;
   const heroImage = hero.backgroundImageUrl || HERO_IMAGE;
-  const heroVideoUrl = (hero.backgroundVideoUrl?.trim() || HERO_VIDEO_FALLBACK)?.trim();
-  const heroVideoEmbed = (() => {
-    if (!heroVideoUrl) return null;
-    const url = heroVideoUrl;
-    try {
-      if (url.includes('youtube.com/watch')) {
-        const parsed = new URL(url);
-        const id = parsed.searchParams.get('v');
-        if (id) {
-          return `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&controls=0&loop=1&playlist=${id}&modestbranding=1&showinfo=0&rel=0&start=${HERO_VIDEO_START_SECONDS}`;
-        }
-      }
-      if (url.includes('youtube.com/embed')) {
-        const separator = url.includes('?') ? '&' : '?';
-        const idMatch = url.split('/').pop()?.split('?')[0];
-        return `${url}${separator}autoplay=1&mute=1&controls=0&loop=1&playlist=${idMatch ?? ''}&modestbranding=1&showinfo=0&rel=0&start=${HERO_VIDEO_START_SECONDS}`;
-      }
-      return url;
-    } catch {
-      return null;
-    }
-  })();
   const featuredOffer = offerCards.find((offer) => offer.isFeatured) ?? offerCards[0];
 
   // Parallax effect for hero
@@ -131,37 +404,35 @@ export function HomeContent({ content }: HomeContentProps) {
       <section id="home" ref={heroRef} className="relative isolate min-h-screen overflow-hidden">
         {/* Background Media */}
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 z-0"
           style={{ transform: `translateY(${scrollY * 0.3}px)` }}
         >
-          {heroVideoEmbed ? (
-            <iframe
-              title="Infinity Sport hero background video"
-              src={heroVideoEmbed}
-              className="absolute inset-0 h-full w-full scale-125 object-cover"
-              allow="autoplay; fullscreen; encrypted-media"
-              allowFullScreen
-              loading="lazy"
-              referrerPolicy="strict-origin-when-cross-origin"
-            />
-          ) : (
-            <Image
-              src={heroImage}
-              alt="Hero athlete"
-              fill
-              className="object-cover scale-110"
-              priority
-              unoptimized
-            />
-          )}
+          <video
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="auto"
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ 
+              objectFit: 'cover',
+              width: '100%',
+              height: '100%',
+              minWidth: '100%',
+              minHeight: '100%'
+            }}
+          >
+            <source src={HERO_VIDEO_PATH} type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
         </div>
         
         {/* Cinematic Gradient Overlay: Top-left BLUE → Bottom-right GREEN */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#1426FF]/60 via-[#69FFDB]/30 to-[#61FF45]/60" />
+        <div className="absolute inset-0 z-10 bg-gradient-to-br from-[#1426FF]/60 via-[#69FFDB]/30 to-[#61FF45]/60" />
         {/* Darkening overlay for text readability */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/30 to-black/60" />
+        <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/20 via-black/30 to-black/60" />
         {/* Subtle blur effect behind cards */}
-        <div className="absolute inset-0 backdrop-blur-[2px]" />
+        <div className="absolute inset-0 z-10 backdrop-blur-[2px]" />
 
         {/* Hero Content Container */}
         <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 pb-12 pt-24 sm:px-6 lg:px-8 lg:pt-32">
@@ -311,25 +582,6 @@ export function HomeContent({ content }: HomeContentProps) {
               </div>
             </ScrollAnimation>
           </div>
-        </div>
-      </section>
-
-      {/* Logo Section */}
-      <section id="logo" className="bg-gray-50 py-12 sm:py-16 md:py-20 lg:py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <ScrollAnimation direction="up">
-            <div className="flex flex-col items-center gap-6">
-              <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Our Brand</p>
-              <div className="relative w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96">
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#1426FF] via-[#69FFDB] to-[#61FF45] flex items-center justify-center shadow-[0_8px_32px_rgba(20,38,255,0.3)]">
-                  <h2 className="text-4xl font-black text-white sm:text-5xl md:text-6xl">INFINITY</h2>
-                </div>
-              </div>
-              <p className="text-base text-gray-600 text-center max-w-2xl leading-relaxed sm:text-lg">
-                Learn. Adapt. Evolve. Built for the next generation of athletes.
-              </p>
-            </div>
-          </ScrollAnimation>
         </div>
       </section>
 
@@ -498,106 +750,7 @@ export function HomeContent({ content }: HomeContentProps) {
       </section>
 
       {/* Trainer Section - Coaches & About */}
-      <section id="trainer" className="bg-gray-50 py-12 sm:py-16 md:py-20 lg:py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <ScrollAnimation direction="up">
-            <div className="flex flex-col gap-3 sm:gap-4 text-center mb-12">
-              <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Trainer</p>
-              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Our Coaching Team</h2>
-            </div>
-          </ScrollAnimation>
-          
-          {/* About Subsection */}
-          <ScrollAnimation direction="up" delay={50}>
-            <div className="max-w-4xl mx-auto mb-16">
-              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-8 shadow-[0_8px_32px_rgba(0,0,0,0.08)] sm:p-12">
-                <h3 className="text-2xl font-black text-brand-black mb-4">About Our Coaches</h3>
-                <p className="text-base text-gray-600 leading-relaxed sm:text-lg">
-                  Our coaching team consists of experienced professionals who are passionate about developing young athletes. Each coach brings unique expertise, from FIBA-licensed basketball coaches to national team gymnastics coaches, all dedicated to helping athletes reach their full potential.
-                </p>
-                <p className="mt-4 text-base text-gray-600 leading-relaxed sm:text-lg">
-                  We believe in a holistic approach to training, combining technical skills, physical conditioning, and mental preparation to create well-rounded athletes ready to compete at the highest levels.
-                </p>
-              </div>
-            </div>
-          </ScrollAnimation>
-          <div className="mt-8 grid gap-6 sm:mt-12 sm:gap-8 md:grid-cols-2 lg:mt-16 lg:grid-cols-3">
-            {/* Coach 1 - Basketball - Coach Samer Nino */}
-            <ScrollAnimation direction="up" delay={0}>
-              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
-                <p className="text-xs uppercase tracking-[0.35em] text-brand-green-dark font-bold">Basketball</p>
-                <h3 className="mt-3 text-2xl font-black text-brand-black">Coach Samer Nino</h3>
-                <p className="mt-4 text-sm text-gray-600 leading-relaxed">
-                  FIBA-licensed coach providing top-quality coaching to grow your kids into complete basketball players using FIBA skills and development techniques. He has coached multiple clubs at both pro and youth levels and has experience with Youth National Teams and assisting the Jordanian National Teams.
-                </p>
-                <p className="mt-4 text-xs italic text-gray-500 leading-relaxed">
-                  &ldquo;Learn the details of the fundamentals of the basketball game offensively and defensively to compete on club and national team level.&rdquo;
-                </p>
-              </div>
-            </ScrollAnimation>
-
-            {/* Coach 2 - Basketball - Coach Abdulla Abu Kura */}
-            <ScrollAnimation direction="up" delay={100}>
-              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
-                <p className="text-xs uppercase tracking-[0.35em] text-brand-green-dark font-bold">Basketball</p>
-                <h3 className="mt-3 text-2xl font-black text-brand-black">Coach Abdulla Abu Kura</h3>
-                <p className="mt-4 text-sm text-gray-600 leading-relaxed">
-                  A passionate and results-driven sports leader with 20+ years of experience as a national-level basketball player and coach. He has a proven record in winning championships, leading high-performance teams, and launching youth development programs. Highly skilled in team management, coaching, and event organization. Adept at working under pressure with diverse teams and committed to continuous growth and impact in the sports industry.
-                </p>
-                <ul className="mt-4 space-y-1.5 text-xs text-gray-600">
-                  <li className="flex items-start gap-2">
-                    <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-brand-green-primary" />
-                    <span>Assistant Coach – Jordan Men&apos;s National Basketball Team (2022–2024)</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-brand-green-primary" />
-                    <span>Head Coach – Amman United Men&apos;s 1st Team: Won the Jordanian Basketball League (2024–2025)</span>
-                  </li>
-                </ul>
-                <p className="mt-4 text-xs text-gray-600 leading-relaxed">
-                  One of the top experienced coaches in the country for youth and men, continuously adapting coaching techniques to raise the level of players.
-                </p>
-              </div>
-            </ScrollAnimation>
-
-            {/* Coach 3 - Gymnastics - Coach Raya Abu Jamous */}
-            <ScrollAnimation direction="up" delay={200}>
-              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
-                <p className="text-xs uppercase tracking-[0.35em] text-brand-green-dark font-bold">Gymnastics</p>
-                <h3 className="mt-3 text-2xl font-black text-brand-black">Coach Raya Abu Jamous</h3>
-                <p className="mt-4 text-sm text-gray-600 leading-relaxed">
-                  Gymnastics Head Coach for our program with deep knowledge of the sport. Longtime member of the Jordanian National Gymnastics Team. Her experience has expanded into athletics training and strength and conditioning environments.
-                </p>
-                <p className="mt-4 text-xs italic text-gray-500 leading-relaxed">
-                  &ldquo;I have developed a strong foundation in gymnastics training to excel youth to the next level.&rdquo;
-                </p>
-              </div>
-            </ScrollAnimation>
-
-            {/* Coach 4 - Assistant Gymnastics Coach – Ahmad Aldarawish */}
-            <ScrollAnimation direction="up" delay={300}>
-              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
-                <p className="text-xs uppercase tracking-[0.35em] text-brand-green-dark font-bold">Gymnastics</p>
-                <h3 className="mt-3 text-2xl font-black text-brand-black">Assistant Gymnastics Coach – Ahmad Aldarawish</h3>
-                <p className="mt-4 text-sm text-gray-600 leading-relaxed">
-                  Dedicated to creating strong athletes through strength and conditioning while aligning them with the core gymnastics program.
-                </p>
-              </div>
-            </ScrollAnimation>
-
-            {/* Coach 5 - Assistant Gymnastics Coach – Ammar Salman */}
-            <ScrollAnimation direction="up" delay={400}>
-              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
-                <p className="text-xs uppercase tracking-[0.35em] text-brand-green-dark font-bold">Gymnastics</p>
-                <h3 className="mt-3 text-2xl font-black text-brand-black">Assistant Gymnastics Coach – Ammar Salman</h3>
-                <p className="mt-4 text-sm text-gray-600 leading-relaxed">
-                  An athlete who maintains an active lifestyle through squash, badminton, swimming, and strength training. Over the years, he has built strong athletic ability supported by discipline, consistency, and a genuine passion for sports. His diverse training background has developed solid endurance, strength, and an understanding of effective performance techniques. He is committed to continuous self-improvement and maintaining a healthy, balanced lifestyle.
-                </p>
-              </div>
-            </ScrollAnimation>
-          </div>
-        </div>
-      </section>
+      <CoachesSection />
 
       {/* Basketball Programs & Pricing Section */}
       <section id="basketball-programs" className="bg-white py-12 sm:py-16 md:py-20 lg:py-24">

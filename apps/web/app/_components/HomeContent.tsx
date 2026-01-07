@@ -346,16 +346,24 @@ export function HomeContent({ content }: HomeContentProps) {
   const [contactSubmitting, setContactSubmitting] = useState(false);
 
   useEffect(() => {
+    let ticking = false;
+    
     const handleScroll = () => {
-      if (heroRef.current) {
-        const rect = heroRef.current.getBoundingClientRect();
-        if (rect.top < window.innerHeight && rect.bottom > 0) {
-          setScrollY(window.scrollY * 0.3);
-        }
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          if (heroRef.current) {
+            const rect = heroRef.current.getBoundingClientRect();
+            if (rect.top < window.innerHeight && rect.bottom > 0) {
+              setScrollY(window.scrollY * 0.3);
+            }
+          }
+          ticking = false;
+        });
+        ticking = true;
       }
     };
 
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
@@ -402,21 +410,33 @@ export function HomeContent({ content }: HomeContentProps) {
         {/* Background Media */}
         <div
           className="absolute inset-0 z-0"
-          style={{ transform: `translateY(${scrollY * 0.3}px)` }}
+          style={{ 
+            transform: `translateY(${scrollY * 0.3}px)`,
+            willChange: 'transform',
+            backfaceVisibility: 'hidden'
+          }}
         >
           <video
             autoPlay
             muted
             loop
             playsInline
-            preload="auto"
+            preload="metadata"
             className="absolute inset-0 h-full w-full object-cover"
             style={{ 
               objectFit: 'cover',
               width: '100%',
               height: '100%',
               minWidth: '100%',
-              minHeight: '100%'
+              minHeight: '100%',
+              willChange: 'transform'
+            }}
+            onLoadedData={(e) => {
+              // Ensure video plays after loading
+              const video = e.currentTarget;
+              video.play().catch(() => {
+                // Autoplay failed, but that's okay
+              });
             }}
           >
             <source src={HERO_VIDEO_PATH} type="video/mp4" />
@@ -428,8 +448,6 @@ export function HomeContent({ content }: HomeContentProps) {
         <div className="absolute inset-0 z-10 bg-gradient-to-br from-[#1426FF]/60 via-[#69FFDB]/30 to-[#61FF45]/60" />
         {/* Darkening overlay for text readability */}
         <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/20 via-black/30 to-black/60" />
-        {/* Subtle blur effect behind cards */}
-        <div className="absolute inset-0 z-10 backdrop-blur-[2px]" />
 
         {/* Hero Content Container */}
         <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 pb-12 pt-24 sm:px-6 lg:px-8 lg:pt-32">

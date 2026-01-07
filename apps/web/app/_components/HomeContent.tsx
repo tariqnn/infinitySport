@@ -14,8 +14,6 @@ interface HomeContentProps {
   content: LandingContent;
 }
 
-const HERO_IMAGE = "/hero-basketball.jpg";
-const HERO_VIDEO_START_SECONDS = 6; // start the clip at 0:06 as requested
 const HERO_VIDEO_PATH = "/background-main.mp4"; // Hardcoded video path
 
 // Coach data structure
@@ -337,7 +335,6 @@ export function HomeContent({ content }: HomeContentProps) {
   const valueProps = content.highlights;
   const announcements = content.announcements?.filter((announcement) => announcement.isActive !== false) ?? [];
   const footer = content.footer;
-  const heroImage = hero.backgroundImageUrl || HERO_IMAGE;
   const featuredOffer = offerCards.find((offer) => offer.isFeatured) ?? offerCards[0];
 
   // Parallax effect for hero

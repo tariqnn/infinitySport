@@ -646,7 +646,7 @@ export function HomeContent({ content }: HomeContentProps) {
                       Join Us for Our Next Event
                     </h3>
                     <p className="text-sm text-white/90 sm:text-base max-w-2xl">
-                      Don't miss out on this exciting opportunity to be part of our community.
+                      Don&apos;t miss out on this exciting opportunity to be part of our community.
                     </p>
                     <Link 
                       href="/events" 

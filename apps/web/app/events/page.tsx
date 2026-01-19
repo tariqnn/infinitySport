@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { fetchEvents } from '../../lib/apiClient';
 
 export const metadata = {
@@ -24,13 +25,28 @@ export default async function EventsPage() {
 
   return (
     <div className="bg-white py-24">
-      {/* Hero Section */}
-      <div className="mx-auto max-w-4xl px-6 text-center lg:px-0">
-        <p className="text-sm uppercase tracking-[0.3em] text-brand-green-dark">Events</p>
-        <h1 className="mt-4 text-5xl font-bold text-brand-black">Signature Infinity Sports programs</h1>
-        <p className="mt-4 text-lg text-gray-600">
-          Seasonal combines, international showcases, and corporate leagues engineered for peak performance.
-        </p>
+      {/* Hero Section with Event Image */}
+      <div className="relative mx-auto max-w-7xl px-6 lg:px-8 mb-16">
+        <div className="relative h-64 sm:h-80 md:h-96 lg:h-[500px] w-full rounded-2xl overflow-hidden border-2 border-brand-lightBlue/20 shadow-[0_8px_32px_rgba(0,0,0,0.08)]">
+          <Image
+            src="/events.jpeg"
+            alt="Upcoming Events"
+            fill
+            className="object-cover"
+            priority
+            sizes="(max-width: 768px) 100vw, (max-width: 1024px) 100vw, 1280px"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-8 md:p-10 text-white">
+            <p className="text-sm uppercase tracking-[0.3em] text-white/90 mb-2">Events</p>
+            <h1 className="text-3xl font-black sm:text-4xl md:text-5xl lg:text-6xl mb-2">
+              Signature Infinity Sports Programs
+            </h1>
+            <p className="text-base text-white/95 sm:text-lg max-w-2xl">
+              Seasonal combines, international showcases, and corporate leagues engineered for peak performance.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Upcoming Events */}
@@ -45,45 +61,56 @@ export default async function EventsPage() {
             {upcoming.map((event) => (
               <div
                 key={event.id}
-                className="flex flex-col rounded-card border border-brand-lightBlue/20 bg-white p-6 shadow-card transition duration-500 hover:-translate-y-2 hover:border-brand-green-primary/50 hover:shadow-card-hover"
+                className="group flex flex-col rounded-2xl border-2 border-brand-lightBlue/20 bg-white overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-2 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)]"
               >
-                <div className="mb-4">
-                  <span className="rounded-full bg-brand-lightBlue/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-brand-blue-primary">
-                    Registration Open
-                  </span>
+                <div className="relative h-48 w-full">
+                  <Image
+                    src="/events.jpeg"
+                    alt={event.title}
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  />
+                  <div className="absolute top-4 left-4">
+                    <span className="rounded-full bg-brand-green-primary px-3 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-white shadow-lg">
+                      Registration Open
+                    </span>
+                  </div>
                 </div>
-                <h3 className="text-2xl font-bold text-brand-black">{event.title}</h3>
-                <div className="mt-3 space-y-2 text-sm text-gray-600">
-                  <p className="flex items-center gap-2">
-                    <svg className="h-4 w-4 text-brand-green-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    {new Date(event.date).toLocaleDateString(undefined, {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit'
-                    })}
-                  </p>
-                  <p className="flex items-center gap-2">
-                    <svg className="h-4 w-4 text-brand-green-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    {event.location}
-                  </p>
+                <div className="p-6 flex-1 flex flex-col">
+                  <h3 className="text-2xl font-black text-brand-black group-hover:text-brand-green-primary transition-colors">{event.title}</h3>
+                  <div className="mt-3 space-y-2 text-sm text-gray-600">
+                    <p className="flex items-center gap-2">
+                      <svg className="h-4 w-4 text-brand-green-primary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      {new Date(event.date).toLocaleDateString(undefined, {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                    <p className="flex items-center gap-2">
+                      <svg className="h-4 w-4 text-brand-green-primary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      {event.location}
+                    </p>
+                  </div>
+                  {event.description && (
+                    <p className="mt-4 text-sm text-gray-600 leading-relaxed line-clamp-3">{event.description}</p>
+                  )}
+                  <Link
+                    href="/contact"
+                    className="mt-6 rounded-full bg-gradient-button px-6 py-3 text-center text-sm font-bold text-white shadow-button transition-all duration-300 hover:scale-105 hover:shadow-button-hover"
+                  >
+                    Secure slot
+                  </Link>
                 </div>
-                {event.description && (
-                  <p className="mt-4 text-sm text-gray-600">{event.description}</p>
-                )}
-                <Link
-                  href="/contact"
-                  className="mt-6 rounded-full bg-gradient-button px-6 py-3 text-center text-sm font-bold text-white shadow-button transition hover:shadow-button-hover"
-                >
-                  Secure slot
-                </Link>
               </div>
             ))}
           </div>
@@ -117,21 +144,39 @@ export default async function EventsPage() {
             {past.map((event) => (
               <div
                 key={event.id}
-                className="flex flex-col rounded-card border border-brand-lightBlue/20 bg-white p-6 shadow-card transition duration-500 hover:-translate-y-2 hover:border-brand-green-primary/50 hover:shadow-card-hover"
+                className="group flex flex-col rounded-2xl border-2 border-brand-lightBlue/20 bg-white overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-2 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)]"
               >
-                <h3 className="text-xl font-bold text-brand-black">{event.title}</h3>
-                <p className="mt-2 text-sm text-gray-500">
-                  {new Date(event.date).toLocaleDateString(undefined, { dateStyle: 'long' })}
-                </p>
-                {event.description && (
-                  <p className="mt-4 text-sm text-gray-600">{event.description}</p>
-                )}
-                <Link
-                  href="/contact"
-                  className="mt-6 text-sm font-semibold text-brand-blue-primary transition hover:text-brand-green-primary"
-                >
-                  Request recap →
-                </Link>
+                <div className="relative h-40 w-full">
+                  <Image
+                    src="/events.jpeg"
+                    alt={event.title}
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-105 opacity-75"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                </div>
+                <div className="p-6 flex-1 flex flex-col">
+                  <h3 className="text-xl font-black text-brand-black group-hover:text-brand-green-primary transition-colors">{event.title}</h3>
+                  <p className="mt-2 text-sm text-gray-500 flex items-center gap-2">
+                    <svg className="h-4 w-4 text-brand-green-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    {new Date(event.date).toLocaleDateString(undefined, { dateStyle: 'long' })}
+                  </p>
+                  {event.description && (
+                    <p className="mt-4 text-sm text-gray-600 leading-relaxed line-clamp-2">{event.description}</p>
+                  )}
+                  <Link
+                    href="/contact"
+                    className="mt-6 text-sm font-semibold text-brand-blue-primary transition-colors hover:text-brand-green-primary inline-flex items-center gap-2"
+                  >
+                    Request recap
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Link>
+                </div>
               </div>
             ))}
           </div>

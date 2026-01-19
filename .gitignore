@@ -23,6 +23,7 @@ packages/*/dist/
 # misc
 .DS_Store
 *.pem
+Screenshot*.png
 
 # debug
 npm-debug.log*

@@ -9,9 +9,9 @@ import { useState } from "react";
 const navLinks = [
   { label: "Home", href: "/#home" },
   { label: "Facilities", href: "/facilities" },
-  { label: "Trainer", href: "/#trainer" },
+  { label: "Coaches", href: "/coaches" },
+  { label: "Programs", href: "/sports" },
   { label: "Events", href: "/events" },
-  { label: "Offers", href: "/offers" },
   { label: "Booking", href: "/booking" }
 ];
 

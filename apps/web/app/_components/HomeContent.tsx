@@ -14,303 +14,10 @@ interface HomeContentProps {
   content: LandingContent;
 }
 
-const HERO_VIDEO_PATH = "/background-main.mp4"; // Hardcoded video path
+const HERO_VIDEO_PATH = "/main-video.mp4"; // Hardcoded video path (MP4 for browser compatibility)
+const HERO_FALLBACK_IMAGE = "/hero-basketball.jpg"; // Fallback image if video fails
 
 // Coach data structure
-interface Coach {
-  id: string;
-  sport: string;
-  name: string;
-  description: string;
-  quote?: string;
-  achievements?: string[];
-  imageUrl?: string;
-}
-
-const COACHES_DATA: Coach[] = [
-  {
-    id: '1',
-    sport: 'Basketball',
-    name: 'Coach Samer Nino',
-    description: 'Coach Samer Nino has immense experience in the basketball field and has shown great passion for youth sports. He has several accomplishments as a player; in 1995, he was part of the U18 National Boys Basketball Team, which received the bronze medal at the Asia Cup. He continued his basketball career earning four national titles, as well as several championships. He served as Head Coach for several clubs, and in 2014, he was assistant Coach for the U18 National Team for the Asia games in Qatar. He later was assistant coach and manager for the Men\'s National Team. Coach Samer was head coach for several years for different age groups at the Orthodox Club, where he received multiple titles. He also coached the Jordanian National 3x3 Team at the World Cup in Mongolia. Recently, he was an assistant coach to U16 National Boys Team and travelled to Serbia, Hungary, and Turkey, participating in various international camps. He has further physical education experience, having completed coaching courses with one of the top seven sports academies in the United States, the DME academy. Another accomplishment includes completing a Canadian Olympic Committee licensed course for sports at the first division and second division levels. Coach Samer has additionally held several camps, with International Organizations including Athlete+, and events that provide youth with exposure to develop and enhance their athletic skills at the national and international level. His most recent accomplishment is founding Infinity Sports Academy, with the purpose of further expanding youth athletics.',
-    achievements: [
-      '1995: U18 National Boys Basketball Team - Bronze Medal at Asia Cup',
-      'Earned four national titles and several championships as a player',
-      '2014: Assistant Coach for U18 National Team at Asia Games in Qatar',
-      'Assistant Coach and Manager for the Men\'s National Team',
-      'Head Coach for several years at Orthodox Club - Multiple titles',
-      'Coached Jordanian National 3x3 Team at World Cup in Mongolia',
-      'Assistant Coach to U16 National Boys Team - Traveled to Serbia, Hungary, and Turkey',
-      'Completed coaching courses with DME Academy (Top 7 sports academies in USA)',
-      'Completed Canadian Olympic Committee licensed course for sports',
-      'Founded Infinity Sports Academy'
-    ],
-    quote: 'Coach Samer Nino\'s dedication, elite experience, and commitment to developing young athletes places him as a driving force in shaping the next generation of athletes.',
-    imageUrl: '/samer.png'
-  },
-  {
-    id: '2',
-    sport: 'Basketball',
-    name: 'Coach Abdulla Abu Kura',
-    description: 'A passionate and results-driven sports leader with 20+ years of experience as a national-level basketball player and coach. He has a proven record in winning championships, leading high-performance teams, and launching youth development programs. Highly skilled in team management, coaching, and event organization. Adept at working under pressure with diverse teams and committed to continuous growth and impact in the sports industry.',
-    achievements: [
-      'Assistant Coach – Jordan Men\'s National Basketball Team (2022–2024)',
-      'Head Coach – Amman United Men\'s 1st Team: Won the Jordanian Basketball League (2024–2025)'
-    ],
-    quote: 'One of the top experienced coaches in the country for youth and men, continuously adapting coaching techniques to raise the level of players.'
-  },
-  {
-    id: '3',
-    sport: 'Gymnastics',
-    name: 'Coach Raya Abu Jamous',
-    description: 'Gymnastics Head Coach for our program with deep knowledge of the sport. Longtime member of the Jordanian National Gymnastics Team. Her experience has expanded into athletics training and strength and conditioning environments.',
-    quote: 'I have developed a strong foundation in gymnastics training to excel youth to the next level.'
-  },
-  {
-    id: '4',
-    sport: 'Gymnastics',
-    name: 'Assistant Gymnastics Coach – Ahmad Aldarawish',
-    description: 'Dedicated to creating strong athletes through strength and conditioning while aligning them with the core gymnastics program.'
-  },
-  {
-    id: '5',
-    sport: 'Gymnastics',
-    name: 'Assistant Gymnastics Coach – Ammar Salman',
-    description: 'An athlete who maintains an active lifestyle through squash, badminton, swimming, and strength training. Over the years, he has built strong athletic ability supported by discipline, consistency, and a genuine passion for sports. His diverse training background has developed solid endurance, strength, and an understanding of effective performance techniques. He is committed to continuous self-improvement and maintaining a healthy, balanced lifestyle.'
-  },
-  {
-    id: '6',
-    sport: 'Volleyball',
-    name: 'Coach Abdelwahab',
-    description: 'Coach Abdelwahab aims to share his extensive experience and passion for developing new volleyball talent, drawing on his previous background as a former member of the Jordanian National team. He began his athletic career at Shabab Al-Hussein Club and continued with various clubs, actively competing in the Premier and First Divisions and contributing to team achievements. He founded Spikers Academy in 2018 with the objective of developing fundamental and advanced skills across all age groups. He has organized and managed training programs to enhance player performances. Coach Abdelwahab specializes in volleyball training courses and demonstrates strong leadership and effective communication skills. He is highly committed to player development and consistently applies strategic planning in training programs.',
-    achievements: [
-      'Former member of the Jordanian National Volleyball Team',
-      'Founded Spikers Academy in 2018',
-      'Competed in Premier and First Divisions with various clubs'
-    ],
-    quote: 'Coach Abdelwahab exemplifies excellence in volleyball coaching through experience, vision, and leadership.'
-  },
-  {
-    id: '7',
-    sport: 'Volleyball',
-    name: 'Coach Leen',
-    description: 'Coach Leen has previously been a team player on the Jordanian National Volleyball team, supported by a degree in Physical Education and three years of experience coaching at Spikers Academy, along with coaching at Al-Choueifat School and various summer camps. She has completed several physical education courses, including a volleyball refereeing course and an international volleyball coaches\' program.',
-    achievements: [
-      'Former team player on the Jordanian National Volleyball Team',
-      'Degree in Physical Education',
-      'FIVB Certified - Certificate in volleyball coaching and refereeing from the International Volleyball Federation',
-      'Three years of coaching experience at Spikers Academy'
-    ],
-    imageUrl: '/leen.jpeg'
-  },
-  {
-    id: '8',
-    sport: 'Volleyball',
-    name: 'Coach Rahaf',
-    description: 'Coach Rahaf is highly experienced as a team leader with strong communication skills. She is a former player on the Jordanian National Volleyball Team and has experience in professional training, coaching, and youth mentorship in sports. Coach Rahaf has a broad skill set, which she utilizes off and on the court, to support athlete development and foster team growth.',
-    achievements: [
-      'Former player on the Jordanian National Volleyball Team',
-      'Experience in professional training and youth mentorship'
-    ]
-  },
-  {
-    id: '9',
-    sport: 'Volleyball',
-    name: 'Coach Raghad',
-    description: 'Coach Raghad has extensive experience in volleyball. She is a volleyball coach for Abd Alhammed Sharaf International School, where she prepares athletes for professional competitions and tournaments. She is a professional volleyball player with the Al-Nassr club and is also part of the Jordanian National Team. Overall, Coach Raghad demonstrates passion and ambition through her dedication and skill, achieving strong connections with both coaches and players.',
-    achievements: [
-      'Volleyball coach at Abd Alhammed Sharaf International School',
-      'Professional volleyball player with Al-Nassr club',
-      'Member of the Jordanian National Volleyball Team'
-    ]
-  },
-  {
-    id: '10',
-    sport: 'Volleyball',
-    name: 'Coach Ayham',
-    description: 'Player for Shabab Al-Hussein Club and the Jordanian Men\'s National Team, and a coach at Spikers Academy for youth age groups. Holds an official coaching certificate from the International Volleyball Federation (FIVB).',
-    achievements: [
-      'Player for Shabab Al-Hussein Club',
-      'Player for the Jordanian Men\'s National Team',
-      'Coach at Spikers Academy for youth age groups',
-      'FIVB Official Coaching Certificate'
-    ],
-    imageUrl: '/ayham.jpeg'
-  }
-];
-
-function CoachesSection() {
-  const [selectedSport, setSelectedSport] = useState<string>('All');
-  const [expandedCoaches, setExpandedCoaches] = useState<Set<string>>(new Set());
-  
-  // Get unique sports from coaches data
-  const sports = ['All', ...Array.from(new Set(COACHES_DATA.map(coach => coach.sport)))];
-  
-  // Filter coaches based on selected sport
-  const filteredCoaches = selectedSport === 'All' 
-    ? COACHES_DATA 
-    : COACHES_DATA.filter(coach => coach.sport === selectedSport);
-
-  // Toggle coach expansion
-  const toggleCoach = (coachId: string) => {
-    setExpandedCoaches(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(coachId)) {
-        newSet.delete(coachId);
-      } else {
-        newSet.add(coachId);
-      }
-      return newSet;
-    });
-  };
-
-  // Truncate description to 150 characters
-  const truncateDescription = (text: string, maxLength: number = 150) => {
-    if (text.length <= maxLength) return text;
-    return text.slice(0, maxLength) + '...';
-  };
-
-  return (
-    <section id="trainer" className="bg-gray-50 py-12 sm:py-16 md:py-20 lg:py-24">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <ScrollAnimation direction="up">
-          <div className="flex flex-col gap-3 sm:gap-4 text-center mb-12">
-            <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Trainer</p>
-            <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Our Coaching Team</h2>
-          </div>
-        </ScrollAnimation>
-        
-        {/* About Subsection */}
-        <ScrollAnimation direction="up" delay={50}>
-          <div className="max-w-4xl mx-auto mb-16">
-            <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-8 shadow-[0_8px_32px_rgba(0,0,0,0.08)] sm:p-12">
-              <h3 className="text-2xl font-black text-brand-black mb-4">About Our Coaches</h3>
-              <p className="text-base text-gray-600 leading-relaxed sm:text-lg">
-                Our coaching team consists of experienced professionals who are passionate about developing young athletes. Each coach brings unique expertise, from FIBA-licensed basketball coaches to national team gymnastics coaches, all dedicated to helping athletes reach their full potential.
-              </p>
-              <p className="mt-4 text-base text-gray-600 leading-relaxed sm:text-lg">
-                We believe in a holistic approach to training, combining technical skills, physical conditioning, and mental preparation to create well-rounded athletes ready to compete at the highest levels.
-              </p>
-            </div>
-          </div>
-        </ScrollAnimation>
-
-        {/* Sport Filter Buttons */}
-        <ScrollAnimation direction="up" delay={100}>
-          <div className="flex flex-wrap justify-center gap-3 mb-8 sm:mb-12">
-            {sports.map((sport) => (
-              <button
-                key={sport}
-                onClick={() => setSelectedSport(sport)}
-                className={`px-6 py-3 rounded-full text-sm font-semibold transition-all duration-300 ${
-                  selectedSport === sport
-                    ? 'bg-brand-green-primary text-white shadow-lg transform scale-105'
-                    : 'bg-white text-brand-black border-2 border-brand-lightBlue/20 hover:border-brand-green-primary/60 hover:shadow-md'
-                }`}
-              >
-                {sport}
-              </button>
-            ))}
-          </div>
-        </ScrollAnimation>
-
-        {/* Coaches Grid */}
-        {filteredCoaches.length > 0 ? (
-          <div className="mt-8 grid gap-6 sm:mt-12 sm:gap-8 md:grid-cols-2 lg:mt-16 lg:grid-cols-3">
-            {filteredCoaches.map((coach, index) => {
-              const isExpanded = expandedCoaches.has(coach.id);
-              const description = isExpanded 
-                ? coach.description 
-                : truncateDescription(coach.description);
-              const showReadMore = coach.description.length > 150;
-
-              return (
-                <ScrollAnimation key={coach.id} direction="up" delay={index * 100}>
-                  <div 
-                    className="flex flex-col rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8 cursor-pointer h-full"
-                    onClick={() => toggleCoach(coach.id)}
-                  >
-                    {coach.imageUrl && (
-                      <div className="mb-4 -mt-2 -mx-2 sm:-mt-4 sm:-mx-4 flex-shrink-0">
-                        <div className="relative h-48 w-full overflow-hidden rounded-t-2xl">
-                          <Image
-                            src={coach.imageUrl}
-                            alt={coach.name}
-                            fill
-                            className="object-cover"
-                            style={
-                              coach.id === '10' 
-                                ? { objectPosition: 'center 15%' } 
-                                : coach.id === '7' 
-                                ? { objectPosition: 'center 15%' } 
-                                : undefined
-                            }
-                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                          />
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex-shrink-0">
-                      <p className="text-xs uppercase tracking-[0.35em] text-brand-green-dark font-bold">{coach.sport}</p>
-                      <h3 className="mt-3 text-2xl font-black text-brand-black">{coach.name}</h3>
-                    </div>
-                    <div className="flex-grow flex flex-col min-h-0">
-                      <div 
-                        className="mt-4 text-sm text-gray-600 leading-relaxed"
-                        style={!isExpanded ? {
-                          display: '-webkit-box',
-                          WebkitLineClamp: 4,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        } : {}}
-                      >
-                        {description}
-                      </div>
-                      {showReadMore && (
-                        <button 
-                          className="mt-2 text-xs font-semibold text-brand-green-primary hover:text-brand-green-dark transition-colors self-start"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleCoach(coach.id);
-                          }}
-                        >
-                          {isExpanded ? 'Read less' : 'Read more'}
-                        </button>
-                      )}
-                      {isExpanded && coach.achievements && coach.achievements.length > 0 && (
-                        <ul className="mt-4 space-y-1.5 text-xs text-gray-600">
-                          {coach.achievements.map((achievement, idx) => (
-                            <li key={idx} className="flex items-start gap-2">
-                              <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-brand-green-primary" />
-                              <span>{achievement}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      {isExpanded && coach.quote && (
-                        <p className="mt-4 text-xs italic text-gray-500 leading-relaxed">
-                          &ldquo;{coach.quote}&rdquo;
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </ScrollAnimation>
-              );
-            })}
-          </div>
-        ) : (
-          <ScrollAnimation direction="up" delay={200}>
-            <div className="text-center py-12">
-              <p className="text-lg text-gray-600">No coaches found for this sport.</p>
-            </div>
-          </ScrollAnimation>
-        )}
-      </div>
-    </section>
-  );
-}
-
 export function HomeContent({ content }: HomeContentProps) {
   const hero = content.hero;
   const heroTitle = hero.title?.trim() || "Infinity Sport – Learn, Adapt, Evolve";
@@ -340,10 +47,28 @@ export function HomeContent({ content }: HomeContentProps) {
   // Parallax effect for hero
   const [scrollY, setScrollY] = useState(0);
   const heroRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoError, setVideoError] = useState(false);
   const [contactForm, setContactForm] = useState({ name: "", email: "", message: "" });
   const [contactStatus, setContactStatus] = useState<"idle" | "success" | "error">("idle");
   const [contactFeedback, setContactFeedback] = useState("");
   const [contactSubmitting, setContactSubmitting] = useState(false);
+
+  // Reset video state when component mounts (when navigating back to page)
+  useEffect(() => {
+    setVideoError(false);
+    // Try to play video when component mounts
+    if (videoRef.current) {
+      videoRef.current.load();
+      videoRef.current.play().catch((error) => {
+        // Autoplay can be blocked in some cases; we retry on canplay below.
+        if (process.env.NODE_ENV !== "production") {
+          console.log("Hero video autoplay prevented (will retry):", error);
+        }
+        // Don't set error immediately, let it try to load first
+      });
+    }
+  }, []);
 
   useEffect(() => {
     let ticking = false;
@@ -417,11 +142,12 @@ export function HomeContent({ content }: HomeContentProps) {
           }}
         >
           <video
+            ref={videoRef}
             autoPlay
             muted
             loop
             playsInline
-            preload="metadata"
+            preload="auto"
             className="absolute inset-0 h-full w-full object-cover"
             style={{ 
               objectFit: 'cover',
@@ -429,19 +155,68 @@ export function HomeContent({ content }: HomeContentProps) {
               height: '100%',
               minWidth: '100%',
               minHeight: '100%',
-              willChange: 'transform'
+              willChange: 'transform',
+              display: videoError ? 'none' : 'block'
             }}
             onLoadedData={(e) => {
               // Ensure video plays after loading
               const video = e.currentTarget;
-              video.play().catch(() => {
-                // Autoplay failed, but that's okay
+              video.play().catch((error) => {
+                if (process.env.NODE_ENV !== "production") {
+                  console.log("Hero video play failed (will retry):", error);
+                }
+                // Retry after a short delay
+                setTimeout(() => {
+                  video.play().catch(() => {
+                    // Only set error if it truly fails after retry
+                    if (process.env.NODE_ENV !== "production") {
+                      console.warn("Hero video failed to play after retry");
+                    }
+                    setVideoError(true);
+                  });
+                }, 500);
               });
+            }}
+            onCanPlay={(e) => {
+              // Try to play when video can play
+              const video = e.currentTarget;
+              if (video.paused) {
+                video.play().catch(() => {
+                  // Silent fail, will try again
+                });
+              }
+            }}
+            onError={(e) => {
+              // Some browsers (or codecs) fail to decode; keep logs quiet for users.
+              if (process.env.NODE_ENV !== "production") {
+                const el = e.currentTarget;
+                console.warn("Hero video error", {
+                  src: el.currentSrc,
+                  networkState: el.networkState,
+                  readyState: el.readyState,
+                  errorCode: el.error?.code,
+                  errorMessage: el.error?.message
+                });
+              }
+              // Only set error after a delay to allow for retries
+              setTimeout(() => {
+                setVideoError(true);
+              }, 2000);
             }}
           >
             <source src={HERO_VIDEO_PATH} type="video/mp4" />
             Your browser does not support the video tag.
           </video>
+          {videoError && (
+            <Image
+              src={HERO_FALLBACK_IMAGE}
+              alt="Hero background"
+              fill
+              className="absolute inset-0 object-cover"
+              priority
+              sizes="100vw"
+            />
+          )}
         </div>
         
         {/* Cinematic Gradient Overlay: Top-left BLUE → Bottom-right GREEN */}
@@ -603,386 +378,61 @@ export function HomeContent({ content }: HomeContentProps) {
       {/* Premium Facilities Section */}
       <section id="facilities" className="bg-white py-12 sm:py-16 md:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <ScrollAnimation direction="up">
-            <div className="flex flex-col gap-3 sm:gap-4">
-              <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Facility Highlights</p>
-              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Our Facility & Venues</h2>
-              <p className="max-w-2xl text-base text-gray-600 leading-relaxed sm:text-lg">
-                Infinity offers multiple premium spaces for training, events, and private sessions.
-              </p>
-            </div>
-          </ScrollAnimation>
-          <div className="mt-8 grid gap-6 sm:mt-12 sm:gap-8 md:grid-cols-2 lg:mt-16 lg:grid-cols-3">
-            {/* Paddle Court */}
-            <ScrollAnimation direction="up" delay={0}>
-              <div className="group rounded-2xl border-2 border-brand-lightBlue/20 bg-white overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)]">
-                <div className="relative h-48 bg-gradient-to-br from-gray-200 to-gray-300">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-gray-400 text-sm font-semibold">Paddle Court Photo</span>
-                  </div>
-                </div>
-                <div className="p-6 sm:p-8">
-                  <h3 className="text-2xl font-black text-brand-black">Paddle Court</h3>
-                  <p className="mt-3 text-sm text-gray-600 leading-relaxed">
-                    Premium paddle court facility for training and competitive play.
-                  </p>
-                </div>
-              </div>
-            </ScrollAnimation>
-
-            {/* 3x3 Basketball Court */}
-            <ScrollAnimation direction="up" delay={100}>
-              <div className="group rounded-2xl border-2 border-brand-lightBlue/20 bg-white overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)]">
-                <div className="relative h-48 bg-gradient-to-br from-gray-200 to-gray-300">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-gray-400 text-sm font-semibold">3x3 Basketball Court Photo</span>
-                  </div>
-                </div>
-                <div className="p-6 sm:p-8">
-                  <h3 className="text-2xl font-black text-brand-black">3x3 Basketball Court</h3>
-                  <p className="mt-3 text-sm text-gray-600 leading-relaxed">
-                    Dedicated 3x3 basketball court for fast-paced games and training sessions.
-                  </p>
-                </div>
-              </div>
-            </ScrollAnimation>
-
-            {/* 5x5 Basketball Court */}
-            <ScrollAnimation direction="up" delay={200}>
-              <div className="group rounded-2xl border-2 border-brand-lightBlue/20 bg-white overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)]">
-                <div className="relative h-48 bg-gradient-to-br from-gray-200 to-gray-300">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-gray-400 text-sm font-semibold">5x5 Basketball Court Photo</span>
-                  </div>
-                </div>
-                <div className="p-6 sm:p-8">
-                  <h3 className="text-2xl font-black text-brand-black">5x5 Basketball Court</h3>
-                  <p className="mt-3 text-sm text-gray-600 leading-relaxed">
-                    Full-size basketball court for complete games and team training.
-                  </p>
-                </div>
-              </div>
-            </ScrollAnimation>
-
-            {/* Multipurpose Hall */}
-            <ScrollAnimation direction="up" delay={300}>
-              <div className="group rounded-2xl border-2 border-brand-lightBlue/20 bg-white overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)]">
-                <div className="relative h-48 bg-gradient-to-br from-gray-200 to-gray-300">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-gray-400 text-sm font-semibold">Multipurpose Hall Photo</span>
-                  </div>
-                </div>
-                <div className="p-6 sm:p-8">
-                  <h3 className="text-2xl font-black text-brand-black">Multipurpose Hall</h3>
-                <p className="mt-3 text-sm text-gray-600 leading-relaxed mb-4">
-                  Versatile space for private lessons and specialized training.
+          <Link href="/facilities" className="block">
+            <ScrollAnimation direction="up">
+              <div className="flex flex-col gap-3 sm:gap-4 cursor-pointer group">
+                <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Facility Highlights</p>
+                <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl group-hover:text-brand-green-primary transition-colors">Our Facility & Venues</h2>
+                <p className="max-w-2xl text-base text-gray-600 leading-relaxed sm:text-lg">
+                  Infinity offers multiple premium spaces for training, events, and private sessions.
                 </p>
-                <div className="mt-4 pt-4 border-t border-brand-lightBlue/20">
-                  <p className="text-xs font-semibold text-gray-700 mb-2">Available for:</p>
-                  <ul className="space-y-1.5 text-sm text-gray-600">
-                    <li className="flex items-center gap-2">
-                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                      Boxing
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                      Muay Thai
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                      MMA
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                      Ballet
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                      Yoga
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                      Pilates
-                    </li>
-                  </ul>
-                </div>
+                <div className="mt-6 flex items-center gap-2 text-brand-green-primary font-semibold group-hover:gap-4 transition-all">
+                  <span>View All Facilities</span>
+                  <ArrowRightIcon className="w-5 h-5" />
                 </div>
               </div>
             </ScrollAnimation>
-
-            {/* Training Center - Basketball */}
-            <ScrollAnimation direction="up" delay={400}>
-              <div className="group rounded-2xl border-2 border-brand-lightBlue/20 bg-white overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)]">
-                <div className="relative h-48 bg-gradient-to-br from-gray-200 to-gray-300">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-gray-400 text-sm font-semibold">Basketball Training Center Photo</span>
-                  </div>
-                </div>
-                <div className="p-6 sm:p-8">
-                  <h3 className="text-2xl font-black text-brand-black">Basketball Training Center</h3>
-                <p className="mt-3 text-sm text-gray-600 leading-relaxed">
-                  Dedicated training facility for youth competitive basketball programs.
-                </p>
-                </div>
-              </div>
-            </ScrollAnimation>
-
-            {/* Training Center - Volleyball */}
-            <ScrollAnimation direction="up" delay={500}>
-              <div className="group rounded-2xl border-2 border-brand-lightBlue/20 bg-white overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)]">
-                <div className="relative h-48 bg-gradient-to-br from-gray-200 to-gray-300">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-gray-400 text-sm font-semibold">Volleyball Training Center Photo</span>
-                  </div>
-                </div>
-                <div className="p-6 sm:p-8">
-                  <h3 className="text-2xl font-black text-brand-black">Volleyball Training Center</h3>
-                <p className="mt-3 text-sm text-gray-600 leading-relaxed">
-                  Specialized facility for youth competitive volleyball training.
-                </p>
-                </div>
-              </div>
-            </ScrollAnimation>
-
-            {/* Training Center - Gymnastics */}
-            <ScrollAnimation direction="up" delay={600}>
-              <div className="group rounded-2xl border-2 border-brand-lightBlue/20 bg-white overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)]">
-                <div className="relative h-48 bg-gradient-to-br from-gray-200 to-gray-300">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-gray-400 text-sm font-semibold">Gymnastics Training Center Photo</span>
-                  </div>
-                </div>
-                <div className="p-6 sm:p-8">
-                  <h3 className="text-2xl font-black text-brand-black">Gymnastics Training Center</h3>
-                  <p className="mt-3 text-sm text-gray-600 leading-relaxed">
-                    Professional gymnastics facility for youth competitive programs.
-                  </p>
-                </div>
-              </div>
-            </ScrollAnimation>
-          </div>
+          </Link>
         </div>
       </section>
 
-      {/* Trainer Section - Coaches & About */}
-      <CoachesSection />
 
       {/* Basketball Programs & Pricing Section */}
       <section id="basketball-programs" className="bg-white py-12 sm:py-16 md:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <ScrollAnimation direction="up">
-            <div className="flex flex-col gap-3 sm:gap-4 text-center mb-12">
-              <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Programs</p>
-              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Basketball Programs & Pricing</h2>
-              <p className="max-w-2xl mx-auto text-base text-gray-600 leading-relaxed sm:text-lg">
-                All basketball programs include 12 sessions over three weeks.
-              </p>
-            </div>
-          </ScrollAnimation>
-          <div className="grid gap-6 md:grid-cols-3">
-            {/* Program 1 - 6-9 years */}
-            <ScrollAnimation direction="up" delay={0}>
-              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
-                <div className="mb-4">
-                  <span className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold">Age Group</span>
-                  <h3 className="mt-2 text-xl font-black text-brand-black">6–9 years – Jumpstarters</h3>
-                </div>
-                <div className="mb-4">
-                  <span className="text-3xl font-black text-brand-black">110 JD</span>
-                </div>
-                <div className="space-y-2 text-sm text-gray-600">
-                  <p className="font-semibold text-gray-700">Schedule:</p>
-                  <ul className="space-y-1.5">
-                    <li className="flex items-center gap-2">
-                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                      Monday: 5–6 PM
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                      Wednesday: 5–6 PM
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                      Friday: 11–12 AM
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                      Saturday: 4–5 PM
-                    </li>
-                  </ul>
+          <Link href="/sports" className="block">
+            <ScrollAnimation direction="up">
+              <div className="flex flex-col gap-3 sm:gap-4 text-center cursor-pointer group">
+                <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Programs</p>
+                <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl group-hover:text-brand-green-primary transition-colors">Basketball Programs & Pricing</h2>
+                <p className="max-w-2xl mx-auto text-base text-gray-600 leading-relaxed sm:text-lg">
+                  All basketball programs include 12 sessions over three weeks.
+                </p>
+                <div className="mt-6 flex items-center justify-center gap-2 text-brand-green-primary font-semibold group-hover:gap-4 transition-all">
+                  <span>View All Programs</span>
+                  <ArrowRightIcon className="w-5 h-5" />
                 </div>
               </div>
             </ScrollAnimation>
-
-            {/* Program 2 - 10-13 years */}
-            <ScrollAnimation direction="up" delay={100}>
-              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
-                <div className="mb-4">
-                  <span className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold">Age Group</span>
-                  <h3 className="mt-2 text-xl font-black text-brand-black">10–13 years – Fastbreakers</h3>
-                </div>
-                <div className="mb-4">
-                  <span className="text-3xl font-black text-brand-black">120 JD</span>
-                </div>
-                <div className="space-y-2 text-sm text-gray-600">
-                  <p className="font-semibold text-gray-700">Schedule:</p>
-                  <ul className="space-y-1.5">
-                    <li className="flex items-center gap-2">
-                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                      Monday: 6–7 PM
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                      Wednesday: 6–7 PM
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                      Friday: 12–1 PM
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                      Saturday: 5–6 PM
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </ScrollAnimation>
-
-            {/* Program 3 - 13-16 years */}
-            <ScrollAnimation direction="up" delay={200}>
-              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
-                <div className="mb-4">
-                  <span className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold">Age Group</span>
-                  <h3 className="mt-2 text-xl font-black text-brand-black">13–16 years – Slam Squads</h3>
-                </div>
-                <div className="mb-4">
-                  <span className="text-3xl font-black text-brand-black">130 JD</span>
-                </div>
-                <div className="space-y-2 text-sm text-gray-600">
-                  <p className="font-semibold text-gray-700">Schedule:</p>
-                  <ul className="space-y-1.5">
-                    <li className="flex items-center gap-2">
-                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                      Monday: 7–8 PM
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                      Wednesday: 7–8 PM
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                      Friday: 1–2 PM
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                      Saturday: 6–7 PM
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </ScrollAnimation>
-          </div>
+          </Link>
         </div>
       </section>
 
       {/* Gymnastics Packages Section */}
       <section id="gymnastics-packages" className="bg-gray-50 py-12 sm:py-16 md:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <ScrollAnimation direction="up">
-            <div className="flex flex-col gap-3 sm:gap-4 text-center mb-12">
-              <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Packages</p>
-              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Gymnastics Packages</h2>
-            </div>
-          </ScrollAnimation>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {/* Package A */}
-            <ScrollAnimation direction="up" delay={0}>
-              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
-                <h3 className="text-xl font-black text-brand-black mb-4">Package A</h3>
-                <div className="mb-4">
-                  <span className="text-3xl font-black text-brand-black">120 JD</span>
+          <Link href="/sports" className="block">
+            <ScrollAnimation direction="up">
+              <div className="flex flex-col gap-3 sm:gap-4 text-center cursor-pointer group">
+                <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Packages</p>
+                <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl group-hover:text-brand-green-primary transition-colors">Gymnastics Packages</h2>
+                <div className="mt-6 flex items-center justify-center gap-2 text-brand-green-primary font-semibold group-hover:gap-4 transition-all">
+                  <span>View All Packages</span>
+                  <ArrowRightIcon className="w-5 h-5" />
                 </div>
-                <ul className="space-y-2 text-sm text-gray-600">
-                  <li className="flex items-center gap-2">
-                    <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                    3 days per week
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                    1 hour per session
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                    12 hours total
-                  </li>
-                </ul>
               </div>
             </ScrollAnimation>
-
-            {/* Package B */}
-            <ScrollAnimation direction="up" delay={100}>
-              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
-                <h3 className="text-xl font-black text-brand-black mb-4">Package B</h3>
-                <div className="mb-4">
-                  <span className="text-3xl font-black text-brand-black">100 JD</span>
-                </div>
-                <ul className="space-y-2 text-sm text-gray-600">
-                  <li className="flex items-center gap-2">
-                    <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                    2 days per week
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                    1 hour per session
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                    8 hours total
-                  </li>
-                </ul>
-              </div>
-            </ScrollAnimation>
-
-            {/* Package C */}
-            <ScrollAnimation direction="up" delay={200}>
-              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
-                <h3 className="text-xl font-black text-brand-black mb-4">Package C</h3>
-                <div className="mb-4">
-                  <span className="text-3xl font-black text-brand-black">140 JD</span>
-                  </div>
-                <ul className="space-y-2 text-sm text-gray-600">
-                  <li className="flex items-center gap-2">
-                    <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                    3 days per week
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                    1.5 hours per session
-                  </li>
-                </ul>
-                  </div>
-            </ScrollAnimation>
-
-            {/* Package D */}
-            <ScrollAnimation direction="up" delay={300}>
-              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] sm:p-8">
-                <h3 className="text-xl font-black text-brand-black mb-4">Package D</h3>
-                <div className="mb-4">
-                  <span className="text-3xl font-black text-brand-black">120 JD</span>
-                </div>
-                <ul className="space-y-2 text-sm text-gray-600">
-                  <li className="flex items-center gap-2">
-                    <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                    2 days per week
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                    1.5 hours per session
-                  </li>
-                </ul>
-                </div>
-              </ScrollAnimation>
-          </div>
+          </Link>
         </div>
       </section>
 
@@ -1173,22 +623,128 @@ export function HomeContent({ content }: HomeContentProps) {
               <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Coming Events</h2>
             </div>
           </ScrollAnimation>
+          
+          {/* Featured Event Image */}
+          <ScrollAnimation direction="up" delay={50}>
+            <div className="mt-8 sm:mt-12 lg:mt-16">
+              <div className="group relative overflow-hidden rounded-2xl border-2 border-brand-lightBlue/20 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-2 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)]">
+                <div className="relative h-64 sm:h-80 md:h-96 lg:h-[500px] w-full">
+                  <Image
+                    src="/events.jpeg"
+                    alt="Upcoming Event"
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 100vw, 1280px"
+                    priority
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-8 md:p-10 text-white">
+                    <p className="text-xs uppercase tracking-[0.35em] text-white/90 font-bold sm:text-sm mb-2">
+                      Upcoming Event
+                    </p>
+                    <h3 className="text-2xl font-black sm:text-3xl md:text-4xl mb-2">
+                      Join Us for Our Next Event
+                    </h3>
+                    <p className="text-sm text-white/90 sm:text-base max-w-2xl">
+                      Don't miss out on this exciting opportunity to be part of our community.
+                    </p>
+                    <Link 
+                      href="/events" 
+                      className="group/link mt-4 inline-flex items-center gap-2 text-sm font-bold text-white bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full transition-all duration-300 hover:bg-white/30 hover:gap-3"
+                    >
+                      View Event Details
+                      <ArrowRightIcon className="h-4 w-4 transition-transform duration-300 group-hover/link:translate-x-1" />
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ScrollAnimation>
+
           <div className="mt-8 grid gap-6 sm:mt-12 sm:gap-8 md:grid-cols-2 lg:mt-16 lg:grid-cols-3">
             {upcomingEvents.map((event, idx) => (
-              <ScrollAnimation key={event.id} direction="up" delay={idx * 100}>
-                <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-blue-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] hover:scale-105 sm:p-8">
-                  <p className="text-xs uppercase tracking-[0.35em] text-brand-green-dark font-bold">
-                    {new Date(event.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                  </p>
-                  <h3 className="mt-4 text-2xl font-black text-brand-black">{event.title}</h3>
-                  <p className="mt-2 text-sm text-gray-600 leading-relaxed">{event.location ?? "Infinity Campus"}</p>
-                  <Link href={event.link || "/events"} className="group/link mt-6 inline-flex items-center gap-2 text-sm font-bold text-brand-blue-primary transition-colors duration-300 hover:text-brand-green-primary">
-                    View details
-                    <ArrowRightIcon className="h-4 w-4 transition-transform duration-300 group-hover/link:translate-x-1" />
-                  </Link>
-                </div>
+              <ScrollAnimation key={event.id} direction="up" delay={(idx + 1) * 100}>
+                <Link href="/events" className="block">
+                  <div className="group rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] hover:scale-105 sm:p-8">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-xs uppercase tracking-[0.35em] text-brand-green-dark font-bold">
+                        {new Date(event.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                      </p>
+                      <span className="rounded-full bg-brand-green-primary/10 px-3 py-1 text-xs font-semibold text-brand-green-primary">
+                        Upcoming
+                      </span>
+                    </div>
+                    <h3 className="text-2xl font-black text-brand-black group-hover:text-brand-green-primary transition-colors">{event.title}</h3>
+                    <p className="mt-2 text-sm text-gray-600 leading-relaxed flex items-center gap-2">
+                      <svg className="h-4 w-4 text-brand-green-primary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      {event.location ?? "Infinity Campus"}
+                    </p>
+                    <div className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-brand-blue-primary transition-colors duration-300 group-hover:text-brand-green-primary">
+                      View Event Details
+                      <ArrowRightIcon className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                    </div>
+                  </div>
+                </Link>
               </ScrollAnimation>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Contact Details Section */}
+      <section id="contact-details" className="bg-white py-12 sm:py-16 md:py-20 lg:py-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <ScrollAnimation direction="up">
+            <div className="flex flex-col gap-3 sm:gap-4 text-center mb-12">
+              <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Contact</p>
+              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Contact Details</h2>
+            </div>
+          </ScrollAnimation>
+          <div className="max-w-4xl mx-auto">
+            <ScrollAnimation direction="up" delay={100}>
+              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-8 shadow-[0_8px_32px_rgba(0,0,0,0.08)] sm:p-12">
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold mb-3">Phone</p>
+                    <a 
+                      href="tel:+962796244059" 
+                      className="text-base text-brand-black font-semibold hover:text-brand-green-primary transition-colors"
+                    >
+                      +962 7 9624 4059
+                    </a>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold mb-3">Email</p>
+                    <a 
+                      href="mailto:infinitysportsacademyjo@gmail.com" 
+                      className="text-base text-brand-black font-semibold hover:text-brand-green-primary transition-colors break-all"
+                    >
+                      infinitysportsacademyjo@gmail.com
+                    </a>
+                  </div>
+                  <div className="sm:col-span-2 lg:col-span-1">
+                    <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold mb-3">Instagram</p>
+                    <a 
+                      href="https://instagram.com/infinity.sports.academy" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-base text-brand-black font-semibold hover:text-brand-green-primary transition-colors"
+                    >
+                      infinity.sports.academy
+                    </a>
+                  </div>
+                  <div className="sm:col-span-2 lg:col-span-3">
+                    <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold mb-3">Location</p>
+                    <p className="text-base text-brand-black font-semibold">
+                      Shmeisani, Princess Alia College
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </ScrollAnimation>
           </div>
         </div>
       </section>

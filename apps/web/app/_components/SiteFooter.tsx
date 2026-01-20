@@ -8,7 +8,7 @@ export async function SiteFooter() {
   const content = await fetchLandingContent();
   const footer = content.footer;
   const lang = normalizeLanguage(cookies().get('infinity-language')?.value);
-  const instagram = Array.isArray(footer.socialLinks)
+  const instagram: string | undefined = Array.isArray(footer.socialLinks)
     ? footer.socialLinks.find((l) => l.label?.toLowerCase().includes('instagram'))?.href
     : undefined;
   // Convert phone to international format for tel: link (07 9624 4059 -> +962796244059)

@@ -7,7 +7,8 @@ import { normalizeLanguage, tr } from '../../lib/translations';
 export async function SiteFooter() {
   const content = await fetchLandingContent();
   const footer = content.footer;
-  const lang = normalizeLanguage(cookies().get('infinity-language')?.value);
+  const cookieStore = await cookies();
+  const lang = normalizeLanguage(cookieStore.get('infinity-language')?.value);
   const instagram: string | undefined = Array.isArray(footer.socialLinks)
     ? footer.socialLinks.find((l) => l.label?.toLowerCase().includes('instagram'))?.href
     : undefined;

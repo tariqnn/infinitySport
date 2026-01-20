@@ -60,8 +60,9 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://infinitysports.jo')
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const lang = normalizeLanguage(cookies().get('infinity-language')?.value);
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const cookieStore = await cookies();
+  const lang = normalizeLanguage(cookieStore.get('infinity-language')?.value);
   const dir = lang === 'ar' ? 'rtl' : 'ltr';
 
   return (

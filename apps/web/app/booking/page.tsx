@@ -7,8 +7,9 @@ export const metadata = {
   description: 'Book a court at Infinity Sport. Choose your preferred court and time slot.'
 };
 
-export default function BookingPage() {
-  const lang = normalizeLanguage(cookies().get('infinity-language')?.value);
+export default async function BookingPage() {
+  const cookieStore = await cookies();
+  const lang = normalizeLanguage(cookieStore.get('infinity-language')?.value);
 
   return (
     <div className="bg-white py-24">

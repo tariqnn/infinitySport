@@ -10,7 +10,7 @@ export async function SiteFooter() {
   const lang = normalizeLanguage(cookies().get('infinity-language')?.value);
   const instagram = footer.socialLinks?.find((l) => l.label.toLowerCase().includes('instagram'))?.href;
   // Convert phone to international format for tel: link (07 9624 4059 -> +962796244059)
-  const phoneHref = footer.phone 
+  const phoneHref = footer.phone && typeof footer.phone === 'string'
     ? footer.phone.replace(/\s+/g, '').replace(/^07/, '+9627')
     : '+962796244059';
 

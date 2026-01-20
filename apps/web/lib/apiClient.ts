@@ -263,7 +263,7 @@ async function _fetchLandingContent(): Promise<LandingContent> {
                   if (!label || !href) return null;
                   return { id: id || label.toLowerCase(), label, href };
                 })
-                .filter(Boolean)
+                .filter((v): v is { id: string; label: string; href: string } => Boolean(v))
             : fallback.socialLinks;
 
         return {

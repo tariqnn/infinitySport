@@ -110,7 +110,9 @@ export async function fetchPrograms(): Promise<ProgramResponse[]> {
   try {
     return await jsonFetch<ProgramResponse[]>(`${API_BASE_URL}/api/public/programs`);
   } catch (error) {
-    console.error('Failed to fetch programs:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('Failed to fetch programs:', error);
+    }
     return [];
   }
 }
@@ -119,7 +121,9 @@ export async function fetchOffers(): Promise<OfferResponse[]> {
   try {
     return await jsonFetch<OfferResponse[]>(`${API_BASE_URL}/api/public/offers`);
   } catch (error) {
-    console.error('Failed to fetch offers:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('Failed to fetch offers:', error);
+    }
     return [];
   }
 }
@@ -128,7 +132,9 @@ export async function fetchEvents(): Promise<EventResponse[]> {
   try {
     return await jsonFetch<EventResponse[]>(`${API_BASE_URL}/api/public/events`);
   } catch (error) {
-    console.error('Failed to fetch events:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('Failed to fetch events:', error);
+    }
     return [];
   }
 }
@@ -137,7 +143,9 @@ export async function fetchFacilities(): Promise<FacilityResponse[]> {
   try {
     return await jsonFetch<FacilityResponse[]>(`${API_BASE_URL}/api/public/facilities`);
   } catch (error) {
-    console.error('Failed to fetch facilities:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('Failed to fetch facilities:', error);
+    }
     return [];
   }
 }
@@ -146,7 +154,9 @@ export async function fetchAnnouncements(): Promise<AnnouncementResponse[]> {
   try {
     return await jsonFetch<AnnouncementResponse[]>(`${API_BASE_URL}/api/public/announcements`);
   } catch (error) {
-    console.error('Failed to fetch announcements:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('Failed to fetch announcements:', error);
+    }
     return [];
   }
 }
@@ -271,7 +281,9 @@ async function _fetchLandingContent(): Promise<LandingContent> {
     
     return transformed;
   } catch (error) {
-    console.error('Failed to fetch landing content:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('Failed to fetch landing content:', error);
+    }
     // Return fallback data
     return {
       hero: {

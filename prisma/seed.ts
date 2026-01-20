@@ -265,8 +265,8 @@ async function main() {
   // Footer Settings
   await (prisma as any).footerSettings?.create?.({
     data: {
-      address: 'Shmeisani, Princess Alia College',
-      phone: '+962 7 9624 4059',
+      address: 'Shemisani, Princess Alia College',
+      phone: '07 9624 4059',
       email: 'infinitysportsacademyjo@gmail.com',
       contactRecipientEmail: 'infinitysportsacademyjo@gmail.com',
       socialLinks: [{ id: 'instagram', label: 'Instagram', href: 'https://instagram.com/infinity.sports.academy' }],

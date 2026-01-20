@@ -9,6 +9,8 @@ import { PlusIcon } from "@heroicons/react/24/outline";
 import type { LandingContent } from "@infinity/types";
 import { AnimatedText } from "./AnimatedText";
 import { ScrollAnimation } from "./ScrollAnimation";
+import { useLanguage } from "./LanguageProvider";
+import { tr } from "../../lib/translations";
 
 interface HomeContentProps {
   content: LandingContent;
@@ -19,6 +21,7 @@ const HERO_FALLBACK_IMAGE = "/hero-basketball.jpg"; // Fallback image if video f
 
 // Coach data structure
 export function HomeContent({ content }: HomeContentProps) {
+  const { language } = useLanguage();
   const hero = content.hero;
   const heroTitle = hero.title?.trim() || "Infinity Sport – Learn, Adapt, Evolve";
   const heroSubtitle =
@@ -118,12 +121,12 @@ export function HomeContent({ content }: HomeContentProps) {
 
       const result = await response.json();
       setContactStatus("success");
-      setContactFeedback(`Request sent. Our team will reply from ${result.submission.recipient}.`);
+      setContactFeedback(`${tr(language, 'home_contact_success')} ${result.submission.recipient}.`);
       setContactForm({ name: "", email: "", message: "" });
     } catch (error) {
       console.error("Contact request error", error);
       setContactStatus("error");
-      setContactFeedback("Something went wrong. Please try again in a moment.");
+      setContactFeedback(tr(language, 'home_contact_error'));
     } finally {
       setContactSubmitting(false);
     }
@@ -238,7 +241,7 @@ export function HomeContent({ content }: HomeContentProps) {
               
               {/* Tagline */}
               <AnimatedText delay={100} className="text-sm text-white/90 max-w-2xl leading-relaxed font-semibold uppercase tracking-[0.2em] sm:text-base md:text-lg">
-                Learn. Adapt. Evolve. Built for the next generation of athletes.
+                {tr(language, 'home_tagline')}
               </AnimatedText>
               
               {/* Subheading */}
@@ -252,7 +255,7 @@ export function HomeContent({ content }: HomeContentProps) {
                   href={primaryCta.href}
                   className="group inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-[#1426FF] via-[#69FFDB] to-[#61FF45] px-6 py-3.5 text-sm font-black text-white shadow-[0_8px_24px_rgba(20,38,255,0.4)] transition-all duration-300 hover:scale-105 hover:shadow-[0_12px_32px_rgba(20,38,255,0.6),0_0_30px_rgba(97,255,69,0.4)] sm:w-auto sm:px-8 sm:py-4 sm:text-base md:px-10 md:py-5"
                 >
-                  {primaryCta.label || "Explore Programs"}
+                  {primaryCta.label || tr(language, 'home_explore_programs')}
                   <ArrowRightIcon className="ml-2 h-4 w-4 sm:h-5 sm:w-5 transition-transform duration-300 group-hover:translate-x-1" />
                 </Link>
                 <Link
@@ -262,7 +265,7 @@ export function HomeContent({ content }: HomeContentProps) {
                   <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/10 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12 sm:h-10 sm:w-10">
                     <PlayIcon className="h-4 w-4 sm:h-5 sm:w-5" />
                   </span>
-                  {secondaryCta.label || "Book a Tour"}
+                  {secondaryCta.label || tr(language, 'home_book_tour')}
                 </Link>
               </AnimatedText>
 
@@ -280,7 +283,7 @@ export function HomeContent({ content }: HomeContentProps) {
                       </div>
                       {announcement.isPinned ? (
                         <span className="flex-shrink-0 rounded-full bg-[#61FF45]/20 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-[#61FF45] sm:px-3 sm:text-[10px]">
-                          Pinned
+                          {tr(language, 'home_pinned')}
                         </span>
                       ) : null}
                     </Link>
@@ -295,7 +298,7 @@ export function HomeContent({ content }: HomeContentProps) {
               {/* Facility Highlights Card - Floating Animation */}
               <ScrollAnimation direction="up" delay={400}>
                 <div className="group relative rounded-2xl border border-white/30 bg-white/15 p-4 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.2)] transition-all duration-500 hover:-translate-y-3 hover:shadow-[0_16px_48px_rgba(0,0,0,0.3)] animate-[float_6s_ease-in-out_infinite] sm:p-6 md:p-8">
-                  <p className="text-[10px] uppercase tracking-[0.25em] text-[#61FF45] font-black sm:text-xs">Facility Highlights</p>
+                  <p className="text-[10px] uppercase tracking-[0.25em] text-[#61FF45] font-black sm:text-xs">{tr(language, 'home_facility_highlights')}</p>
                   <h3 className="mt-2 text-xl font-black text-white sm:mt-3 sm:text-2xl">
                     {facilityHighlight?.name || "Infinity Arena"}
                   </h3>
@@ -315,7 +318,7 @@ export function HomeContent({ content }: HomeContentProps) {
               <ScrollAnimation direction="up" delay={500}>
                 <div className="rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-xl shadow-[0_8px_24px_rgba(0,0,0,0.15)] transition-all duration-500 hover:-translate-y-2 hover:bg-white/15 hover:shadow-[0_12px_32px_rgba(0,0,0,0.2)] sm:p-6">
                   <p className="text-xs leading-relaxed italic text-white/95 sm:text-sm md:text-base">
-                    &ldquo;Elite conditioning programs tailored for pros who demand results.&rdquo;
+                    &ldquo;{tr(language, 'home_elite_quote')}&rdquo;
                   </p>
                 </div>
               </ScrollAnimation>
@@ -324,11 +327,11 @@ export function HomeContent({ content }: HomeContentProps) {
               <ScrollAnimation direction="right" delay={600}>
                 <div className="rounded-2xl border border-white/30 bg-white/15 p-4 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.2)] transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_16px_48px_rgba(0,0,0,0.3)] sm:p-6 md:p-8">
                   <p className="text-[10px] uppercase tracking-[0.3em] text-[#69FFDB] font-black sm:text-xs sm:tracking-[0.4em]">
-                    {featuredOffer?.badge || "Featured plan"}
+                    {featuredOffer?.badge || tr(language, 'home_featured_plan')}
                   </p>
-                  <h4 className="mt-2 text-lg font-black text-white sm:mt-3 sm:text-xl">{featuredOffer?.name || "Elite Membership"}</h4>
+                  <h4 className="mt-2 text-lg font-black text-white sm:mt-3 sm:text-xl">{featuredOffer?.name || tr(language, 'home_elite_membership')}</h4>
                   <p className="mt-2 text-xs text-white/90 leading-relaxed sm:text-sm">
-                    {featuredOffer?.description || "Monthly, yearly, and family memberships built for your routine."}
+                    {featuredOffer?.description || tr(language, 'home_membership_features')}
                   </p>
                   <ul className="mt-3 space-y-1.5 text-xs text-white/85 sm:mt-4 sm:space-y-2 sm:text-sm">
                     {(featuredOffer?.features || []).slice(0, 3).map((feature) => (
@@ -342,7 +345,7 @@ export function HomeContent({ content }: HomeContentProps) {
                     href={featuredOffer?.link || "/offers"}
                     className="group mt-4 inline-flex w-full items-center justify-center rounded-full border border-white/30 bg-white/10 px-4 py-2 text-xs font-bold text-white transition-all duration-300 hover:scale-105 hover:bg-white/20 hover:border-white/50 sm:mt-6 sm:w-auto sm:px-6 sm:py-2.5 sm:text-sm"
                   >
-                    Explore Offers
+                    {tr(language, 'home_explore_offers')}
                     <ArrowRightIcon className="ml-2 h-3 w-3 transition-transform duration-300 group-hover:translate-x-1 sm:h-4 sm:w-4" />
                   </Link>
                 </div>
@@ -357,18 +360,18 @@ export function HomeContent({ content }: HomeContentProps) {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <ScrollAnimation direction="up">
             <div className="flex flex-col gap-3 sm:gap-4 text-center mb-12">
-              <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">About Us</p>
-              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Who We Are</h2>
+              <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">{tr(language, 'home_about_us')}</p>
+              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">{tr(language, 'home_who_we_are')}</h2>
             </div>
           </ScrollAnimation>
           <div className="max-w-4xl mx-auto">
             <ScrollAnimation direction="up" delay={100}>
               <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-8 shadow-[0_8px_32px_rgba(0,0,0,0.08)] sm:p-12">
                 <p className="text-base text-gray-600 leading-relaxed sm:text-lg md:text-xl">
-                  Infinity Sport is a modern sports facility designed for both leisure and competitive environments. We are a place where athletes and parents can watch kids learn, adapt, and evolve into modern-day players. Our mission is to provide cutting-edge innovation focused on youth development and high-performance training.
+                  {tr(language, 'home_about_desc')}
                 </p>
                 <p className="mt-6 text-base text-gray-600 leading-relaxed sm:text-lg md:text-xl">
-                  We believe in the power of sports to transform lives. Through our comprehensive programs, world-class facilities, and expert coaching team, we create an environment where every athlete can reach their full potential.
+                  {tr(language, 'home_about_desc2')}
                 </p>
               </div>
             </ScrollAnimation>
@@ -382,13 +385,13 @@ export function HomeContent({ content }: HomeContentProps) {
           <Link href="/facilities" className="block">
             <ScrollAnimation direction="up">
               <div className="flex flex-col gap-3 text-center sm:gap-4 cursor-pointer group">
-                <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Facility Highlights</p>
-                <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl group-hover:text-brand-green-primary transition-colors">Our Facility & Venues</h2>
+                <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">{tr(language, 'home_facility_highlights')}</p>
+                <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl group-hover:text-brand-green-primary transition-colors">{tr(language, 'home_our_facilities')}</h2>
                 <p className="max-w-2xl mx-auto text-base text-gray-600 leading-relaxed sm:text-lg">
-                  Infinity offers multiple premium spaces for training, events, and private sessions.
+                  {tr(language, 'home_facilities_desc')}
                 </p>
                 <div className="mt-6 flex items-center justify-center gap-2 text-brand-green-primary font-semibold group-hover:gap-4 transition-all">
-                  <span>View All Facilities</span>
+                  <span>{tr(language, 'home_view_all_facilities')}</span>
                   <ArrowRightIcon className="w-5 h-5" />
                 </div>
               </div>
@@ -404,13 +407,13 @@ export function HomeContent({ content }: HomeContentProps) {
           <Link href="/sports" className="block">
             <ScrollAnimation direction="up">
               <div className="flex flex-col gap-3 sm:gap-4 text-center cursor-pointer group">
-                <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Programs</p>
-                <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl group-hover:text-brand-green-primary transition-colors">Basketball Programs & Pricing</h2>
+                <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">{tr(language, 'home_programs')}</p>
+                <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl group-hover:text-brand-green-primary transition-colors">{tr(language, 'home_basketball_programs')}</h2>
                 <p className="max-w-2xl mx-auto text-base text-gray-600 leading-relaxed sm:text-lg">
-                  All basketball programs include 12 sessions over three weeks.
+                  {tr(language, 'home_programs_desc')}
                 </p>
                 <div className="mt-6 flex items-center justify-center gap-2 text-brand-green-primary font-semibold group-hover:gap-4 transition-all">
-                  <span>View All Programs</span>
+                  <span>{tr(language, 'home_view_all_programs')}</span>
                   <ArrowRightIcon className="w-5 h-5" />
                 </div>
               </div>
@@ -425,8 +428,8 @@ export function HomeContent({ content }: HomeContentProps) {
           <Link href="/sports" className="block">
             <ScrollAnimation direction="up">
               <div className="flex flex-col gap-3 sm:gap-4 text-center cursor-pointer group">
-                <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Packages</p>
-                <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl group-hover:text-brand-green-primary transition-colors">Gymnastics Packages</h2>
+                <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">{tr(language, 'home_packages')}</p>
+                <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl group-hover:text-brand-green-primary transition-colors">{tr(language, 'home_gymnastics_packages')}</h2>
                 <div className="mt-6 flex items-center justify-center gap-2 text-brand-green-primary font-semibold group-hover:gap-4 transition-all">
                   <span>View All Packages</span>
                   <ArrowRightIcon className="w-5 h-5" />
@@ -442,11 +445,11 @@ export function HomeContent({ content }: HomeContentProps) {
         <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <ScrollAnimation direction="up">
-            <div className="flex flex-col gap-3 sm:gap-4">
-              <p className="text-xs uppercase tracking-[0.3em] text-white/90 font-bold sm:text-sm">Programs</p>
-              <h2 className="text-3xl font-black text-white leading-tight sm:text-4xl md:text-5xl">Game-ready coaching</h2>
-              <p className="max-w-2xl text-base text-white/95 leading-relaxed sm:text-lg">
-                Basketball, padel, tennis, volleyball, and multi-sport conditioning with tournament-ready formats.
+            <div className="flex flex-col gap-3 sm:gap-4 text-center mx-auto">
+              <p className="text-xs uppercase tracking-[0.3em] text-white/90 font-bold sm:text-sm">{tr(language, 'home_programs')}</p>
+              <h2 className="text-3xl font-black text-white leading-tight sm:text-4xl md:text-5xl">{tr(language, 'home_game_ready')}</h2>
+              <p className="max-w-2xl mx-auto text-base text-white/95 leading-relaxed sm:text-lg">
+                {tr(language, 'home_game_ready_desc')}
               </p>
             </div>
           </ScrollAnimation>
@@ -470,7 +473,7 @@ export function HomeContent({ content }: HomeContentProps) {
                     href={program.link || "/sports"}
                     className="group/link mt-4 inline-flex items-center gap-2 text-sm font-bold text-brand-blue-primary transition-colors duration-300 hover:text-brand-green-primary"
                   >
-                    Explore program
+                    {tr(language, 'home_explore_program')}
                     <ArrowRightIcon className="h-4 w-4 transition-transform duration-300 group-hover/link:translate-x-1" />
                   </Link>
                 </div>
@@ -484,10 +487,10 @@ export function HomeContent({ content }: HomeContentProps) {
       <section id="offers" className="bg-white py-12 sm:py-16 md:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <ScrollAnimation direction="up">
-            <div className="flex flex-col gap-3 sm:gap-4">
-              <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Membership</p>
-              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Limited-time offers</h2>
-              <p className="max-w-2xl text-base text-gray-600 leading-relaxed sm:text-lg">Slide into the plan that matches your grind.</p>
+            <div className="flex flex-col gap-3 sm:gap-4 text-center mx-auto">
+              <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">{tr(language, 'home_membership')}</p>
+              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">{tr(language, 'home_membership_desc')}</h2>
+              <p className="max-w-2xl mx-auto text-base text-gray-600 leading-relaxed sm:text-lg">{tr(language, 'home_membership_subdesc')}</p>
             </div>
           </ScrollAnimation>
           <div className="mt-8 grid gap-6 sm:mt-12 sm:gap-8 md:grid-cols-2 lg:mt-16 lg:grid-cols-3">
@@ -534,7 +537,7 @@ export function HomeContent({ content }: HomeContentProps) {
           <ScrollAnimation direction="up">
             <div className="flex flex-col gap-3 sm:gap-4 text-center mb-12">
               <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Reservations</p>
-              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Book Your Session</h2>
+              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">{tr(language, 'home_book_session')}</h2>
               <p className="max-w-2xl mx-auto text-base text-gray-600 leading-relaxed sm:text-lg">
                 Reserve your court, training session, or facility space today.
               </p>
@@ -545,7 +548,7 @@ export function HomeContent({ content }: HomeContentProps) {
               <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-8 shadow-[0_8px_32px_rgba(0,0,0,0.08)] sm:p-12">
                 <div className="grid gap-6 sm:grid-cols-2">
                   <div>
-                    <h3 className="text-xl font-black text-brand-black mb-4">Court Bookings</h3>
+                    <h3 className="text-xl font-black text-brand-black mb-4">{tr(language, 'home_court_bookings')}</h3>
                     <p className="text-sm text-gray-600 leading-relaxed mb-4">
                       Reserve basketball courts, paddle courts, or multipurpose halls for your training sessions or events.
                     </p>
@@ -553,20 +556,20 @@ export function HomeContent({ content }: HomeContentProps) {
                       href="/contact"
                       className="inline-flex items-center gap-2 text-sm font-bold text-brand-blue-primary transition-colors duration-300 hover:text-brand-green-primary"
                     >
-                      Book a Court
+                      {tr(language, 'home_book_court')}
                       <ArrowRightIcon className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
                     </Link>
                   </div>
                   <div>
                     <h3 className="text-xl font-black text-brand-black mb-4">Training Sessions</h3>
                     <p className="text-sm text-gray-600 leading-relaxed mb-4">
-                      Book private training sessions with our expert coaches for personalized instruction.
+                      {tr(language, 'home_book_training_desc')}
                     </p>
                     <Link
                       href="/contact"
                       className="inline-flex items-center gap-2 text-sm font-bold text-brand-blue-primary transition-colors duration-300 hover:text-brand-green-primary"
                     >
-                      Book Training
+                      {tr(language, 'home_book_training')}
                       <ArrowRightIcon className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
                     </Link>
                   </div>
@@ -576,7 +579,7 @@ export function HomeContent({ content }: HomeContentProps) {
                     href="/contact"
                     className="group inline-flex w-full items-center justify-center rounded-full bg-gradient-button px-6 py-3.5 text-sm font-black text-white shadow-[0_8px_24px_rgba(20,26,255,0.35)] transition-all duration-300 hover:scale-105 hover:shadow-[0_12px_32px_rgba(20,26,255,0.5),0_0_24px_rgba(96,208,102,0.3)] sm:w-auto sm:px-10 sm:py-4 sm:text-base"
                   >
-                    Contact Us to Book
+                    {tr(language, 'home_contact_to_book')}
                     <ArrowRightIcon className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1 sm:h-5 sm:w-5" />
                   </Link>
                 </div>
@@ -605,7 +608,7 @@ export function HomeContent({ content }: HomeContentProps) {
                   <h3 className="text-2xl font-black text-brand-black">{value.title}</h3>
                   <p className="mt-4 text-sm text-gray-600 leading-relaxed">{value.description}</p>
                   <Link href="/offerings" className="group/link mt-6 inline-flex items-center gap-2 text-sm font-bold text-brand-blue-primary transition-colors duration-300 hover:text-brand-green-primary">
-                    Learn more
+                    {tr(language, 'home_learn_more')}
                     <ArrowRightIcon className="h-4 w-4 transition-transform duration-300 group-hover/link:translate-x-1" />
                   </Link>
                 </div>
@@ -621,7 +624,7 @@ export function HomeContent({ content }: HomeContentProps) {
           <ScrollAnimation direction="up">
             <div className="flex flex-col items-center gap-3 text-center sm:gap-4">
               <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Events</p>
-              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Coming Events</h2>
+              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">{tr(language, 'home_coming_events')}</h2>
             </div>
           </ScrollAnimation>
           
@@ -687,72 +690,14 @@ export function HomeContent({ content }: HomeContentProps) {
         </div>
       </section>
 
-      {/* Contact Details Section */}
-      <section id="contact-details" className="bg-white py-12 sm:py-16 md:py-20 lg:py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <ScrollAnimation direction="up">
-            <div className="flex flex-col gap-3 sm:gap-4 text-center mb-12">
-              <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Contact</p>
-              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Contact Details</h2>
-            </div>
-          </ScrollAnimation>
-          <div className="max-w-4xl mx-auto">
-            <ScrollAnimation direction="up" delay={100}>
-              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-8 shadow-[0_8px_32px_rgba(0,0,0,0.08)] sm:p-12">
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold mb-3">Phone</p>
-                    <a 
-                      href={footer?.phone ? `tel:${footer.phone.replace(/\s+/g, '')}` : undefined}
-                      className="text-base text-brand-black font-semibold hover:text-brand-green-primary transition-colors"
-                    >
-                      {footer?.phone || '+962 7 9624 4059'}
-                    </a>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold mb-3">Email</p>
-                    <a 
-                      href={footer?.email ? `mailto:${footer.email}` : undefined}
-                      className="text-base text-brand-black font-semibold hover:text-brand-green-primary transition-colors break-all"
-                    >
-                      {footer?.email || 'infinitysportsacademyjo@gmail.com'}
-                    </a>
-                  </div>
-                  <div className="sm:col-span-2 lg:col-span-1">
-                    <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold mb-3">Instagram</p>
-                    <a 
-                      href={
-                        footer?.socialLinks?.find((l) => l.label.toLowerCase().includes('instagram'))?.href ||
-                        'https://instagram.com/infinity.sports.academy'
-                      }
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-base text-brand-black font-semibold hover:text-brand-green-primary transition-colors"
-                    >
-                      infinity.sports.academy
-                    </a>
-                  </div>
-                  <div className="sm:col-span-2 lg:col-span-3">
-                    <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold mb-3">Location</p>
-                    <p className="text-base text-brand-black font-semibold">
-                      {footer?.address || 'Shmeisani, Princess Alia College'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </ScrollAnimation>
-          </div>
-        </div>
-      </section>
-
       {/* Premium Contact CTA Section with Gradient */}
       <section id="contact" className="relative bg-gradient-to-br from-[#141AFF] via-[#6BA5E8] to-[#60D066] py-12 sm:py-16 md:py-20 lg:py-24 overflow-hidden">
         <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
         <div className="relative mx-auto flex max-w-4xl flex-col items-center gap-4 px-4 text-center sm:gap-6 sm:px-6">
           <ScrollAnimation direction="up">
-            <h2 className="text-3xl font-black text-white leading-tight sm:text-4xl md:text-5xl">Ready to elevate your team?</h2>
+            <h2 className="text-3xl font-black text-white leading-tight sm:text-4xl md:text-5xl">{tr(language, 'home_ready_elevate')}</h2>
             <p className="text-white/95 text-base leading-relaxed max-w-2xl sm:text-lg md:text-xl">
-              Book a campus tour, drop into a performance session, or request a corporate activation brief.
+              {tr(language, 'home_ready_desc')}
             </p>
           </ScrollAnimation>
           <ScrollAnimation direction="up" delay={100}>
@@ -761,7 +706,7 @@ export function HomeContent({ content }: HomeContentProps) {
                 href="/contact"
                 className="group inline-flex w-full items-center justify-center rounded-xl bg-white px-6 py-3 text-sm font-black text-brand-black shadow-[0_8px_24px_rgba(20,26,255,0.35)] transition-all duration-300 hover:scale-105 hover:shadow-[0_12px_32px_rgba(20,26,255,0.5),0_0_24px_rgba(96,208,102,0.3)] sm:w-auto sm:px-10 sm:py-4 sm:text-base"
               >
-                Book a Tour
+                {tr(language, 'home_book_tour')}
                 <ArrowRightIcon className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1 sm:h-5 sm:w-5" />
               </Link>
               <Link
@@ -802,7 +747,7 @@ export function HomeContent({ content }: HomeContentProps) {
             >
               <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
                 <div className="text-left">
-                  <label className="text-sm font-bold text-brand-black">Full Name</label>
+                  <label className="text-sm font-bold text-brand-black">{tr(language, 'home_contact_name')}</label>
                   <input
                     type="text"
                     className="mt-2 w-full rounded-xl border-2 border-brand-lightBlue bg-white px-5 py-4 text-brand-black placeholder-gray-400 transition-all duration-300 focus:border-brand-blue-primary focus:outline-none focus:ring-4 focus:ring-brand-blue-primary/20 hover:border-brand-blue-primary/60"
@@ -813,7 +758,7 @@ export function HomeContent({ content }: HomeContentProps) {
                   />
                 </div>
                 <div className="text-left">
-                  <label className="text-sm font-bold text-brand-black">Email</label>
+                  <label className="text-sm font-bold text-brand-black">{tr(language, 'home_contact_email')}</label>
                   <input
                     type="email"
                     className="mt-2 w-full rounded-xl border-2 border-brand-lightBlue bg-white px-5 py-4 text-brand-black placeholder-gray-400 transition-all duration-300 focus:border-brand-blue-primary focus:outline-none focus:ring-4 focus:ring-brand-blue-primary/20 hover:border-brand-blue-primary/60"
@@ -824,7 +769,7 @@ export function HomeContent({ content }: HomeContentProps) {
                   />
                 </div>
                 <div className="text-left md:col-span-2">
-                  <label className="text-sm font-bold text-brand-black">Message</label>
+                  <label className="text-sm font-bold text-brand-black">{tr(language, 'home_contact_message')}</label>
                   <textarea
                     rows={5}
                     className="mt-2 w-full rounded-xl border-2 border-brand-lightBlue bg-white px-5 py-4 text-brand-black placeholder-gray-400 transition-all duration-300 focus:border-brand-blue-primary focus:outline-none focus:ring-4 focus:ring-brand-blue-primary/20 hover:border-brand-blue-primary/60"
@@ -840,7 +785,7 @@ export function HomeContent({ content }: HomeContentProps) {
                 className="group mt-6 w-full rounded-xl bg-gradient-button px-6 py-3.5 text-sm font-black text-white shadow-[0_8px_24px_rgba(20,26,255,0.35)] transition-all duration-300 hover:scale-105 hover:shadow-[0_12px_32px_rgba(20,26,255,0.5),0_0_24px_rgba(96,208,102,0.3)] disabled:opacity-70 sm:mt-8 sm:px-8 sm:py-4 sm:text-base"
                 disabled={contactSubmitting}
               >
-                {contactSubmitting ? "Sending..." : "Send Request"}
+                {contactSubmitting ? tr(language, 'home_contact_sending') : tr(language, 'home_contact_send')}
                 <ArrowRightIcon className="ml-2 inline h-4 w-4 transition-transform duration-300 group-hover:translate-x-1 sm:h-5 sm:w-5" />
               </button>
               {contactFeedback ? (

@@ -1,4 +1,6 @@
 import { BookingForm } from './BookingForm';
+import { cookies } from 'next/headers';
+import { normalizeLanguage, tr } from '../../lib/translations';
 
 export const metadata = {
   title: 'Book a Court - Infinity Sport',
@@ -6,14 +8,16 @@ export const metadata = {
 };
 
 export default function BookingPage() {
+  const lang = normalizeLanguage(cookies().get('infinity-language')?.value);
+
   return (
     <div className="bg-white py-24">
       {/* Header Section */}
       <div className="mx-auto max-w-4xl px-6 text-center lg:px-0">
-        <p className="text-sm uppercase tracking-[0.3em] text-brand-green-dark">Booking</p>
-        <h1 className="mt-4 text-5xl font-bold text-brand-black">Book Your Court</h1>
+        <p className="text-sm uppercase tracking-[0.3em] text-brand-green-dark">{tr(lang, 'booking_kicker')}</p>
+        <h1 className="mt-4 text-5xl font-bold text-brand-black">{tr(lang, 'booking_title')}</h1>
         <p className="mt-4 text-lg text-gray-600">
-          Select your preferred court and time slot. If you add your email, you&apos;ll receive a confirmation message.
+          {tr(lang, 'booking_subtitle')}
         </p>
       </div>
 

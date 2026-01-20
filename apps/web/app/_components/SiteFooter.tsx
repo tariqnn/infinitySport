@@ -1,12 +1,18 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { fetchLandingContent } from '../../lib/apiClient';
+import { cookies } from 'next/headers';
+import { normalizeLanguage, tr } from '../../lib/translations';
 
 export async function SiteFooter() {
   const content = await fetchLandingContent();
   const footer = content.footer;
+  const lang = normalizeLanguage(cookies().get('infinity-language')?.value);
   const instagram = footer.socialLinks?.find((l) => l.label.toLowerCase().includes('instagram'))?.href;
-  const phoneHref = footer.phone?.replace(/\s+/g, '') || '';
+  // Convert phone to international format for tel: link (07 9624 4059 -> +962796244059)
+  const phoneHref = footer.phone 
+    ? footer.phone.replace(/\s+/g, '').replace(/^07/, '+9627')
+    : '+962796244059';
 
   return (
     <footer className="border-t border-gray-200 bg-white">
@@ -25,73 +31,89 @@ export async function SiteFooter() {
               <span className="text-xl font-bold text-black">Infinity Sports</span>
             </div>
             <p className="text-sm leading-relaxed text-gray-600">
-              Empowering athletes and teams across the region with elite coaching, sport science, and world-class facilities.
+              {tr(lang, 'footer_tagline')}
             </p>
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-black">Quick Links</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-black">{tr(lang, 'footer_quick_links')}</h3>
             <nav className="flex flex-col space-y-3">
               <Link href="/sports" className="text-sm text-gray-600 transition-colors hover:text-brand-blue-primary">
-                Programs
+                {tr(lang, 'footer_programs')}
               </Link>
               <Link href="/events" className="text-sm text-gray-600 transition-colors hover:text-brand-blue-primary">
-                Events
+                {tr(lang, 'footer_events')}
               </Link>
               <Link href="/facilities" className="text-sm text-gray-600 transition-colors hover:text-brand-blue-primary">
-                Facilities
+                {tr(lang, 'footer_facilities')}
               </Link>
               <Link href="/coaches" className="text-sm text-gray-600 transition-colors hover:text-brand-blue-primary">
-                Coaches
+                {tr(lang, 'footer_coaches')}
               </Link>
             </nav>
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-black">Legal</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-black">{tr(lang, 'footer_legal')}</h3>
             <nav className="flex flex-col space-y-3">
               <Link href="/privacy" className="text-sm text-gray-600 transition-colors hover:text-brand-blue-primary">
-                Privacy Policy
+                {tr(lang, 'footer_privacy')}
               </Link>
               <Link href="/terms" className="text-sm text-gray-600 transition-colors hover:text-brand-blue-primary">
-                Terms of Service
+                {tr(lang, 'footer_terms')}
               </Link>
               <Link href="/contact" className="text-sm text-gray-600 transition-colors hover:text-brand-blue-primary">
-                Contact Us
+                {tr(lang, 'footer_contact')}
               </Link>
             </nav>
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-black">Get in Touch</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-black">{tr(lang, 'footer_get_in_touch')}</h3>
             <div className="space-y-3 text-sm text-gray-600">
-              <p className="leading-relaxed whitespace-pre-line">{footer.address}</p>
-              <p>
-                <a href={`mailto:${footer.email}`} className="transition-colors hover:text-brand-blue-primary">
-                  {footer.email}
-                </a>
-              </p>
-              <p>
-                <a href={phoneHref ? `tel:${phoneHref}` : undefined} className="transition-colors hover:text-brand-blue-primary">
-                  {footer.phone}
-                </a>
-              </p>
-              {instagram ? (
-                <p>
-                  <a href={instagram} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-brand-blue-primary">
-                    Instagram
+              <div>
+                <p className="font-semibold text-black">
+                  {tr(lang, 'footer_tel')} :{' '}
+                  <a
+                    href={phoneHref ? `tel:${phoneHref}` : 'tel:+962796244059'}
+                    className="transition-colors hover:text-brand-blue-primary"
+                  >
+                    {footer.phone || '07 9624 4059'}
                   </a>
                 </p>
-              ) : null}
+              </div>
+              <div>
+                <p className="font-semibold text-black">{tr(lang, 'footer_instagram')}</p>
+                <a 
+                  href={instagram || 'https://instagram.com/infinity.sports.academy'} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="transition-colors hover:text-brand-blue-primary"
+                >
+                  Infinity.sports.academy
+                </a>
+              </div>
+              <div>
+                <p className="font-semibold text-black">{tr(lang, 'footer_location')}</p>
+                <p className="text-gray-600">{footer.address || 'Shemisani, Princess Alia College'}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-black">{tr(lang, 'footer_email')}</p>
+                <a href={`mailto:${footer.email || 'infinitysportsacademyjo@gmail.com'}`} className="transition-colors hover:text-brand-blue-primary">
+                  {footer.email || 'infinitysportsacademyjo@gmail.com'}
+                </a>
+              </div>
             </div>
           </div>
         </div>
 
         <div className="mt-12 border-t border-gray-200 pt-8">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-            <p className="text-sm text-gray-500">© {new Date().getFullYear()} Infinity Sports. All rights reserved.</p>
             <p className="text-sm text-gray-500">
-              Created by{' '}
+              © {new Date().getFullYear()} Infinity Sports. {tr(lang, 'footer_rights')}
+            </p>
+            <p className="text-sm text-gray-500">
+              {tr(lang, 'footer_created_by')}{' '}
               <a
                 href="https://creative-networks.tech/"
                 target="_blank"

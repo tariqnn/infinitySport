@@ -1,11 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import { isValidPhoneNumber } from '../../lib/phoneValidation';
 
 export function ContactFormWrapper() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [submitMessage, setSubmitMessage] = useState('');
+  const [phoneError, setPhoneError] = useState<string>('');
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -14,10 +16,25 @@ export function ContactFormWrapper() {
     setSubmitMessage('');
 
     const formData = new FormData(event.currentTarget);
+    const phoneValue = formData.get('phone') ? String(formData.get('phone')) : undefined;
+    
+    // Validate phone if provided (it's optional)
+    if (phoneValue && phoneValue.trim()) {
+      const phoneValidation = isValidPhoneNumber(phoneValue);
+      if (!phoneValidation.valid) {
+        setPhoneError(phoneValidation.error || 'Invalid phone number');
+        setSubmitStatus('error');
+        setSubmitMessage(phoneValidation.error || 'Please enter a valid phone number.');
+        setIsSubmitting(false);
+        return;
+      }
+      setPhoneError('');
+    }
+    
     const payload = {
       name: String(formData.get('name') ?? ''),
       email: String(formData.get('email') ?? ''),
-      phone: formData.get('phone') ? String(formData.get('phone')) : undefined,
+      phone: phoneValue,
       message: String(formData.get('message') ?? '')
     };
 
@@ -77,15 +94,49 @@ export function ContactFormWrapper() {
       </div>
       <div>
         <label htmlFor="phone" className="block text-sm font-medium text-brand-black mb-2">
-          Phone number
+          Phone number <span className="text-gray-400">(optional)</span>
         </label>
         <input
           id="phone"
           name="phone"
           type="tel"
-          placeholder="+962"
-          className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-brand-black placeholder:text-gray-400 focus:border-brand-blue-primary focus:outline-none focus:ring-2 focus:ring-brand-blue-primary/20 transition"
+          placeholder="+962 7 9000 2200"
+          onChange={(e) => {
+            const value = e.target.value;
+            // Clear error when user starts typing
+            if (phoneError) {
+              setPhoneError('');
+            }
+            // Validate on blur or when user stops typing
+            if (value.trim()) {
+              const validation = isValidPhoneNumber(value);
+              if (!validation.valid) {
+                setPhoneError(validation.error || 'Invalid phone number');
+              } else {
+                setPhoneError('');
+              }
+            }
+          }}
+          onBlur={(e) => {
+            const value = e.target.value;
+            if (value.trim()) {
+              const validation = isValidPhoneNumber(value);
+              if (!validation.valid) {
+                setPhoneError(validation.error || 'Invalid phone number');
+              } else {
+                setPhoneError('');
+              }
+            }
+          }}
+          className={`w-full rounded-xl border bg-white px-4 py-3 text-sm text-brand-black placeholder:text-gray-400 focus:outline-none focus:ring-2 transition ${
+            phoneError
+              ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+              : 'border-gray-300 focus:border-brand-blue-primary focus:ring-brand-blue-primary/20'
+          }`}
         />
+        {phoneError && (
+          <p className="mt-1.5 text-sm text-red-600">{phoneError}</p>
+        )}
       </div>
       <div>
         <label htmlFor="message" className="block text-sm font-medium text-brand-black mb-2">

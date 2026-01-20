@@ -5,19 +5,21 @@ import { LanguageToggle } from "./LanguageToggle";
 import { Bars3Icon, MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { useLanguage } from "./LanguageProvider";
 
 const navLinks = [
-  { label: "Home", href: "/#home" },
-  { label: "Facilities", href: "/facilities" },
-  { label: "Coaches", href: "/coaches" },
-  { label: "Programs", href: "/sports" },
-  { label: "Events", href: "/events" },
-  { label: "Booking", href: "/booking" }
-];
+  { key: "nav_home", href: "/#home" },
+  { key: "nav_facilities", href: "/facilities" },
+  { key: "nav_coaches", href: "/coaches" },
+  { key: "nav_programs", href: "/sports" },
+  { key: "nav_events", href: "/events" },
+  { key: "nav_booking", href: "/booking" }
+] as const;
 
 export function NavbarWithLanguage() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const { tr } = useLanguage();
   const isActive = (href: string) => {
     if (href === "/#home" || href === "/") return pathname === "/";
     return pathname.startsWith(href.replace("/#", "/"));
@@ -50,7 +52,7 @@ export function NavbarWithLanguage() {
             const active = isActive(link.href);
             return (
               <Link
-                key={link.href}
+                key={link.key}
                 href={link.href}
                 className={`group relative px-1 py-2 transition-all duration-300 ${
                   active 
@@ -58,7 +60,7 @@ export function NavbarWithLanguage() {
                     : "text-gray-700 hover:text-brand-blue-primary"
                 }`}
               >
-                <span className="relative z-10">{link.label}</span>
+                <span className="relative z-10">{tr(link.key)}</span>
                 {active && (
                   <span className="absolute inset-x-0 bottom-0 h-1 bg-gradient-button rounded-full" />
                 )}
@@ -81,7 +83,7 @@ export function NavbarWithLanguage() {
             href="/contact"
             className="rounded-full bg-gradient-button px-8 py-2.5 text-sm font-bold text-white shadow-button transition-all duration-300 hover:scale-105 hover:shadow-button-hover"
           >
-            Join Infinity Sport
+            {tr("nav_join")}
           </Link>
         </div>
         <button
@@ -100,7 +102,7 @@ export function NavbarWithLanguage() {
               const active = isActive(link.href);
               return (
                 <Link
-                  key={link.href}
+                  key={link.key}
                   href={link.href}
                   className={`rounded-xl px-4 py-3 font-medium transition ${
                     active
@@ -109,7 +111,7 @@ export function NavbarWithLanguage() {
                   }`}
                   onClick={() => setIsOpen(false)}
                 >
-                  {link.label}
+                  {tr(link.key)}
                 </Link>
               );
             })}
@@ -121,7 +123,7 @@ export function NavbarWithLanguage() {
               className="mt-4 rounded-full bg-gradient-button px-6 py-3 text-center text-sm font-semibold text-white shadow-button transition hover:shadow-button-hover"
               onClick={() => setIsOpen(false)}
             >
-              Join Infinity Sport
+              {tr("nav_join")}
             </Link>
           </nav>
         </div>

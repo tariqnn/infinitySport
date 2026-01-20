@@ -21,6 +21,11 @@
   --foreground-muted: #1A4D3A;
 }
 
+/* Arabic (RTL) support */
+html[lang="ar"] body {
+  font-family: var(--font-ar), var(--font-sans), system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+}
+
 @layer utilities {
   /* Premium Fade Animations */
   @keyframes fade-in-up {

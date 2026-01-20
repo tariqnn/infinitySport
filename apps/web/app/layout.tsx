@@ -1,9 +1,12 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Plus_Jakarta_Sans, Space_Grotesk } from 'next/font/google';
+import { Cairo } from 'next/font/google';
+import { cookies } from 'next/headers';
 import { LanguageProvider } from './_components/LanguageProvider';
 import { NavbarWithLanguage } from './_components/NavbarWithLanguage';
 import { SiteFooter } from './_components/SiteFooter';
+import { normalizeLanguage } from '../lib/translations';
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -13,6 +16,12 @@ const jakarta = Plus_Jakarta_Sans({
 const spaceGrotesk = Space_Grotesk({
   subsets: ['latin'],
   variable: '--font-display',
+  display: 'swap'
+});
+
+const cairo = Cairo({
+  subsets: ['arabic'],
+  variable: '--font-ar',
   display: 'swap'
 });
 
@@ -52,10 +61,13 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const lang = normalizeLanguage(cookies().get('infinity-language')?.value);
+  const dir = lang === 'ar' ? 'rtl' : 'ltr';
+
   return (
-    <html lang="en">
-      <body className={`${jakarta.variable} ${spaceGrotesk.variable} bg-white text-brand-black antialiased`}>
-        <LanguageProvider>
+    <html lang={lang} dir={dir} suppressHydrationWarning>
+      <body className={`${jakarta.variable} ${spaceGrotesk.variable} ${cairo.variable} bg-white text-brand-black antialiased`}>
+        <LanguageProvider initialLanguage={lang}>
           <NavbarWithLanguage />
           <main className="flex-1">{children}</main>
           <SiteFooter />

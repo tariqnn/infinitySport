@@ -23,6 +23,13 @@ const COACHES_DATA: Coach[] = [
     imageUrl: '/samer.png'
   },
   {
+    id: '2',
+    sport: 'Basketball',
+    name: 'Coach Naef Asfour',
+    description: 'Assistant Coach for AU Men\'s 2 years. Assistant Coach for the Jordan NT Men\'s. Head Coach For the Women\'s Jordan NT. 3 arab Championship 2023/ 2024 / 2025.',
+    imageUrl: '/naef-asfour.jpeg'
+  },
+  {
     id: '3',
     sport: 'Gymnastics',
     name: 'Coach Raya Abu Jamous',
@@ -32,14 +39,16 @@ const COACHES_DATA: Coach[] = [
   {
     id: '4',
     sport: 'Gymnastics',
-    name: 'Assistant Gymnastics Coach – Ahmad Aldarawish',
-    description: 'Dedicated to creating strong athletes through strength and conditioning while aligning them with the core gymnastics program.'
+    name: 'Assistant Gymnastics Coach � Ahmad Aldarawish',
+    description: 'Dedicated to creating strong athletes through strength and conditioning while aligning them with the core gymnastics program.',
+    imageUrl: '/ahmad-aldarawesh.jpg'
   },
   {
     id: '5',
     sport: 'Gymnastics',
-    name: 'Assistant Gymnastics Coach – Ammar Salman',
-    description: 'An athlete who maintains an active lifestyle through squash, badminton, swimming, and strength training. Over the years, he has built strong athletic ability supported by discipline, consistency, and a genuine passion for sports. His diverse training background has developed solid endurance, strength, and an understanding of effective performance techniques. He is committed to continuous self-improvement and maintaining a healthy, balanced lifestyle.'
+    name: 'Assistant Gymnastics Coach � Ammar Salman',
+    description: 'An athlete who maintains an active lifestyle through squash, badminton, swimming, and strength training. Over the years, he has built strong athletic ability supported by discipline, consistency, and a genuine passion for sports. His diverse training background has developed solid endurance, strength, and an understanding of effective performance techniques. He is committed to continuous self-improvement and maintaining a healthy, balanced lifestyle.',
+    imageUrl: '/ammar-salman.jpg'
   },
   {
     id: '6',
@@ -200,13 +209,13 @@ export function CoachesSection() {
                   >
                     <div className={`${isExpanded ? 'flex flex-col sm:flex-row gap-4 sm:gap-6 p-4 sm:p-8' : 'flex flex-row gap-4 p-4 sm:p-6'}`}>
                       {coach.imageUrl && (
-                        <div className={`${isExpanded ? 'w-full sm:w-64 flex-shrink-0' : 'w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0'}`}>
-                          <div className={`relative ${isExpanded ? 'h-56 w-full rounded-xl sm:h-64 sm:w-64' : 'h-24 w-24 sm:h-32 sm:w-32 rounded-lg'} overflow-hidden`}>
+                        <div className={`${isExpanded ? (coach.id === '2' || coach.id === '4' || coach.id === '5' ? 'w-64 flex-shrink-0' : 'w-full sm:w-64 flex-shrink-0') : 'w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0'}`}>
+                          <div className={`relative ${isExpanded ? (coach.id === '2' || coach.id === '4' || coach.id === '5' ? 'h-64 w-64 rounded-2xl' : 'h-56 w-full rounded-xl sm:h-64 sm:w-64') : (coach.id === '2' || coach.id === '4' || coach.id === '5' ? 'h-24 w-24 sm:h-32 sm:w-32 rounded-xl' : 'h-24 w-24 sm:h-32 sm:w-32 rounded-lg')} overflow-hidden ${coach.id === '2' || coach.id === '4' || coach.id === '5' ? 'border-4 border-brand-lightBlue/30 shadow-lg bg-white p-1' : ''}`}>
                             <Image
                               src={coach.imageUrl}
                               alt={coach.name}
                               fill
-                              className="object-cover"
+                              className={coach.id === '2' || coach.id === '4' || coach.id === '5' ? "object-contain rounded-lg" : "object-cover"}
                               style={
                                 coach.id === '10' 
                                   ? { objectPosition: 'center 15%' } 

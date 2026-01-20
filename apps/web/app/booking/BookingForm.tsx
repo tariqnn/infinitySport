@@ -1,15 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { isValidPhoneNumber } from '../../lib/phoneValidation';
+import { useLanguage } from '../_components/LanguageProvider';
+import { tr } from '../../lib/translations';
 
 type CourtType = 'Basketball AC' | 'Basketball 3x3' | 'Padel' | 'Volleyball';
-
-const COURTS: Array<{ id: string; name: string; type: CourtType }> = [
-  { id: 'basketball-ac', name: 'Basketball', type: 'Basketball AC' },
-  { id: 'basketball-3x3', name: 'Basketball 3x3', type: 'Basketball 3x3' },
-  { id: 'padel', name: 'Padel', type: 'Padel' },
-  { id: 'volleyball', name: 'Volleyball', type: 'Volleyball' },
-];
 
 // Generate time slots from 7:00 AM to 11:00 PM, every hour (+ 12:00 AM shown at the end)
 const generateTimeSlots = () => {
@@ -36,19 +32,19 @@ const toMinutes = (hhmm: string) => {
   return (h || 0) * 60 + (m || 0);
 };
 
-const formatSlotLabel = (hhmm: string) => {
+const formatSlotLabel = (hhmm: string, lang: 'en' | 'ar') => {
   const [h] = hhmm.split(':').map((n) => Number(n));
   const hour = h ?? 0;
   const isPm = hour >= 12;
   const hour12 = hour % 12 === 0 ? 12 : hour % 12;
-  return `${hour12}:00 ${isPm ? 'PM' : 'AM'}`;
+  return `${hour12}:00 ${isPm ? tr(lang, 'booking_pm') : tr(lang, 'booking_am')}`;
 };
 
-// These time slots are ALWAYS FULL (unavailable). All are EVENING.
-// NOTE: This schedule applies ONLY to Basketball AC.
+// These time slots are ALWAYS FULL (unavailable).
 const ALWAYS_FULL: Record<string, Partial<Record<CourtType, string[]>>> = {
   MONDAY: {
     'Basketball AC': ['17:00', '18:00', '19:00'],
+    'Volleyball': ['19:00'], // 7-8 PM
   },
   WEDNESDAY: {
     'Basketball AC': ['17:00', '18:00', '19:00'],
@@ -58,11 +54,15 @@ const ALWAYS_FULL: Record<string, Partial<Record<CourtType, string[]>>> = {
   },
   SATURDAY: {
     'Basketball AC': ['17:00', '18:00'],
+    'Volleyball': ['15:00', '16:00'], // 3-5 PM
+  },
+  SUNDAY: {
+    'Volleyball': ['15:00', '16:00'], // 3-5 PM (assuming same as Saturday)
   },
 };
 
-const isAlwaysFullSlot = (opts: { date: string; time: string; courtId: string }) => {
-  const court = COURTS.find((c) => c.id === opts.courtId);
+const isAlwaysFullSlot = (opts: { date: string; time: string; courtId: string; courts: Array<{ id: string; type: CourtType }> }) => {
+  const court = opts.courts.find((c) => c.id === opts.courtId);
   if (!court) return false;
   const day = dayKey(opts.date);
   const times = ALWAYS_FULL[day]?.[court.type] ?? [];
@@ -70,15 +70,24 @@ const isAlwaysFullSlot = (opts: { date: string; time: string; courtId: string })
 };
 
 export function BookingForm() {
+  const { language } = useLanguage();
   const [selectedCourt, setSelectedCourt] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [name, setName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
+  const [phoneError, setPhoneError] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [submitMessage, setSubmitMessage] = useState('');
+
+  const COURTS: Array<{ id: string; name: string; type: CourtType }> = [
+    { id: 'basketball-ac', name: tr(language, 'booking_court_basketball'), type: 'Basketball AC' },
+    { id: 'basketball-3x3', name: tr(language, 'booking_court_basketball_3x3'), type: 'Basketball 3x3' },
+    { id: 'padel', name: tr(language, 'booking_court_padel'), type: 'Padel' },
+    { id: 'volleyball', name: tr(language, 'booking_court_volleyball'), type: 'Volleyball' },
+  ];
 
   // Get today's date in YYYY-MM-DD format
   const today = new Date().toISOString().split('T')[0];
@@ -113,9 +122,20 @@ export function BookingForm() {
       return;
     }
 
-    if (isAlwaysFullSlot({ date: selectedDate, time: selectedTime, courtId: selectedCourt })) {
+    // Validate phone number
+    const phoneValidation = isValidPhoneNumber(phone);
+    if (!phoneValidation.valid) {
+      setPhoneError(phoneValidation.error || 'Invalid phone number');
       setSubmitStatus('error');
-      setSubmitMessage('This time slot is fully booked. Please select another time.');
+      setSubmitMessage(phoneValidation.error || 'Please enter a valid phone number.');
+      setIsSubmitting(false);
+      return;
+    }
+    setPhoneError('');
+
+    if (isAlwaysFullSlot({ date: selectedDate, time: selectedTime, courtId: selectedCourt, courts: COURTS })) {
+      setSubmitStatus('error');
+      setSubmitMessage(tr(language, 'booking_slot_full'));
       setIsSubmitting(false);
       return;
     }
@@ -144,8 +164,8 @@ export function BookingForm() {
       setSubmitStatus('success');
       setSubmitMessage(
         email
-          ? 'Booking submitted successfully! Check your email for confirmation.'
-          : 'Booking submitted successfully! We will contact you to confirm.'
+          ? tr(language, 'booking_success_email')
+          : tr(language, 'booking_success_no_email')
       );
       
       // Reset form
@@ -158,7 +178,7 @@ export function BookingForm() {
     } catch (error) {
       console.error('Booking submission error', error);
       setSubmitStatus('error');
-      setSubmitMessage(error instanceof Error ? error.message : 'Something went wrong. Please try again.');
+      setSubmitMessage(error instanceof Error ? error.message : tr(language, 'booking_error_generic'));
     } finally {
       setIsSubmitting(false);
     }
@@ -170,7 +190,7 @@ export function BookingForm() {
         {/* Court Selection */}
         <div>
           <label htmlFor="court" className="block text-sm font-semibold text-brand-black mb-3">
-            Select Court <span className="text-red-500">*</span>
+            {tr(language, 'booking_select_court')} <span className="text-red-500">*</span>
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
             {COURTS.map((court) => (
@@ -194,7 +214,7 @@ export function BookingForm() {
         {/* Date Selection */}
         <div>
           <label htmlFor="date" className="block text-sm font-semibold text-brand-black mb-2">
-            Select Date <span className="text-red-500">*</span>
+            {tr(language, 'booking_select_date')} <span className="text-red-500">*</span>
           </label>
           <input
             id="date"
@@ -215,12 +235,12 @@ export function BookingForm() {
         {selectedDate && (
           <div>
             <label htmlFor="time" className="block text-sm font-semibold text-brand-black mb-2">
-              Select Time Slot <span className="text-red-500">*</span>
+              {tr(language, 'booking_select_time')} <span className="text-red-500">*</span>
             </label>
             <div className="grid grid-cols-4 gap-3 sm:grid-cols-6 md:grid-cols-8">
               {getAvailableTimeSlots().map((time) => {
                 const full = selectedCourt
-                  ? isAlwaysFullSlot({ date: selectedDate, time, courtId: selectedCourt })
+                  ? isAlwaysFullSlot({ date: selectedDate, time, courtId: selectedCourt, courts: COURTS })
                   : false;
 
                 return (
@@ -232,7 +252,7 @@ export function BookingForm() {
                       setSelectedTime(time);
                     }}
                     disabled={full || !selectedCourt}
-                    title={!selectedCourt ? 'Select a court first' : full ? 'Always full' : ''}
+                    title={!selectedCourt ? tr(language, 'booking_select_court_first') : full ? tr(language, 'booking_always_full_tooltip') : ''}
                     className={`rounded-lg border-2 px-3 py-2 text-sm font-medium transition-all ${
                       !selectedCourt
                         ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
@@ -243,13 +263,13 @@ export function BookingForm() {
                             : 'border-gray-200 text-brand-black hover:border-brand-blue-primary/50 hover:bg-brand-blue-primary/5'
                     }`}
                   >
-                    {formatSlotLabel(time)}
+                    {formatSlotLabel(time, language)}
                   </button>
                 );
               })}
             </div>
             {getAvailableTimeSlots().length === 0 && (
-              <p className="mt-2 text-sm text-gray-500">No available time slots for today. Please select another date.</p>
+              <p className="mt-2 text-sm text-gray-500">{tr(language, 'booking_no_slots_today')}</p>
             )}
           </div>
         )}
@@ -257,14 +277,14 @@ export function BookingForm() {
         {/* Name Input */}
         <div>
           <label htmlFor="name" className="block text-sm font-semibold text-brand-black mb-2">
-            Full Name <span className="text-red-500">*</span>
+            {tr(language, 'booking_full_name')} <span className="text-red-500">*</span>
           </label>
           <input
             id="name"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Your full name"
+            placeholder={tr(language, 'booking_placeholder_name')}
             required
             className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-brand-black placeholder:text-gray-400 focus:border-brand-blue-primary focus:outline-none focus:ring-2 focus:ring-brand-blue-primary/20 transition"
           />
@@ -273,14 +293,14 @@ export function BookingForm() {
         {/* Email Input (Optional but recommended for confirmation) */}
         <div>
           <label htmlFor="email" className="block text-sm font-semibold text-brand-black mb-2">
-            Email <span className="text-gray-400">(optional)</span>
+            {tr(language, 'booking_email')} <span className="text-gray-400">{tr(language, 'booking_optional')}</span>
           </label>
           <input
             id="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
+            placeholder={tr(language, 'booking_placeholder_email')}
             className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-brand-black placeholder:text-gray-400 focus:border-brand-blue-primary focus:outline-none focus:ring-2 focus:ring-brand-blue-primary/20 transition"
           />
         </div>
@@ -288,17 +308,51 @@ export function BookingForm() {
         {/* Phone Input */}
         <div>
           <label htmlFor="phone" className="block text-sm font-semibold text-brand-black mb-2">
-            Phone Number <span className="text-red-500">*</span>
+            {tr(language, 'booking_phone')} <span className="text-red-500">*</span>
           </label>
           <input
             id="phone"
             type="tel"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+962 7 9000 2200"
+            onChange={(e) => {
+              const value = e.target.value;
+              setPhone(value);
+              // Clear error when user starts typing
+              if (phoneError) {
+                setPhoneError('');
+              }
+              // Validate on blur or when user stops typing
+              if (value.trim()) {
+                const validation = isValidPhoneNumber(value);
+                if (!validation.valid) {
+                  setPhoneError(validation.error || tr(language, 'booking_invalid_phone'));
+                } else {
+                  setPhoneError('');
+                }
+              }
+            }}
+            onBlur={(e) => {
+              const value = e.target.value;
+              if (value.trim()) {
+                const validation = isValidPhoneNumber(value);
+                if (!validation.valid) {
+                  setPhoneError(validation.error || tr(language, 'booking_invalid_phone'));
+                } else {
+                  setPhoneError('');
+                }
+              }
+            }}
+            placeholder={tr(language, 'booking_placeholder_phone')}
             required
-            className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-brand-black placeholder:text-gray-400 focus:border-brand-blue-primary focus:outline-none focus:ring-2 focus:ring-brand-blue-primary/20 transition"
+            className={`w-full rounded-xl border bg-white px-4 py-3 text-sm text-brand-black placeholder:text-gray-400 focus:outline-none focus:ring-2 transition ${
+              phoneError
+                ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                : 'border-gray-300 focus:border-brand-blue-primary focus:ring-brand-blue-primary/20'
+            }`}
           />
+          {phoneError && (
+            <p className="mt-1.5 text-sm text-red-600">{phoneError}</p>
+          )}
         </div>
 
         {/* Status Message */}
@@ -325,11 +379,12 @@ export function BookingForm() {
               !selectedTime ||
               !name ||
               !phone ||
-              isAlwaysFullSlot({ date: selectedDate, time: selectedTime, courtId: selectedCourt })
+              !!phoneError ||
+              isAlwaysFullSlot({ date: selectedDate, time: selectedTime, courtId: selectedCourt, courts: COURTS })
             }
             className="rounded-full bg-gradient-button px-8 py-3 text-sm font-bold text-white shadow-button transition hover:shadow-button-hover disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? 'Submitting...' : 'Book Court'}
+            {isSubmitting ? tr(language, 'booking_submitting') : tr(language, 'booking_submit')}
           </button>
         </div>
       </form>

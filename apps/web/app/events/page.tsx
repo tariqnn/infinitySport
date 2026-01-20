@@ -1,13 +1,23 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { fetchEvents } from '../../lib/apiClient';
+import { useLanguage } from '../_components/LanguageProvider';
+import { tr } from '../../lib/translations';
 
-export const metadata = {
-  title: 'Events & Programs'
-};
+export default function EventsPage() {
+  const { language } = useLanguage();
+  const [eventsData, setEventsData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-export default async function EventsPage() {
-  const eventsData = await fetchEvents();
+  useEffect(() => {
+    fetchEvents().then((data) => {
+      setEventsData(data);
+      setLoading(false);
+    });
+  }, []);
   
   // Transform API data to match UI structure
   const events = eventsData.map((event) => ({
@@ -28,12 +38,12 @@ export default async function EventsPage() {
       {/* Hero Section with Event Image */}
       <div className="relative mx-auto max-w-7xl px-6 lg:px-8 mb-16">
         <div className="mb-6 text-center">
-          <p className="text-sm uppercase tracking-[0.3em] text-brand-green-dark">Events</p>
+          <p className="text-sm uppercase tracking-[0.3em] text-brand-green-dark">{tr(language, 'events_kicker')}</p>
           <h1 className="mt-3 text-4xl font-black text-brand-black sm:text-5xl lg:text-6xl">
-            Signature Infinity Sports Programs
+            {tr(language, 'events_title')}
           </h1>
           <p className="mx-auto mt-3 max-w-2xl text-base text-gray-600 sm:text-lg">
-            Seasonal combines, international showcases, and corporate leagues engineered for peak performance.
+            {tr(language, 'events_subtitle')}
           </p>
         </div>
         <div className="relative h-64 sm:h-80 md:h-96 lg:h-[500px] w-full rounded-2xl overflow-hidden border-2 border-brand-lightBlue/20 shadow-[0_8px_32px_rgba(0,0,0,0.08)]">
@@ -52,9 +62,9 @@ export default async function EventsPage() {
       {upcoming.length > 0 ? (
         <div className="mx-auto mt-16 max-w-7xl px-6 lg:px-8">
           <div className="mb-8">
-            <p className="text-sm uppercase tracking-[0.3em] text-brand-green-dark">Upcoming</p>
-            <h2 className="mt-2 text-3xl font-bold text-brand-black">Reserve your slot</h2>
-            <p className="mt-2 text-gray-600">Secure team entries, book corporate hospitality, or register individual athletes.</p>
+            <p className="text-sm uppercase tracking-[0.3em] text-brand-green-dark">{tr(language, 'events_upcoming_kicker')}</p>
+            <h2 className="mt-2 text-3xl font-bold text-brand-black">{tr(language, 'events_upcoming_title')}</h2>
+            <p className="mt-2 text-gray-600">{tr(language, 'events_upcoming_subtitle')}</p>
           </div>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {upcoming.map((event) => (

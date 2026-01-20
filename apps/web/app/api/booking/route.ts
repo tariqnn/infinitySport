@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isValidPhoneNumber } from '../../../lib/phoneValidation';
 
 async function sendBookingWhatsAppMessage(data: {
   phone: string;
@@ -139,12 +140,21 @@ const courtTypeForId = (courtId: string): CourtType | null => {
   return null;
 };
 
-// Same schedule as the booking UI. NOTE: applies ONLY to Basketball AC.
+// Same schedule as the booking UI.
 const ALWAYS_FULL: Record<string, Partial<Record<CourtType, string[]>>> = {
-  MONDAY: { 'Basketball AC': ['17:00', '18:00', '19:00'] },
+  MONDAY: { 
+    'Basketball AC': ['17:00', '18:00', '19:00'],
+    'Volleyball': ['19:00'], // 7-8 PM
+  },
   WEDNESDAY: { 'Basketball AC': ['17:00', '18:00', '19:00'] },
   FRIDAY: { 'Basketball AC': ['22:00', '23:00', '00:00'] },
-  SATURDAY: { 'Basketball AC': ['17:00', '18:00'] },
+  SATURDAY: { 
+    'Basketball AC': ['17:00', '18:00'],
+    'Volleyball': ['15:00', '16:00'], // 3-5 PM
+  },
+  SUNDAY: {
+    'Volleyball': ['15:00', '16:00'], // 3-5 PM (assuming same as Saturday)
+  },
 };
 
 export async function POST(request: Request) {
@@ -156,6 +166,15 @@ export async function POST(request: Request) {
     if (!courtId || !courtName || !date || !time || !name || !phone) {
       return NextResponse.json(
         { error: 'Missing required fields. Please fill in all fields.' },
+        { status: 400 }
+      );
+    }
+
+    // Validate phone number (server-side validation)
+    const phoneValidation = isValidPhoneNumber(phone);
+    if (!phoneValidation.valid) {
+      return NextResponse.json(
+        { error: phoneValidation.error || 'Invalid phone number. Please enter a valid phone number.' },
         { status: 400 }
       );
     }

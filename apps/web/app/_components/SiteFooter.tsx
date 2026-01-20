@@ -12,7 +12,7 @@ export async function SiteFooter() {
     ? footer.socialLinks.find((l) => l.label?.toLowerCase().includes('instagram'))?.href
     : undefined;
   // Convert phone to international format for tel: link (07 9624 4059 -> +962796244059)
-  const phoneHref = footer.phone && typeof footer.phone === 'string'
+  const phoneHref: string = footer.phone && typeof footer.phone === 'string'
     ? footer.phone.replace(/\s+/g, '').replace(/^07/, '+9627')
     : '+962796244059';
 
@@ -77,7 +77,7 @@ export async function SiteFooter() {
                 <p className="font-semibold text-black">
                   {tr(lang, 'footer_tel')} :{' '}
                   <a
-                    href={phoneHref ? `tel:${phoneHref}` : 'tel:+962796244059'}
+                    href={`tel:${phoneHref}`}
                     className="transition-colors hover:text-brand-blue-primary"
                   >
                     {footer.phone || '07 9624 4059'}

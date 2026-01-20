@@ -198,10 +198,10 @@ export function CoachesSection() {
                     className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)] cursor-pointer overflow-hidden"
                     onClick={() => toggleCoach(coach.id)}
                   >
-                    <div className={`${isExpanded ? 'flex flex-row gap-6 p-6 sm:p-8' : 'flex flex-row gap-4 p-4 sm:p-6'}`}>
+                    <div className={`${isExpanded ? 'flex flex-col sm:flex-row gap-4 sm:gap-6 p-4 sm:p-8' : 'flex flex-row gap-4 p-4 sm:p-6'}`}>
                       {coach.imageUrl && (
-                        <div className={`${isExpanded ? 'w-64 h-64 flex-shrink-0' : 'w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0'}`}>
-                          <div className={`relative ${isExpanded ? 'h-64 w-64 rounded-xl' : 'h-24 w-24 sm:h-32 sm:w-32 rounded-lg'} overflow-hidden`}>
+                        <div className={`${isExpanded ? 'w-full sm:w-64 flex-shrink-0' : 'w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0'}`}>
+                          <div className={`relative ${isExpanded ? 'h-56 w-full rounded-xl sm:h-64 sm:w-64' : 'h-24 w-24 sm:h-32 sm:w-32 rounded-lg'} overflow-hidden`}>
                             <Image
                               src={coach.imageUrl}
                               alt={coach.name}
@@ -214,7 +214,7 @@ export function CoachesSection() {
                                   ? { objectPosition: 'center 15%' } 
                                   : undefined
                               }
-                              sizes={isExpanded ? "256px" : "(max-width: 640px) 96px, 128px"}
+                              sizes={isExpanded ? "(max-width: 640px) 100vw, 256px" : "(max-width: 640px) 96px, 128px"}
                             />
                           </div>
                         </div>

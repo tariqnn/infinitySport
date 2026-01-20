@@ -245,10 +245,11 @@ async function _fetchLandingContent(): Promise<LandingContent> {
         const socialLinks =
           Array.isArray(rawLinks)
             ? rawLinks
-                .map((link: any) => {
-                  const id = typeof link?.id === 'string' ? link.id : undefined;
-                  const label = typeof link?.label === 'string' ? link.label : undefined;
-                  const href = typeof link?.href === 'string' ? link.href : undefined;
+                .map((link: unknown) => {
+                  const obj = typeof link === 'object' && link !== null ? (link as Record<string, unknown>) : null;
+                  const id = obj && typeof obj.id === 'string' ? obj.id : undefined;
+                  const label = obj && typeof obj.label === 'string' ? obj.label : undefined;
+                  const href = obj && typeof obj.href === 'string' ? obj.href : undefined;
                   if (!label || !href) return null;
                   return { id: id || label.toLowerCase(), label, href };
                 })

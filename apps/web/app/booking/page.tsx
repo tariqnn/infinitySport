@@ -13,7 +13,7 @@ export default function BookingPage() {
         <p className="text-sm uppercase tracking-[0.3em] text-brand-green-dark">Booking</p>
         <h1 className="mt-4 text-5xl font-bold text-brand-black">Book Your Court</h1>
         <p className="mt-4 text-lg text-gray-600">
-          Select your preferred court and time slot. We&apos;ll send you a confirmation email.
+          Select your preferred court and time slot. If you add your email, you&apos;ll receive a confirmation message.
         </p>
       </div>
 

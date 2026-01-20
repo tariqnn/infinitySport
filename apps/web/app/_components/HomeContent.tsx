@@ -14,7 +14,7 @@ interface HomeContentProps {
   content: LandingContent;
 }
 
-const HERO_VIDEO_PATH = "/main-video.mp4"; // Hardcoded video path (MP4 for browser compatibility)
+const HERO_VIDEO_FALLBACK_PATH = "/main-video.mp4"; // Fallback video path (MP4 for browser compatibility)
 const HERO_FALLBACK_IMAGE = "/hero-basketball.jpg"; // Fallback image if video fails
 
 // Coach data structure
@@ -24,6 +24,7 @@ export function HomeContent({ content }: HomeContentProps) {
   const heroSubtitle =
     hero.subtitle?.trim() ||
     "Infinity features a modern sports facility designed for both leisure and competitive environments. It's a place where athletes and parents can watch kids learn, adapt, and evolve into modern-day players. Learn, adapt, and evolve with cutting-edge innovation focused on youth development and high-performance training.";
+  const heroVideoPath = hero.backgroundVideoUrl?.trim() || HERO_VIDEO_FALLBACK_PATH;
   const primaryCta = {
     href: hero.primaryCtaLink || "/contact",
     label: hero.primaryCtaLabel || "Explore Programs"
@@ -204,7 +205,7 @@ export function HomeContent({ content }: HomeContentProps) {
               }, 2000);
             }}
           >
-            <source src={HERO_VIDEO_PATH} type="video/mp4" />
+            <source src={heroVideoPath} type="video/mp4" />
             Your browser does not support the video tag.
           </video>
           {videoError && (
@@ -226,10 +227,10 @@ export function HomeContent({ content }: HomeContentProps) {
 
         {/* Hero Content Container */}
         <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 pb-12 pt-24 sm:px-6 lg:px-8 lg:pt-32">
-          <div className="flex flex-1 flex-col lg:flex-row lg:items-center lg:justify-between lg:gap-12">
+          <div className="flex flex-1 flex-col items-center justify-center text-center lg:gap-12">
             
             {/* Main Hero Content - Left Side */}
-            <div className="flex flex-1 flex-col justify-center gap-6 text-left lg:max-w-3xl sm:gap-8">
+            <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center lg:max-w-4xl sm:gap-8">
               {/* Headline with fade-up animation */}
               <AnimatedText className="text-3xl font-black leading-[1.1] text-white drop-shadow-[0_4px_20px_rgba(0,0,0,0.5)] sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl 2xl:text-8xl tracking-tight">
                 {heroTitle}
@@ -241,12 +242,12 @@ export function HomeContent({ content }: HomeContentProps) {
               </AnimatedText>
               
               {/* Subheading */}
-              <AnimatedText delay={150} className="text-base text-white/95 max-w-2xl leading-relaxed font-medium sm:text-lg md:text-xl lg:text-2xl">
+              <AnimatedText delay={150} className="text-base text-white/95 max-w-3xl leading-relaxed font-medium sm:text-lg md:text-xl lg:text-2xl">
                 {heroSubtitle}
               </AnimatedText>
               
               {/* CTA Buttons */}
-              <AnimatedText delay={300} className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
+              <AnimatedText delay={300} className="flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
                 <Link
                   href={primaryCta.href}
                   className="group inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-[#1426FF] via-[#69FFDB] to-[#61FF45] px-6 py-3.5 text-sm font-black text-white shadow-[0_8px_24px_rgba(20,38,255,0.4)] transition-all duration-300 hover:scale-105 hover:shadow-[0_12px_32px_rgba(20,38,255,0.6),0_0_30px_rgba(97,255,69,0.4)] sm:w-auto sm:px-8 sm:py-4 sm:text-base md:px-10 md:py-5"
@@ -266,7 +267,7 @@ export function HomeContent({ content }: HomeContentProps) {
               </AnimatedText>
 
               {announcements.length ? (
-                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
                   {announcements.slice(0, 2).map((announcement) => (
                     <Link
                       key={announcement.id}
@@ -288,11 +289,11 @@ export function HomeContent({ content }: HomeContentProps) {
               ) : null}
             </div>
 
-            {/* Glassmorphism Cards - Right Side (Desktop) / Below (Mobile) */}
-            <div className="mt-8 flex flex-col gap-4 sm:mt-12 sm:gap-6 lg:mt-0 lg:max-w-md">
+            {/* Glassmorphism Cards */}
+            <div className="mt-8 flex w-full max-w-3xl flex-col gap-4 sm:mt-12 sm:gap-6">
               
               {/* Facility Highlights Card - Floating Animation */}
-              <ScrollAnimation direction="right" delay={400}>
+              <ScrollAnimation direction="up" delay={400}>
                 <div className="group relative rounded-2xl border border-white/30 bg-white/15 p-4 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.2)] transition-all duration-500 hover:-translate-y-3 hover:shadow-[0_16px_48px_rgba(0,0,0,0.3)] animate-[float_6s_ease-in-out_infinite] sm:p-6 md:p-8">
                   <p className="text-[10px] uppercase tracking-[0.25em] text-[#61FF45] font-black sm:text-xs">Facility Highlights</p>
                   <h3 className="mt-2 text-xl font-black text-white sm:mt-3 sm:text-2xl">
@@ -311,7 +312,7 @@ export function HomeContent({ content }: HomeContentProps) {
               </ScrollAnimation>
 
               {/* Quote Card */}
-              <ScrollAnimation direction="right" delay={500}>
+              <ScrollAnimation direction="up" delay={500}>
                 <div className="rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-xl shadow-[0_8px_24px_rgba(0,0,0,0.15)] transition-all duration-500 hover:-translate-y-2 hover:bg-white/15 hover:shadow-[0_12px_32px_rgba(0,0,0,0.2)] sm:p-6">
                   <p className="text-xs leading-relaxed italic text-white/95 sm:text-sm md:text-base">
                     &ldquo;Elite conditioning programs tailored for pros who demand results.&rdquo;
@@ -380,13 +381,13 @@ export function HomeContent({ content }: HomeContentProps) {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Link href="/facilities" className="block">
             <ScrollAnimation direction="up">
-              <div className="flex flex-col gap-3 sm:gap-4 cursor-pointer group">
+              <div className="flex flex-col gap-3 text-center sm:gap-4 cursor-pointer group">
                 <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Facility Highlights</p>
                 <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl group-hover:text-brand-green-primary transition-colors">Our Facility & Venues</h2>
-                <p className="max-w-2xl text-base text-gray-600 leading-relaxed sm:text-lg">
+                <p className="max-w-2xl mx-auto text-base text-gray-600 leading-relaxed sm:text-lg">
                   Infinity offers multiple premium spaces for training, events, and private sessions.
                 </p>
-                <div className="mt-6 flex items-center gap-2 text-brand-green-primary font-semibold group-hover:gap-4 transition-all">
+                <div className="mt-6 flex items-center justify-center gap-2 text-brand-green-primary font-semibold group-hover:gap-4 transition-all">
                   <span>View All Facilities</span>
                   <ArrowRightIcon className="w-5 h-5" />
                 </div>
@@ -589,7 +590,7 @@ export function HomeContent({ content }: HomeContentProps) {
       <section id="services" className="bg-gray-50 py-12 sm:py-16 md:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <ScrollAnimation direction="up">
-            <div className="flex flex-col gap-3 sm:gap-4">
+            <div className="flex flex-col items-center gap-3 text-center sm:gap-4">
               <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">What we offer</p>
               <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Beyond training sessions</h2>
             </div>
@@ -618,7 +619,7 @@ export function HomeContent({ content }: HomeContentProps) {
       <section id="events" className="bg-white py-12 sm:py-16 md:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <ScrollAnimation direction="up">
-            <div className="flex flex-col gap-3 sm:gap-4">
+            <div className="flex flex-col items-center gap-3 text-center sm:gap-4">
               <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">Events</p>
               <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">Coming Events</h2>
             </div>
@@ -637,26 +638,18 @@ export function HomeContent({ content }: HomeContentProps) {
                     sizes="(max-width: 768px) 100vw, (max-width: 1024px) 100vw, 1280px"
                     priority
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-8 md:p-10 text-white">
-                    <p className="text-xs uppercase tracking-[0.35em] text-white/90 font-bold sm:text-sm mb-2">
-                      Upcoming Event
-                    </p>
-                    <h3 className="text-2xl font-black sm:text-3xl md:text-4xl mb-2">
-                      Join Us for Our Next Event
-                    </h3>
-                    <p className="text-sm text-white/90 sm:text-base max-w-2xl">
-                      Don&apos;t miss out on this exciting opportunity to be part of our community.
-                    </p>
-                    <Link 
-                      href="/events" 
-                      className="group/link mt-4 inline-flex items-center gap-2 text-sm font-bold text-white bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full transition-all duration-300 hover:bg-white/30 hover:gap-3"
-                    >
-                      View Event Details
-                      <ArrowRightIcon className="h-4 w-4 transition-transform duration-300 group-hover/link:translate-x-1" />
-                    </Link>
-                  </div>
                 </div>
+              </div>
+              <div className="mx-auto mt-5 flex max-w-3xl flex-col items-center gap-3 text-center">
+                <p className="text-xs uppercase tracking-[0.35em] text-brand-green-dark font-bold">Upcoming Event</p>
+                <h3 className="text-2xl font-black text-brand-black sm:text-3xl">See what&apos;s next at Infinity</h3>
+                <Link
+                  href="/events"
+                  className="group/link inline-flex items-center gap-2 text-sm font-bold text-white bg-gradient-button px-5 py-2.5 rounded-full shadow-button transition-all duration-300 hover:shadow-button-hover hover:gap-3"
+                >
+                  View Event Details
+                  <ArrowRightIcon className="h-4 w-4 transition-transform duration-300 group-hover/link:translate-x-1" />
+                </Link>
               </div>
             </div>
           </ScrollAnimation>
@@ -710,25 +703,28 @@ export function HomeContent({ content }: HomeContentProps) {
                   <div>
                     <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold mb-3">Phone</p>
                     <a 
-                      href="tel:+962796244059" 
+                      href={footer?.phone ? `tel:${footer.phone.replace(/\s+/g, '')}` : undefined}
                       className="text-base text-brand-black font-semibold hover:text-brand-green-primary transition-colors"
                     >
-                      +962 7 9624 4059
+                      {footer?.phone || '+962 7 9624 4059'}
                     </a>
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold mb-3">Email</p>
                     <a 
-                      href="mailto:infinitysportsacademyjo@gmail.com" 
+                      href={footer?.email ? `mailto:${footer.email}` : undefined}
                       className="text-base text-brand-black font-semibold hover:text-brand-green-primary transition-colors break-all"
                     >
-                      infinitysportsacademyjo@gmail.com
+                      {footer?.email || 'infinitysportsacademyjo@gmail.com'}
                     </a>
                   </div>
                   <div className="sm:col-span-2 lg:col-span-1">
                     <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold mb-3">Instagram</p>
                     <a 
-                      href="https://instagram.com/infinity.sports.academy" 
+                      href={
+                        footer?.socialLinks?.find((l) => l.label.toLowerCase().includes('instagram'))?.href ||
+                        'https://instagram.com/infinity.sports.academy'
+                      }
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="text-base text-brand-black font-semibold hover:text-brand-green-primary transition-colors"
@@ -739,7 +735,7 @@ export function HomeContent({ content }: HomeContentProps) {
                   <div className="sm:col-span-2 lg:col-span-3">
                     <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold mb-3">Location</p>
                     <p className="text-base text-brand-black font-semibold">
-                      Shmeisani, Princess Alia College
+                      {footer?.address || 'Shmeisani, Princess Alia College'}
                     </p>
                   </div>
                 </div>

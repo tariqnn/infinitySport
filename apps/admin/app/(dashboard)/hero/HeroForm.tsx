@@ -50,6 +50,7 @@ export function HeroForm({
         secondaryCta: formData.get('secondaryCtaLabel')?.toString() || undefined,
         secondaryUrl: formData.get('secondaryCtaLink')?.toString() || undefined,
         backgroundImageUrl: backgroundImageUrl || undefined,
+        backgroundVideoUrl: backgroundVideoUrl || undefined,
       });
 
       setStatus('success');

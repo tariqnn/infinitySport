@@ -6,6 +6,7 @@ import type {
   LandingOffer,
   LandingProgram,
 } from '@infinity/types';
+import { cache } from 'react';
 
 // Default to deployed API, allow override via environment variable
 const getApiBaseUrl = () => {
@@ -72,20 +73,37 @@ type LandingApiResponse = {
     secondaryCta?: string;
     secondaryUrl?: string;
     backgroundImageUrl?: string;
+    backgroundVideoUrl?: string;
   };
   programs?: ProgramResponse[];
   offers?: OfferResponse[];
   events?: EventResponse[];
   announcements?: AnnouncementResponse[];
   facilities?: FacilityResponse[];
+  footerSettings?: {
+    address: string;
+    phone: string;
+    email: string;
+    contactRecipientEmail?: string | null;
+    socialLinks?: unknown;
+  } | null;
 };
 
 async function jsonFetch<T>(endpoint: string): Promise<T> {
-  const response = await fetch(endpoint, { cache: 'no-store' });
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(endpoint, {
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    return response.json() as Promise<T>;
+  } finally {
+    clearTimeout(timeout);
   }
-  return response.json() as Promise<T>;
 }
 
 export async function fetchPrograms(): Promise<ProgramResponse[]> {
@@ -133,7 +151,7 @@ export async function fetchAnnouncements(): Promise<AnnouncementResponse[]> {
   }
 }
 
-export async function fetchLandingContent(): Promise<LandingContent> {
+async function _fetchLandingContent(): Promise<LandingContent> {
   try {
     const data = await jsonFetch<LandingApiResponse>(`${API_BASE_URL}/api/public/landing`);
 
@@ -157,7 +175,7 @@ export async function fetchLandingContent(): Promise<LandingContent> {
           secondaryCtaLabel: data.hero.secondaryCta || undefined,
           secondaryCtaLink: data.hero.secondaryUrl || undefined,
           backgroundImageUrl: data.hero.backgroundImageUrl || undefined,
-          backgroundVideoUrl: undefined,
+          backgroundVideoUrl: data.hero.backgroundVideoUrl || undefined,
         }
       : defaultHero;
 
@@ -210,13 +228,42 @@ export async function fetchLandingContent(): Promise<LandingContent> {
         mediaUrl: f.imageUrl || undefined,
         badge: undefined,
       })),
-      footer: {
-        address: 'Infinity Campus, Airport Road, Amman, Jordan',
-        phone: '+962 6 555 8899',
-        email: 'hello@infinitysport.jo',
-        contactRecipientEmail: 'hello@infinitysport.jo',
-        socialLinks: [],
-      },
+      footer: (() => {
+        const fallback: LandingContent['footer'] = {
+          address: 'Shmeisani, Princess Alia College',
+          phone: '+962 7 9624 4059',
+          email: 'infinitysportsacademyjo@gmail.com',
+          contactRecipientEmail: 'infinitysportsacademyjo@gmail.com',
+          socialLinks: [
+            { id: 'instagram', label: 'Instagram', href: 'https://instagram.com/infinity.sports.academy' },
+          ],
+        };
+
+        if (!data.footerSettings) return fallback;
+
+        const rawLinks = data.footerSettings.socialLinks;
+        const socialLinks =
+          Array.isArray(rawLinks)
+            ? rawLinks
+                .map((link: any) => {
+                  const id = typeof link?.id === 'string' ? link.id : undefined;
+                  const label = typeof link?.label === 'string' ? link.label : undefined;
+                  const href = typeof link?.href === 'string' ? link.href : undefined;
+                  if (!label || !href) return null;
+                  return { id: id || label.toLowerCase(), label, href };
+                })
+                .filter(Boolean)
+            : fallback.socialLinks;
+
+        return {
+          address: data.footerSettings.address || fallback.address,
+          phone: data.footerSettings.phone || fallback.phone,
+          email: data.footerSettings.email || fallback.email,
+          contactRecipientEmail:
+            data.footerSettings.contactRecipientEmail || data.footerSettings.email || fallback.contactRecipientEmail,
+          socialLinks,
+        };
+      })(),
       updatedAt: new Date().toISOString(),
       updatedBy: 'System',
     };
@@ -254,3 +301,5 @@ export async function fetchLandingContent(): Promise<LandingContent> {
   }
 }
 
+// Memoize per-request so Home + Footer don't trigger multiple slow API calls.
+export const fetchLandingContent = cache(_fetchLandingContent);

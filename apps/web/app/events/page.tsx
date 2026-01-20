@@ -27,6 +27,15 @@ export default async function EventsPage() {
     <div className="bg-white py-24">
       {/* Hero Section with Event Image */}
       <div className="relative mx-auto max-w-7xl px-6 lg:px-8 mb-16">
+        <div className="mb-6 text-center">
+          <p className="text-sm uppercase tracking-[0.3em] text-brand-green-dark">Events</p>
+          <h1 className="mt-3 text-4xl font-black text-brand-black sm:text-5xl lg:text-6xl">
+            Signature Infinity Sports Programs
+          </h1>
+          <p className="mx-auto mt-3 max-w-2xl text-base text-gray-600 sm:text-lg">
+            Seasonal combines, international showcases, and corporate leagues engineered for peak performance.
+          </p>
+        </div>
         <div className="relative h-64 sm:h-80 md:h-96 lg:h-[500px] w-full rounded-2xl overflow-hidden border-2 border-brand-lightBlue/20 shadow-[0_8px_32px_rgba(0,0,0,0.08)]">
           <Image
             src="/events.jpeg"
@@ -36,16 +45,6 @@ export default async function EventsPage() {
             priority
             sizes="(max-width: 768px) 100vw, (max-width: 1024px) 100vw, 1280px"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-8 md:p-10 text-white">
-            <p className="text-sm uppercase tracking-[0.3em] text-white/90 mb-2">Events</p>
-            <h1 className="text-3xl font-black sm:text-4xl md:text-5xl lg:text-6xl mb-2">
-              Signature Infinity Sports Programs
-            </h1>
-            <p className="text-base text-white/95 sm:text-lg max-w-2xl">
-              Seasonal combines, international showcases, and corporate leagues engineered for peak performance.
-            </p>
-          </div>
         </div>
       </div>
 

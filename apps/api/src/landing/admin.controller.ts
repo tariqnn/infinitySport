@@ -18,6 +18,7 @@ import {
   Announcement,
   FacilityHighlight,
   FooterLink,
+  FooterSettings,
   Prisma,
 } from '@prisma/client';
 
@@ -196,6 +197,17 @@ export class AdminController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteFooterLink(@Param('id') id: string) {
     await this.landingService.deleteFooterLink(id);
+  }
+
+  // Footer Settings
+  @Get('footer-settings')
+  async getFooterSettings() {
+    return this.landingService.getFooterSettings();
+  }
+
+  @Patch('footer-settings')
+  async updateFooterSettings(@Body() data: Partial<FooterSettings>) {
+    return this.landingService.updateFooterSettings(data);
   }
 }
 

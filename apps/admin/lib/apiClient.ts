@@ -247,6 +247,18 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  // Footer Settings
+  async getFooterSettings() {
+    return this.request('/api/admin/footer-settings');
+  }
+
+  async updateFooterSettings(data: any) {
+    return this.request('/api/admin/footer-settings', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 export const apiClient = new ApiClient();

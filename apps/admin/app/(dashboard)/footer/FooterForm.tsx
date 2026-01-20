@@ -42,18 +42,27 @@ export function FooterForm() {
   useEffect(() => {
     async function loadFooter() {
       try {
-        // For now, we'll use default values since footer is not in the database schema
-        // In the future, you might want to add a FooterSettings model
+        const existing = await apiClient.getFooterSettings().catch(() => null);
+        const fallback: LandingFooter = {
+          address: 'Shmeisani, Princess Alia College',
+          phone: '+962 7 9624 4059',
+          email: 'infinitysportsacademyjo@gmail.com',
+          contactRecipientEmail: 'infinitysportsacademyjo@gmail.com',
+          socialLinks: [{ id: 'instagram', label: 'Instagram', href: 'https://instagram.com/infinity.sports.academy' }],
+        };
+
+        if (!existing) {
+          setFooter(fallback);
+          return;
+        }
+
+        const socialLinks = Array.isArray(existing.socialLinks) ? existing.socialLinks : fallback.socialLinks;
         setFooter({
-          address: 'Infinity Campus, Airport Road, Amman, Jordan',
-          phone: '+962 6 555 8899',
-          email: 'hello@infinitysport.jo',
-          contactRecipientEmail: 'hello@infinitysport.jo',
-          socialLinks: [
-            { id: 'social-ig', label: 'Instagram', href: 'https://instagram.com/infinitysport' },
-            { id: 'social-li', label: 'LinkedIn', href: 'https://linkedin.com/company/infinitysport' },
-            { id: 'social-yt', label: 'YouTube', href: 'https://youtube.com/@infinitysport' },
-          ],
+          address: existing.address || fallback.address,
+          phone: existing.phone || fallback.phone,
+          email: existing.email || fallback.email,
+          contactRecipientEmail: existing.contactRecipientEmail || existing.email || fallback.contactRecipientEmail,
+          socialLinks,
         });
       } catch (error) {
         console.error('Failed to load footer:', error);
@@ -95,11 +104,16 @@ export function FooterForm() {
         socialLinks,
       };
 
+      await apiClient.updateFooterSettings({
+        address: updatedFooter.address,
+        phone: updatedFooter.phone,
+        email: updatedFooter.email,
+        contactRecipientEmail: updatedFooter.contactRecipientEmail,
+        socialLinks: updatedFooter.socialLinks,
+      });
+
       setFooter(updatedFooter);
-      setState({ status: 'success', message: 'Footer settings saved! (Note: Currently stored in memory. Consider adding a FooterSettings model to the database.)' });
-      
-      // TODO: In the future, add a FooterSettings API endpoint to persist this
-      // For now, this is just stored in component state
+      setState({ status: 'success', message: 'Footer settings saved!' });
       
       router.refresh();
     } catch (error) {

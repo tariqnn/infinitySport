@@ -8,6 +8,7 @@ import {
   Announcement,
   FacilityHighlight,
   FooterLink,
+  FooterSettings,
   Prisma,
 } from '@prisma/client';
 
@@ -204,9 +205,27 @@ export class LandingService {
     await this.prisma.footerLink.delete({ where: { id } });
   }
 
+  // Footer Settings (contact info + social links)
+  async getFooterSettings(): Promise<FooterSettings | null> {
+    return this.prisma.footerSettings.findFirst();
+  }
+
+  async updateFooterSettings(data: Partial<FooterSettings>): Promise<FooterSettings> {
+    const existing = await this.prisma.footerSettings.findFirst();
+    if (existing) {
+      return this.prisma.footerSettings.update({
+        where: { id: existing.id },
+        data,
+      });
+    }
+    return this.prisma.footerSettings.create({
+      data: data as Prisma.FooterSettingsCreateInput,
+    });
+  }
+
   // Combined landing content
   async getLandingContent() {
-    const [hero, programs, offers, events, announcements, facilities, footerLinks] = await Promise.all([
+    const [hero, programs, offers, events, announcements, facilities, footerLinks, footerSettings] = await Promise.all([
       this.getHero(),
       this.getPrograms(),
       this.getOffers(),
@@ -214,6 +233,7 @@ export class LandingService {
       this.getAnnouncements(),
       this.getFacilities(),
       this.getFooterLinks(),
+      this.getFooterSettings(),
     ]);
 
     return {
@@ -224,6 +244,7 @@ export class LandingService {
       announcements,
       facilities,
       footerLinks,
+      footerSettings: footerSettings || null,
     };
   }
 }

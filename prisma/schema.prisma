@@ -19,6 +19,7 @@ model HeroSection {
   secondaryCta      String?
   secondaryUrl      String?
   backgroundImageUrl String?
+  backgroundVideoUrl String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
@@ -89,6 +90,17 @@ model FooterLink {
   order     Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model FooterSettings {
+  id                  String   @id @default(cuid())
+  address             String
+  phone               String
+  email               String
+  contactRecipientEmail String?
+  socialLinks         Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }
 
 // Portal Models

@@ -22,6 +22,8 @@ async function main() {
   }
 
   // Clear existing data
+  // FooterSettings is a newer table; use `as any` to avoid compile errors if prisma client isn't generated yet.
+  await (prisma as any).footerSettings?.deleteMany?.().catch(() => undefined);
   await prisma.footerLink.deleteMany();
   await prisma.facilityHighlight.deleteMany();
   await prisma.announcement.deleteMany();
@@ -40,6 +42,7 @@ async function main() {
       secondaryCta: 'Book a Tour',
       secondaryUrl: '/contact',
       backgroundImageUrl: 'https://images.unsplash.com/photo-1461897104016-0b3b00cc81ee?auto=format&fit=crop&w=2000&q=80',
+      backgroundVideoUrl: '/main-video.mp4',
     },
   });
   console.log('✅ Created hero section');
@@ -259,6 +262,18 @@ async function main() {
   ]);
   console.log(`✅ Created ${footerLinks.length} footer links`);
 
+  // Footer Settings
+  await (prisma as any).footerSettings?.create?.({
+    data: {
+      address: 'Shmeisani, Princess Alia College',
+      phone: '+962 7 9624 4059',
+      email: 'infinitysportsacademyjo@gmail.com',
+      contactRecipientEmail: 'infinitysportsacademyjo@gmail.com',
+      socialLinks: [{ id: 'instagram', label: 'Instagram', href: 'https://instagram.com/infinity.sports.academy' }],
+    },
+  });
+  console.log('✅ Created footer settings');
+
   console.log('✨ Seeding completed!');
   console.log('\n📊 Summary:');
   console.log(`   - Hero Section: 1`);
@@ -268,6 +283,7 @@ async function main() {
   console.log(`   - Announcements: ${announcements.length}`);
   console.log(`   - Facilities: ${facilities.length}`);
   console.log(`   - Footer Links: ${footerLinks.length}`);
+  console.log(`   - Footer Settings: 1`);
   console.log('\n🎉 Database is ready! You can now start the API server.');
 }
 

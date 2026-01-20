@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { Footer } from '@infinity/ui';
 import { Plus_Jakarta_Sans, Space_Grotesk } from 'next/font/google';
 import { LanguageProvider } from './_components/LanguageProvider';
 import { NavbarWithLanguage } from './_components/NavbarWithLanguage';
+import { SiteFooter } from './_components/SiteFooter';
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -58,7 +58,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <LanguageProvider>
           <NavbarWithLanguage />
           <main className="flex-1">{children}</main>
-          <Footer />
+          <SiteFooter />
         </LanguageProvider>
       </body>
     </html>

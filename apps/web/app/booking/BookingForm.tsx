@@ -2,32 +2,79 @@
 
 import { useState } from 'react';
 
-const COURTS = [
-  { id: 'basketball-1', name: 'Basketball Court 1', type: 'Basketball' },
-  { id: 'basketball-2', name: 'Basketball Court 2', type: 'Basketball' },
-  { id: 'padel-1', name: 'Padel Court 1', type: 'Padel' },
-  { id: 'padel-2', name: 'Padel Court 2', type: 'Padel' },
-  { id: 'turf-1', name: 'Turf Field 1', type: 'Turf' },
-  { id: 'turf-2', name: 'Turf Field 2', type: 'Turf' },
+type CourtType = 'Basketball AC' | 'Basketball 3x3' | 'Padel' | 'Volleyball';
+
+const COURTS: Array<{ id: string; name: string; type: CourtType }> = [
+  { id: 'basketball-ac', name: 'Basketball', type: 'Basketball AC' },
+  { id: 'basketball-3x3', name: 'Basketball 3x3', type: 'Basketball 3x3' },
+  { id: 'padel', name: 'Padel', type: 'Padel' },
+  { id: 'volleyball', name: 'Volleyball', type: 'Volleyball' },
 ];
 
-// Generate time slots from 7:00 AM to 10:00 PM, every hour
+// Generate time slots from 7:00 AM to 11:00 PM, every hour (+ 12:00 AM shown at the end)
 const generateTimeSlots = () => {
-  const slots = [];
-  for (let hour = 7; hour <= 22; hour++) {
-    const time = `${hour.toString().padStart(2, '0')}:00`;
-    slots.push(time);
+  const slots: string[] = [];
+  for (let hour = 7; hour <= 23; hour++) {
+    slots.push(`${hour.toString().padStart(2, '0')}:00`);
   }
+  // Put 12:00 AM at the end (shown as evening continuation in the UI)
+  slots.push('00:00');
   return slots;
 };
 
 const TIME_SLOTS = generateTimeSlots();
+
+const dayKey = (dateStr: string) => {
+  // dateStr is YYYY-MM-DD; treat as local date
+  const [y, m, d] = dateStr.split('-').map((n) => Number(n));
+  const date = new Date(y, (m ?? 1) - 1, d ?? 1);
+  return date.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+};
+
+const toMinutes = (hhmm: string) => {
+  const [h, m] = hhmm.split(':').map((n) => Number(n));
+  return (h || 0) * 60 + (m || 0);
+};
+
+const formatSlotLabel = (hhmm: string) => {
+  const [h] = hhmm.split(':').map((n) => Number(n));
+  const hour = h ?? 0;
+  const isPm = hour >= 12;
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${hour12}:00 ${isPm ? 'PM' : 'AM'}`;
+};
+
+// These time slots are ALWAYS FULL (unavailable). All are EVENING.
+// NOTE: This schedule applies ONLY to Basketball AC.
+const ALWAYS_FULL: Record<string, Partial<Record<CourtType, string[]>>> = {
+  MONDAY: {
+    'Basketball AC': ['17:00', '18:00', '19:00'],
+  },
+  WEDNESDAY: {
+    'Basketball AC': ['17:00', '18:00', '19:00'],
+  },
+  FRIDAY: {
+    'Basketball AC': ['22:00', '23:00', '00:00'],
+  },
+  SATURDAY: {
+    'Basketball AC': ['17:00', '18:00'],
+  },
+};
+
+const isAlwaysFullSlot = (opts: { date: string; time: string; courtId: string }) => {
+  const court = COURTS.find((c) => c.id === opts.courtId);
+  if (!court) return false;
+  const day = dayKey(opts.date);
+  const times = ALWAYS_FULL[day]?.[court.type] ?? [];
+  return times.includes(opts.time);
+};
 
 export function BookingForm() {
   const [selectedCourt, setSelectedCourt] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [name, setName] = useState<string>('');
+  const [email, setEmail] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -46,10 +93,10 @@ export function BookingForm() {
       return TIME_SLOTS;
     }
     const now = new Date();
-    const currentHour = now.getHours();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
     return TIME_SLOTS.filter(slot => {
-      const slotHour = parseInt(slot.split(':')[0]);
-      return slotHour > currentHour;
+      // Allow selecting the next slot if we're already past it
+      return toMinutes(slot) > currentMinutes;
     });
   };
 
@@ -66,6 +113,13 @@ export function BookingForm() {
       return;
     }
 
+    if (isAlwaysFullSlot({ date: selectedDate, time: selectedTime, courtId: selectedCourt })) {
+      setSubmitStatus('error');
+      setSubmitMessage('This time slot is fully booked. Please select another time.');
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       const response = await fetch('/api/booking', {
         method: 'POST',
@@ -76,6 +130,7 @@ export function BookingForm() {
           date: selectedDate,
           time: selectedTime,
           name,
+          email: email || undefined,
           phone,
         }),
       });
@@ -87,13 +142,18 @@ export function BookingForm() {
       }
 
       setSubmitStatus('success');
-      setSubmitMessage('Booking submitted successfully! Check your email for confirmation.');
+      setSubmitMessage(
+        email
+          ? 'Booking submitted successfully! Check your email for confirmation.'
+          : 'Booking submitted successfully! We will contact you to confirm.'
+      );
       
       // Reset form
       setSelectedCourt('');
       setSelectedDate('');
       setSelectedTime('');
       setName('');
+      setEmail('');
       setPhone('');
     } catch (error) {
       console.error('Booking submission error', error);
@@ -158,20 +218,35 @@ export function BookingForm() {
               Select Time Slot <span className="text-red-500">*</span>
             </label>
             <div className="grid grid-cols-4 gap-3 sm:grid-cols-6 md:grid-cols-8">
-              {getAvailableTimeSlots().map((time) => (
-                <button
-                  key={time}
-                  type="button"
-                  onClick={() => setSelectedTime(time)}
-                  className={`rounded-lg border-2 px-3 py-2 text-sm font-medium transition-all ${
-                    selectedTime === time
-                      ? 'border-brand-blue-primary bg-brand-blue-primary text-white'
-                      : 'border-gray-200 text-brand-black hover:border-brand-blue-primary/50 hover:bg-brand-blue-primary/5'
-                  }`}
-                >
-                  {time}
-                </button>
-              ))}
+              {getAvailableTimeSlots().map((time) => {
+                const full = selectedCourt
+                  ? isAlwaysFullSlot({ date: selectedDate, time, courtId: selectedCourt })
+                  : false;
+
+                return (
+                  <button
+                    key={time}
+                    type="button"
+                    onClick={() => {
+                      if (full) return;
+                      setSelectedTime(time);
+                    }}
+                    disabled={full || !selectedCourt}
+                    title={!selectedCourt ? 'Select a court first' : full ? 'Always full' : ''}
+                    className={`rounded-lg border-2 px-3 py-2 text-sm font-medium transition-all ${
+                      !selectedCourt
+                        ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+                        : full
+                          ? 'border-red-300 bg-red-50 text-red-700 cursor-not-allowed'
+                          : selectedTime === time
+                            ? 'border-brand-blue-primary bg-brand-blue-primary text-white'
+                            : 'border-gray-200 text-brand-black hover:border-brand-blue-primary/50 hover:bg-brand-blue-primary/5'
+                    }`}
+                  >
+                    {formatSlotLabel(time)}
+                  </button>
+                );
+              })}
             </div>
             {getAvailableTimeSlots().length === 0 && (
               <p className="mt-2 text-sm text-gray-500">No available time slots for today. Please select another date.</p>
@@ -191,6 +266,21 @@ export function BookingForm() {
             onChange={(e) => setName(e.target.value)}
             placeholder="Your full name"
             required
+            className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-brand-black placeholder:text-gray-400 focus:border-brand-blue-primary focus:outline-none focus:ring-2 focus:ring-brand-blue-primary/20 transition"
+          />
+        </div>
+
+        {/* Email Input (Optional but recommended for confirmation) */}
+        <div>
+          <label htmlFor="email" className="block text-sm font-semibold text-brand-black mb-2">
+            Email <span className="text-gray-400">(optional)</span>
+          </label>
+          <input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
             className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-brand-black placeholder:text-gray-400 focus:border-brand-blue-primary focus:outline-none focus:ring-2 focus:ring-brand-blue-primary/20 transition"
           />
         </div>
@@ -228,7 +318,15 @@ export function BookingForm() {
         <div className="flex justify-end pt-4">
           <button
             type="submit"
-            disabled={isSubmitting || !selectedCourt || !selectedDate || !selectedTime || !name || !phone}
+            disabled={
+              isSubmitting ||
+              !selectedCourt ||
+              !selectedDate ||
+              !selectedTime ||
+              !name ||
+              !phone ||
+              isAlwaysFullSlot({ date: selectedDate, time: selectedTime, courtId: selectedCourt })
+            }
             className="rounded-full bg-gradient-button px-8 py-3 text-sm font-bold text-white shadow-button transition hover:shadow-button-hover disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? 'Submitting...' : 'Book Court'}

@@ -3,19 +3,17 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { fetchEvents } from '../../lib/apiClient';
+import { fetchEvents, type EventResponse } from '../../lib/apiClient';
 import { useLanguage } from '../_components/LanguageProvider';
 import { tr } from '../../lib/translations';
 
 export default function EventsPage() {
   const { language } = useLanguage();
-  const [eventsData, setEventsData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [eventsData, setEventsData] = useState<EventResponse[]>([]);
 
   useEffect(() => {
     fetchEvents().then((data) => {
       setEventsData(data);
-      setLoading(false);
     });
   }, []);
   

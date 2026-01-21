@@ -30,7 +30,12 @@ export class PortalController {
 
   @Post('companies')
   async createCompany(@Body() data: Prisma.CompanyCreateInput) {
-    return this.portalService.createCompany(data);
+    try {
+      return await this.portalService.createCompany(data);
+    } catch (error: any) {
+      console.error('Error creating company:', error);
+      throw error;
+    }
   }
 
   @Patch('companies/:id')

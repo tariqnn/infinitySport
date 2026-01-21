@@ -51,6 +51,13 @@ export class PortalService {
   }
 
   async createCompany(data: Prisma.CompanyCreateInput): Promise<Company> {
+    // Check if company with same name already exists
+    const existing = await this.prisma.company.findFirst({
+      where: { name: data.name },
+    });
+    if (existing) {
+      return existing;
+    }
     return this.prisma.company.create({ data });
   }
 

@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { Modal, Input, Select, Textarea, Button } from '../../_components/ui';
 import { financeApi, membersApi, getFirstCompany } from '../../../lib/portalApi';
 import { useRouter } from 'next/navigation';
+import { getApiBaseUrl } from '../../../lib/getApiBaseUrl';
 
 type LineItem = {
   id: string;
@@ -13,7 +14,7 @@ type LineItem = {
 };
 
 const COMPANY_NAME = 'Infinity Sporty';
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://infinitysport.onrender.com';
+const API_BASE_URL = getApiBaseUrl();
 
 export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();

@@ -1,4 +1,6 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://infinitysport.onrender.com';
+import { getApiBaseUrl } from './getApiBaseUrl';
+
+const API_BASE_URL = getApiBaseUrl();
 
 // Get company ID from localStorage or context (you may need to adjust this)
 function getCompanyId(): string | undefined {

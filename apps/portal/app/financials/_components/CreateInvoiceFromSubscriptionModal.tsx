@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 import { Modal, Select, Input, Button } from '../../_components/ui';
 import { financeApi, subscriptionsApi, getFirstCompany } from '../../../lib/portalApi';
 import { useRouter } from 'next/navigation';
+import { getApiBaseUrl } from '../../../lib/getApiBaseUrl';
 
 const COMPANY_NAME = 'Infinity Sporty';
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://infinitysport.onrender.com';
+const API_BASE_URL = getApiBaseUrl();
 
 export function CreateInvoiceFromSubscriptionModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();

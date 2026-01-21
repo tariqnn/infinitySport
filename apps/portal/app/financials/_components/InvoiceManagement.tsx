@@ -9,8 +9,9 @@ import { CreateInvoiceFromSubscriptionModal } from './CreateInvoiceFromSubscript
 import { EditInvoiceModal } from './EditInvoiceModal';
 import { CurrencyDollarIcon, PlusIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { DonutBreakdown, RevenueAreaChart } from '../../_components/PortalCharts';
+import { getApiBaseUrl } from '../../../lib/getApiBaseUrl';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://infinitysport.onrender.com';
+const API_BASE_URL = getApiBaseUrl();
 
 export function InvoiceManagement() {
   const [invoices, setInvoices] = useState<any[]>([]);

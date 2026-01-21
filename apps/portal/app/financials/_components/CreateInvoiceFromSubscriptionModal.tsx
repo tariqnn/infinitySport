@@ -328,6 +328,7 @@ export function CreateInvoiceFromSubscriptionModal({ open, onClose }: { open: bo
             />
             </>
           )}
+          </>
         ) : (
           <>
             <Input

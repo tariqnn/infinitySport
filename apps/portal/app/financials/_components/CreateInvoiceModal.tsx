@@ -15,6 +15,7 @@ type LineItem = {
 
 const COMPANY_NAME = 'Infinity Sporty';
 const API_BASE_URL = getApiBaseUrl();
+const DEFAULT_COMPANY_ADDRESS = 'Shemisani, Princess Alia College';
 
 export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
@@ -23,10 +24,10 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
   const [members, setMembers] = useState<any[]>([]);
 
   // Form state
-  const [companyAddress, setCompanyAddress] = useState('');
+  const [companyAddress, setCompanyAddress] = useState(DEFAULT_COMPANY_ADDRESS);
   const [clientName, setClientName] = useState('');
   const [clientEmail, setClientEmail] = useState('');
-  const [clientAddress, setClientAddress] = useState('');
+  const [clientAddress, setClientAddress] = useState('-');
   const [memberId, setMemberId] = useState<string>('');
   const [currency, setCurrency] = useState('JOD');
   const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'CASH'>('CARD');
@@ -36,7 +37,7 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
   const [discount, setDiscount] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<LineItem[]>([
-    { id: crypto?.randomUUID?.() ?? String(Date.now()), description: '', quantity: 1, unitPrice: 0 },
+    { id: crypto?.randomUUID?.() ?? String(Date.now()), description: 'Service', quantity: 1, unitPrice: 0 },
   ]);
 
   useEffect(() => {
@@ -44,6 +45,16 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
       loadMembers();
     }
   }, [open]);
+
+  // Auto-fill client info when selecting a member (only fills empty fields)
+  useEffect(() => {
+    if (!memberId) return;
+    const m = members.find((x) => x.id === memberId);
+    if (!m) return;
+
+    if (!clientName.trim()) setClientName(`${m.firstName || ''} ${m.lastName || ''}`.trim());
+    if (!clientEmail.trim() && m.email) setClientEmail(String(m.email));
+  }, [memberId, members, clientName, clientEmail]);
 
   async function loadMembers() {
     try {
@@ -60,9 +71,9 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
 
     if (!companyAddress.trim()) next.companyAddress = 'Company address is required.';
     if (!clientName.trim()) next.clientName = 'Client name is required.';
-    if (!clientEmail.trim()) next.clientEmail = 'Client email is required.';
+    // Client email is optional (some members don't have an email); validate only if provided
     if (clientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail)) next.clientEmail = 'Enter a valid email address.';
-    if (!clientAddress.trim()) next.clientAddress = 'Client address is required.';
+    // Client address is optional; keep it for PDF but don't block creation
     if (!issueDate) next.issueDate = 'Issue date is required.';
     if (!dueDate) next.dueDate = 'Due date is required.';
     if (issueDate && dueDate && new Date(dueDate) < new Date(issueDate)) next.dueDate = 'Due date must be on/after issue date.';

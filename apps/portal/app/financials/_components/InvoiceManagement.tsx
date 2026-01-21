@@ -192,7 +192,7 @@ export function InvoiceManagement() {
       header: 'Actions',
       render: (row: any) => (
         <div className="flex gap-2">
-          {row.pdfPath && (
+          {(row.pdfPath || getInvoiceMeta(row)?.pdfPath) && (
             <button
               onClick={() => downloadInvoicePdf(row)}
               className="text-sm font-semibold text-primaryBlue hover:underline"

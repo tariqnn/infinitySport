@@ -154,10 +154,10 @@ export function PettyCash() {
 
       {/* Transactions Table */}
       <Card>
-        <CardHeader
-          title="Petty Cash Transactions"
-          actions={
-            <>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-textPrimary">Petty Cash Transactions</h3>
+            <div className="flex gap-3">
               <ExportCsvButton
                 rows={transactions.map(t => ({
                   date: new Date(t.date).toLocaleDateString(),
@@ -177,9 +177,9 @@ export function PettyCash() {
               <Button onClick={() => setShowModal(true)} leadingIcon={<PlusIcon className="h-5 w-5" />}>
                 Add Transaction
               </Button>
-            </>
-          }
-        />
+            </div>
+          </div>
+        </CardHeader>
         <CardBody className="p-0">
           <DataTable columns={columns} rows={transactions} />
         </CardBody>

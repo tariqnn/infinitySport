@@ -136,10 +136,10 @@ export function CashFlow() {
 
       {/* Entries Table */}
       <Card>
-        <CardHeader
-          title="Cash Flow Entries"
-          actions={
-            <>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-textPrimary">Cash Flow Entries</h3>
+            <div className="flex gap-3">
               <ExportCsvButton
                 rows={entries.map(e => ({
                   date: new Date(e.date).toLocaleDateString(),
@@ -157,9 +157,9 @@ export function CashFlow() {
               <Button onClick={() => setShowModal(true)} leadingIcon={<PlusIcon className="h-5 w-5" />}>
                 Add Entry
               </Button>
-            </>
-          }
-        />
+            </div>
+          </div>
+        </CardHeader>
         <CardBody className="p-0">
           <DataTable columns={columns} rows={entries} />
         </CardBody>

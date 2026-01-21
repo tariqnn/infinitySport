@@ -141,14 +141,14 @@ export function BudgetPlanning() {
     <div className="space-y-6">
       {/* Categories Section */}
       <Card>
-        <CardHeader
-          title="Budget Categories"
-          actions={
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-textPrimary">Budget Categories</h3>
             <Button onClick={() => setShowCategoryModal(true)} leadingIcon={<PlusIcon className="h-5 w-5" />}>
               Add Category
             </Button>
-          }
-        />
+          </div>
+        </CardHeader>
         <CardBody className="p-0">
           <DataTable columns={categoryColumns} rows={categories} />
         </CardBody>
@@ -156,14 +156,14 @@ export function BudgetPlanning() {
 
       {/* Entries Section */}
       <Card>
-        <CardHeader
-          title="Budget Entries"
-          actions={
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-textPrimary">Budget Entries</h3>
             <Button onClick={() => setShowEntryModal(true)} leadingIcon={<PlusIcon className="h-5 w-5" />}>
               Add Entry
             </Button>
-          }
-        />
+          </div>
+        </CardHeader>
         <CardBody className="p-0">
           <DataTable columns={entryColumns} rows={entries} />
         </CardBody>

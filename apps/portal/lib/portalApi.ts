@@ -236,13 +236,53 @@ export const dashboardApi = {
 };
 
 // Helper to get first company (for initial setup)
+// Creates "Infinity Sporty" company in DB if none exists
 export async function getFirstCompany() {
   try {
     const companies = await portalFetch<any[]>('/portal/companies');
-    return companies[0];
+    if (companies && companies.length > 0) {
+      return companies[0];
+    }
+    // Create default company if none exists
+    try {
+      const created = await portalFetch<any>('/portal/companies', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: 'Infinity Sporty',
+          address: 'Shemisani, Princess Alia College',
+          status: 'ACTIVE',
+        }),
+      });
+      return created;
+    } catch (createErr) {
+      // If create fails, return default object (callers should handle gracefully)
+      console.warn('Could not create default company:', createErr);
+      return {
+        id: 'default',
+        name: 'Infinity Sporty',
+        address: 'Shemisani, Princess Alia College',
+      };
+    }
   } catch (e) {
-    // Return null so callers can show a friendly UI message without unhandled promise rejections.
-    return null;
+    // Try to create default company on error
+    try {
+      const created = await portalFetch<any>('/portal/companies', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: 'Infinity Sporty',
+          address: 'Shemisani, Princess Alia College',
+          status: 'ACTIVE',
+        }),
+      });
+      return created;
+    } catch (createErr) {
+      console.warn('Could not create default company:', createErr);
+      return {
+        id: 'default',
+        name: 'Infinity Sporty',
+        address: 'Shemisani, Princess Alia College',
+      };
+    }
   }
 }
 

@@ -59,11 +59,6 @@ export function CreateInvoiceFromSubscriptionModal({ open, onClose }: { open: bo
     setLoading(true);
 
     const company = await getFirstCompany();
-    if (!company) {
-      setError('No company found. Please create a company first.');
-      setLoading(false);
-      return;
-    }
 
     try {
       const member = subscription.member;

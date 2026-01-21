@@ -133,11 +133,6 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
     setLoading(true);
 
     const company = await getFirstCompany();
-    if (!company) {
-      setError('No company found. Please create a company first.');
-      setLoading(false);
-      return;
-    }
 
     try {
       const payloadItems = items.map((it, idx) => ({

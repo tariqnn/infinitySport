@@ -93,7 +93,7 @@ export function DonutBreakdown({ data }: { data: { name: string; value: number; 
               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
               {item.name}
             </span>
-            <span className="font-semibold text-[#0f1a2b]">{Math.round((item.value / total) * 100)}%</span>
+            <span className="font-semibold text-[#0f1a2b]">{total > 0 ? Math.round((item.value / total) * 100) : 0}%</span>
           </div>
         ))}
       </div>

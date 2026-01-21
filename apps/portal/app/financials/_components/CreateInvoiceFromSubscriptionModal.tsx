@@ -16,6 +16,7 @@ export function CreateInvoiceFromSubscriptionModal({ open, onClose }: { open: bo
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
   const [selectedSubscriptionId, setSelectedSubscriptionId] = useState<string>('');
   const [companyAddress, setCompanyAddress] = useState('Shemisani, Princess Alia College');
+  const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'CASH'>('CARD');
   const [dueDate, setDueDate] = useState<string>(() => {
     const date = new Date();
     date.setMonth(date.getMonth() + 1);
@@ -73,6 +74,7 @@ export function CreateInvoiceFromSubscriptionModal({ open, onClose }: { open: bo
         amount: offer.pricePerMonth || 0,
         currency: 'JOD',
         status: 'DRAFT',
+        paymentMethod,
         issuedAt: new Date().toISOString(),
         dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
 
@@ -198,6 +200,16 @@ export function CreateInvoiceFromSubscriptionModal({ open, onClose }: { open: bo
               value={companyAddress}
               onChange={(e) => setCompanyAddress(e.target.value)}
               required
+            />
+
+            <Select
+              label="Payment method"
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value as 'CARD' | 'CASH')}
+              options={[
+                { value: 'CARD', label: 'Visa / MasterCard' },
+                { value: 'CASH', label: 'Cash' },
+              ]}
             />
 
             <Input

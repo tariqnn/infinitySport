@@ -93,12 +93,24 @@ export function InvoiceManagement() {
     });
   }
 
-  const paymentMix = [
-    { name: 'Visa / MasterCard', value: 55, color: '#1D48FF' },
-    { name: 'Apple Pay', value: 22, color: '#29C461' },
-    { name: 'Cash', value: 13, color: '#00A3A3' },
-    { name: 'Wire', value: 10, color: '#6B7280' }
-  ];
+  // Payment methods breakdown (live from invoices)
+  const paymentMix = (() => {
+    const totals = invoices.reduce(
+      (acc, inv) => {
+        const method = (inv.paymentMethod || 'CARD') as 'CARD' | 'CASH';
+        const amount = Number(inv.amount) || 0;
+        if (method === 'CASH') acc.cash += amount;
+        else acc.card += amount;
+        return acc;
+      },
+      { card: 0, cash: 0 }
+    );
+
+    return [
+      { name: 'Visa / MasterCard', value: totals.card, color: '#1D48FF' },
+      { name: 'Cash', value: totals.cash, color: '#00A3A3' },
+    ];
+  })();
 
   const columns = [
     {

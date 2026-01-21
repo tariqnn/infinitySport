@@ -151,6 +151,11 @@ enum InvoiceStatus {
   CANCELLED
 }
 
+enum PaymentMethod {
+  CARD
+  CASH
+}
+
 enum InventoryStatus {
   AVAILABLE
   LOW
@@ -285,6 +290,7 @@ model Invoice {
   amount      Int
   currency    String        @default("JOD")
   status      InvoiceStatus @default(DRAFT)
+  paymentMethod PaymentMethod?
   dueDate     DateTime?
   issuedAt    DateTime      @default(now())
   paidAt      DateTime?

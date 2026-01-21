@@ -256,6 +256,11 @@ export class PortalService {
       data.number = await this.generateInvoiceNumber();
     }
 
+    // Backward-compatible default
+    if (!(data as any).paymentMethod) {
+      (data as any).paymentMethod = 'CARD';
+    }
+
     const created = await this.prisma.invoice.create({ data });
 
     if (generatePdf) {

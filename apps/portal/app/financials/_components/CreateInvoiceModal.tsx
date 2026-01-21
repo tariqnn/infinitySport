@@ -29,6 +29,7 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
   const [clientAddress, setClientAddress] = useState('');
   const [memberId, setMemberId] = useState<string>('');
   const [currency, setCurrency] = useState('JOD');
+  const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'CASH'>('CARD');
   const [issueDate, setIssueDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [dueDate, setDueDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [tax, setTax] = useState<string>('');
@@ -66,6 +67,7 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
     if (!dueDate) next.dueDate = 'Due date is required.';
     if (issueDate && dueDate && new Date(dueDate) < new Date(issueDate)) next.dueDate = 'Due date must be on/after issue date.';
     if (!currency) next.currency = 'Currency is required.';
+    if (!paymentMethod) next.paymentMethod = 'Payment method is required.';
 
     if (!items.length) {
       next.items = 'At least one line item is required.';
@@ -139,6 +141,7 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
         amount: Math.round(computed.total), // legacy int column (for dashboards/table); PDF uses lineItems for exact values
         currency,
         status: 'DRAFT',
+        paymentMethod,
         issuedAt: new Date(issueDate).toISOString(),
         dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
         description: undefined,
@@ -282,17 +285,29 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
             error={fieldErrors.dueDate}
             required
           />
-          <Select
-            label="Currency"
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value)}
-            error={fieldErrors.currency}
-            options={[
-              { value: 'JOD', label: 'JOD' },
-              { value: 'USD', label: 'USD' },
-              { value: 'EUR', label: 'EUR' },
-            ]}
-          />
+          <div className="space-y-4">
+            <Select
+              label="Payment method"
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value as 'CARD' | 'CASH')}
+              error={fieldErrors.paymentMethod}
+              options={[
+                { value: 'CARD', label: 'Visa / MasterCard' },
+                { value: 'CASH', label: 'Cash' },
+              ]}
+            />
+            <Select
+              label="Currency"
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              error={fieldErrors.currency}
+              options={[
+                { value: 'JOD', label: 'JOD' },
+                { value: 'USD', label: 'USD' },
+                { value: 'EUR', label: 'EUR' },
+              ]}
+            />
+          </div>
         </div>
 
         {/* Line items */}

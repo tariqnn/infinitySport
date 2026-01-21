@@ -51,6 +51,7 @@ export function EditBookingModal({ open, booking, onClose }: { open: boolean; bo
         endTime: endTime.toISOString(),
         facilityArea: formData.get('facilityArea') ? String(formData.get('facilityArea')) : undefined,
         status: String(formData.get('status')),
+        isPaid: formData.get('isPaid') === 'on',
         notes: formData.get('notes') ? String(formData.get('notes')) : undefined,
         ...(formData.get('classId') && { class: { connect: { id: String(formData.get('classId')) } } }),
         ...(formData.get('coachId') && { coach: { connect: { id: String(formData.get('coachId')) } } }),
@@ -141,6 +142,18 @@ export function EditBookingModal({ open, booking, onClose }: { open: boolean; bo
           ]}
           defaultValue={booking.status}
         />
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            name="isPaid"
+            id="isPaid"
+            defaultChecked={booking.isPaid || false}
+            className="h-4 w-4 rounded border-borderColor text-primaryBlue focus:ring-primaryBlue"
+          />
+          <label htmlFor="isPaid" className="text-sm font-medium text-textPrimary">
+            Payment Received
+          </label>
+        </div>
         <Textarea label="Notes" name="notes" rows={3} defaultValue={booking.notes || ''} />
       </form>
     </Modal>

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, LayoutDashboard, Layers3, CalendarRange, Gift, Megaphone, Footprints, Settings } from 'lucide-react';
+import { Home, LayoutDashboard, Layers3, CalendarRange, Gift, Megaphone, Footprints, Settings, Calendar } from 'lucide-react';
 import clsx from 'clsx';
 
 const navItems = [
@@ -12,6 +12,7 @@ const navItems = [
   { href: '/programs', label: 'Programs', icon: Layers3 },
   { href: '/offers', label: 'Offers', icon: Gift },
   { href: '/events', label: 'Events', icon: CalendarRange },
+  { href: '/bookings', label: 'Bookings', icon: Calendar },
   { href: '/announcements', label: 'Announcements', icon: Megaphone },
   { href: '/facilities', label: 'Facilities', icon: Footprints },
   { href: '/footer', label: 'Footer', icon: Settings }

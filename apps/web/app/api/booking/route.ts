@@ -1,6 +1,20 @@
 import { NextResponse } from 'next/server';
 import { isValidPhoneNumber } from '../../../lib/phoneValidation';
 
+// Default to deployed API, allow override via environment variable
+const getApiBaseUrl = () => {
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    return process.env.NEXT_PUBLIC_API_BASE_URL;
+  }
+  // In development, default to localhost:4000
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://localhost:4000';
+  }
+  return 'https://infinitysport.onrender.com';
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
 async function sendBookingWhatsAppMessage(data: {
   phone: string;
   courtName: string;
@@ -190,8 +204,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // TODO: Check if the time slot is already booked (query database)
-    // For now, we'll accept all bookings
+    // Check if the time slot is already booked (query database)
     // But we must always reject the configured "always full" slots.
     const courtType = courtTypeForId(courtId);
     if (courtType) {
@@ -203,6 +216,69 @@ export async function POST(request: Request) {
           { status: 409 }
         );
       }
+    }
+
+    // Check for existing bookings at this time slot
+    try {
+      const startTime = new Date(`${date}T${time}:00`);
+      const endTime = new Date(startTime);
+      endTime.setHours(endTime.getHours() + 1);
+
+      // Get first company (or create it)
+      const companiesRes = await fetch(`${API_BASE_URL}/api/portal/companies`, {
+        cache: 'no-store',
+      });
+      let companies: any[] = [];
+      if (companiesRes.ok) {
+        companies = await companiesRes.json();
+      }
+
+      let companyId: string;
+      if (companies && companies.length > 0) {
+        companyId = companies[0].id;
+      } else {
+        // Create default company if none exists
+        const createCompanyRes = await fetch(`${API_BASE_URL}/api/portal/companies`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: 'Infinity Sporty',
+            contactName: 'Infinity Sporty',
+            contactEmail: 'infinitysportsacademyjo@gmail.com',
+            status: 'ACTIVE',
+          }),
+        });
+        if (createCompanyRes.ok) {
+          const newCompany = await createCompanyRes.json();
+          companyId = newCompany.id;
+        } else {
+          throw new Error('Failed to create company');
+        }
+      }
+
+      // Check for existing bookings at this time and court
+      const bookingsRes = await fetch(
+        `${API_BASE_URL}/api/portal/bookings?companyId=${companyId}&startDate=${startTime.toISOString()}&endDate=${endTime.toISOString()}`,
+        { cache: 'no-store' }
+      );
+      if (bookingsRes.ok) {
+        const existingBookings: any[] = await bookingsRes.json();
+        const conflictingBooking = existingBookings.find(
+          (b) =>
+            b.facilityArea === courtName &&
+            new Date(b.startTime).getTime() === startTime.getTime() &&
+            b.status !== 'CANCELLED'
+        );
+        if (conflictingBooking) {
+          return NextResponse.json(
+            { error: 'This time slot is already booked. Please select another time.' },
+            { status: 409 }
+          );
+        }
+      }
+    } catch (checkError) {
+      console.error('Error checking existing bookings:', checkError);
+      // Continue with booking creation even if check fails
     }
 
     // Send confirmation email
@@ -227,21 +303,72 @@ export async function POST(request: Request) {
       console.error('WhatsApp sending error:', whatsAppError);
     }
 
-    // TODO: Save booking to database
-    // For now, we'll just return success
-    // You can add database saving here:
-    /*
-    const booking = await prisma.booking.create({
-      data: {
-        companyId: 'default-company-id', // Or get from a default company
-        facilityArea: courtName,
-        startTime: new Date(`${date}T${time}`),
-        endTime: new Date(`${date}T${parseInt(time.split(':')[0]) + 1}:00`),
-        status: 'PENDING',
-        notes: `Public booking - Name: ${name}, Phone: ${phone}`,
-      },
-    });
-    */
+    // Save booking to database
+    try {
+      const startTime = new Date(`${date}T${time}:00`);
+      const endTime = new Date(startTime);
+      endTime.setHours(endTime.getHours() + 1);
+
+      // Get or create company
+      const companiesRes = await fetch(`${API_BASE_URL}/api/portal/companies`, {
+        cache: 'no-store',
+      });
+      let companies: any[] = [];
+      if (companiesRes.ok) {
+        companies = await companiesRes.json();
+      }
+
+      let companyId: string;
+      if (companies && companies.length > 0) {
+        companyId = companies[0].id;
+      } else {
+        // Create default company if none exists
+        const createCompanyRes = await fetch(`${API_BASE_URL}/api/portal/companies`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: 'Infinity Sporty',
+            contactName: 'Infinity Sporty',
+            contactEmail: 'infinitysportsacademyjo@gmail.com',
+            status: 'ACTIVE',
+          }),
+        });
+        if (createCompanyRes.ok) {
+          const newCompany = await createCompanyRes.json();
+          companyId = newCompany.id;
+        } else {
+          throw new Error('Failed to create company');
+        }
+      }
+
+      // Create booking
+      const bookingRes = await fetch(`${API_BASE_URL}/api/portal/bookings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          company: { connect: { id: companyId } },
+          facilityArea: courtName,
+          startTime: startTime.toISOString(),
+          endTime: endTime.toISOString(),
+          status: 'PENDING',
+          isPaid: false,
+          customerName: name,
+          customerPhone: phone,
+          customerEmail: typeof email === 'string' ? email : undefined,
+          notes: `Public booking from landing page`,
+        }),
+      });
+
+      if (!bookingRes.ok) {
+        const errorData = await bookingRes.json().catch(() => ({}));
+        console.error('Failed to create booking:', errorData);
+        throw new Error('Failed to save booking to database');
+      }
+    } catch (dbError) {
+      console.error('Database error:', dbError);
+      // Don't fail the booking if database save fails, but log it
+      // The email/WhatsApp notifications were already sent
+    }
 
     return NextResponse.json({
       success: true,

@@ -242,6 +242,10 @@ model Booking {
   startTime   DateTime
   endTime     DateTime
   status      BookingStatus @default(PENDING)
+  isPaid      Boolean       @default(false)
+  customerName String?      // For public bookings from landing page
+  customerPhone String?     // For public bookings from landing page
+  customerEmail String?     // For public bookings from landing page
   notes       String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt

@@ -110,6 +110,23 @@ export default function BookingsPage() {
       },
     },
     {
+      id: 'payment',
+      header: 'Payment',
+      render: (row: any) => {
+        const customerName = row.customerName || (row.member ? `${row.member.firstName} ${row.member.lastName}` : null);
+        return (
+          <div className="flex flex-col gap-1">
+            <span className={`text-sm font-semibold ${row.isPaid ? 'text-green-600' : 'text-red-600'}`}>
+              {row.isPaid ? 'Paid' : 'Unpaid'}
+            </span>
+            {customerName && (
+              <span className="text-xs text-textMuted">{customerName}</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       id: 'actions',
       header: 'Actions',
       render: (row: any) => (

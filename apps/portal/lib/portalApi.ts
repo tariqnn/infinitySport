@@ -247,41 +247,46 @@ export async function getFirstCompany() {
     try {
       const created = await portalFetch<any>('/portal/companies', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           name: 'Infinity Sporty',
           address: 'Shemisani, Princess Alia College',
           status: 'ACTIVE',
         }),
       });
-      return created;
-    } catch (createErr) {
-      // If create fails, return default object (callers should handle gracefully)
-      console.warn('Could not create default company:', createErr);
-      return {
-        id: 'default',
-        name: 'Infinity Sporty',
-        address: 'Shemisani, Princess Alia College',
-      };
+      if (created && created.id) {
+        return created;
+      }
+      throw new Error('Company creation returned invalid data');
+    } catch (createErr: any) {
+      console.error('Could not create default company:', createErr);
+      // Return null instead of default object so callers know it failed
+      return null;
     }
-  } catch (e) {
+  } catch (e: any) {
+    console.error('Failed to fetch companies:', e);
     // Try to create default company on error
     try {
       const created = await portalFetch<any>('/portal/companies', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           name: 'Infinity Sporty',
           address: 'Shemisani, Princess Alia College',
           status: 'ACTIVE',
         }),
       });
-      return created;
-    } catch (createErr) {
-      console.warn('Could not create default company:', createErr);
-      return {
-        id: 'default',
-        name: 'Infinity Sporty',
-        address: 'Shemisani, Princess Alia College',
-      };
+      if (created && created.id) {
+        return created;
+      }
+      throw new Error('Company creation returned invalid data');
+    } catch (createErr: any) {
+      console.error('Could not create default company:', createErr);
+      return null;
     }
   }
 }

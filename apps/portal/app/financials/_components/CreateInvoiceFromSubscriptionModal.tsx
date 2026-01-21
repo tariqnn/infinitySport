@@ -45,8 +45,8 @@ export function CreateInvoiceFromSubscriptionModal({ open, onClose }: { open: bo
 
     const company = await getFirstCompany();
     
-    if (!company || !company.id || company.id === 'default') {
-      setError('Company not found. Please ensure a company exists.');
+    if (!company || !company.id) {
+      setError('Company not found. The system tried to create "Infinity Sporty" but failed. Please check the API connection or create a company manually in the settings.');
       setLoading(false);
       return;
     }

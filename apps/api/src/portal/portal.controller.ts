@@ -151,7 +151,12 @@ export class PortalController {
 
   @Post('invoices')
   async createInvoice(@Body() data: any) {
-    return this.portalService.createInvoice(data);
+    try {
+      return await this.portalService.createInvoice(data);
+    } catch (error: any) {
+      console.error('Error creating invoice:', error);
+      throw error;
+    }
   }
 
   @Patch('invoices/:id')

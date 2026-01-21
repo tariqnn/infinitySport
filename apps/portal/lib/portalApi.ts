@@ -252,7 +252,8 @@ export async function getFirstCompany() {
         },
         body: JSON.stringify({
           name: 'Infinity Sporty',
-          address: 'Shemisani, Princess Alia College',
+          contactName: 'Infinity Sporty',
+          contactEmail: 'infinitysportsacademyjo@gmail.com',
           status: 'ACTIVE',
         }),
       });
@@ -276,7 +277,8 @@ export async function getFirstCompany() {
         },
         body: JSON.stringify({
           name: 'Infinity Sporty',
-          address: 'Shemisani, Princess Alia College',
+          contactName: 'Infinity Sporty',
+          contactEmail: 'infinitysportsacademyjo@gmail.com',
           status: 'ACTIVE',
         }),
       });

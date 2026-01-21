@@ -249,10 +249,10 @@ export function InvoiceManagement() {
 
       {/* Invoices Table */}
       <Card>
-        <CardHeader
-          title="Invoices"
-          actions={
-            <>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-textPrimary">Invoices</h3>
+            <div className="flex gap-3">
               <ExportCsvButton
                 rows={invoices.map(i => ({
                   number: i.number,
@@ -270,9 +270,9 @@ export function InvoiceManagement() {
               <Button onClick={() => setShowCreateModal(true)} leadingIcon={<PlusIcon className="h-5 w-5" />}>
                 Create Invoice
               </Button>
-            </>
-          }
-        />
+            </div>
+          </div>
+        </CardHeader>
         <CardBody className="p-0">
           <DataTable columns={columns} rows={invoices} />
         </CardBody>

@@ -151,11 +151,6 @@ enum InvoiceStatus {
   CANCELLED
 }
 
-enum PaymentMethod {
-  CARD
-  CASH
-}
-
 enum InventoryStatus {
   AVAILABLE
   LOW
@@ -290,24 +285,10 @@ model Invoice {
   amount      Int
   currency    String        @default("JOD")
   status      InvoiceStatus @default(DRAFT)
-  paymentMethod PaymentMethod?
   dueDate     DateTime?
   issuedAt    DateTime      @default(now())
   paidAt      DateTime?
   description String?
-  // Enterprise invoice fields (for client-ready PDF invoices)
-  companyName    String?
-  companyAddress String?
-  logoPath       String?
-  clientName     String?
-  clientEmail    String?
-  clientAddress  String?
-  lineItems      Json?
-  subtotal       Int?
-  tax            Int?
-  discount       Int?
-  notes          String?
-  pdfPath        String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 

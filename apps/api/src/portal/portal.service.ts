@@ -241,33 +241,68 @@ export class PortalService {
   async createInvoice(
     data: Prisma.InvoiceCreateInput & { generatePdf?: boolean } & Record<string, unknown>
   ): Promise<Invoice> {
-    // Support extended invoice payloads (client-ready PDFs) while remaining compatible with older callers.
+    // IMPORTANT: We intentionally persist extended invoice fields inside `description` JSON to avoid DB migrations.
+    // This keeps invoice creation working even if the database schema only has the original Invoice columns.
+
     const generatePdf =
       Boolean((data as any)?.generatePdf) ||
       Boolean((data as any)?.clientName) ||
       Boolean((data as any)?.lineItems);
 
-    if ('generatePdf' in (data as any)) {
-      delete (data as any).generatePdf;
-    }
+    const paymentMethod: 'CARD' | 'CASH' = ((data as any)?.paymentMethod as any) || 'CARD';
 
-    // Generate invoice number if not provided (retry on unique constraint collisions)
-    if (!data.number) {
-      data.number = await this.generateInvoiceNumber();
-    }
+    const invoiceNumber = data.number ? String(data.number) : await this.generateInvoiceNumber();
+    const issuedAtIso = (data as any)?.issuedAt ? String((data as any).issuedAt) : new Date().toISOString();
 
-    // Backward-compatible default
-    if (!(data as any).paymentMethod) {
-      (data as any).paymentMethod = 'CARD';
-    }
+    const meta = {
+      v: 1,
+      companyName: (data as any)?.companyName || 'Infinity Sporty',
+      companyAddress: (data as any)?.companyAddress || '',
+      clientName: (data as any)?.clientName || '',
+      clientEmail: (data as any)?.clientEmail || '',
+      clientAddress: (data as any)?.clientAddress || '',
+      currency: (data as any)?.currency || 'JOD',
+      paymentMethod,
+      lineItems: Array.isArray((data as any)?.lineItems) ? (data as any).lineItems : [],
+      subtotal: (data as any)?.subtotal ?? null,
+      tax: (data as any)?.tax ?? null,
+      discount: (data as any)?.discount ?? null,
+      notes: (data as any)?.notes ?? null,
+      pdfPath: null as null | string,
+    };
 
-    const created = await this.prisma.invoice.create({ data });
+    // Strip non-schema fields so Prisma doesn't try to write missing DB columns.
+    const createData: Prisma.InvoiceCreateInput = {
+      number: invoiceNumber,
+      amount: Number.isFinite((data as any)?.amount) ? (data as any).amount : 0,
+      currency: String((data as any)?.currency || 'JOD'),
+      status: (data as any)?.status || 'DRAFT',
+      issuedAt: new Date(issuedAtIso),
+      dueDate: (data as any)?.dueDate ? new Date(String((data as any).dueDate)) : undefined,
+      paidAt: (data as any)?.paidAt ? new Date(String((data as any).paidAt)) : undefined,
+      description: JSON.stringify(meta),
+      company: (data as any)?.company,
+      member: (data as any)?.member,
+      subscription: (data as any)?.subscription,
+    };
+
+    const created = await this.prisma.invoice.create({ data: createData });
 
     if (generatePdf) {
-      const pdfPath = await this.generateInvoicePdf(created);
+      const pdfPath = await this.generateInvoicePdf({
+        number: created.number,
+        issuedAt: created.issuedAt,
+        dueDate: created.dueDate,
+        currency: created.currency,
+        amount: created.amount,
+        meta,
+      });
+
+      meta.pdfPath = pdfPath;
+
       return this.prisma.invoice.update({
         where: { id: created.id },
-        data: { pdfPath },
+        data: { description: JSON.stringify(meta) },
       });
     }
 
@@ -299,11 +334,18 @@ export class PortalService {
     return `INV-${y}${m}${d}-${rand}`;
   }
 
-  private async generateInvoicePdf(invoice: Invoice): Promise<string> {
+  private async generateInvoicePdf(input: {
+    number: string;
+    issuedAt: Date;
+    dueDate: Date | null;
+    currency: string;
+    amount: number;
+    meta: any;
+  }): Promise<string> {
     const uploadsDir = join(process.cwd(), 'uploads', 'invoices');
     if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
 
-    const safeNumber = invoice.number.replace(/[^A-Za-z0-9-_]/g, '_');
+    const safeNumber = input.number.replace(/[^A-Za-z0-9-_]/g, '_');
     const filename = `${safeNumber}.pdf`;
     const absolutePath = join(uploadsDir, filename);
 
@@ -315,15 +357,15 @@ export class PortalService {
     const stream = createWriteStream(absolutePath);
     doc.pipe(stream);
 
-    const companyName = (invoice as any).companyName || 'Infinity Sporty';
-    const companyAddress = (invoice as any).companyAddress || '';
+    const companyName = input.meta?.companyName || 'Infinity Sporty';
+    const companyAddress = input.meta?.companyAddress || '';
 
     // Try to load a logo from the monorepo (no new assets required)
     const candidateLogoPaths = [
       join(process.cwd(), 'apps', 'web', 'public', 'infinity-logo.png'),
       join(process.cwd(), 'apps', 'portal', 'public', 'infinity-logo.png'),
     ];
-    const logoPath = (invoice as any).logoPath || candidateLogoPaths.find((p) => existsSync(p));
+    const logoPath = input.meta?.logoPath || candidateLogoPaths.find((p) => existsSync(p));
 
     const headerY = 50;
     if (logoPath && existsSync(logoPath)) {
@@ -342,14 +384,14 @@ export class PortalService {
     doc.font('Helvetica-Bold').fontSize(22).fillColor('#111827').text('INVOICE', rightX, headerY, { align: 'right', width: 190 });
 
     doc.font('Helvetica').fontSize(10).fillColor('#374151');
-    const issuedAt = invoice.issuedAt ? new Date(invoice.issuedAt) : new Date();
-    const dueDate = invoice.dueDate ? new Date(invoice.dueDate) : null;
+    const issuedAt = input.issuedAt ? new Date(input.issuedAt) : new Date();
+    const dueDate = input.dueDate ? new Date(input.dueDate) : null;
 
     const metaLines: Array<[string, string]> = [
-      ['Invoice #', invoice.number],
+      ['Invoice #', input.number],
       ['Issue date', issuedAt.toLocaleDateString()],
       ['Due date', dueDate ? dueDate.toLocaleDateString() : '—'],
-      ['Currency', invoice.currency || 'JOD'],
+      ['Currency', input.currency || 'JOD'],
     ];
 
     let metaY = headerY + 34;
@@ -363,9 +405,9 @@ export class PortalService {
     doc.moveTo(50, 130).lineTo(545, 130).lineWidth(1).strokeColor('#E5E7EB').stroke();
 
     // Bill To
-    const clientName = (invoice as any).clientName || '';
-    const clientEmail = (invoice as any).clientEmail || '';
-    const clientAddress = (invoice as any).clientAddress || '';
+    const clientName = input.meta?.clientName || '';
+    const clientEmail = input.meta?.clientEmail || '';
+    const clientAddress = input.meta?.clientAddress || '';
 
     doc.font('Helvetica-Bold').fontSize(11).fillColor('#111827').text('Bill To', 50, 150);
     doc.font('Helvetica').fontSize(10).fillColor('#374151');
@@ -374,7 +416,7 @@ export class PortalService {
     if (clientAddress) doc.text(clientAddress, 50, doc.y + 2, { width: 260 });
 
     // Items table
-    const itemsRaw = (invoice as any).lineItems;
+    const itemsRaw = input.meta?.lineItems;
     const items: Array<{ description: string; quantity: number; unitPrice: number; lineTotal: number }> =
       Array.isArray(itemsRaw) ? itemsRaw : [];
 
@@ -425,10 +467,10 @@ export class PortalService {
 
     // Totals (right)
     const subtotal =
-      typeof (invoice as any).subtotal === 'number' ? (invoice as any).subtotal : items.reduce((sum, i) => sum + (Number(i.lineTotal) || 0), 0);
-    const tax = Number((invoice as any).tax) || 0;
-    const discount = Number((invoice as any).discount) || 0;
-    const grandTotal = Number.isFinite(invoice.amount) ? invoice.amount : subtotal + tax - discount;
+      typeof input.meta?.subtotal === 'number' ? input.meta.subtotal : items.reduce((sum, i) => sum + (Number(i.lineTotal) || 0), 0);
+    const tax = Number(input.meta?.tax) || 0;
+    const discount = Number(input.meta?.discount) || 0;
+    const grandTotal = Number.isFinite(input.amount) ? input.amount : subtotal + tax - discount;
 
     let totalsY = dividerY + 16;
     const totalsX = 350;
@@ -453,7 +495,7 @@ export class PortalService {
     doc.text('Total', totalsX, totalsY + 12, { width: labelW, align: 'right' });
     doc.text(money(grandTotal), totalsX + labelW, totalsY + 12, { width: valueW, align: 'right' });
 
-    const notes = (invoice as any).notes || '';
+    const notes = input.meta?.notes || '';
     if (notes) {
       const notesY = Math.max(580, totalsY + 50);
       doc.font('Helvetica-Bold').fontSize(11).fillColor('#111827').text('Notes / Payment Terms', 50, notesY);

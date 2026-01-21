@@ -13,6 +13,17 @@ import { getApiBaseUrl } from '../../../lib/getApiBaseUrl';
 
 const API_BASE_URL = getApiBaseUrl();
 
+function getInvoiceMeta(row: any): any | null {
+  const desc = row?.description;
+  if (!desc || typeof desc !== 'string') return null;
+  try {
+    const parsed = JSON.parse(desc);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 export function InvoiceManagement() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,9 +33,11 @@ export function InvoiceManagement() {
   const [editingInvoice, setEditingInvoice] = useState<any | null>(null);
 
   async function downloadInvoicePdf(row: any) {
-    if (!row?.pdfPath) return;
+    const meta = getInvoiceMeta(row);
+    const pdfPath = row?.pdfPath || meta?.pdfPath;
+    if (!pdfPath) return;
     try {
-      const pdfUrl = `${API_BASE_URL}${row.pdfPath}`;
+      const pdfUrl = `${API_BASE_URL}${pdfPath}`;
       const res = await fetch(pdfUrl, { cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to download invoice PDF');
       const blob = await res.blob();
@@ -98,7 +111,8 @@ export function InvoiceManagement() {
   const paymentMix = (() => {
     const totals = invoices.reduce(
       (acc, inv) => {
-        const method = (inv.paymentMethod || 'CARD') as 'CARD' | 'CASH';
+        const meta = getInvoiceMeta(inv);
+        const method = ((inv.paymentMethod || meta?.paymentMethod || 'CARD') as 'CARD' | 'CASH');
         const amount = Number(inv.amount) || 0;
         if (method === 'CASH') acc.cash += amount;
         else acc.card += amount;

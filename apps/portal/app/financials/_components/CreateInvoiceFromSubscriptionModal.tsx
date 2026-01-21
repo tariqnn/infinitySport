@@ -105,8 +105,16 @@ export function CreateInvoiceFromSubscriptionModal({ open, onClose }: { open: bo
       });
 
       // Download PDF immediately if available
-      if (created?.pdfPath) {
-        const pdfUrl = `${API_BASE_URL}${created.pdfPath}`;
+      let pdfPath: string | undefined = created?.pdfPath;
+      if (!pdfPath && typeof created?.description === 'string') {
+        try {
+          const meta = JSON.parse(created.description);
+          pdfPath = meta?.pdfPath;
+        } catch {}
+      }
+
+      if (pdfPath) {
+        const pdfUrl = `${API_BASE_URL}${pdfPath}`;
         const res = await fetch(pdfUrl, { cache: 'no-store' });
         if (res.ok) {
           const blob = await res.blob();

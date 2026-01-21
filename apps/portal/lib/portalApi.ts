@@ -96,6 +96,20 @@ export const classesApi = {
   },
 };
 
+export const subscriptionsApi = {
+  list: (companyId?: string, memberId?: string) => {
+    const params = new URLSearchParams();
+    if (companyId) params.append('companyId', companyId);
+    if (memberId) params.append('memberId', memberId);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return portalFetch<any[]>(`/portal/subscriptions${query}`);
+  },
+  get: (id: string) => portalFetch<any>(`/portal/subscriptions/${id}`),
+  create: (data: any) => portalFetch<any>('/portal/subscriptions', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: any) => portalFetch<any>(`/portal/subscriptions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  delete: (id: string) => portalFetch<void>(`/portal/subscriptions/${id}`, { method: 'DELETE' }),
+};
+
 export const financeApi = {
   // Budget
   budgetCategories: {

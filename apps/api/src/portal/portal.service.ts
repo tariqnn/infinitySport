@@ -216,7 +216,11 @@ export class PortalService {
       },
       include: {
         company: true,
-        subscription: true,
+        subscription: {
+          include: {
+            offer: true,
+          },
+        },
         member: true,
       },
       orderBy: { issuedAt: 'desc' },

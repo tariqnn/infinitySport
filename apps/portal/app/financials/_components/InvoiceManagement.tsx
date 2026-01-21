@@ -5,8 +5,9 @@ import { Card, CardBody, CardHeader, DataTable, Badge, Button, KPIStatCard } fro
 import { financeApi, dashboardApi, getFirstCompany } from '../../../lib/portalApi';
 import { ExportCsvButton } from '../../_components/ActionButtons';
 import { CreateInvoiceModal } from './CreateInvoiceModal';
+import { CreateInvoiceFromSubscriptionModal } from './CreateInvoiceFromSubscriptionModal';
 import { EditInvoiceModal } from './EditInvoiceModal';
-import { CurrencyDollarIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { CurrencyDollarIcon, PlusIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { DonutBreakdown, RevenueAreaChart } from '../../_components/PortalCharts';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://infinitysport.onrender.com';
@@ -16,6 +17,7 @@ export function InvoiceManagement() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateFromSubscriptionModal, setShowCreateFromSubscriptionModal] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<any | null>(null);
 
   async function downloadInvoicePdf(row: any) {
@@ -267,6 +269,13 @@ export function InvoiceManagement() {
                 filename="invoices-report.csv"
                 label="Export"
               />
+              <Button 
+                onClick={() => setShowCreateFromSubscriptionModal(true)} 
+                variant="secondary"
+                leadingIcon={<DocumentTextIcon className="h-5 w-5" />}
+              >
+                From Subscription
+              </Button>
               <Button onClick={() => setShowCreateModal(true)} leadingIcon={<PlusIcon className="h-5 w-5" />}>
                 Create Invoice
               </Button>
@@ -284,6 +293,16 @@ export function InvoiceManagement() {
           open={showCreateModal}
           onClose={() => {
             setShowCreateModal(false);
+            loadData();
+          }}
+        />
+      )}
+
+      {showCreateFromSubscriptionModal && (
+        <CreateInvoiceFromSubscriptionModal
+          open={showCreateFromSubscriptionModal}
+          onClose={() => {
+            setShowCreateFromSubscriptionModal(false);
             loadData();
           }}
         />

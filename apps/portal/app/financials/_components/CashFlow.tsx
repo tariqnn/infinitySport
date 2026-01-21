@@ -20,10 +20,11 @@ export function CashFlow() {
     try {
       setLoading(true);
       const company = await getFirstCompany();
+      if (!company) return;
       const data = await financeApi.cashFlow.list(company?.id);
       setEntries(data);
     } catch (error) {
-      console.error('Failed to load cash flow data:', error);
+      console.warn('Failed to load cash flow data:', error);
     } finally {
       setLoading(false);
     }

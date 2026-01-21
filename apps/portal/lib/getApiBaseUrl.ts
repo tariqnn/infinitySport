@@ -1,15 +1,9 @@
-// Keep portal API base URL logic consistent with the rest of the monorepo.
-// - If NEXT_PUBLIC_API_BASE_URL is set, use it
-// - Otherwise:
-//   - dev: use local API (http://localhost:4000)
-//   - prod: use deployed API
+// Keep portal API base URL logic consistent with the rest of the monorepo (landing/admin).
+// - If NEXT_PUBLIC_API_BASE_URL is set, use it (this is how you point to localhost:4000)
+// - Otherwise default to the deployed API (avoids ERR_CONNECTION_REFUSED when local API isn't running)
 export function getApiBaseUrl() {
   const envUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   if (envUrl) return envUrl.replace(/\/$/, '');
-
-  if (process.env.NODE_ENV === 'development') {
-    return 'http://localhost:4000';
-  }
 
   return 'https://infinitysport.onrender.com';
 }

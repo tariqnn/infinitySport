@@ -24,6 +24,7 @@ export function BudgetPlanning() {
     try {
       setLoading(true);
       const company = await getFirstCompany();
+      if (!company) return;
       const [cats, ents] = await Promise.all([
         financeApi.budgetCategories.list(company?.id),
         financeApi.budgetEntries.list(company?.id),
@@ -31,7 +32,7 @@ export function BudgetPlanning() {
       setCategories(cats);
       setEntries(ents);
     } catch (error) {
-      console.error('Failed to load budget data:', error);
+      console.warn('Failed to load budget data:', error);
     } finally {
       setLoading(false);
     }

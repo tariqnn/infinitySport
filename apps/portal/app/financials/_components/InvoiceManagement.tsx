@@ -49,6 +49,7 @@ export function InvoiceManagement() {
     try {
       setLoading(true);
       const company = await getFirstCompany();
+      if (!company) return;
       const [invs, dashboardStats] = await Promise.all([
         financeApi.invoices.list(company?.id),
         dashboardApi.stats(company?.id),
@@ -56,7 +57,7 @@ export function InvoiceManagement() {
       setInvoices(invs);
       setStats(dashboardStats);
     } catch (error) {
-      console.error('Failed to load invoice data:', error);
+      console.warn('Failed to load invoice data:', error);
     } finally {
       setLoading(false);
     }

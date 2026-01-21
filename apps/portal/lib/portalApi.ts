@@ -21,11 +21,18 @@ async function portalFetch<T>(endpoint: string, options?: RequestInit): Promise<
     headers['x-company-id'] = companyId;
   }
 
-  const response = await fetch(`${API_BASE_URL}/api${endpoint}`, {
-    ...options,
-    headers,
-    cache: 'no-store',
-  });
+  const url = `${API_BASE_URL}/api${endpoint}`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+      cache: 'no-store',
+    });
+  } catch (e) {
+    // Match admin-style error clarity
+    throw new Error(`Cannot connect to API at ${url}. Set NEXT_PUBLIC_API_BASE_URL or ensure the API is reachable.`);
+  }
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ message: 'Unknown API error' }));
@@ -230,7 +237,12 @@ export const dashboardApi = {
 
 // Helper to get first company (for initial setup)
 export async function getFirstCompany() {
-  const companies = await portalFetch<any[]>('/portal/companies');
-  return companies[0];
+  try {
+    const companies = await portalFetch<any[]>('/portal/companies');
+    return companies[0];
+  } catch (e) {
+    // Return null so callers can show a friendly UI message without unhandled promise rejections.
+    return null;
+  }
 }
 

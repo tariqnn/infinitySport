@@ -20,10 +20,11 @@ export function PettyCash() {
     try {
       setLoading(true);
       const company = await getFirstCompany();
+      if (!company) return;
       const data = await financeApi.pettyCash.list(company?.id);
       setTransactions(data);
     } catch (error) {
-      console.error('Failed to load petty cash data:', error);
+      console.warn('Failed to load petty cash data:', error);
     } finally {
       setLoading(false);
     }

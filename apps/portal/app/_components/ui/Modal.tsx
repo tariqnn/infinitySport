@@ -28,10 +28,10 @@ export function Modal({ title, description, open, onClose, children, footer, siz
   }, [open]);
 
   const sizeClasses = {
-    sm: 'max-w-md',
-    md: 'max-w-lg',
-    lg: 'max-w-2xl',
-    xl: 'max-w-4xl',
+    sm: 'w-full max-w-md',
+    md: 'w-full max-w-lg',
+    lg: 'w-full max-w-2xl',
+    xl: 'w-full max-w-4xl',
   };
 
   return (
@@ -62,7 +62,7 @@ export function Modal({ title, description, open, onClose, children, footer, siz
             >
               <Dialog.Panel
                 className={clsx(
-                  'relative z-[10001] w-full transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-2xl transition-all',
+                  'relative z-[10001] transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-2xl transition-all',
                   sizeClasses[size]
                 )}
                 onClick={(e) => e.stopPropagation()}

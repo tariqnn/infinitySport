@@ -9,12 +9,19 @@ import { getApiBaseUrl } from '../../../lib/getApiBaseUrl';
 const COMPANY_NAME = 'Infinity Sporty';
 const API_BASE_URL = getApiBaseUrl();
 
+type ServiceType = 'basketball' | 'padel' | 'court-booking' | 'gym' | 'gymnastics' | 'subscription';
+
 export function CreateInvoiceFromSubscriptionModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [serviceType, setServiceType] = useState<ServiceType>('subscription');
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
   const [selectedSubscriptionId, setSelectedSubscriptionId] = useState<string>('');
+  const [clientName, setClientName] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
+  const [clientAddress, setClientAddress] = useState('');
+  const [amount, setAmount] = useState<string>('');
   const [companyAddress, setCompanyAddress] = useState('Shemisani, Princess Alia College');
   const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'CASH'>('CARD');
   const [dueDate, setDueDate] = useState<string>(() => {
@@ -25,9 +32,11 @@ export function CreateInvoiceFromSubscriptionModal({ open, onClose }: { open: bo
 
   useEffect(() => {
     if (open) {
-      loadSubscriptions();
+      if (serviceType === 'subscription') {
+        loadSubscriptions();
+      }
     }
-  }, [open]);
+  }, [open, serviceType]);
 
   async function loadSubscriptions() {
     try {
@@ -45,15 +54,20 @@ export function CreateInvoiceFromSubscriptionModal({ open, onClose }: { open: bo
     e.preventDefault();
     setError(null);
 
-    if (!selectedSubscriptionId) {
-      setError('Please select a subscription');
-      return;
-    }
-
-    const subscription = subscriptions.find((s) => s.id === selectedSubscriptionId);
-    if (!subscription) {
-      setError('Selected subscription not found');
-      return;
+    if (serviceType === 'subscription') {
+      if (!selectedSubscriptionId) {
+        setError('Please select a subscription');
+        return;
+      }
+    } else {
+      if (!clientName.trim()) {
+        setError('Please enter client name');
+        return;
+      }
+      if (!amount.trim() || isNaN(Number(amount)) || Number(amount) <= 0) {
+        setError('Please enter a valid amount');
+        return;
+      }
     }
 
     setLoading(true);
@@ -61,43 +75,100 @@ export function CreateInvoiceFromSubscriptionModal({ open, onClose }: { open: bo
     const company = await getFirstCompany();
 
     try {
-      const member = subscription.member;
-      const offer = subscription.offer;
+      let invoiceData: any;
 
-      // Create invoice from subscription
-      const created = await financeApi.invoices.create({
-        amount: offer.pricePerMonth || 0,
-        currency: 'JOD',
-        status: 'DRAFT',
-        paymentMethod,
-        issuedAt: new Date().toISOString(),
-        dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
+      if (serviceType === 'subscription') {
+        const subscription = subscriptions.find((s) => s.id === selectedSubscriptionId);
+        if (!subscription) {
+          setError('Selected subscription not found');
+          setLoading(false);
+          return;
+        }
 
-        // Company and member relations
-        company: { connect: { id: company.id } },
-        ...(member ? { member: { connect: { id: member.id } } } : {}),
-        subscription: { connect: { id: subscription.id } },
+        const member = subscription.member;
+        const offer = subscription.offer;
 
-        // Enterprise invoice fields
-        companyName: COMPANY_NAME,
-        companyAddress: companyAddress.trim(),
-        clientName: member ? `${member.firstName} ${member.lastName}` : 'N/A',
-        clientEmail: member?.email || '',
-        clientAddress: member?.address || '',
+        invoiceData = {
+          amount: offer.pricePerMonth || 0,
+          currency: 'JOD',
+          status: 'DRAFT',
+          paymentMethod,
+          issuedAt: new Date().toISOString(),
+          dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
 
-        // Line items - membership subscription
-        lineItems: [
-          {
-            description: `${offer.name} - Membership Subscription`,
-            quantity: 1,
-            unitPrice: offer.pricePerMonth || 0,
-            lineTotal: offer.pricePerMonth || 0,
-          },
-        ],
-        subtotal: offer.pricePerMonth || 0,
-        notes: `Membership subscription: ${offer.name}. Period: ${new Date(subscription.startDate).toLocaleDateString()}${subscription.endDate ? ` - ${new Date(subscription.endDate).toLocaleDateString()}` : ''}`,
-        generatePdf: true,
-      });
+          // Company and member relations
+          company: { connect: { id: company.id } },
+          ...(member ? { member: { connect: { id: member.id } } } : {}),
+          subscription: { connect: { id: subscription.id } },
+
+          // Enterprise invoice fields
+          companyName: COMPANY_NAME,
+          companyAddress: companyAddress.trim(),
+          clientName: member ? `${member.firstName} ${member.lastName}` : 'N/A',
+          clientEmail: member?.email || '',
+          clientAddress: member?.address || '',
+
+          // Line items - membership subscription
+          lineItems: [
+            {
+              description: `${offer.name} - Membership Subscription`,
+              quantity: 1,
+              unitPrice: offer.pricePerMonth || 0,
+              lineTotal: offer.pricePerMonth || 0,
+            },
+          ],
+          subtotal: offer.pricePerMonth || 0,
+          notes: `Membership subscription: ${offer.name}. Period: ${new Date(subscription.startDate).toLocaleDateString()}${subscription.endDate ? ` - ${new Date(subscription.endDate).toLocaleDateString()}` : ''}`,
+          generatePdf: true,
+        };
+      } else {
+        // Service type invoices (basketball, padel, court-booking, gym, gymnastics)
+        const serviceNames: Record<ServiceType, string> = {
+          'basketball': 'Basketball Subscription',
+          'padel': 'Padel Subscription',
+          'court-booking': 'Court Booking',
+          'gym': 'Gym Membership',
+          'gymnastics': 'Gymnastics Subscription',
+          'subscription': '',
+        };
+
+        const serviceName = serviceNames[serviceType];
+        const invoiceAmount = Math.round(Number(amount)); // Amount in JOD (stored as int, but represents JOD)
+
+        invoiceData = {
+          amount: invoiceAmount,
+          currency: 'JOD',
+          status: 'DRAFT',
+          paymentMethod,
+          issuedAt: new Date().toISOString(),
+          dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
+
+          // Company relation
+          company: { connect: { id: company.id } },
+
+          // Enterprise invoice fields
+          companyName: COMPANY_NAME,
+          companyAddress: companyAddress.trim(),
+          clientName: clientName.trim(),
+          clientEmail: clientEmail.trim() || '',
+          clientAddress: clientAddress.trim() || '',
+
+          // Line items
+          lineItems: [
+            {
+              description: serviceName,
+              quantity: 1,
+              unitPrice: Number(amount),
+              lineTotal: Number(amount),
+            },
+          ],
+          subtotal: Number(amount),
+          notes: `Service: ${serviceName}`,
+          generatePdf: true,
+        };
+      }
+
+      const created = await financeApi.invoices.create(invoiceData);
 
       // Download PDF immediately if available
       let pdfPath: string | undefined = created?.pdfPath;
@@ -148,7 +219,16 @@ export function CreateInvoiceFromSubscriptionModal({ open, onClose }: { open: bo
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" form="create-invoice-from-subscription-form" isLoading={loading} disabled={!selectedSubscriptionId}>
+          <Button 
+            type="submit" 
+            form="create-invoice-from-subscription-form" 
+            isLoading={loading} 
+            disabled={
+              serviceType === 'subscription' 
+                ? !selectedSubscriptionId 
+                : !clientName.trim() || !amount.trim() || isNaN(Number(amount)) || Number(amount) <= 0
+            }
+          >
             Create Invoice
           </Button>
         </>
@@ -162,20 +242,44 @@ export function CreateInvoiceFromSubscriptionModal({ open, onClose }: { open: bo
         )}
 
         <Select
-          label="Select Subscription *"
-          value={selectedSubscriptionId}
-          onChange={(e) => setSelectedSubscriptionId(e.target.value)}
+          label="Service Type *"
+          value={serviceType}
+          onChange={(e) => {
+            setServiceType(e.target.value as ServiceType);
+            setSelectedSubscriptionId('');
+            setClientName('');
+            setClientEmail('');
+            setClientAddress('');
+            setAmount('');
+          }}
           required
           options={[
-            { value: '', label: 'Select a subscription...' },
-            ...subscriptions.map((sub) => ({
-              value: sub.id,
-              label: `${sub.offer?.name || 'Unknown'} - ${sub.member ? `${sub.member.firstName} ${sub.member.lastName}` : 'No Member'} (${sub.offer?.pricePerMonth || 0} JOD/month)`,
-            })),
+            { value: 'subscription', label: 'Existing Subscription' },
+            { value: 'basketball', label: 'Basketball Subscription' },
+            { value: 'padel', label: 'Padel Subscription' },
+            { value: 'court-booking', label: 'Court Booking' },
+            { value: 'gym', label: 'Gym Membership' },
+            { value: 'gymnastics', label: 'Gymnastics Subscription' },
           ]}
         />
 
-        {selectedSubscription && (
+        {serviceType === 'subscription' ? (
+          <>
+            <Select
+              label="Select Subscription *"
+              value={selectedSubscriptionId}
+              onChange={(e) => setSelectedSubscriptionId(e.target.value)}
+              required
+              options={[
+                { value: '', label: 'Select a subscription...' },
+                ...subscriptions.map((sub) => ({
+                  value: sub.id,
+                  label: `${sub.offer?.name || 'Unknown'} - ${sub.member ? `${sub.member.firstName} ${sub.member.lastName}` : 'No Member'} (${sub.offer?.pricePerMonth || 0} JOD/month)`,
+                })),
+              ]}
+            />
+
+            {selectedSubscription && (
           <>
             <div className="rounded-lg border border-ui-border bg-ui-softBg p-4 space-y-2">
               <div className="text-sm">
@@ -222,10 +326,66 @@ export function CreateInvoiceFromSubscriptionModal({ open, onClose }: { open: bo
               onChange={(e) => setDueDate(e.target.value)}
               required
             />
+            </>
+          )}
+        ) : (
+          <>
+            <Input
+              label="Client Name *"
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              required
+              placeholder="Enter client name"
+            />
+            <Input
+              label="Client Email"
+              type="email"
+              value={clientEmail}
+              onChange={(e) => setClientEmail(e.target.value)}
+              placeholder="Enter client email (optional)"
+            />
+            <Input
+              label="Client Address"
+              value={clientAddress}
+              onChange={(e) => setClientAddress(e.target.value)}
+              placeholder="Enter client address (optional)"
+            />
+            <Input
+              label="Amount (JOD) *"
+              type="number"
+              step="0.01"
+              min="0"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+              placeholder="Enter amount"
+            />
+            <Input
+              label="Company address"
+              value={companyAddress}
+              onChange={(e) => setCompanyAddress(e.target.value)}
+              required
+            />
+            <Select
+              label="Payment method"
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value as 'CARD' | 'CASH')}
+              options={[
+                { value: 'CARD', label: 'Visa / MasterCard' },
+                { value: 'CASH', label: 'Cash' },
+              ]}
+            />
+            <Input
+              label="Due date"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              required
+            />
           </>
         )}
 
-        {subscriptions.length === 0 && (
+        {serviceType === 'subscription' && subscriptions.length === 0 && (
           <div className="rounded-lg bg-yellow-50 p-3 text-sm text-yellow-800">
             No active subscriptions found. Create a subscription first.
           </div>

@@ -141,7 +141,7 @@ export function CreateInvoiceFromSubscriptionModal({ open, onClose }: { open: bo
     <Modal
       open={open}
       onClose={onClose}
-      title="Create Invoice from Subscription"
+      title="Create Invoice"
       size="lg"
       footer={
         <>

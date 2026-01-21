@@ -173,7 +173,7 @@ export function PettyCash() {
                 }))}
                 columns={['date', 'type', 'item', 'staff', 'amount', 'currency', 'balanceAfter', 'reference', 'description']}
                 filename="petty-cash-report.csv"
-                label="Export"
+                label="Export Report"
               />
               <Button onClick={() => setShowModal(true)} leadingIcon={<PlusIcon className="h-5 w-5" />}>
                 Add Transaction

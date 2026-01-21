@@ -4,10 +4,9 @@ import { useState, useEffect } from 'react';
 import { Card, CardBody, CardHeader, DataTable, Badge, Button, KPIStatCard } from '../../_components/ui';
 import { financeApi, dashboardApi, getFirstCompany } from '../../../lib/portalApi';
 import { ExportCsvButton } from '../../_components/ActionButtons';
-import { CreateInvoiceModal } from './CreateInvoiceModal';
 import { CreateInvoiceFromSubscriptionModal } from './CreateInvoiceFromSubscriptionModal';
 import { EditInvoiceModal } from './EditInvoiceModal';
-import { CurrencyDollarIcon, PlusIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import { CurrencyDollarIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { DonutBreakdown, RevenueAreaChart } from '../../_components/PortalCharts';
 import { getApiBaseUrl } from '../../../lib/getApiBaseUrl';
 
@@ -28,7 +27,6 @@ export function InvoiceManagement() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCreateFromSubscriptionModal, setShowCreateFromSubscriptionModal] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<any | null>(null);
 
@@ -295,16 +293,9 @@ export function InvoiceManagement() {
                 }))}
                 columns={['number', 'member', 'amount', 'currency', 'status', 'issuedAt', 'dueDate']}
                 filename="invoices-report.csv"
-                label="Export"
+                label="Export Report"
               />
-              <Button 
-                onClick={() => setShowCreateFromSubscriptionModal(true)} 
-                variant="secondary"
-                leadingIcon={<DocumentTextIcon className="h-5 w-5" />}
-              >
-                From Subscription
-              </Button>
-              <Button onClick={() => setShowCreateModal(true)} leadingIcon={<PlusIcon className="h-5 w-5" />}>
+              <Button onClick={() => setShowCreateFromSubscriptionModal(true)} leadingIcon={<PlusIcon className="h-5 w-5" />}>
                 Create Invoice
               </Button>
             </div>
@@ -316,16 +307,6 @@ export function InvoiceManagement() {
       </Card>
 
       {/* Modals */}
-      {showCreateModal && (
-        <CreateInvoiceModal
-          open={showCreateModal}
-          onClose={() => {
-            setShowCreateModal(false);
-            loadData();
-          }}
-        />
-      )}
-
       {showCreateFromSubscriptionModal && (
         <CreateInvoiceFromSubscriptionModal
           open={showCreateFromSubscriptionModal}

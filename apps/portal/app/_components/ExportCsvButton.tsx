@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@infinity/ui';
+import { Button } from './ui';
 
 type CsvPrimitive = string | number | boolean | null | undefined;
 type CsvRow = Record<string, CsvPrimitive>;

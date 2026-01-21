@@ -153,7 +153,7 @@ export function CashFlow() {
                 }))}
                 columns={['date', 'type', 'category', 'amount', 'currency', 'invoice', 'description']}
                 filename="cash-flow-report.csv"
-                label="Export"
+                label="Export Report"
               />
               <Button onClick={() => setShowModal(true)} leadingIcon={<PlusIcon className="h-5 w-5" />}>
                 Add Entry

@@ -145,7 +145,7 @@ export class PortalController {
   }
 
   @Post('invoices')
-  async createInvoice(@Body() data: Prisma.InvoiceCreateInput) {
+  async createInvoice(@Body() data: any) {
     return this.portalService.createInvoice(data);
   }
 

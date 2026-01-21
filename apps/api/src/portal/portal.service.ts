@@ -23,6 +23,9 @@ import {
   InventoryStatus,
   TaskStatus,
 } from '@prisma/client';
+import PDFDocument from 'pdfkit';
+import { createWriteStream, existsSync, mkdirSync } from 'fs';
+import { join } from 'path';
 
 @Injectable()
 export class PortalService {
@@ -231,13 +234,231 @@ export class PortalService {
     });
   }
 
-  async createInvoice(data: Prisma.InvoiceCreateInput): Promise<Invoice> {
-    // Generate invoice number if not provided
-    if (!data.number) {
-      const count = await this.prisma.invoice.count();
-      data.number = `INV-${String(count + 1).padStart(4, '0')}`;
+  async createInvoice(
+    data: Prisma.InvoiceCreateInput & { generatePdf?: boolean } & Record<string, unknown>
+  ): Promise<Invoice> {
+    // Support extended invoice payloads (client-ready PDFs) while remaining compatible with older callers.
+    const generatePdf =
+      Boolean((data as any)?.generatePdf) ||
+      Boolean((data as any)?.clientName) ||
+      Boolean((data as any)?.lineItems);
+
+    if ('generatePdf' in (data as any)) {
+      delete (data as any).generatePdf;
     }
-    return this.prisma.invoice.create({ data });
+
+    // Generate invoice number if not provided (retry on unique constraint collisions)
+    if (!data.number) {
+      data.number = await this.generateInvoiceNumber();
+    }
+
+    const created = await this.prisma.invoice.create({ data });
+
+    if (generatePdf) {
+      const pdfPath = await this.generateInvoicePdf(created);
+      return this.prisma.invoice.update({
+        where: { id: created.id },
+        data: { pdfPath },
+      });
+    }
+
+    return created;
+  }
+
+  private async generateInvoiceNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+
+    // Try a few times in case concurrent creates cause a unique constraint collision.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const yearPrefix = `INV-${year}-`;
+      const countThisYear = await this.prisma.invoice.count({
+        where: { number: { startsWith: yearPrefix } },
+      });
+      const seq = countThisYear + 1 + attempt;
+      const candidate = `${yearPrefix}${String(seq).padStart(6, '0')}`;
+
+      const exists = await this.prisma.invoice.findUnique({ where: { number: candidate } });
+      if (!exists) return candidate;
+    }
+
+    // Fallback if something is very wrong.
+    const date = new Date();
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    const rand = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+    return `INV-${y}${m}${d}-${rand}`;
+  }
+
+  private async generateInvoicePdf(invoice: Invoice): Promise<string> {
+    const uploadsDir = join(process.cwd(), 'uploads', 'invoices');
+    if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
+
+    const safeNumber = invoice.number.replace(/[^A-Za-z0-9-_]/g, '_');
+    const filename = `${safeNumber}.pdf`;
+    const absolutePath = join(uploadsDir, filename);
+
+    const doc = new PDFDocument({
+      size: 'A4',
+      margins: { top: 50, bottom: 50, left: 50, right: 50 },
+    });
+
+    const stream = createWriteStream(absolutePath);
+    doc.pipe(stream);
+
+    const companyName = (invoice as any).companyName || 'Infinity Sporty';
+    const companyAddress = (invoice as any).companyAddress || '';
+
+    // Try to load a logo from the monorepo (no new assets required)
+    const candidateLogoPaths = [
+      join(process.cwd(), 'apps', 'web', 'public', 'infinity-logo.png'),
+      join(process.cwd(), 'apps', 'portal', 'public', 'infinity-logo.png'),
+    ];
+    const logoPath = (invoice as any).logoPath || candidateLogoPaths.find((p) => existsSync(p));
+
+    const headerY = 50;
+    if (logoPath && existsSync(logoPath)) {
+      try {
+        doc.image(logoPath, 50, headerY, { width: 56, height: 56 });
+      } catch {
+        // Ignore logo failures; branding still present via text.
+      }
+    }
+
+    doc.font('Helvetica-Bold').fontSize(20).fillColor('#111827').text(companyName, 120, headerY);
+    doc.font('Helvetica').fontSize(10).fillColor('#4B5563').text(companyAddress, 120, headerY + 28, { width: 240 });
+
+    // Invoice meta (right aligned)
+    const rightX = 350;
+    doc.font('Helvetica-Bold').fontSize(22).fillColor('#111827').text('INVOICE', rightX, headerY, { align: 'right', width: 190 });
+
+    doc.font('Helvetica').fontSize(10).fillColor('#374151');
+    const issuedAt = invoice.issuedAt ? new Date(invoice.issuedAt) : new Date();
+    const dueDate = invoice.dueDate ? new Date(invoice.dueDate) : null;
+
+    const metaLines: Array<[string, string]> = [
+      ['Invoice #', invoice.number],
+      ['Issue date', issuedAt.toLocaleDateString()],
+      ['Due date', dueDate ? dueDate.toLocaleDateString() : '—'],
+      ['Currency', invoice.currency || 'JOD'],
+    ];
+
+    let metaY = headerY + 34;
+    metaLines.forEach(([k, v]) => {
+      doc.font('Helvetica-Bold').text(`${k}:`, rightX, metaY, { align: 'right', width: 190, continued: true });
+      doc.font('Helvetica').text(` ${v}`, { align: 'right' });
+      metaY += 16;
+    });
+
+    // Divider
+    doc.moveTo(50, 130).lineTo(545, 130).lineWidth(1).strokeColor('#E5E7EB').stroke();
+
+    // Bill To
+    const clientName = (invoice as any).clientName || '';
+    const clientEmail = (invoice as any).clientEmail || '';
+    const clientAddress = (invoice as any).clientAddress || '';
+
+    doc.font('Helvetica-Bold').fontSize(11).fillColor('#111827').text('Bill To', 50, 150);
+    doc.font('Helvetica').fontSize(10).fillColor('#374151');
+    doc.text(clientName, 50, 168, { width: 260 });
+    if (clientEmail) doc.text(clientEmail, 50, doc.y + 2, { width: 260 });
+    if (clientAddress) doc.text(clientAddress, 50, doc.y + 2, { width: 260 });
+
+    // Items table
+    const itemsRaw = (invoice as any).lineItems;
+    const items: Array<{ description: string; quantity: number; unitPrice: number; lineTotal: number }> =
+      Array.isArray(itemsRaw) ? itemsRaw : [];
+
+    const tableTop = 240;
+    const col = {
+      desc: { x: 50, w: 290 },
+      qty: { x: 345, w: 45 },
+      unit: { x: 395, w: 70 },
+      total: { x: 470, w: 75 },
+    };
+
+    doc.rect(50, tableTop, 495, 24).fillColor('#F3F4F6').fill();
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#111827');
+    doc.text('Description', col.desc.x, tableTop + 7, { width: col.desc.w });
+    doc.text('Qty', col.qty.x, tableTop + 7, { width: col.qty.w, align: 'right' });
+    doc.text('Unit', col.unit.x, tableTop + 7, { width: col.unit.w, align: 'right' });
+    doc.text('Total', col.total.x, tableTop + 7, { width: col.total.w, align: 'right' });
+
+    const money = (n: number) =>
+      Number.isFinite(n) ? n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
+
+    doc.font('Helvetica').fontSize(10).fillColor('#111827');
+    let y = tableTop + 30;
+    const rowGap = 10;
+
+    items.forEach((item) => {
+      const descY = y;
+      const descText = item.description || '—';
+      doc.text(descText, col.desc.x, descY, { width: col.desc.w });
+      const descHeight = doc.heightOfString(descText, { width: col.desc.w });
+      const rowHeight = Math.max(18, descHeight);
+
+      doc.text(String(item.quantity ?? 0), col.qty.x, descY, { width: col.qty.w, align: 'right' });
+      doc.text(money(item.unitPrice ?? 0), col.unit.x, descY, { width: col.unit.w, align: 'right' });
+      doc.text(money(item.lineTotal ?? 0), col.total.x, descY, { width: col.total.w, align: 'right' });
+
+      y += rowHeight + rowGap;
+
+      // Page break for large invoices
+      if (y > 650) {
+        doc.addPage();
+        y = 80;
+      }
+    });
+
+    const dividerY = Math.min(y + 6, 720);
+    doc.moveTo(50, dividerY).lineTo(545, dividerY).lineWidth(1).strokeColor('#E5E7EB').stroke();
+
+    // Totals (right)
+    const subtotal =
+      typeof (invoice as any).subtotal === 'number' ? (invoice as any).subtotal : items.reduce((sum, i) => sum + (Number(i.lineTotal) || 0), 0);
+    const tax = Number((invoice as any).tax) || 0;
+    const discount = Number((invoice as any).discount) || 0;
+    const grandTotal = Number.isFinite(invoice.amount) ? invoice.amount : subtotal + tax - discount;
+
+    let totalsY = dividerY + 16;
+    const totalsX = 350;
+    const labelW = 110;
+    const valueW = 85;
+
+    const totalsLines: Array<[string, number]> = [
+      ['Subtotal', subtotal],
+      ...(tax ? [['Tax', tax] as [string, number]] : []),
+      ...(discount ? [['Discount', -discount] as [string, number]] : []),
+    ];
+
+    doc.font('Helvetica').fontSize(10).fillColor('#374151');
+    totalsLines.forEach(([label, val]) => {
+      doc.text(label, totalsX, totalsY, { width: labelW, align: 'right' });
+      doc.text(money(val), totalsX + labelW, totalsY, { width: valueW, align: 'right' });
+      totalsY += 16;
+    });
+
+    doc.rect(totalsX, totalsY + 4, labelW + valueW, 28).fillColor('#111827').fill();
+    doc.font('Helvetica-Bold').fontSize(11).fillColor('#FFFFFF');
+    doc.text('Total', totalsX, totalsY + 12, { width: labelW, align: 'right' });
+    doc.text(money(grandTotal), totalsX + labelW, totalsY + 12, { width: valueW, align: 'right' });
+
+    const notes = (invoice as any).notes || '';
+    if (notes) {
+      const notesY = Math.max(580, totalsY + 50);
+      doc.font('Helvetica-Bold').fontSize(11).fillColor('#111827').text('Notes / Payment Terms', 50, notesY);
+      doc.font('Helvetica').fontSize(10).fillColor('#374151').text(notes, 50, notesY + 18, { width: 495 });
+    }
+
+    doc.end();
+
+    await new Promise<void>((resolve, reject) => {
+      stream.on('finish', () => resolve());
+      stream.on('error', (e) => reject(e));
+    });
+
+    return `/uploads/invoices/${filename}`;
   }
 
   async updateInvoice(id: string, data: Prisma.InvoiceUpdateInput): Promise<Invoice> {

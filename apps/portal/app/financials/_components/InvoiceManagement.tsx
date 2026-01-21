@@ -9,12 +9,34 @@ import { EditInvoiceModal } from './EditInvoiceModal';
 import { CurrencyDollarIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { DonutBreakdown, RevenueAreaChart } from '../../_components/PortalCharts';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://infinitysport.onrender.com';
+
 export function InvoiceManagement() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<any | null>(null);
+
+  async function downloadInvoicePdf(row: any) {
+    if (!row?.pdfPath) return;
+    try {
+      const pdfUrl = `${API_BASE_URL}${row.pdfPath}`;
+      const res = await fetch(pdfUrl, { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to download invoice PDF');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${row.number || 'invoice'}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
   useEffect(() => {
     loadData();
@@ -90,7 +112,7 @@ export function InvoiceManagement() {
         <span className="text-textPrimary">
           {row.member?.firstName && row.member?.lastName
             ? `${row.member.firstName} ${row.member.lastName}`
-            : row.company?.name || 'N/A'}
+            : row.clientName || row.company?.name || 'N/A'}
         </span>
       ),
     },
@@ -140,6 +162,14 @@ export function InvoiceManagement() {
       header: 'Actions',
       render: (row: any) => (
         <div className="flex gap-2">
+          {row.pdfPath && (
+            <button
+              onClick={() => downloadInvoicePdf(row)}
+              className="text-sm font-semibold text-primaryBlue hover:underline"
+            >
+              Download
+            </button>
+          )}
           <button
             onClick={() => setEditingInvoice(row)}
             className="text-sm font-semibold text-primaryBlue hover:underline"
@@ -238,7 +268,7 @@ export function InvoiceManagement() {
                 label="Export"
               />
               <Button onClick={() => setShowCreateModal(true)} leadingIcon={<PlusIcon className="h-5 w-5" />}>
-                Add Invoice
+                Create Invoice
               </Button>
             </>
           }

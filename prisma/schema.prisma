@@ -289,6 +289,19 @@ model Invoice {
   issuedAt    DateTime      @default(now())
   paidAt      DateTime?
   description String?
+  // Enterprise invoice fields (for client-ready PDF invoices)
+  companyName    String?
+  companyAddress String?
+  logoPath       String?
+  clientName     String?
+  clientEmail    String?
+  clientAddress  String?
+  lineItems      Json?
+  subtotal       Int?
+  tax            Int?
+  discount       Int?
+  notes          String?
+  pdfPath        String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 

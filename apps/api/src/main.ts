@@ -9,7 +9,7 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   
   // Create upload directories if they don't exist
-  const uploadDirs = ['./uploads/images', './uploads/videos', './uploads/media'];
+  const uploadDirs = ['./uploads/images', './uploads/videos', './uploads/media', './uploads/invoices'];
   uploadDirs.forEach((dir) => {
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true });
@@ -30,7 +30,7 @@ async function bootstrap() {
     origin: [landingOrigin, adminOrigin, portalOrigin, 'http://localhost:3002'],
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-company-id'],
   });
 
   // Set global prefix

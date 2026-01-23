@@ -11,18 +11,25 @@ import { normalizeLanguage } from '../lib/translations';
 const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
   variable: '--font-sans',
-  display: 'swap'
+  display: 'swap',
+  preload: true,
+  fallback: ['system-ui', 'arial'],
 });
+
 const spaceGrotesk = Space_Grotesk({
   subsets: ['latin'],
   variable: '--font-display',
-  display: 'swap'
+  display: 'swap',
+  preload: true,
+  fallback: ['system-ui', 'arial'],
 });
 
 const cairo = Cairo({
   subsets: ['arabic'],
   variable: '--font-ar',
-  display: 'swap'
+  display: 'swap',
+  preload: false, // Only load when needed (RTL)
+  fallback: ['system-ui', 'arial'],
 });
 
 

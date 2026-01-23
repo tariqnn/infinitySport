@@ -220,6 +220,9 @@ export function CoachesSection() {
                               src={coach.imageUrl}
                               alt={coach.name}
                               fill
+                              priority={index < 3}
+                              loading={index < 3 ? "eager" : "lazy"}
+                              quality={85}
                               className={coach.id === '2' || coach.id === '4' || coach.id === '5' ? "object-contain rounded-lg" : "object-cover"}
                               style={
                                 coach.id === '10' 

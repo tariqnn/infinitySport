@@ -83,11 +83,16 @@ export class PortalController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.portalService.getBookings(
-      companyId,
-      startDate ? new Date(startDate) : undefined,
-      endDate ? new Date(endDate) : undefined,
-    );
+    try {
+      return await this.portalService.getBookings(
+        companyId,
+        startDate ? new Date(startDate) : undefined,
+        endDate ? new Date(endDate) : undefined,
+      );
+    } catch (error) {
+      console.error('Error in getBookings controller:', error);
+      throw new Error('Failed to fetch bookings');
+    }
   }
 
   @Get('bookings/:id')

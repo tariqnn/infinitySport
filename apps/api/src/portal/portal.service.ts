@@ -119,26 +119,68 @@ export class PortalService {
 
   // Bookings
   async getBookings(companyId?: string, startDate?: Date, endDate?: Date): Promise<Booking[]> {
-    return this.prisma.booking.findMany({
-      where: {
-        companyId: companyId || undefined,
-        startTime: startDate
-          ? {
-              gte: startDate,
-              lte: endDate,
-            }
-          : undefined,
-      },
-      include: {
-        company: true,
-        program: true,
-        facility: true,
-        member: true,
-        class: true,
-        coach: true,
-      },
-      orderBy: { startTime: 'asc' },
-    });
+    try {
+      const where: Prisma.BookingWhereInput = {};
+      
+      if (companyId) {
+        where.companyId = companyId;
+      }
+      
+      if (startDate && endDate) {
+        where.startTime = {
+          gte: startDate,
+          lte: endDate,
+        };
+      }
+      
+      return this.prisma.booking.findMany({
+        where,
+        include: {
+          company: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          program: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          facility: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          member: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+          class: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          coach: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+        orderBy: { startTime: 'asc' },
+      });
+    } catch (error) {
+      console.error('Error fetching bookings:', error);
+      throw error;
+    }
   }
 
   async getBooking(id: string): Promise<Booking | null> {

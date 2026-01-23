@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useActionState } from 'react';
 import { useActionToast } from '../../_components/useActionToast';
 import { updateBookingPaymentAction, updateBookingStatusAction } from './actions';
-import { useFormState } from 'react-dom';
 
 const getApiBaseUrl = () => {
   if (process.env.NEXT_PUBLIC_API_BASE_URL) {
@@ -37,8 +36,8 @@ const initialState = { status: 'idle' as const };
 export function BookingsManager() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
-  const [paymentState, paymentAction] = useFormState(updateBookingPaymentAction, initialState);
-  const [statusState, statusAction] = useFormState(updateBookingStatusAction, initialState);
+  const [paymentState, paymentAction] = useActionState(updateBookingPaymentAction, initialState);
+  const [statusState, statusAction] = useActionState(updateBookingStatusAction, initialState);
 
   useActionToast(paymentState);
   useActionToast(statusState);

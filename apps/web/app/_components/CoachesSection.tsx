@@ -61,7 +61,8 @@ const COACHES_DATA: Coach[] = [
       'Founded Spikers Academy in 2018',
       'Competed in Premier and First Divisions with various clubs'
     ],
-    quote: 'Coach Abdulwahab exemplifies excellence in volleyball coaching through experience, vision, and leadership.'
+    quote: 'Coach Abdulwahab exemplifies excellence in volleyball coaching through experience, vision, and leadership.',
+    imageUrl: '/wahab-abu-khanfar.jpeg'
   },
   {
     id: '7',
@@ -84,7 +85,8 @@ const COACHES_DATA: Coach[] = [
     achievements: [
       'Former player on the Jordanian National Volleyball Team',
       'Experience in professional training and youth mentorship'
-    ]
+    ],
+    imageUrl: '/rahaf-haimour.jpeg'
   },
   {
     id: '9',
@@ -95,13 +97,15 @@ const COACHES_DATA: Coach[] = [
       'Volleyball coach at Abd Alhammed Sharaf International School',
       'Professional volleyball player with Al-Nassr club',
       'Member of the Jordanian National Volleyball Team'
-    ]
+    ],
+    imageUrl: '/raghad-haimour.jpeg'
   },
   {
     id: '11',
     sport: 'Volleyball',
     name: 'Coach Abdullah Yahya',
-    description: 'Coach Abdullah Yahya brings valuable experience and dedication to our volleyball program.'
+    description: 'Coach Abdullah Yahya brings valuable experience and dedication to our volleyball program.',
+    imageUrl: '/abdallah-yahya.jpeg'
   },
   {
     id: '10',

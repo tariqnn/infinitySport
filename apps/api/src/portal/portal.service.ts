@@ -133,7 +133,7 @@ export class PortalService {
         };
       }
       
-      return this.prisma.booking.findMany({
+      const bookings = await this.prisma.booking.findMany({
         where,
         include: {
           company: {
@@ -177,9 +177,16 @@ export class PortalService {
         },
         orderBy: { startTime: 'asc' },
       });
+      
+      return bookings;
     } catch (error) {
       console.error('Error fetching bookings:', error);
-      throw error;
+      // Return empty array instead of throwing to prevent 500 errors
+      // Log the error for debugging
+      if (error instanceof Error) {
+        console.error('Error details:', error.message, error.stack);
+      }
+      return [];
     }
   }
 

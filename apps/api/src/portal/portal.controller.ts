@@ -91,6 +91,9 @@ export class PortalController {
       );
     } catch (error) {
       console.error('Error in getBookings controller:', error);
+      if (error instanceof Error) {
+        throw new Error(`Failed to fetch bookings: ${error.message}`);
+      }
       throw new Error('Failed to fetch bookings');
     }
   }

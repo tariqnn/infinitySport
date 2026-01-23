@@ -228,7 +228,7 @@ export async function POST(request: Request) {
       const companiesRes = await fetch(`${API_BASE_URL}/api/portal/companies`, {
         cache: 'no-store',
       });
-      let companies: any[] = [];
+      let companies: Array<{ id: string; name: string }> = [];
       if (companiesRes.ok) {
         companies = await companiesRes.json();
       }
@@ -256,26 +256,30 @@ export async function POST(request: Request) {
         }
       }
 
-      // Check for existing bookings at this time and court
-      const bookingsRes = await fetch(
-        `${API_BASE_URL}/api/portal/bookings?companyId=${companyId}&startDate=${startTime.toISOString()}&endDate=${endTime.toISOString()}`,
-        { cache: 'no-store' }
-      );
-      if (bookingsRes.ok) {
-        const existingBookings: any[] = await bookingsRes.json();
-        const conflictingBooking = existingBookings.find(
-          (b) =>
-            b.facilityArea === courtName &&
-            new Date(b.startTime).getTime() === startTime.getTime() &&
-            b.status !== 'CANCELLED'
+        // Check for existing bookings at this time and court
+        const bookingsRes = await fetch(
+          `${API_BASE_URL}/api/portal/bookings?companyId=${companyId}&startDate=${startTime.toISOString()}&endDate=${endTime.toISOString()}`,
+          { cache: 'no-store' }
         );
-        if (conflictingBooking) {
-          return NextResponse.json(
-            { error: 'This time slot is already booked. Please select another time.' },
-            { status: 409 }
+        if (bookingsRes.ok) {
+          const existingBookings: Array<{
+            facilityArea: string | null;
+            startTime: string;
+            status: string;
+          }> = await bookingsRes.json();
+          const conflictingBooking = existingBookings.find(
+            (b) =>
+              b.facilityArea === courtName &&
+              new Date(b.startTime).getTime() === startTime.getTime() &&
+              b.status !== 'CANCELLED'
           );
+          if (conflictingBooking) {
+            return NextResponse.json(
+              { error: 'This time slot is already booked. Please select another time.' },
+              { status: 409 }
+            );
+          }
         }
-      }
     } catch (checkError) {
       console.error('Error checking existing bookings:', checkError);
       // Continue with booking creation even if check fails
@@ -313,7 +317,7 @@ export async function POST(request: Request) {
       const companiesRes = await fetch(`${API_BASE_URL}/api/portal/companies`, {
         cache: 'no-store',
       });
-      let companies: any[] = [];
+      let companies: Array<{ id: string; name: string }> = [];
       if (companiesRes.ok) {
         companies = await companiesRes.json();
       }

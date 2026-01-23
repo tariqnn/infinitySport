@@ -47,6 +47,13 @@ export function BookingsManager() {
     loadBookings();
   }, []);
 
+  // Reload bookings after successful payment or status update
+  useEffect(() => {
+    if (paymentState.status === 'success' || statusState.status === 'success') {
+      loadBookings();
+    }
+  }, [paymentState.status, statusState.status]);
+
   async function loadBookings() {
     try {
       setLoading(true);
@@ -121,12 +128,18 @@ export function BookingsManager() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-2xl font-bold">All Bookings</h2>
+        <div>
+          <h2 className="text-2xl font-bold">All Bookings</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Manage bookings from the landing page. Mark payments and update status.
+          </p>
+        </div>
         <button
           onClick={loadBookings}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+          disabled={loading}
+          className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Refresh
+          {loading ? 'Refreshing...' : 'Refresh'}
         </button>
       </div>
 
@@ -200,7 +213,10 @@ export function BookingsManager() {
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4">
-                      <form action={paymentAction}>
+                      <form 
+                        action={paymentAction}
+                        key={`payment-${booking.id}-${booking.isPaid}`}
+                      >
                         <input type="hidden" name="bookingId" value={booking.id} />
                         <input type="hidden" name="status" value={booking.status} />
                         <label className="flex items-center gap-2">
@@ -209,9 +225,15 @@ export function BookingsManager() {
                             name="isPaid"
                             value="true"
                             defaultChecked={booking.isPaid}
-                            onChange={(e) => {
+                            onChange={async (e) => {
                               const form = e.currentTarget.form;
                               if (form) {
+                                // Optimistically update UI
+                                setBookings(prev => prev.map(b => 
+                                  b.id === booking.id 
+                                    ? { ...b, isPaid: e.target.checked }
+                                    : b
+                                ));
                                 form.requestSubmit();
                               }
                             }}
@@ -224,14 +246,24 @@ export function BookingsManager() {
                       </form>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm">
-                      <form action={statusAction} className="inline">
+                      <form 
+                        action={statusAction} 
+                        className="inline"
+                        key={`status-${booking.id}-${booking.status}`}
+                      >
                         <input type="hidden" name="bookingId" value={booking.id} />
                         <select
                           name="status"
                           defaultValue={booking.status}
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             const form = e.currentTarget.form;
                             if (form) {
+                              // Optimistically update UI
+                              setBookings(prev => prev.map(b => 
+                                b.id === booking.id 
+                                  ? { ...b, status: e.target.value as Booking['status'] }
+                                  : b
+                              ));
                               form.requestSubmit();
                             }
                           }}

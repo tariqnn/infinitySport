@@ -284,6 +284,70 @@ async function main() {
   console.log(`   - Facilities: ${facilities.length}`);
   console.log(`   - Footer Links: ${footerLinks.length}`);
   console.log(`   - Footer Settings: 1`);
+
+  // Create test bookings if company exists
+  const companies = await prisma.company.findMany();
+  if (companies.length > 0) {
+    const company = companies[0];
+    const now = new Date();
+    
+    // Delete existing test bookings first
+    await prisma.booking.deleteMany({
+      where: {
+        companyId: company.id,
+        notes: {
+          contains: 'Test booking',
+        },
+      },
+    });
+    
+    // Create some test bookings
+    const testBookings = [
+      {
+        companyId: company.id,
+        facilityArea: 'Basketball AC',
+        startTime: new Date(now.getTime() + 24 * 60 * 60 * 1000), // Tomorrow
+        endTime: new Date(now.getTime() + 24 * 60 * 60 * 1000 + 60 * 60 * 1000), // Tomorrow + 1 hour
+        status: 'PENDING' as const,
+        isPaid: false,
+        customerName: 'Test Customer 1',
+        customerPhone: '+962791234567',
+        customerEmail: 'test1@example.com',
+        notes: 'Test booking from seed',
+      },
+      {
+        companyId: company.id,
+        facilityArea: 'Padel',
+        startTime: new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000), // Day after tomorrow
+        endTime: new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000),
+        status: 'CONFIRMED' as const,
+        isPaid: true,
+        customerName: 'Test Customer 2',
+        customerPhone: '+962791234568',
+        customerEmail: 'test2@example.com',
+        notes: 'Test booking - paid',
+      },
+      {
+        companyId: company.id,
+        facilityArea: 'Basketball 3x3',
+        startTime: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000),
+        endTime: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000),
+        status: 'PENDING' as const,
+        isPaid: false,
+        customerName: 'Test Customer 3',
+        customerPhone: '+962791234569',
+        notes: 'Test booking - unpaid',
+      },
+    ];
+
+    for (const bookingData of testBookings) {
+      await prisma.booking.create({
+        data: bookingData,
+      });
+    }
+    console.log(`✅ Created ${testBookings.length} test bookings`);
+  }
+
   console.log('\n🎉 Database is ready! You can now start the API server.');
 }
 

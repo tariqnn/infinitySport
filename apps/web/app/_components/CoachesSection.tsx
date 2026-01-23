@@ -33,8 +33,9 @@ const COACHES_DATA: Coach[] = [
     id: '3',
     sport: 'Gymnastics',
     name: 'Coach Raya Abu Jamous',
-    description: 'Gymnastics Head Coach for our program with deep knowledge of the sport. Longtime member of the Jordanian National Gymnastics Team. Her experience has expanded into athletics training and strength and conditioning environments.',
-    quote: 'I have developed a strong foundation in gymnastics training to excel youth to the next level.'
+    description: 'My name is Raya Abu Jamous, and I am a current member of the national parkour team, having previously competed as a national team gymnast. I bring over seven years of professional experience as a gymnastics coach, in addition to my work as a fitness and strength coach. Through these roles, I have developed a strong foundation in athletic training, technique development, and performance enhancement, supported by years of dedication to both my athletic career and coaching practice.',
+    quote: 'I have developed a strong foundation in gymnastics training to excel youth to the next level.',
+    imageUrl: '/raya-abu-jamous.jpeg'
   },
   {
     id: '4',

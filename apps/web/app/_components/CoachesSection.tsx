@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import Image from "next/image";
 import { ScrollAnimation } from "./ScrollAnimation";
 
@@ -126,18 +126,20 @@ export function CoachesSection() {
   const [selectedSport, setSelectedSport] = useState<string>('All');
   const [expandedCoach, setExpandedCoach] = useState<string | null>(null);
   
-  // Get unique sports from coaches data
-  const sports = ['All', ...Array.from(new Set(COACHES_DATA.map(coach => coach.sport)))];
+  // Get unique sports from coaches data (memoized)
+  const sports = useMemo(() => ['All', ...Array.from(new Set(COACHES_DATA.map(coach => coach.sport)))], []);
   
-  // Filter coaches based on selected sport
-  const filteredCoaches = selectedSport === 'All' 
-    ? COACHES_DATA 
-    : COACHES_DATA.filter(coach => coach.sport === selectedSport);
+  // Filter coaches based on selected sport (memoized)
+  const filteredCoaches = useMemo(() => {
+    return selectedSport === 'All' 
+      ? COACHES_DATA 
+      : COACHES_DATA.filter(coach => coach.sport === selectedSport);
+  }, [selectedSport]);
 
-  // Toggle coach expansion
-  const toggleCoach = (coachId: string) => {
+  // Toggle coach expansion (memoized callback)
+  const toggleCoach = useCallback((coachId: string) => {
     setExpandedCoach(prev => prev === coachId ? null : coachId);
-  };
+  }, []);
 
   // Truncate description to 150 characters
   const truncateDescription = (text: string, maxLength: number = 150) => {

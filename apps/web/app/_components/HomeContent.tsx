@@ -167,7 +167,8 @@ export function HomeContent({ content }: HomeContentProps) {
             muted
             loop
             playsInline
-            preload="auto"
+            preload="metadata"
+            poster={hero.backgroundImageUrl || HERO_FALLBACK_IMAGE}
             className="absolute inset-0 h-full w-full object-cover"
             style={{ 
               objectFit: 'cover',
@@ -175,7 +176,6 @@ export function HomeContent({ content }: HomeContentProps) {
               height: '100%',
               minWidth: '100%',
               minHeight: '100%',
-              willChange: 'transform',
               display: videoError ? 'none' : 'block'
             }}
             onLoadedData={(e) => {

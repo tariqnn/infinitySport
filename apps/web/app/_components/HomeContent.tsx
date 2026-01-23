@@ -61,16 +61,32 @@ export function HomeContent({ content }: HomeContentProps) {
   // Reset video state when component mounts (when navigating back to page)
   useEffect(() => {
     setVideoError(false);
-    // Try to play video when component mounts
-    if (videoRef.current) {
-      videoRef.current.load();
-      videoRef.current.play().catch((error) => {
-        // Autoplay can be blocked in some cases; we retry on canplay below.
-        if (process.env.NODE_ENV !== "production") {
-          console.log("Hero video autoplay prevented (will retry):", error);
-        }
-        // Don't set error immediately, let it try to load first
-      });
+    // Optimize video loading - only load when in viewport
+    const video = videoRef.current;
+    if (video) {
+      // Use intersection observer to load video only when visible
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              video.load();
+              video.play().catch(() => {
+                // Autoplay can be blocked, will retry on canplay
+              });
+            } else {
+              // Pause video when not visible to save resources
+              video.pause();
+            }
+          });
+        },
+        { threshold: 0.1 }
+      );
+      
+      observer.observe(video);
+      
+      return () => {
+        observer.disconnect();
+      };
     }
   }, []);
 

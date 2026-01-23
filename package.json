@@ -8,7 +8,7 @@
     "packages/*"
   ],
   "scripts": {
-    "postinstall": "npm run prisma:generate",
+    "postinstall": "npm run prisma:generate || echo 'Prisma generate skipped (prisma not available)'",
     "dev": "npm run dev:web",
     "dev:web": "npm --workspace apps/web run dev",
     "dev:admin": "npm --workspace apps/admin run dev",
@@ -24,27 +24,29 @@
     "lint:admin": "npm --workspace apps/admin run lint",
     "lint:portal": "npm --workspace apps/portal run lint",
     "format": "npm --workspace apps/web run lint -- --fix && npm --workspace apps/admin run lint -- --fix && npm --workspace apps/portal run lint -- --fix",
-    "prisma:generate": "prisma generate --schema=./prisma/schema.prisma",
-    "prisma:migrate": "prisma migrate dev --schema=./prisma/schema.prisma",
+    "prisma:generate": "npx prisma generate --schema=./prisma/schema.prisma",
+    "prisma:migrate": "npx prisma migrate dev --schema=./prisma/schema.prisma",
     "prisma:seed": "cd prisma && ts-node --project tsconfig.json seed.ts",
     "start:api": "npm --workspace apps/api run start",
     "start:portal": "npm --workspace apps/portal run start",
     "start:admin": "npm --workspace apps/admin run start",
     "start:web": "npm --workspace apps/web run start",
-    "prisma:studio": "prisma studio --schema=./prisma/schema.prisma",
+    "prisma:studio": "npx prisma studio --schema=./prisma/schema.prisma",
     "db:setup": "npm run prisma:generate && npm run prisma:migrate && npm run prisma:seed"
   },
   "engines": {
     "node": ">=18.18.0",
     "npm": ">=9.0.0"
   },
-  "devDependencies": {
+  "dependencies": {
     "@prisma/client": "^5.19.0",
+    "prisma": "^5.19.0"
+  },
+  "devDependencies": {
     "autoprefixer": "^10.4.21",
     "dotenv": "^17.2.3",
     "ffmpeg-static": "^5.3.0",
     "postcss": "^8.5.6",
-    "prisma": "^5.19.0",
     "tailwindcss": "^4.1.17",
     "ts-node": "^10.9.2"
   }

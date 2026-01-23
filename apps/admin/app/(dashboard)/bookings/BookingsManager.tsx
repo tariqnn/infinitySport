@@ -77,10 +77,16 @@ export function BookingsManager() {
         const data = await bookingsRes.json();
         setBookings(data);
       } else {
-        console.error('Failed to load bookings');
+        // Failed to load bookings - set empty array
+        setBookings([]);
       }
     } catch (error) {
-      console.error('Error loading bookings:', error);
+      // Error loading bookings - set empty array and log in development
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.error('Error loading bookings:', error);
+      }
+      setBookings([]);
     } finally {
       setLoading(false);
     }

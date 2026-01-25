@@ -27,6 +27,7 @@ import PDFDocument from 'pdfkit';
 import { createWriteStream, existsSync, mkdirSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
+import { Writable } from 'stream';
 
 @Injectable()
 export class PortalService {
@@ -314,29 +315,32 @@ export class PortalService {
   async getInvoicePdfBuffer(id: string): Promise<{ buffer: Buffer; filename: string }> {
     const invoice = await this.prisma.invoice.findUnique({ where: { id } });
     if (!invoice) throw new NotFoundException('Invoice not found');
-    const safe = invoice.number.replace(/[^A-Za-z0-9-_]/g, '_');
+    const num = (invoice.number ?? invoice.id ?? 'invoice').toString();
+    const safe = num.replace(/[^A-Za-z0-9-_]/g, '_');
     const filePath = join(process.cwd(), 'uploads', 'invoices', `${safe}.pdf`);
-    if (!existsSync(filePath)) {
-      let meta: Record<string, unknown> = {};
-      try {
-        if (invoice.description && typeof invoice.description === 'string') {
-          const p = JSON.parse(invoice.description);
-          if (p && typeof p === 'object') meta = p;
-        }
-      } catch {
-        /* ignore */
-      }
-      await this.generateInvoicePdf({
-        number: invoice.number,
-        issuedAt: invoice.issuedAt,
-        dueDate: invoice.dueDate,
-        currency: invoice.currency,
-        amount: Number(invoice.amount) || 0,
-        meta,
-      });
+    if (existsSync(filePath)) {
+      const buffer = await readFile(filePath);
+      return { buffer, filename: `${num}.pdf` };
     }
-    const buffer = await readFile(filePath);
-    return { buffer, filename: `${invoice.number}.pdf` };
+    // Generate PDF in-memory when file is missing (e.g. after deploy on ephemeral disk)
+    let meta: Record<string, unknown> = {};
+    try {
+      if (invoice.description && typeof invoice.description === 'string') {
+        const p = JSON.parse(invoice.description);
+        if (p && typeof p === 'object') meta = p;
+      }
+    } catch {
+      /* ignore */
+    }
+    const buffer = await this.generateInvoicePdfToBuffer({
+      number: num,
+      issuedAt: invoice.issuedAt,
+      dueDate: invoice.dueDate,
+      currency: invoice.currency,
+      amount: Number(invoice.amount) || 0,
+      meta,
+    });
+    return { buffer, filename: `${num}.pdf` };
   }
 
   async createInvoice(
@@ -480,20 +484,41 @@ export class PortalService {
     const stream = createWriteStream(absolutePath);
     doc.pipe(stream);
 
-    const companyName = input.meta?.companyName || 'Infinity Sporty';
-    const companyAddress = input.meta?.companyAddress || '';
-
-    // Try to load a logo from the monorepo (no new assets required)
     const candidateLogoPaths = [
       join(process.cwd(), 'apps', 'web', 'public', 'infinity-logo.png'),
       join(process.cwd(), 'apps', 'portal', 'public', 'infinity-logo.png'),
     ];
-    const logoPath = input.meta?.logoPath || candidateLogoPaths.find((p) => existsSync(p));
+    const logoPath = (input.meta?.logoPath || candidateLogoPaths.find((p) => existsSync(p))) || null;
+
+    this.drawInvoiceContent(doc, { ...input, logoPath });
+
+    await new Promise<void>((resolve, reject) => {
+      stream.on('finish', () => resolve());
+      stream.on('error', (e) => reject(e));
+    });
+
+    return `/uploads/invoices/${filename}`;
+  }
+
+  private drawInvoiceContent(
+    doc: InstanceType<typeof PDFDocument>,
+    input: {
+      number: string;
+      issuedAt: Date;
+      dueDate: Date | null;
+      currency: string;
+      amount: number;
+      meta: Record<string, unknown>;
+      logoPath?: string | null;
+    },
+  ): void {
+    const companyName = (input.meta?.companyName as string) || 'Infinity Sporty';
+    const companyAddress = (input.meta?.companyAddress as string) || '';
 
     const headerY = 50;
-    if (logoPath && existsSync(logoPath)) {
+    if (input.logoPath) {
       try {
-        doc.image(logoPath, 50, headerY, { width: 56, height: 56 });
+        doc.image(input.logoPath, 50, headerY, { width: 56, height: 56 });
       } catch {
         // Ignore logo failures; branding still present via text.
       }
@@ -626,13 +651,51 @@ export class PortalService {
     }
 
     doc.end();
+  }
 
-    await new Promise<void>((resolve, reject) => {
-      stream.on('finish', () => resolve());
-      stream.on('error', (e) => reject(e));
+  private async generateInvoicePdfToBuffer(input: {
+    number: string;
+    issuedAt: Date;
+    dueDate: Date | null;
+    currency: string;
+    amount: number;
+    meta: Record<string, unknown>;
+  }): Promise<Buffer> {
+    const doc = new PDFDocument({
+      size: 'A4',
+      margins: { top: 50, bottom: 50, left: 50, right: 50 },
     });
 
-    return `/uploads/invoices/${filename}`;
+    const chunks: Buffer[] = [];
+    let resolveBuf: (b: Buffer) => void;
+    const bufPromise = new Promise<Buffer>((resolve, reject) => {
+      resolveBuf = resolve;
+      const w = new Writable({
+        write(chunk: Buffer | string, _enc, cb) {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+          cb();
+        },
+        final(cb) {
+          resolveBuf(Buffer.concat(chunks));
+          cb();
+        },
+      });
+      w.on('error', reject);
+      doc.on('error', reject);
+      doc.pipe(w);
+    });
+
+    const candidateLogoPaths = [
+      join(process.cwd(), 'apps', 'web', 'public', 'infinity-logo.png'),
+      join(process.cwd(), 'apps', 'portal', 'public', 'infinity-logo.png'),
+    ];
+    const logoPath: string | null =
+      (typeof input.meta?.logoPath === 'string' ? input.meta.logoPath : null) ||
+      candidateLogoPaths.find((p) => existsSync(p)) ||
+      null;
+
+    this.drawInvoiceContent(doc, { ...input, logoPath });
+    return bufPromise;
   }
 
   async updateInvoice(id: string, data: Prisma.InvoiceUpdateInput): Promise<Invoice> {

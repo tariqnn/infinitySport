@@ -36,7 +36,11 @@ export function InvoiceManagement() {
       const pdfUrl = financeApi.invoices.getPdfUrl(row.id);
       const res = await fetch(pdfUrl, { cache: 'no-store' });
       if (!res.ok) {
-        alert('PDF not available for this invoice.');
+        const msg =
+          res.status === 404
+            ? 'Invoice not found.'
+            : 'PDF could not be generated for this invoice. Please try again.';
+        alert(msg);
         return;
       }
       const blob = await res.blob();

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   Company,
@@ -25,6 +25,7 @@ import {
 } from '@prisma/client';
 import PDFDocument from 'pdfkit';
 import { createWriteStream, existsSync, mkdirSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { join } from 'path';
 
 @Injectable()
@@ -308,6 +309,34 @@ export class PortalService {
         member: true,
       },
     });
+  }
+
+  async getInvoicePdfBuffer(id: string): Promise<{ buffer: Buffer; filename: string }> {
+    const invoice = await this.prisma.invoice.findUnique({ where: { id } });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    const safe = invoice.number.replace(/[^A-Za-z0-9-_]/g, '_');
+    const filePath = join(process.cwd(), 'uploads', 'invoices', `${safe}.pdf`);
+    if (!existsSync(filePath)) {
+      let meta: Record<string, unknown> = {};
+      try {
+        if (invoice.description && typeof invoice.description === 'string') {
+          const p = JSON.parse(invoice.description);
+          if (p && typeof p === 'object') meta = p;
+        }
+      } catch {
+        /* ignore */
+      }
+      await this.generateInvoicePdf({
+        number: invoice.number,
+        issuedAt: invoice.issuedAt,
+        dueDate: invoice.dueDate,
+        currency: invoice.currency,
+        amount: Number(invoice.amount) || 0,
+        meta,
+      });
+    }
+    const buffer = await readFile(filePath);
+    return { buffer, filename: `${invoice.number}.pdf` };
   }
 
   async createInvoice(

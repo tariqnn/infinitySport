@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  transpilePackages: ["@infinity/ui", "@infinity/types", "@infinity/mock-api"],
   images: {
     remotePatterns: [
       {
@@ -8,7 +9,7 @@ const nextConfig: NextConfig = {
         hostname: 'images.unsplash.com'
       }
     ]
-  }
+  },
 };
 
 export default nextConfig;

@@ -9,6 +9,7 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  StreamableFile,
 } from '@nestjs/common';
 import { PortalService } from './portal.service';
 import { Prisma } from '@prisma/client';
@@ -165,6 +166,15 @@ export class PortalController {
   @Get('invoices/:id')
   async getInvoice(@Param('id') id: string) {
     return this.portalService.getInvoice(id);
+  }
+
+  @Get('invoices/:id/pdf')
+  async getInvoicePdf(@Param('id') id: string) {
+    const { buffer, filename } = await this.portalService.getInvoicePdfBuffer(id);
+    return new StreamableFile(buffer, {
+      type: 'application/pdf',
+      disposition: `attachment; filename="${filename}"`,
+    });
   }
 
   @Post('invoices')

@@ -146,7 +146,7 @@ export const financeApi = {
     update: (id: string, data: any) => portalFetch<any>(`/portal/budget-entries/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: (id: string) => portalFetch<void>(`/portal/budget-entries/${id}`, { method: 'DELETE' }),
   },
-  // Invoices
+  // Invoices (create, delete, PDF via Nest API to avoid Node/fs in portal build)
   invoices: {
     list: (companyId?: string, status?: string) => {
       const params = new URLSearchParams();
@@ -156,24 +156,24 @@ export const financeApi = {
       return portalFetch<any[]>(`/portal/invoices${query}`);
     },
     get: (id: string) => portalFetch<any>(`/portal/invoices/${id}`),
-    create: async (data: any) => {
-      const res = await fetch('/api/invoices', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-        cache: 'no-store',
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error((json as { message?: string }).message || res.statusText);
-      return json;
-    },
+    create: (data: Record<string, unknown>) =>
+      portalFetch<any>('/portal/invoices', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: any) => portalFetch<any>(`/portal/invoices/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: async (id: string) => {
-      const res = await fetch(`/api/invoices/${id}`, { method: 'DELETE', cache: 'no-store' });
+      const url = `${API_BASE_URL}/api/portal/invoices/${id}`;
+      const res = await fetch(url, {
+        method: 'DELETE',
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(getCompanyId() ? { 'x-company-id': getCompanyId()! } : {}),
+        },
+      });
       if (res.status === 204) return;
       const json = await res.json().catch(() => ({}));
       throw new Error((json as { message?: string }).message || res.statusText);
     },
+    getPdfUrl: (id: string) => `${API_BASE_URL}/api/portal/invoices/${id}/pdf`,
   },
   // Cash Flow
   cashFlow: {

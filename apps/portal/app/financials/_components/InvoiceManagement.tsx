@@ -8,9 +8,6 @@ import { CreateInvoiceFromSubscriptionModal } from './CreateInvoiceFromSubscript
 import { EditInvoiceModal } from './EditInvoiceModal';
 import { ArrowDownTrayIcon, CurrencyDollarIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { DonutBreakdown, RevenueAreaChart } from '../../_components/PortalCharts';
-import { getApiBaseUrl } from '../../../lib/getApiBaseUrl';
-
-const API_BASE_URL = getApiBaseUrl();
 
 function getInvoiceMeta(row: any): any | null {
   const desc = row?.description;
@@ -31,15 +28,12 @@ export function InvoiceManagement() {
   const [editingInvoice, setEditingInvoice] = useState<any | null>(null);
 
   async function downloadInvoicePdf(row: any) {
-    const meta = getInvoiceMeta(row);
-    const pdfPath = row?.pdfPath || meta?.pdfPath || (row?.id ? `/api/invoices/${row.id}/pdf` : null);
-    if (!pdfPath) {
+    if (!row?.id) {
       alert('Cannot download: invoice ID is missing.');
       return;
     }
     try {
-      const base = pdfPath.startsWith('/api/') ? window.location.origin : API_BASE_URL;
-      const pdfUrl = base + pdfPath;
+      const pdfUrl = financeApi.invoices.getPdfUrl(row.id);
       const res = await fetch(pdfUrl, { cache: 'no-store' });
       if (!res.ok) {
         alert('PDF not available for this invoice.');

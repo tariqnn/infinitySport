@@ -7,6 +7,7 @@ export function BasketballPackageCard({ pkg }: { pkg: BasketballPackage }) {
   const [open, setOpen] = useState(false);
   const hasPrice = pkg.price != null && pkg.price !== '';
   const hasTimeSlots = Array.isArray(pkg.timeSlots) && pkg.timeSlots.length > 0;
+  const price = pkg.price ?? '';
 
   return (
     <div
@@ -39,7 +40,7 @@ export function BasketballPackageCard({ pkg }: { pkg: BasketballPackage }) {
           {hasPrice ? (
             <div className="mb-2">
               <span className="text-2xl font-bold text-brand-black">
-                {pkg.price.includes('Contact') || pkg.price.includes('Enquire') ? pkg.price : `${pkg.price} JOD`}
+                {price.includes('Contact') || price.includes('Enquire') ? price : `${price} JOD`}
               </span>
               {pkg.priceNote ? <span className="ml-2 text-sm text-gray-600">{pkg.priceNote}</span> : null}
             </div>

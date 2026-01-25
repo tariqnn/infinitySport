@@ -83,7 +83,13 @@ export default async function SportsPage() {
               <span className="text-sm text-gray-500"> — 12 sessions per month</span>
             </div>
             <p className="text-xs text-gray-500 font-medium">Training Schedule</p>
-            <p className="text-sm text-gray-600">Sun • Tue • Thu | 5:00–7:00 PM</p>
+            <p className="text-sm text-gray-600 mb-4">Sun • Tue • Thu | 5:00–7:00 PM</p>
+            <Link
+              href="/booking"
+              className="flex items-center justify-center rounded-lg bg-brand-green-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-green-dark"
+            >
+              Book
+            </Link>
           </div>
 
           {/* Package B */}
@@ -109,7 +115,13 @@ export default async function SportsPage() {
               <span className="text-sm text-gray-500"> — 8 sessions per month</span>
             </div>
             <p className="text-xs text-gray-500 font-medium">Training Schedule</p>
-            <p className="text-sm text-gray-600">Sun • Tue • Thu | 5:00–7:00 PM</p>
+            <p className="text-sm text-gray-600 mb-4">Sun • Tue • Thu | 5:00–7:00 PM</p>
+            <Link
+              href="/booking"
+              className="flex items-center justify-center rounded-lg bg-brand-green-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-green-dark"
+            >
+              Book
+            </Link>
           </div>
 
           {/* Package C */}
@@ -135,7 +147,13 @@ export default async function SportsPage() {
               <span className="text-sm text-gray-500"> — 18 sessions per month</span>
             </div>
             <p className="text-xs text-gray-500 font-medium">Training Schedule</p>
-            <p className="text-sm text-gray-600">Sun • Tue • Thu | 5:00–7:00 PM</p>
+            <p className="text-sm text-gray-600 mb-4">Sun • Tue • Thu | 5:00–7:00 PM</p>
+            <Link
+              href="/booking"
+              className="flex items-center justify-center rounded-lg bg-brand-green-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-green-dark"
+            >
+              Book
+            </Link>
           </div>
 
           {/* Package D */}
@@ -161,7 +179,13 @@ export default async function SportsPage() {
               <span className="text-sm text-gray-500"> — 12 sessions per month</span>
             </div>
             <p className="text-xs text-gray-500 font-medium">Training Schedule</p>
-            <p className="text-sm text-gray-600">Sun • Tue • Thu | 5:00–7:00 PM</p>
+            <p className="text-sm text-gray-600 mb-4">Sun • Tue • Thu | 5:00–7:00 PM</p>
+            <Link
+              href="/booking"
+              className="flex items-center justify-center rounded-lg bg-brand-green-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-green-dark"
+            >
+              Book
+            </Link>
           </div>
         </div>
       </div>
@@ -188,8 +212,14 @@ export default async function SportsPage() {
             </li>
           </ul>
           <p className="text-xs text-gray-500 font-medium mb-1">Training Schedule</p>
-          <p className="text-sm text-gray-700">Saturday 3:00–5:00 PM</p>
-          <p className="text-sm text-gray-700">Tuesday & Sunday 7:00–9:00 PM</p>
+          <p className="text-sm text-gray-700 mb-6">Saturday 3:00–5:00 PM</p>
+          <p className="text-sm text-gray-700 mb-6">Tuesday & Sunday 7:00–9:00 PM</p>
+          <Link
+            href="/booking"
+            className="flex items-center justify-center rounded-lg bg-brand-green-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-green-dark"
+          >
+            Book
+          </Link>
         </div>
       </div>
 

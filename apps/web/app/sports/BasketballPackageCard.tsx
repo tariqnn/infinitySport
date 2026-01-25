@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import type { BasketballPackage } from '@infinity/mock-api';
 
 export function BasketballPackageCard({ pkg }: { pkg: BasketballPackage }) {
@@ -55,6 +56,13 @@ export function BasketballPackageCard({ pkg }: { pkg: BasketballPackage }) {
               </ul>
             </div>
           ) : null}
+          <Link
+            href="/booking"
+            onClick={(e) => e.stopPropagation()}
+            className="mt-4 flex items-center justify-center rounded-lg bg-brand-green-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-green-dark"
+          >
+            Book
+          </Link>
         </div>
       ) : null}
     </div>

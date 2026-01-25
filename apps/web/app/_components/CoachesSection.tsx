@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo, useCallback } from "react";
 import Image from "next/image";
@@ -40,14 +40,14 @@ const COACHES_DATA: Coach[] = [
   {
     id: '4',
     sport: 'Gymnastics',
-    name: 'Assistant Gymnastics Coach � Ahmad Aldarawish',
+    name: 'Coach Ahmad Aldarawish',
     description: 'Dedicated to creating strong athletes through strength and conditioning while aligning them with the core gymnastics program.',
     imageUrl: '/ahmad-aldarawesh.jpg'
   },
   {
     id: '5',
     sport: 'Gymnastics',
-    name: 'Assistant Gymnastics Coach � Ammar Salman',
+    name: 'Coach Ammar Salman',
     description: 'An athlete who maintains an active lifestyle through squash, badminton, swimming, and strength training. Over the years, he has built strong athletic ability supported by discipline, consistency, and a genuine passion for sports. His diverse training background has developed solid endurance, strength, and an understanding of effective performance techniques. He is committed to continuous self-improvement and maintaining a healthy, balanced lifestyle.',
     imageUrl: '/ammar-salman.jpg'
   },

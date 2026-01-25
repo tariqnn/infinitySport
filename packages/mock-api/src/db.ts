@@ -53,16 +53,16 @@ export const db: MockDatabase = {
   docs: structuredClone(docsSeed).map((doc: unknown) => docItemSchema.parse(doc)),
   directory: structuredClone(directorySeed),
   budget: structuredClone(budgetSeed),
-  invoices: structuredClone(invoicesSeed).map((invoice: { status?: string; currency?: string }) => ({
+  invoices: (structuredClone(invoicesSeed) as Record<string, unknown>[]).map((invoice) => ({
     ...invoice,
     status: invoice.status as Invoice['status'],
     currency: invoice.currency as Invoice['currency'],
-  })),
-  cashflow: structuredClone(cashflowSeed).map((entry: { category?: string; currency?: string }) => ({
+  })) as Invoice[],
+  cashflow: (structuredClone(cashflowSeed) as Record<string, unknown>[]).map((entry) => ({
     ...entry,
     category: entry.category as CashFlowEntry['category'],
     currency: entry.currency as CashFlowEntry['currency'],
-  })),
+  })) as CashFlowEntry[],
   pettycash: structuredClone(pettyCashSeed).map((txn: unknown) => pettyCashTxnSchema.parse(txn)),
   landing: landingContentSchema.parse(structuredClone(landingSeed)),
 };

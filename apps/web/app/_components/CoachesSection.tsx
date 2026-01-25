@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useMemo, useCallback } from "react";
 import Image from "next/image";
@@ -104,7 +104,7 @@ const COACHES_DATA: Coach[] = [
     id: '11',
     sport: 'Volleyball',
     name: 'Coach Abdullah Yahya',
-    description: 'Coach Abdullah Yahya brings valuable experience and dedication to our volleyball program.',
+    description: 'Player for Shabab Al-Hussein Club and the Jordanian Men\'s National Team, and a coach at Spikers Academy for youth age groups. Holds an official coaching certificate from the International Volleyball Federation (FIVB).',
     imageUrl: '/abdallah-yahya.jpeg'
   },
   {

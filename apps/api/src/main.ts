@@ -25,9 +25,22 @@ async function bootstrap() {
   const landingOrigin = process.env.LANDING_ORIGIN || 'http://localhost:3000';
   const adminOrigin = process.env.ADMIN_ORIGIN || 'http://localhost:3001';
   const portalOrigin = process.env.PORTAL_ORIGIN || 'http://localhost:3002';
-  
+  const productionOrigins = [
+    'https://infinitysport.onrender.com',
+    'https://infinitysport-1.onrender.com',
+  ];
+  const origins = [
+    landingOrigin,
+    adminOrigin,
+    portalOrigin,
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3002',
+    'http://localhost:3003',
+    ...productionOrigins,
+  ];
   app.enableCors({
-    origin: [landingOrigin, adminOrigin, portalOrigin, 'http://localhost:3002', 'http://localhost:3003'],
+    origin: origins,
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-company-id'],

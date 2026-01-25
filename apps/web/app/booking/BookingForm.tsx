@@ -41,11 +41,12 @@ const formatSlotLabel = (hhmm: string, lang: 'en' | 'ar') => {
 };
 
 // Fallback when API fails: these slots are blocked. Admin can override via Booking Availability.
+// Includes basketball academy: Little Kobes (Sat/Mon/Wed 17:00, Fri 10:00), Ballers & Hoopers (18:00, Fri 11:00), Warriors (19:00, Fri 12:00).
 const FALLBACK_BLOCKED: Record<string, Partial<Record<CourtType, string[]>>> = {
   MONDAY: { 'Basketball AC': ['17:00', '18:00', '19:00'], Volleyball: ['19:00'] },
   WEDNESDAY: { 'Basketball AC': ['17:00', '18:00', '19:00'] },
-  FRIDAY: { 'Basketball AC': ['22:00', '23:00', '00:00'] },
-  SATURDAY: { 'Basketball AC': ['17:00', '18:00'], Volleyball: ['15:00', '16:00'] },
+  FRIDAY: { 'Basketball AC': ['10:00', '11:00', '12:00', '22:00', '23:00', '00:00'] },
+  SATURDAY: { 'Basketball AC': ['17:00', '18:00', '19:00'], Volleyball: ['15:00', '16:00'] },
   SUNDAY: { Volleyball: ['15:00', '16:00'] },
 };
 

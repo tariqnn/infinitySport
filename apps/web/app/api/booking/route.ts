@@ -219,47 +219,14 @@ export async function POST(request: Request) {
       }
     }
 
-    // Check for existing bookings at this time slot
+    // Check for existing bookings at this time and court (all companies – same venue)
     try {
       const startTime = new Date(`${date}T${time}:00`);
       const endTime = new Date(startTime);
       endTime.setHours(endTime.getHours() + 1);
 
-      // Get first company (or create it)
-      const companiesRes = await fetch(`${API_BASE_URL}/api/portal/companies`, {
-        cache: 'no-store',
-      });
-      let companies: Array<{ id: string; name: string }> = [];
-      if (companiesRes.ok) {
-        companies = await companiesRes.json();
-      }
-
-      let companyId: string;
-      if (companies && companies.length > 0) {
-        companyId = companies[0].id;
-      } else {
-        // Create default company if none exists
-        const createCompanyRes = await fetch(`${API_BASE_URL}/api/portal/companies`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: 'Infinity Sporty',
-            contactName: 'Infinity Sporty',
-            contactEmail: 'infinitysportsacademyjo@gmail.com',
-            status: 'ACTIVE',
-          }),
-        });
-        if (createCompanyRes.ok) {
-          const newCompany = await createCompanyRes.json();
-          companyId = newCompany.id;
-        } else {
-          throw new Error('Failed to create company');
-        }
-      }
-
-        // Check for existing bookings at this time and court (all companies – same venue)
-        const courtType = courtTypeForId(courtId);
-        const bookingsRes = await fetch(
+      const courtType = courtTypeForId(courtId);
+      const bookingsRes = await fetch(
           `${API_BASE_URL}/api/portal/bookings?startDate=${startTime.toISOString()}&endDate=${endTime.toISOString()}`,
           { cache: 'no-store' }
         );

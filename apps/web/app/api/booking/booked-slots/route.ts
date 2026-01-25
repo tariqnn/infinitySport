@@ -52,7 +52,7 @@ export async function GET(request: Request) {
 
     for (const b of rows) {
       if (b.status === 'CANCELLED') continue;
-      const ct = b.facilityArea && COURT_TYPES.includes(b.facilityArea as any) ? b.facilityArea : null;
+      const ct = b.facilityArea && (COURT_TYPES as readonly string[]).includes(b.facilityArea) ? b.facilityArea : null;
       if (!ct) continue;
       const d = new Date(b.startTime);
       const dateStr = toDateStr(d);

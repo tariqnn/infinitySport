@@ -8,11 +8,12 @@ const prisma = new PrismaClient();
 
 const TO_INSERT: { dayOfWeek: string; courtType: string; time: string; isBlocked: boolean }[] = (() => {
   const out: { dayOfWeek: string; courtType: string; time: string; isBlocked: boolean }[] = [];
+  // Recurring blocks: team trainings, volleyball, and basketball academy (Little Kobes, Ballers & Hoopers, Warriors)
   const ALWAYS_FULL: Record<string, Partial<Record<string, string[]>>> = {
     MONDAY: { 'Basketball AC': ['17:00', '18:00', '19:00'], Volleyball: ['19:00'] },
     WEDNESDAY: { 'Basketball AC': ['17:00', '18:00', '19:00'] },
-    FRIDAY: { 'Basketball AC': ['22:00', '23:00', '00:00'] },
-    SATURDAY: { 'Basketball AC': ['17:00', '18:00'], Volleyball: ['15:00', '16:00'] },
+    FRIDAY: { 'Basketball AC': ['10:00', '11:00', '12:00', '22:00', '23:00', '00:00'] },
+    SATURDAY: { 'Basketball AC': ['17:00', '18:00', '19:00'], Volleyball: ['15:00', '16:00'] },
     SUNDAY: { Volleyball: ['15:00', '16:00'] },
   };
   for (const [day, courts] of Object.entries(ALWAYS_FULL)) {

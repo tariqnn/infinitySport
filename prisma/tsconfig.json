@@ -11,7 +11,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true
   },
-  "include": ["seed.ts", "seed-blocked-slots.ts", "seed-bookings.ts"],
+  "include": ["seed.ts", "seed-blocked-slots.ts", "seed-bookings.ts", "seed-basketball-academy-blocks.ts"],
   "exclude": ["node_modules"]
 }
 

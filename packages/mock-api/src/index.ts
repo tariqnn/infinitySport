@@ -305,6 +305,9 @@ export type BasketballPackage = {
   id: string;
   title: string;
   note?: string;
+  price?: string;
+  priceNote?: string | null;
+  timeSlots?: string[];
   features: string[];
 };
 

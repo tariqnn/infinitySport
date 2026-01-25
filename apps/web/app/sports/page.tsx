@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { fetchPrograms } from '../../lib/apiClient';
 import { getBasketballPackages } from '@infinity/mock-api';
+import { BasketballPackageCard } from './BasketballPackageCard';
 
 export const metadata = {
   title: 'Sports & Facilities'
@@ -43,28 +44,9 @@ export default async function SportsPage() {
           <h2 className="text-3xl font-bold text-brand-black">Basketball Packages</h2>
           <p className="mt-2 text-sm text-gray-600">Age-group programmes built on fundamental movement skills, confidence, and teamwork.</p>
         </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {basketballPackages.map((pkg) => (
-            <div
-              key={pkg.id}
-              className="rounded-card border border-brand-lightBlue/20 bg-white p-6 shadow-card transition duration-500 hover:-translate-y-2 hover:border-brand-green-primary/50 hover:shadow-card-hover"
-            >
-              <div className="mb-4">
-                <span className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold">Basketball</span>
-                <h3 className="mt-2 text-xl font-bold text-brand-black">{pkg.title}</h3>
-              </div>
-              {pkg.note ? (
-                <p className="mb-4 text-sm italic text-gray-500">{pkg.note}</p>
-              ) : null}
-              <ul className="space-y-2 text-sm text-gray-600">
-                {pkg.features.map((f, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="mt-1.5 block h-1.5 w-1.5 flex-shrink-0 rounded-full bg-brand-green-primary" />
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <BasketballPackageCard key={pkg.id} pkg={pkg} />
           ))}
         </div>
       </div>

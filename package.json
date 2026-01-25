@@ -29,6 +29,7 @@
     "prisma:seed": "cd prisma && ts-node --project tsconfig.json seed.ts",
     "prisma:seed-blocked-slots": "cd prisma && ts-node --project tsconfig.json seed-blocked-slots.ts",
     "prisma:seed-bookings": "cd prisma && ts-node --project tsconfig.json seed-bookings.ts",
+    "prisma:seed-basketball-academy-blocks": "cd prisma && ts-node --project tsconfig.json seed-basketball-academy-blocks.ts",
     "start:api": "npm --workspace apps/api run start",
     "start:portal": "npm --workspace apps/portal run start",
     "start:admin": "npm --workspace apps/admin run start",

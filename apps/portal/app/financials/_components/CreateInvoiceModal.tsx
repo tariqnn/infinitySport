@@ -5,6 +5,7 @@ import { Modal, Input, Select, Textarea, Button } from '../../_components/ui';
 import { financeApi, membersApi, getFirstCompany } from '../../../lib/portalApi';
 import { useRouter } from 'next/navigation';
 import { getApiBaseUrl } from '../../../lib/getApiBaseUrl';
+import { getBasketballPackages } from '@infinity/mock-api';
 
 type LineItem = {
   id: string;
@@ -39,6 +40,16 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
   const [items, setItems] = useState<LineItem[]>([
     { id: crypto?.randomUUID?.() ?? String(Date.now()), description: 'Service', quantity: 1, unitPrice: 0 },
   ]);
+  const [quickAddPkg, setQuickAddPkg] = useState('');
+
+  const basketballPackagesWithPrice = useMemo(
+    () =>
+      getBasketballPackages().filter((p) => {
+        const n = parseFloat(String(p.price ?? ''));
+        return !Number.isNaN(n) && n > 0;
+      }),
+    []
+  );
 
   useEffect(() => {
     if (open) {
@@ -133,6 +144,11 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
     setLoading(true);
 
     const company = await getFirstCompany();
+    if (!company) {
+      setError('Cannot connect to the API. Start it with: npm run dev:api (must run on http://localhost:4000).');
+      setLoading(false);
+      return;
+    }
 
     try {
       const payloadItems = items.map((it, idx) => ({
@@ -180,7 +196,8 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
       }
 
       if (pdfPath) {
-        const pdfUrl = `${API_BASE_URL}${pdfPath}`;
+        const base = pdfPath.startsWith('/api/') ? (typeof window !== 'undefined' ? window.location.origin : '') : API_BASE_URL;
+        const pdfUrl = base + pdfPath;
         const res = await fetch(pdfUrl, { cache: 'no-store' });
         if (res.ok) {
           const blob = await res.blob();
@@ -326,20 +343,55 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
 
         {/* Line items */}
         <div className="rounded-xl border border-borderColor p-4">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex items-center justify-between gap-4 flex-wrap">
             <div className="text-sm font-semibold text-textPrimary">Line items</div>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() =>
-                setItems((prev) => [
-                  ...prev,
-                  { id: crypto?.randomUUID?.() ?? String(Date.now() + prev.length), description: '', quantity: 1, unitPrice: 0 },
-                ])
-              }
-            >
-              Add item
-            </Button>
+            <div className="flex items-center gap-2">
+              <div className="w-60">
+                <Select
+                  label=""
+                  value={quickAddPkg}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (!v) {
+                      setQuickAddPkg('');
+                      return;
+                    }
+                    const p = basketballPackagesWithPrice.find((x) => x.id === v);
+                    if (p) {
+                      setItems((prev) => [
+                        ...prev,
+                        {
+                          id: crypto?.randomUUID?.() ?? String(Date.now()),
+                          description: p.priceNote ? `${p.title} - ${p.priceNote}` : p.title,
+                          quantity: 1,
+                          unitPrice: parseFloat(String(p.price)),
+                        },
+                      ]);
+                    }
+                    setQuickAddPkg('');
+                  }}
+                  options={[
+                    { value: '', label: '— Basketball package —' },
+                    ...basketballPackagesWithPrice.map((p) => ({
+                      value: p.id,
+                      label: `${p.title} – ${p.price} JOD${p.priceNote ? ` (${p.priceNote})` : ''}`,
+                    })),
+                  ]}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() =>
+                  setItems((prev) => [
+                    ...prev,
+                    { id: crypto?.randomUUID?.() ?? String(Date.now() + prev.length), description: '', quantity: 1, unitPrice: 0 },
+                  ])
+                }
+              >
+                Add item
+              </Button>
+            </div>
           </div>
 
           {fieldErrors.items && <p className="mb-2 text-sm text-ui-danger">{fieldErrors.items}</p>}

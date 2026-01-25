@@ -6,7 +6,7 @@ import { financeApi, dashboardApi, getFirstCompany } from '../../../lib/portalAp
 import { ExportCsvButton } from '../../_components/ActionButtons';
 import { CreateInvoiceFromSubscriptionModal } from './CreateInvoiceFromSubscriptionModal';
 import { EditInvoiceModal } from './EditInvoiceModal';
-import { CurrencyDollarIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, CurrencyDollarIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { DonutBreakdown, RevenueAreaChart } from '../../_components/PortalCharts';
 import { getApiBaseUrl } from '../../../lib/getApiBaseUrl';
 
@@ -32,12 +32,19 @@ export function InvoiceManagement() {
 
   async function downloadInvoicePdf(row: any) {
     const meta = getInvoiceMeta(row);
-    const pdfPath = row?.pdfPath || meta?.pdfPath;
-    if (!pdfPath) return;
+    const pdfPath = row?.pdfPath || meta?.pdfPath || (row?.id ? `/api/invoices/${row.id}/pdf` : null);
+    if (!pdfPath) {
+      alert('Cannot download: invoice ID is missing.');
+      return;
+    }
     try {
-      const pdfUrl = `${API_BASE_URL}${pdfPath}`;
+      const base = pdfPath.startsWith('/api/') ? window.location.origin : API_BASE_URL;
+      const pdfUrl = base + pdfPath;
       const res = await fetch(pdfUrl, { cache: 'no-store' });
-      if (!res.ok) throw new Error('Failed to download invoice PDF');
+      if (!res.ok) {
+        alert('PDF not available for this invoice.');
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -49,6 +56,7 @@ export function InvoiceManagement() {
       URL.revokeObjectURL(url);
     } catch (e) {
       console.error(e);
+      alert('Failed to download invoice PDF.');
     }
   }
 
@@ -189,23 +197,26 @@ export function InvoiceManagement() {
       id: 'actions',
       header: 'Actions',
       render: (row: any) => (
-        <div className="flex gap-2">
-          {(row.pdfPath || getInvoiceMeta(row)?.pdfPath) && (
-            <button
-              onClick={() => downloadInvoicePdf(row)}
-              className="text-sm font-semibold text-primaryBlue hover:underline"
-            >
-              Download
-            </button>
-          )}
-          <button
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            leadingIcon={<ArrowDownTrayIcon className="h-4 w-4" />}
+            onClick={() => downloadInvoicePdf(row)}
+          >
+            Download
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setEditingInvoice(row)}
-            className="text-sm font-semibold text-primaryBlue hover:underline"
           >
             Edit
-          </button>
+          </Button>
           {row.status !== 'PAID' && (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={async () => {
                 try {
                   await financeApi.invoices.update(row.id, { status: 'PAID', paidAt: new Date().toISOString() });
@@ -214,11 +225,28 @@ export function InvoiceManagement() {
                   console.error('Failed to mark as paid:', error);
                 }
               }}
-              className="text-sm font-semibold text-success hover:underline"
+              className="text-success hover:bg-green-50"
             >
               Mark Paid
-            </button>
+            </Button>
           )}
+          <Button
+            variant="destructive"
+            size="sm"
+            leadingIcon={<TrashIcon className="h-4 w-4" />}
+            onClick={async () => {
+              if (!confirm(`Delete invoice ${row.number}? This cannot be undone.`)) return;
+              try {
+                await financeApi.invoices.delete(row.id);
+                loadData();
+              } catch (error) {
+                console.error('Failed to delete invoice', error);
+                alert('Failed to delete invoice. It may be in use elsewhere.');
+              }
+            }}
+          >
+            Delete
+          </Button>
         </div>
       ),
     },

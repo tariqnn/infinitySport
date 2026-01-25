@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   Company,
@@ -313,69 +313,91 @@ export class PortalService {
   async createInvoice(
     data: Prisma.InvoiceCreateInput & { generatePdf?: boolean } & Record<string, unknown>
   ): Promise<Invoice> {
-    // IMPORTANT: We intentionally persist extended invoice fields inside `description` JSON to avoid DB migrations.
-    // This keeps invoice creation working even if the database schema only has the original Invoice columns.
+    const d = (data ?? {}) as Record<string, unknown>;
+    const companyId = d?.company && typeof d.company === 'object' && (d.company as any)?.connect?.id
+      ? String((d.company as any).connect.id).trim()
+      : '';
+    if (!companyId) {
+      throw new BadRequestException('company.connect.id is required');
+    }
+
+    const company = await this.prisma.company.findUnique({ where: { id: companyId } });
+    if (!company) {
+      throw new BadRequestException('Company not found');
+    }
 
     const generatePdf =
-      Boolean((data as any)?.generatePdf) ||
-      Boolean((data as any)?.clientName) ||
-      Boolean((data as any)?.lineItems);
+      Boolean(d.generatePdf) || Boolean(d.clientName) || (Array.isArray(d.lineItems) && d.lineItems.length > 0);
+    const paymentMethod: 'CARD' | 'CASH' = (d.paymentMethod === 'CASH' ? 'CASH' : 'CARD') as 'CARD' | 'CASH';
 
-    const paymentMethod: 'CARD' | 'CASH' = ((data as any)?.paymentMethod as any) || 'CARD';
-
-    const invoiceNumber = data.number ? String(data.number) : await this.generateInvoiceNumber();
-    const issuedAtIso = (data as any)?.issuedAt ? String((data as any).issuedAt) : new Date().toISOString();
+    const invoiceNumber = d.number && String(d.number).trim() ? String(d.number).trim() : await this.generateInvoiceNumber();
+    const issuedAtIso = d.issuedAt ? String(d.issuedAt) : new Date().toISOString();
+    const issuedAt = new Date(issuedAtIso);
+    if (Number.isNaN(issuedAt.getTime())) {
+      throw new BadRequestException('issuedAt must be a valid date');
+    }
 
     const meta = {
       v: 1,
-      companyName: (data as any)?.companyName || 'Infinity Sporty',
-      companyAddress: (data as any)?.companyAddress || '',
-      clientName: (data as any)?.clientName || '',
-      clientEmail: (data as any)?.clientEmail || '',
-      clientAddress: (data as any)?.clientAddress || '',
-      currency: (data as any)?.currency || 'JOD',
+      companyName: (d.companyName && String(d.companyName)) || 'Infinity Sporty',
+      companyAddress: (d.companyAddress && String(d.companyAddress)) || '',
+      clientName: (d.clientName && String(d.clientName)) || '',
+      clientEmail: (d.clientEmail && String(d.clientEmail)) || '',
+      clientAddress: (d.clientAddress && String(d.clientAddress)) || '',
+      currency: (d.currency && String(d.currency)) || 'JOD',
       paymentMethod,
-      lineItems: Array.isArray((data as any)?.lineItems) ? (data as any).lineItems : [],
-      subtotal: (data as any)?.subtotal ?? null,
-      tax: (data as any)?.tax ?? null,
-      discount: (data as any)?.discount ?? null,
-      notes: (data as any)?.notes ?? null,
+      lineItems: Array.isArray(d.lineItems) ? d.lineItems : [],
+      subtotal: typeof d.subtotal === 'number' ? d.subtotal : null,
+      tax: typeof d.tax === 'number' ? d.tax : null,
+      discount: typeof d.discount === 'number' ? d.discount : null,
+      notes: (d.notes && String(d.notes)) || null,
       pdfPath: null as null | string,
     };
 
-    // Strip non-schema fields so Prisma doesn't try to write missing DB columns.
+    const amount = Math.round(Number(d.amount)) || 0;
+    const dueVal = d.dueDate ? new Date(String(d.dueDate)) : null;
+    const dueDate = dueVal && !Number.isNaN(dueVal.getTime()) ? dueVal : undefined;
+    const paidVal = d.paidAt ? new Date(String(d.paidAt)) : null;
+    const paidAt = paidVal && !Number.isNaN(paidVal.getTime()) ? paidVal : undefined;
+
     const createData: Prisma.InvoiceCreateInput = {
       number: invoiceNumber,
-      amount: Number.isFinite((data as any)?.amount) ? (data as any).amount : 0,
-      currency: String((data as any)?.currency || 'JOD'),
-      status: (data as any)?.status || 'DRAFT',
-      issuedAt: new Date(issuedAtIso),
-      dueDate: (data as any)?.dueDate ? new Date(String((data as any).dueDate)) : undefined,
-      paidAt: (data as any)?.paidAt ? new Date(String((data as any).paidAt)) : undefined,
+      amount,
+      currency: meta.currency,
+      status: ((d.status && String(d.status)) || 'DRAFT') as InvoiceStatus,
+      issuedAt,
+      dueDate: dueDate ?? undefined,
+      paidAt: paidAt ?? undefined,
       description: JSON.stringify(meta),
-      company: (data as any)?.company,
-      member: (data as any)?.member,
-      subscription: (data as any)?.subscription,
+      company: { connect: { id: companyId } },
+      ...(d.member && typeof d.member === 'object' && (d.member as any)?.connect?.id
+        ? { member: { connect: { id: String((d.member as any).connect.id) } } }
+        : {}),
+      ...(d.subscription && typeof d.subscription === 'object' && (d.subscription as any)?.connect?.id
+        ? { subscription: { connect: { id: String((d.subscription as any).connect.id) } } }
+        : {}),
     };
 
     const created = await this.prisma.invoice.create({ data: createData });
 
     if (generatePdf) {
-      const pdfPath = await this.generateInvoicePdf({
-        number: created.number,
-        issuedAt: created.issuedAt,
-        dueDate: created.dueDate,
-        currency: created.currency,
-        amount: created.amount,
-        meta,
-      });
-
-      meta.pdfPath = pdfPath;
-
-      return this.prisma.invoice.update({
-        where: { id: created.id },
-        data: { description: JSON.stringify(meta) },
-      });
+      try {
+        const pdfPath = await this.generateInvoicePdf({
+          number: created.number,
+          issuedAt: created.issuedAt,
+          dueDate: created.dueDate,
+          currency: created.currency,
+          amount: created.amount,
+          meta,
+        });
+        (meta as any).pdfPath = pdfPath;
+        return this.prisma.invoice.update({
+          where: { id: created.id },
+          data: { description: JSON.stringify(meta) },
+        });
+      } catch (err) {
+        console.error('createInvoice: generateInvoicePdf failed', err);
+      }
     }
 
     return created;

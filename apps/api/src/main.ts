@@ -27,7 +27,7 @@ async function bootstrap() {
   const portalOrigin = process.env.PORTAL_ORIGIN || 'http://localhost:3002';
   
   app.enableCors({
-    origin: [landingOrigin, adminOrigin, portalOrigin, 'http://localhost:3002'],
+    origin: [landingOrigin, adminOrigin, portalOrigin, 'http://localhost:3002', 'http://localhost:3003'],
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-company-id'],

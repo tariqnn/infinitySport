@@ -156,9 +156,24 @@ export const financeApi = {
       return portalFetch<any[]>(`/portal/invoices${query}`);
     },
     get: (id: string) => portalFetch<any>(`/portal/invoices/${id}`),
-    create: (data: any) => portalFetch<any>('/portal/invoices', { method: 'POST', body: JSON.stringify(data) }),
+    create: async (data: any) => {
+      const res = await fetch('/api/invoices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+        cache: 'no-store',
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((json as { message?: string }).message || res.statusText);
+      return json;
+    },
     update: (id: string, data: any) => portalFetch<any>(`/portal/invoices/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-    delete: (id: string) => portalFetch<void>(`/portal/invoices/${id}`, { method: 'DELETE' }),
+    delete: async (id: string) => {
+      const res = await fetch(`/api/invoices/${id}`, { method: 'DELETE', cache: 'no-store' });
+      if (res.status === 204) return;
+      const json = await res.json().catch(() => ({}));
+      throw new Error((json as { message?: string }).message || res.statusText);
+    },
   },
   // Cash Flow
   cashFlow: {
@@ -267,14 +282,15 @@ export async function getFirstCompany() {
       return null;
     }
   } catch (e: any) {
+    // If API is unreachable, skip retry (POST would fail the same way)
+    if (e?.message?.includes?.('Cannot connect to API')) {
+      return null;
+    }
     console.error('Failed to fetch companies:', e);
-    // Try to create default company on error
     try {
       const created = await portalFetch<any>('/portal/companies', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: 'Infinity Sporty',
           contactName: 'Infinity Sporty',
@@ -282,14 +298,9 @@ export async function getFirstCompany() {
           status: 'ACTIVE',
         }),
       });
-      if (created && created.id) {
-        return created;
-      }
-      throw new Error('Company creation returned invalid data');
-    } catch (createErr: any) {
-      console.error('Could not create default company:', createErr);
-      return null;
-    }
+      if (created?.id) return created;
+    } catch (_) {}
+    return null;
   }
 }
 

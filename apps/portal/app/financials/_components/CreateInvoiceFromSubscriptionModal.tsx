@@ -108,7 +108,8 @@ export function CreateInvoiceFromSubscriptionModal({ open, onClose }: { open: bo
       }
 
       if (pdfPath) {
-        const pdfUrl = `${API_BASE_URL}${pdfPath}`;
+        const base = pdfPath.startsWith('/api/') ? (typeof window !== 'undefined' ? window.location.origin : '') : API_BASE_URL;
+        const pdfUrl = base + pdfPath;
         const res = await fetch(pdfUrl, { cache: 'no-store' });
         if (res.ok) {
           const blob = await res.blob();

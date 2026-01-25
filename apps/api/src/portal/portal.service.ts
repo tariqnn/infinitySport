@@ -219,6 +219,22 @@ export class PortalService {
     await this.prisma.booking.delete({ where: { id } });
   }
 
+  // Blocked slots (static booking blocks; isBlocked=false makes the slot free for public booking)
+  async getBlockedSlots(): Promise<{ id: string; dayOfWeek: string; courtType: string; time: string; isBlocked: boolean }[]> {
+    const rows = await (this.prisma as any).blockedSlot.findMany({
+      orderBy: [{ dayOfWeek: 'asc' }, { courtType: 'asc' }, { time: 'asc' }],
+    });
+    return rows;
+  }
+
+  async updateBlockedSlot(id: string, data: { isBlocked: boolean }): Promise<{ id: string; dayOfWeek: string; courtType: string; time: string; isBlocked: boolean } | null> {
+    const row = await (this.prisma as any).blockedSlot.update({
+      where: { id },
+      data: { isBlocked: data.isBlocked, updatedAt: new Date() },
+    });
+    return row;
+  }
+
   // Subscriptions
   async getSubscriptions(companyId?: string, memberId?: string): Promise<Subscription[]> {
     return this.prisma.subscription.findMany({

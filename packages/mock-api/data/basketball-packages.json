@@ -1,0 +1,39 @@
+[
+  {
+    "id": "bb-pkg-u10",
+    "title": "Little Kobes U10",
+    "note": "Age may be accepted according to fundamental movement skills.",
+    "features": [
+      "Have fun and grow in health",
+      "Ball handling and dribbling fundamentals",
+      "Basic shot skills and types of passing"
+    ]
+  },
+  {
+    "id": "bb-pkg-u12",
+    "title": "U12 Ballers",
+    "features": [
+      "Always stay confident",
+      "Shooting with footwork",
+      "Different types of finish"
+    ]
+  },
+  {
+    "id": "bb-pkg-u14",
+    "title": "U14 Hoopers",
+    "features": [
+      "Introduce basic court movement",
+      "Respect your team",
+      "Introducing basic elements of form shooting"
+    ]
+  },
+  {
+    "id": "bb-pkg-u16",
+    "title": "U16 and above – Skilled Warriors",
+    "features": [
+      "Reading game situations",
+      "Be a good teammate",
+      "Refine offensive and defensive skills"
+    ]
+  }
+]

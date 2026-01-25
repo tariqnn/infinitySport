@@ -118,6 +118,17 @@ export class PortalController {
     await this.portalService.deleteBooking(id);
   }
 
+  // Blocked slots (booking availability: toggle which recurring slots are blocked vs free)
+  @Get('blocked-slots')
+  async getBlockedSlots() {
+    return this.portalService.getBlockedSlots();
+  }
+
+  @Patch('blocked-slots/:id')
+  async updateBlockedSlot(@Param('id') id: string, @Body() data: { isBlocked: boolean }) {
+    return this.portalService.updateBlockedSlot(id, data);
+  }
+
   // Subscriptions
   @Get('subscriptions')
   async getSubscriptions(@Query('companyId') companyId?: string, @Query('memberId') memberId?: string) {

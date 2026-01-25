@@ -398,14 +398,23 @@ export function HomeContent({ content }: HomeContentProps) {
       {/* Premium Facilities Section */}
       <section id="facilities" className="bg-white py-12 sm:py-16 md:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <Link href="/facilities" className="block">
+          <Link href="/facilities" className="block cursor-pointer group">
             <ScrollAnimation direction="up">
-              <div className="flex flex-col gap-3 text-center sm:gap-4 cursor-pointer group">
+              <div className="flex flex-col gap-3 text-center sm:gap-4">
                 <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">{tr(language, 'home_facility_highlights')}</p>
                 <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl group-hover:text-brand-green-primary transition-colors">{tr(language, 'home_our_facilities')}</h2>
                 <p className="max-w-2xl mx-auto text-base text-gray-600 leading-relaxed sm:text-lg">
                   {tr(language, 'home_facilities_desc')}
                 </p>
+                {content.facilityHighlights.length > 0 ? (
+                  <ul className="mt-6 flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+                    {content.facilityHighlights.map((f) => (
+                      <li key={f.id} className="rounded-full border border-brand-lightBlue/40 bg-white px-4 py-2 text-sm font-semibold text-brand-black shadow-sm transition-all group-hover:border-brand-green-primary/50">
+                        {f.name}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
                 <div className="mt-6 flex items-center justify-center gap-2 text-brand-green-primary font-semibold group-hover:gap-4 transition-all">
                   <span>{tr(language, 'home_view_all_facilities')}</span>
                   <ArrowRightIcon className="w-5 h-5" />

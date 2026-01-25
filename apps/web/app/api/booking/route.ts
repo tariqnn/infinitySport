@@ -154,22 +154,23 @@ const courtTypeForId = (courtId: string): CourtType | null => {
   return null;
 };
 
-// Same schedule as the booking UI.
-const ALWAYS_FULL: Record<string, Partial<Record<CourtType, string[]>>> = {
-  MONDAY: { 
-    'Basketball AC': ['17:00', '18:00', '19:00'],
-    'Volleyball': ['19:00'], // 7-8 PM
-  },
-  WEDNESDAY: { 'Basketball AC': ['17:00', '18:00', '19:00'] },
-  FRIDAY: { 'Basketball AC': ['22:00', '23:00', '00:00'] },
-  SATURDAY: { 
-    'Basketball AC': ['17:00', '18:00'],
-    'Volleyball': ['15:00', '16:00'], // 3-5 PM
-  },
-  SUNDAY: {
-    'Volleyball': ['15:00', '16:00'], // 3-5 PM (assuming same as Saturday)
-  },
-};
+async function fetchBlockedMap(): Promise<Record<string, Partial<Record<CourtType, string[]>>>> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/portal/blocked-slots`, { cache: 'no-store' });
+    if (!res.ok) return {};
+    const rows: { dayOfWeek: string; courtType: string; time: string; isBlocked: boolean }[] = await res.json();
+    const blocked: Record<string, Record<string, string[]>> = {};
+    for (const r of rows) {
+      if (!r.isBlocked) continue;
+      if (!blocked[r.dayOfWeek]) blocked[r.dayOfWeek] = {};
+      if (!blocked[r.dayOfWeek][r.courtType]) blocked[r.dayOfWeek][r.courtType] = [];
+      blocked[r.dayOfWeek][r.courtType].push(r.time);
+    }
+    return blocked;
+  } catch {
+    return {};
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -204,12 +205,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check if the time slot is already booked (query database)
-    // But we must always reject the configured "always full" slots.
+    // Reject slots marked as blocked in admin (Booking Availability). Admin can set isBlocked=false to free them.
     const courtType = courtTypeForId(courtId);
     if (courtType) {
+      const blockedMap = await fetchBlockedMap();
       const day = dayKey(date);
-      const fullTimes = ALWAYS_FULL[day]?.[courtType] ?? [];
+      const fullTimes = blockedMap[day]?.[courtType] ?? [];
       if (fullTimes.includes(time)) {
         return NextResponse.json(
           { error: 'This time slot is fully booked. Please select another time.' },
@@ -256,12 +257,13 @@ export async function POST(request: Request) {
         }
       }
 
-        // Check for existing bookings at this time and court
+        // Check for existing bookings at this time and court (all companies – same venue)
+        const courtType = courtTypeForId(courtId);
         const bookingsRes = await fetch(
-          `${API_BASE_URL}/api/portal/bookings?companyId=${companyId}&startDate=${startTime.toISOString()}&endDate=${endTime.toISOString()}`,
+          `${API_BASE_URL}/api/portal/bookings?startDate=${startTime.toISOString()}&endDate=${endTime.toISOString()}`,
           { cache: 'no-store' }
         );
-        if (bookingsRes.ok) {
+        if (bookingsRes.ok && courtType) {
           const existingBookings: Array<{
             facilityArea: string | null;
             startTime: string;
@@ -269,9 +271,9 @@ export async function POST(request: Request) {
           }> = await bookingsRes.json();
           const conflictingBooking = existingBookings.find(
             (b) =>
-              b.facilityArea === courtName &&
-              new Date(b.startTime).getTime() === startTime.getTime() &&
-              b.status !== 'CANCELLED'
+              b.status !== 'CANCELLED' &&
+              (b.facilityArea === courtType || b.facilityArea === courtName) &&
+              new Date(b.startTime).getTime() === startTime.getTime()
           );
           if (conflictingBooking) {
             return NextResponse.json(
@@ -345,13 +347,14 @@ export async function POST(request: Request) {
         }
       }
 
-      // Create booking
+      // Create booking (facilityArea = canonical courtType so it matches blocked/booked logic)
+      const courtType = courtTypeForId(courtId);
       const bookingRes = await fetch(`${API_BASE_URL}/api/portal/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           company: { connect: { id: companyId } },
-          facilityArea: courtName,
+          facilityArea: courtType || courtName,
           startTime: startTime.toISOString(),
           endTime: endTime.toISOString(),
           status: 'PENDING',

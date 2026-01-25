@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { isValidPhoneNumber } from '../../lib/phoneValidation';
 import { useLanguage } from '../_components/LanguageProvider';
 import { tr } from '../../lib/translations';
@@ -40,37 +40,41 @@ const formatSlotLabel = (hhmm: string, lang: 'en' | 'ar') => {
   return `${hour12}:00 ${isPm ? tr(lang, 'booking_pm') : tr(lang, 'booking_am')}`;
 };
 
-// These time slots are ALWAYS FULL (unavailable).
-const ALWAYS_FULL: Record<string, Partial<Record<CourtType, string[]>>> = {
-  MONDAY: {
-    'Basketball AC': ['17:00', '18:00', '19:00'],
-    'Volleyball': ['19:00'], // 7-8 PM
-  },
-  WEDNESDAY: {
-    'Basketball AC': ['17:00', '18:00', '19:00'],
-  },
-  FRIDAY: {
-    'Basketball AC': ['22:00', '23:00', '00:00'],
-  },
-  SATURDAY: {
-    'Basketball AC': ['17:00', '18:00'],
-    'Volleyball': ['15:00', '16:00'], // 3-5 PM
-  },
-  SUNDAY: {
-    'Volleyball': ['15:00', '16:00'], // 3-5 PM (assuming same as Saturday)
-  },
+// Fallback when API fails: these slots are blocked. Admin can override via Booking Availability.
+const FALLBACK_BLOCKED: Record<string, Partial<Record<CourtType, string[]>>> = {
+  MONDAY: { 'Basketball AC': ['17:00', '18:00', '19:00'], Volleyball: ['19:00'] },
+  WEDNESDAY: { 'Basketball AC': ['17:00', '18:00', '19:00'] },
+  FRIDAY: { 'Basketball AC': ['22:00', '23:00', '00:00'] },
+  SATURDAY: { 'Basketball AC': ['17:00', '18:00'], Volleyball: ['15:00', '16:00'] },
+  SUNDAY: { Volleyball: ['15:00', '16:00'] },
 };
 
-const isAlwaysFullSlot = (opts: { date: string; time: string; courtId: string; courts: Array<{ id: string; type: CourtType }> }) => {
+const isBlockedSlot = (
+  opts: { date: string; time: string; courtId: string; courts: Array<{ id: string; type: CourtType }> },
+  blocked: Record<string, Partial<Record<CourtType, string[]>>>
+) => {
   const court = opts.courts.find((c) => c.id === opts.courtId);
   if (!court) return false;
   const day = dayKey(opts.date);
-  const times = ALWAYS_FULL[day]?.[court.type] ?? [];
+  const times = blocked[day]?.[court.type] ?? [];
+  return times.includes(opts.time);
+};
+
+// Booked slots: existing (non‑cancelled) bookings; keyed by YYYY‑MM‑DD
+const isBookedSlot = (
+  opts: { date: string; time: string; courtId: string; courts: Array<{ id: string; type: CourtType }> },
+  booked: Record<string, Partial<Record<CourtType, string[]>>>
+) => {
+  const court = opts.courts.find((c) => c.id === opts.courtId);
+  if (!court) return false;
+  const times = booked[opts.date]?.[court.type] ?? [];
   return times.includes(opts.time);
 };
 
 export function BookingForm() {
   const { language } = useLanguage();
+  const [blocked, setBlocked] = useState<Record<string, Partial<Record<CourtType, string[]>>>>(FALLBACK_BLOCKED);
+  const [booked, setBooked] = useState<Record<string, Partial<Record<CourtType, string[]>>>>({});
   const [selectedCourt, setSelectedCourt] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
@@ -81,6 +85,32 @@ export function BookingForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [submitMessage, setSubmitMessage] = useState('');
+
+  useEffect(() => {
+    fetch('/api/booking/blocked-slots')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.blocked && typeof d.blocked === 'object') setBlocked(d.blocked);
+      })
+      .catch(() => {});
+  }, []);
+
+  const fetchBooked = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const max = new Date();
+    max.setDate(max.getDate() + 30);
+    const end = max.toISOString().split('T')[0];
+    fetch(`/api/booking/booked-slots?startDate=${today}&endDate=${end}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.booked && typeof d.booked === 'object') setBooked(d.booked);
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchBooked();
+  }, []);
 
   const COURTS: Array<{ id: string; name: string; type: CourtType }> = [
     { id: 'basketball-ac', name: tr(language, 'booking_court_basketball'), type: 'Basketball AC' },
@@ -133,7 +163,13 @@ export function BookingForm() {
     }
     setPhoneError('');
 
-    if (isAlwaysFullSlot({ date: selectedDate, time: selectedTime, courtId: selectedCourt, courts: COURTS })) {
+    if (isBlockedSlot({ date: selectedDate, time: selectedTime, courtId: selectedCourt, courts: COURTS }, blocked)) {
+      setSubmitStatus('error');
+      setSubmitMessage(tr(language, 'booking_slot_full'));
+      setIsSubmitting(false);
+      return;
+    }
+    if (isBookedSlot({ date: selectedDate, time: selectedTime, courtId: selectedCourt, courts: COURTS }, booked)) {
       setSubmitStatus('error');
       setSubmitMessage(tr(language, 'booking_slot_full'));
       setIsSubmitting(false);
@@ -167,7 +203,7 @@ export function BookingForm() {
           ? tr(language, 'booking_success_email')
           : tr(language, 'booking_success_no_email')
       );
-      
+      fetchBooked();
       // Reset form
       setSelectedCourt('');
       setSelectedDate('');
@@ -239,9 +275,13 @@ export function BookingForm() {
             </label>
             <div className="grid grid-cols-4 gap-3 sm:grid-cols-6 md:grid-cols-8">
               {getAvailableTimeSlots().map((time) => {
-                const full = selectedCourt
-                  ? isAlwaysFullSlot({ date: selectedDate, time, courtId: selectedCourt, courts: COURTS })
+                const blockedSlot = selectedCourt
+                  ? isBlockedSlot({ date: selectedDate, time, courtId: selectedCourt, courts: COURTS }, blocked)
                   : false;
+                const bookedSlot = selectedCourt
+                  ? isBookedSlot({ date: selectedDate, time, courtId: selectedCourt, courts: COURTS }, booked)
+                  : false;
+                const full = blockedSlot || bookedSlot;
 
                 return (
                   <button
@@ -380,7 +420,8 @@ export function BookingForm() {
               !name ||
               !phone ||
               !!phoneError ||
-              isAlwaysFullSlot({ date: selectedDate, time: selectedTime, courtId: selectedCourt, courts: COURTS })
+              isBlockedSlot({ date: selectedDate, time: selectedTime, courtId: selectedCourt, courts: COURTS }, blocked) ||
+              isBookedSlot({ date: selectedDate, time: selectedTime, courtId: selectedCourt, courts: COURTS }, booked)
             }
             className="rounded-full bg-gradient-button px-8 py-3 text-sm font-bold text-white shadow-button transition hover:shadow-button-hover disabled:opacity-50 disabled:cursor-not-allowed"
           >

@@ -64,6 +64,16 @@ export type AnnouncementResponse = {
   isPinned?: boolean;
 };
 
+// Fallback facilities when API returns none (used in landing + facilities page)
+const FALLBACK_FACILITIES: { id: string; name: string; description: string }[] = [
+  { id: 'iba-5x5', name: 'IBA Approved Court 5x5', description: 'Full-size basketball court meeting IBA standards for official 5x5 play.' },
+  { id: 'fiba-3x3', name: 'FIBA Approved 3x3 Court', description: 'FIBA-approved half-court for official 3x3 basketball.' },
+  { id: 'multipurpose-hall', name: 'Multipurpose Hall', description: 'Suitable for Yoga, Pilates, Ballet, Kickboxing, and more.' },
+  { id: 'padel-merry', name: 'Padel Court by Merry Sports', description: 'Professional padel court by Merry Sports.' },
+  { id: 'volleyball', name: 'Official Volleyball Court', description: 'Full-size official volleyball court.' },
+  { id: 'gymnastics', name: 'Official Gymnastics Training Facility', description: 'Dedicated gymnastics training facility meeting official standards.' },
+];
+
 type LandingApiResponse = {
   hero?: {
     title: string;
@@ -139,15 +149,15 @@ export async function fetchEvents(): Promise<EventResponse[]> {
   }
 }
 
+// Our Facility & Venues: always use these 6 (excludes Padel Dome, Infinity Arena, etc.)
 export async function fetchFacilities(): Promise<FacilityResponse[]> {
-  try {
-    return await jsonFetch<FacilityResponse[]>(`${API_BASE_URL}/api/public/facilities`);
-  } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('Failed to fetch facilities:', error);
-    }
-    return [];
-  }
+  return FALLBACK_FACILITIES.map((f): FacilityResponse => ({
+    id: f.id,
+    name: f.name,
+    description: f.description,
+    imageUrl: undefined,
+    specs: undefined,
+  }));
 }
 
 export async function fetchAnnouncements(): Promise<AnnouncementResponse[]> {
@@ -231,13 +241,21 @@ async function _fetchLandingContent(): Promise<LandingContent> {
         isActive: true,
         link: '/contact',
       })),
-      facilityHighlights: (data.facilities || []).map((f): LandingFacilityHighlight => ({
-        id: f.id,
-        name: f.name,
-        description: f.description ?? '',
-        mediaUrl: f.imageUrl || undefined,
-        badge: undefined,
-      })),
+      facilityHighlights: ((data.facilities || []).length > 0
+        ? (data.facilities || []).map((f): LandingFacilityHighlight => ({
+            id: f.id,
+            name: f.name,
+            description: f.description ?? '',
+            mediaUrl: f.imageUrl || undefined,
+            badge: undefined,
+          }))
+        : FALLBACK_FACILITIES.map((f): LandingFacilityHighlight => ({
+            id: f.id,
+            name: f.name,
+            description: f.description,
+            mediaUrl: undefined,
+            badge: undefined,
+          }))),
       footer: (() => {
         const fallback: LandingContent['footer'] = {
           address: 'Shemisani, Princess Alia College',
@@ -300,7 +318,13 @@ async function _fetchLandingContent(): Promise<LandingContent> {
       offers: [],
       events: [],
       announcements: [],
-      facilityHighlights: [],
+      facilityHighlights: FALLBACK_FACILITIES.map((f): LandingFacilityHighlight => ({
+        id: f.id,
+        name: f.name,
+        description: f.description,
+        mediaUrl: undefined,
+        badge: undefined,
+      })),
       footer: {
         address: 'Shemisani, Princess Alia College',
         phone: '07 9624 4059',

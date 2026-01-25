@@ -257,6 +257,21 @@ model Booking {
   @@index([coachId])
 }
 
+// Recurring blocked time slots (e.g. static team bookings). isBlocked=false means the slot is free for public booking.
+model BlockedSlot {
+  id         String   @id @default(cuid())
+  dayOfWeek  String   // MONDAY, TUESDAY, ... SUNDAY
+  courtType  String   // Basketball AC, Basketball 3x3, Padel, Volleyball
+  time       String   // HH:MM e.g. 17:00
+  isBlocked  Boolean  @default(true) // true = unavailable, false = free for booking
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([dayOfWeek, courtType, time])
+  @@index([dayOfWeek])
+  @@index([courtType])
+}
+
 model Subscription {
   id          String             @id @default(cuid())
   companyId   String

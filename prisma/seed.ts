@@ -274,6 +274,28 @@ async function main() {
   });
   console.log('✅ Created footer settings');
 
+  // BlockedSlot: seed static booking blocks (only when empty). Admin can toggle isBlocked to make slots free.
+  const blockedCount = await prisma.blockedSlot.count();
+  if (blockedCount === 0) {
+    const toInsert: { dayOfWeek: string; courtType: string; time: string; isBlocked: boolean }[] = [];
+    const ALWAYS_FULL: Record<string, Partial<Record<string, string[]>>> = {
+      MONDAY: { 'Basketball AC': ['17:00', '18:00', '19:00'], Volleyball: ['19:00'] },
+      WEDNESDAY: { 'Basketball AC': ['17:00', '18:00', '19:00'] },
+      FRIDAY: { 'Basketball AC': ['22:00', '23:00', '00:00'] },
+      SATURDAY: { 'Basketball AC': ['17:00', '18:00'], Volleyball: ['15:00', '16:00'] },
+      SUNDAY: { Volleyball: ['15:00', '16:00'] },
+    };
+    for (const [day, courts] of Object.entries(ALWAYS_FULL)) {
+      for (const [courtType, times] of Object.entries(courts)) {
+        for (const time of times ?? []) {
+          toInsert.push({ dayOfWeek: day, courtType, time, isBlocked: true });
+        }
+      }
+    }
+    await prisma.blockedSlot.createMany({ data: toInsert });
+    console.log(`✅ Created ${toInsert.length} blocked slots (booking availability)`);
+  }
+
   console.log('✨ Seeding completed!');
   console.log('\n📊 Summary:');
   console.log(`   - Hero Section: 1`);

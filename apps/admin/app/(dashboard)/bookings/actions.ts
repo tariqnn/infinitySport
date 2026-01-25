@@ -84,3 +84,46 @@ export async function updateBookingStatusAction(
     return { status: 'error', message: 'Unable to update booking status.' };
   }
 }
+
+export async function updateBookingAction(
+  _prev: BookingState,
+  formData: FormData
+): Promise<BookingState> {
+  try {
+    const bookingId = formData.get('bookingId')?.toString();
+    const status = formData.get('status')?.toString();
+    const isPaid = formData.get('isPaid')?.toString() === 'true';
+    const notes = formData.get('notes')?.toString() ?? '';
+    const facilityArea = formData.get('facilityArea')?.toString() ?? '';
+
+    if (!bookingId) {
+      return { status: 'error', message: 'Missing booking ID.' };
+    }
+    const validStatuses = ['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED'];
+    const update: { status?: string; isPaid: boolean; notes: string | null; facilityArea: string | null } = {
+      isPaid,
+      notes: notes === '' ? null : notes,
+      facilityArea: facilityArea === '' ? null : facilityArea,
+    };
+    if (status && validStatuses.includes(status)) {
+      update.status = status;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/portal/bookings/${bookingId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(update),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      return { status: 'error', message: (error as { message?: string }).message || 'Failed to update booking.' };
+    }
+
+    revalidatePath('/bookings');
+    return { status: 'success', message: 'Booking updated successfully.' };
+  } catch (error) {
+    console.error('Booking update error', error);
+    return { status: 'error', message: 'Unable to update booking.' };
+  }
+}

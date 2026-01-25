@@ -13,6 +13,7 @@ import invoicesSeed from '../data/invoices.json';
 import cashflowSeed from '../data/cashflow.json';
 import pettyCashSeed from '../data/pettycash.json';
 import landingSeed from '../data/landing-content.json';
+import basketballPackagesSeed from '../data/basketball-packages.json';
 import {
   IntroContent,
   Sport,
@@ -298,6 +299,17 @@ export function getPettyCash(): PettyCashTxn[] {
 
 export function getLandingContent(): LandingContent {
   return structuredClone(db.landing);
+}
+
+export type BasketballPackage = {
+  id: string;
+  title: string;
+  note?: string;
+  features: string[];
+};
+
+export function getBasketballPackages(): BasketballPackage[] {
+  return structuredClone(basketballPackagesSeed as BasketballPackage[]);
 }
 
 export function updateIntroContent(payload: Partial<IntroContent>) {

@@ -29,7 +29,7 @@ async function portalFetch<T>(endpoint: string, options?: RequestInit): Promise<
       headers,
       cache: 'no-store',
     });
-  } catch (e) {
+  } catch {
     // Match admin-style error clarity
     throw new Error(`Cannot connect to API at ${url}. Set NEXT_PUBLIC_API_BASE_URL or ensure the API is reachable.`);
   }
@@ -46,22 +46,22 @@ async function portalFetch<T>(endpoint: string, options?: RequestInit): Promise<
 export const membersApi = {
   list: (companyId?: string) => {
     const params = companyId ? `?companyId=${companyId}` : '';
-    return portalFetch<any[]>(`/portal/members${params}`);
+    return portalFetch<unknown[]>(`/portal/members${params}`);
   },
-  get: (id: string) => portalFetch<any>(`/portal/members/${id}`),
-  create: (data: any) => portalFetch<any>('/portal/members', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: any) => portalFetch<any>(`/portal/members/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  get: (id: string) => portalFetch<unknown>(`/portal/members/${id}`),
+  create: (data: unknown) => portalFetch<unknown>('/portal/members', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: unknown) => portalFetch<unknown>(`/portal/members/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) => portalFetch<void>(`/portal/members/${id}`, { method: 'DELETE' }),
 };
 
 export const coachesApi = {
   list: (companyId?: string) => {
     const params = companyId ? `?companyId=${companyId}` : '';
-    return portalFetch<any[]>(`/portal/coaches${params}`);
+    return portalFetch<unknown[]>(`/portal/coaches${params}`);
   },
-  get: (id: string) => portalFetch<any>(`/portal/coaches/${id}`),
-  create: (data: any) => portalFetch<any>('/portal/coaches', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: any) => portalFetch<any>(`/portal/coaches/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  get: (id: string) => portalFetch<unknown>(`/portal/coaches/${id}`),
+  create: (data: unknown) => portalFetch<unknown>('/portal/coaches', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: unknown) => portalFetch<unknown>(`/portal/coaches/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) => portalFetch<void>(`/portal/coaches/${id}`, { method: 'DELETE' }),
 };
 
@@ -72,11 +72,11 @@ export const bookingsApi = {
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
     const query = params.toString() ? `?${params.toString()}` : '';
-    return portalFetch<any[]>(`/portal/bookings${query}`);
+    return portalFetch<unknown[]>(`/portal/bookings${query}`);
   },
-  get: (id: string) => portalFetch<any>(`/portal/bookings/${id}`),
-  create: (data: any) => portalFetch<any>('/portal/bookings', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: any) => portalFetch<any>(`/portal/bookings/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  get: (id: string) => portalFetch<unknown>(`/portal/bookings/${id}`),
+  create: (data: unknown) => portalFetch<unknown>('/portal/bookings', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: unknown) => portalFetch<unknown>(`/portal/bookings/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) => portalFetch<void>(`/portal/bookings/${id}`, { method: 'DELETE' }),
 };
 
@@ -86,11 +86,11 @@ export const classesApi = {
     if (companyId) params.append('companyId', companyId);
     if (coachId) params.append('coachId', coachId);
     const query = params.toString() ? `?${params.toString()}` : '';
-    return portalFetch<any[]>(`/portal/classes${query}`);
+    return portalFetch<unknown[]>(`/portal/classes${query}`);
   },
-  get: (id: string) => portalFetch<any>(`/portal/classes/${id}`),
-  create: (data: any) => portalFetch<any>('/portal/classes', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: any) => portalFetch<any>(`/portal/classes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  get: (id: string) => portalFetch<unknown>(`/portal/classes/${id}`),
+  create: (data: unknown) => portalFetch<unknown>('/portal/classes', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: unknown) => portalFetch<unknown>(`/portal/classes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) => portalFetch<void>(`/portal/classes/${id}`, { method: 'DELETE' }),
   enrollments: {
     list: (classId?: string, memberId?: string) => {
@@ -98,9 +98,9 @@ export const classesApi = {
       if (classId) params.append('classId', classId);
       if (memberId) params.append('memberId', memberId);
       const query = params.toString() ? `?${params.toString()}` : '';
-      return portalFetch<any[]>(`/portal/enrollments${query}`);
+      return portalFetch<unknown[]>(`/portal/enrollments${query}`);
     },
-    create: (data: any) => portalFetch<any>('/portal/enrollments', { method: 'POST', body: JSON.stringify(data) }),
+    create: (data: unknown) => portalFetch<unknown>('/portal/enrollments', { method: 'POST', body: JSON.stringify(data) }),
     delete: (id: string) => portalFetch<void>(`/portal/enrollments/${id}`, { method: 'DELETE' }),
   },
 };
@@ -111,11 +111,11 @@ export const subscriptionsApi = {
     if (companyId) params.append('companyId', companyId);
     if (memberId) params.append('memberId', memberId);
     const query = params.toString() ? `?${params.toString()}` : '';
-    return portalFetch<any[]>(`/portal/subscriptions${query}`);
+    return portalFetch<unknown[]>(`/portal/subscriptions${query}`);
   },
-  get: (id: string) => portalFetch<any>(`/portal/subscriptions/${id}`),
-  create: (data: any) => portalFetch<any>('/portal/subscriptions', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: any) => portalFetch<any>(`/portal/subscriptions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  get: (id: string) => portalFetch<unknown>(`/portal/subscriptions/${id}`),
+  create: (data: unknown) => portalFetch<unknown>('/portal/subscriptions', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: unknown) => portalFetch<unknown>(`/portal/subscriptions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) => portalFetch<void>(`/portal/subscriptions/${id}`, { method: 'DELETE' }),
 };
 
@@ -124,11 +124,11 @@ export const financeApi = {
   budgetCategories: {
     list: (companyId?: string) => {
       const params = companyId ? `?companyId=${companyId}` : '';
-      return portalFetch<any[]>(`/portal/budget-categories${params}`);
+      return portalFetch<unknown[]>(`/portal/budget-categories${params}`);
     },
-    get: (id: string) => portalFetch<any>(`/portal/budget-categories/${id}`),
-    create: (data: any) => portalFetch<any>('/portal/budget-categories', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: any) => portalFetch<any>(`/portal/budget-categories/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    get: (id: string) => portalFetch<unknown>(`/portal/budget-categories/${id}`),
+    create: (data: unknown) => portalFetch<unknown>('/portal/budget-categories', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: unknown) => portalFetch<unknown>(`/portal/budget-categories/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: (id: string) => portalFetch<void>(`/portal/budget-categories/${id}`, { method: 'DELETE' }),
   },
   budgetEntries: {
@@ -139,11 +139,11 @@ export const financeApi = {
       if (periodStart) params.append('periodStart', periodStart);
       if (periodEnd) params.append('periodEnd', periodEnd);
       const query = params.toString() ? `?${params.toString()}` : '';
-      return portalFetch<any[]>(`/portal/budget-entries${query}`);
+      return portalFetch<unknown[]>(`/portal/budget-entries${query}`);
     },
-    get: (id: string) => portalFetch<any>(`/portal/budget-entries/${id}`),
-    create: (data: any) => portalFetch<any>('/portal/budget-entries', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: any) => portalFetch<any>(`/portal/budget-entries/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    get: (id: string) => portalFetch<unknown>(`/portal/budget-entries/${id}`),
+    create: (data: unknown) => portalFetch<unknown>('/portal/budget-entries', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: unknown) => portalFetch<unknown>(`/portal/budget-entries/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: (id: string) => portalFetch<void>(`/portal/budget-entries/${id}`, { method: 'DELETE' }),
   },
   // Invoices (create, delete, PDF via Nest API to avoid Node/fs in portal build)
@@ -153,12 +153,12 @@ export const financeApi = {
       if (companyId) params.append('companyId', companyId);
       if (status) params.append('status', status);
       const query = params.toString() ? `?${params.toString()}` : '';
-      return portalFetch<any[]>(`/portal/invoices${query}`);
+      return portalFetch<unknown[]>(`/portal/invoices${query}`);
     },
-    get: (id: string) => portalFetch<any>(`/portal/invoices/${id}`),
+    get: (id: string) => portalFetch<unknown>(`/portal/invoices/${id}`),
     create: (data: Record<string, unknown>) =>
-      portalFetch<any>('/portal/invoices', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: any) => portalFetch<any>(`/portal/invoices/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      portalFetch<unknown>('/portal/invoices', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: unknown) => portalFetch<unknown>(`/portal/invoices/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: async (id: string) => {
       const url = `${API_BASE_URL}/api/portal/invoices/${id}`;
       const res = await fetch(url, {
@@ -184,11 +184,11 @@ export const financeApi = {
       if (startDate) params.append('startDate', startDate);
       if (endDate) params.append('endDate', endDate);
       const query = params.toString() ? `?${params.toString()}` : '';
-      return portalFetch<any[]>(`/portal/cash-flow${query}`);
+      return portalFetch<unknown[]>(`/portal/cash-flow${query}`);
     },
-    get: (id: string) => portalFetch<any>(`/portal/cash-flow/${id}`),
-    create: (data: any) => portalFetch<any>('/portal/cash-flow', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: any) => portalFetch<any>(`/portal/cash-flow/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    get: (id: string) => portalFetch<unknown>(`/portal/cash-flow/${id}`),
+    create: (data: unknown) => portalFetch<unknown>('/portal/cash-flow', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: unknown) => portalFetch<unknown>(`/portal/cash-flow/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: (id: string) => portalFetch<void>(`/portal/cash-flow/${id}`, { method: 'DELETE' }),
   },
   // Petty Cash
@@ -200,11 +200,11 @@ export const financeApi = {
       if (startDate) params.append('startDate', startDate);
       if (endDate) params.append('endDate', endDate);
       const query = params.toString() ? `?${params.toString()}` : '';
-      return portalFetch<any[]>(`/portal/petty-cash${query}`);
+      return portalFetch<unknown[]>(`/portal/petty-cash${query}`);
     },
-    get: (id: string) => portalFetch<any>(`/portal/petty-cash/${id}`),
-    create: (data: any) => portalFetch<any>('/portal/petty-cash', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: any) => portalFetch<any>(`/portal/petty-cash/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    get: (id: string) => portalFetch<unknown>(`/portal/petty-cash/${id}`),
+    create: (data: unknown) => portalFetch<unknown>('/portal/petty-cash', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: unknown) => portalFetch<unknown>(`/portal/petty-cash/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: (id: string) => portalFetch<void>(`/portal/petty-cash/${id}`, { method: 'DELETE' }),
   },
 };
@@ -215,11 +215,11 @@ export const inventoryApi = {
     if (companyId) params.append('companyId', companyId);
     if (status) params.append('status', status);
     const query = params.toString() ? `?${params.toString()}` : '';
-    return portalFetch<any[]>(`/portal/inventory${query}`);
+    return portalFetch<unknown[]>(`/portal/inventory${query}`);
   },
-  get: (id: string) => portalFetch<any>(`/portal/inventory/${id}`),
-  create: (data: any) => portalFetch<any>('/portal/inventory', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: any) => portalFetch<any>(`/portal/inventory/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  get: (id: string) => portalFetch<unknown>(`/portal/inventory/${id}`),
+  create: (data: unknown) => portalFetch<unknown>('/portal/inventory', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: unknown) => portalFetch<unknown>(`/portal/inventory/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) => portalFetch<void>(`/portal/inventory/${id}`, { method: 'DELETE' }),
 };
 
@@ -229,24 +229,24 @@ export const tasksApi = {
     if (companyId) params.append('companyId', companyId);
     if (status) params.append('status', status);
     const query = params.toString() ? `?${params.toString()}` : '';
-    return portalFetch<any[]>(`/portal/staff-tasks${query}`);
+    return portalFetch<unknown[]>(`/portal/staff-tasks${query}`);
   },
-  get: (id: string) => portalFetch<any>(`/portal/staff-tasks/${id}`),
-  create: (data: any) => portalFetch<any>('/portal/staff-tasks', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: any) => portalFetch<any>(`/portal/staff-tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  get: (id: string) => portalFetch<unknown>(`/portal/staff-tasks/${id}`),
+  create: (data: unknown) => portalFetch<unknown>('/portal/staff-tasks', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: unknown) => portalFetch<unknown>(`/portal/staff-tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) => portalFetch<void>(`/portal/staff-tasks/${id}`, { method: 'DELETE' }),
 };
 
 export const settingsApi = {
-  get: (companyId: string) => portalFetch<any>(`/portal/settings/${companyId}`),
-  create: (data: any) => portalFetch<any>('/portal/settings', { method: 'POST', body: JSON.stringify(data) }),
-  update: (companyId: string, data: any) => portalFetch<any>(`/portal/settings/${companyId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  get: (companyId: string) => portalFetch<unknown>(`/portal/settings/${companyId}`),
+  create: (data: unknown) => portalFetch<unknown>('/portal/settings', { method: 'POST', body: JSON.stringify(data) }),
+  update: (companyId: string, data: unknown) => portalFetch<unknown>(`/portal/settings/${companyId}`, { method: 'PATCH', body: JSON.stringify(data) }),
 };
 
 export const dashboardApi = {
   stats: (companyId?: string) => {
     const params = companyId ? `?companyId=${companyId}` : '';
-    return portalFetch<any>(`/portal/dashboard/stats${params}`);
+    return portalFetch<unknown>(`/portal/dashboard/stats${params}`);
   },
 };
 
@@ -254,13 +254,13 @@ export const dashboardApi = {
 // Creates "Infinity Sporty" company in DB if none exists
 export async function getFirstCompany() {
   try {
-    const companies = await portalFetch<any[]>('/portal/companies');
+    const companies = await portalFetch<unknown[]>('/portal/companies');
     if (companies && companies.length > 0) {
       return companies[0];
     }
     // Create default company if none exists
     try {
-      const created = await portalFetch<any>('/portal/companies', {
+      const created = await portalFetch<unknown>('/portal/companies', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -272,23 +272,23 @@ export async function getFirstCompany() {
           status: 'ACTIVE',
         }),
       });
-      if (created && created.id) {
+      if (created && typeof created === 'object' && created !== null && 'id' in created) {
         return created;
       }
       throw new Error('Company creation returned invalid data');
-    } catch (createErr: any) {
+    } catch (createErr: unknown) {
       console.error('Could not create default company:', createErr);
       // Return null instead of default object so callers know it failed
       return null;
     }
-  } catch (e: any) {
+  } catch (err: unknown) {
     // If API is unreachable, skip retry (POST would fail the same way)
-    if (e?.message?.includes?.('Cannot connect to API')) {
+    if (err instanceof Error && err.message.includes('Cannot connect to API')) {
       return null;
     }
-    console.error('Failed to fetch companies:', e);
+    console.error('Failed to fetch companies:', err);
     try {
-      const created = await portalFetch<any>('/portal/companies', {
+      const created = await portalFetch<unknown>('/portal/companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -298,8 +298,8 @@ export async function getFirstCompany() {
           status: 'ACTIVE',
         }),
       });
-      if (created?.id) return created;
-    } catch (_) {}
+      if (created && typeof created === 'object' && created !== null && 'id' in created) return created;
+    } catch {}
     return null;
   }
 }

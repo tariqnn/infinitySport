@@ -57,11 +57,11 @@ export function BasketballPackageCard({ pkg }: { pkg: BasketballPackage }) {
             </div>
           ) : null}
           <Link
-            href="/booking"
+            href={`/packages/register?package=${encodeURIComponent(`Basketball - ${pkg.title}`)}`}
             onClick={(e) => e.stopPropagation()}
             className="mt-4 flex items-center justify-center rounded-lg bg-brand-green-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-green-dark"
           >
-            Book
+            Register now
           </Link>
         </div>
       ) : null}

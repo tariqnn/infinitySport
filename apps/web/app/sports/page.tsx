@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { fetchPrograms } from '../../lib/apiClient';
 import { getBasketballPackages } from '@infinity/mock-api';
 import { BasketballPackageCard } from './BasketballPackageCard';
+import { GymnasticsPackageCard } from './GymnasticsPackageCard';
 
 export const metadata = {
   title: 'Sports & Facilities'
@@ -60,133 +61,38 @@ export default async function SportsPage() {
           </p>
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {/* Package A */}
-          <div className="rounded-card border border-brand-lightBlue/20 bg-white p-6 shadow-card transition duration-500 hover:-translate-y-2 hover:border-brand-green-primary/50 hover:shadow-card-hover">
-            <h3 className="text-xl font-bold text-brand-black mb-2">Package A</h3>
-            <p className="text-sm text-gray-500 mb-3">3 Days / Week – 1 Hour / Session</p>
-            <ul className="space-y-2 text-sm text-gray-600 mb-4">
-              <li className="flex items-center gap-2">
-                <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                Improve flexibility and balance
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                Learn basic gymnastics movements
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                Build strength and body control
-              </li>
-            </ul>
-            <div className="mb-2">
-              <span className="text-2xl font-bold text-brand-black">120 JOD</span>
-              <span className="text-sm text-gray-500"> — 12 sessions per month</span>
-            </div>
-            <p className="text-xs text-gray-500 font-medium">Training Schedule</p>
-            <p className="text-sm text-gray-600 mb-4">Sun • Tue • Thu | 5:00–7:00 PM</p>
-            <Link
-              href="/booking"
-              className="flex items-center justify-center rounded-lg bg-brand-green-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-green-dark"
-            >
-              Book
-            </Link>
-          </div>
-
-          {/* Package B */}
-          <div className="rounded-card border border-brand-lightBlue/20 bg-white p-6 shadow-card transition duration-500 hover:-translate-y-2 hover:border-brand-green-primary/50 hover:shadow-card-hover">
-            <h3 className="text-xl font-bold text-brand-black mb-2">Package B</h3>
-            <p className="text-sm text-gray-500 mb-3">2 Days / Week – 1 Hour / Session</p>
-            <ul className="space-y-2 text-sm text-gray-600 mb-4">
-              <li className="flex items-center gap-2">
-                <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                Basic movement skills
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                Coordination and balance training
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                Fun and active learning environment
-              </li>
-            </ul>
-            <div className="mb-2">
-              <span className="text-2xl font-bold text-brand-black">100 JOD</span>
-              <span className="text-sm text-gray-500"> — 8 sessions per month</span>
-            </div>
-            <p className="text-xs text-gray-500 font-medium">Training Schedule</p>
-            <p className="text-sm text-gray-600 mb-4">Sun • Tue • Thu | 5:00–7:00 PM</p>
-            <Link
-              href="/booking"
-              className="flex items-center justify-center rounded-lg bg-brand-green-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-green-dark"
-            >
-              Book
-            </Link>
-          </div>
-
-          {/* Package C */}
-          <div className="rounded-card border border-brand-lightBlue/20 bg-white p-6 shadow-card transition duration-500 hover:-translate-y-2 hover:border-brand-green-primary/50 hover:shadow-card-hover">
-            <h3 className="text-xl font-bold text-brand-black mb-2">Package C</h3>
-            <p className="text-sm text-gray-500 mb-3">3 Days / Week – 1.5 Hours / Session</p>
-            <ul className="space-y-2 text-sm text-gray-600 mb-4">
-              <li className="flex items-center gap-2">
-                <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                Advanced flexibility and strength work
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                Gymnastics routines and techniques
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                Improve discipline and performance
-              </li>
-            </ul>
-            <div className="mb-2">
-              <span className="text-2xl font-bold text-brand-black">140 JOD</span>
-              <span className="text-sm text-gray-500"> — 18 sessions per month</span>
-            </div>
-            <p className="text-xs text-gray-500 font-medium">Training Schedule</p>
-            <p className="text-sm text-gray-600 mb-4">Sun • Tue • Thu | 5:00–7:00 PM</p>
-            <Link
-              href="/booking"
-              className="flex items-center justify-center rounded-lg bg-brand-green-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-green-dark"
-            >
-              Book
-            </Link>
-          </div>
-
-          {/* Package D */}
-          <div className="rounded-card border border-brand-lightBlue/20 bg-white p-6 shadow-card transition duration-500 hover:-translate-y-2 hover:border-brand-green-primary/50 hover:shadow-card-hover">
-            <h3 className="text-xl font-bold text-brand-black mb-2">Package D</h3>
-            <p className="text-sm text-gray-500 mb-3">2 Days / Week – 1.5 Hours / Session</p>
-            <ul className="space-y-2 text-sm text-gray-600 mb-4">
-              <li className="flex items-center gap-2">
-                <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                Strength and balance development
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                Skill improvement and routines
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                Focus on technique and control
-              </li>
-            </ul>
-            <div className="mb-2">
-              <span className="text-2xl font-bold text-brand-black">120 JOD</span>
-              <span className="text-sm text-gray-500"> — 12 sessions per month</span>
-            </div>
-            <p className="text-xs text-gray-500 font-medium">Training Schedule</p>
-            <p className="text-sm text-gray-600 mb-4">Sun • Tue • Thu | 5:00–7:00 PM</p>
-            <Link
-              href="/booking"
-              className="flex items-center justify-center rounded-lg bg-brand-green-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-green-dark"
-            >
-              Book
-            </Link>
-          </div>
+          <GymnasticsPackageCard
+            title="Package A"
+            daysHours="3 Days / Week – 1 Hour / Session"
+            bullets={['Improve flexibility and balance', 'Learn basic gymnastics movements', 'Build strength and body control']}
+            price="120 JOD"
+            sessionsNote="12 sessions per month"
+            schedule="Sun • Tue • Thu | 5:00–7:00 PM"
+          />
+          <GymnasticsPackageCard
+            title="Package B"
+            daysHours="2 Days / Week – 1 Hour / Session"
+            bullets={['Basic movement skills', 'Coordination and balance training', 'Fun and active learning environment']}
+            price="100 JOD"
+            sessionsNote="8 sessions per month"
+            schedule="Sun • Tue • Thu | 5:00–7:00 PM"
+          />
+          <GymnasticsPackageCard
+            title="Package C"
+            daysHours="3 Days / Week – 1.5 Hours / Session"
+            bullets={['Advanced flexibility and strength work', 'Gymnastics routines and techniques', 'Improve discipline and performance']}
+            price="140 JOD"
+            sessionsNote="18 sessions per month"
+            schedule="Sun • Tue • Thu | 5:00–7:00 PM"
+          />
+          <GymnasticsPackageCard
+            title="Package D"
+            daysHours="2 Days / Week – 1.5 Hours / Session"
+            bullets={['Strength and balance development', 'Skill improvement and routines', 'Focus on technique and control']}
+            price="120 JOD"
+            sessionsNote="12 sessions per month"
+            schedule="Sun • Tue • Thu | 5:00–7:00 PM"
+          />
         </div>
       </div>
 
@@ -215,10 +121,10 @@ export default async function SportsPage() {
           <p className="text-sm text-gray-700 mb-6">Saturday 3:00–5:00 PM</p>
           <p className="text-sm text-gray-700 mb-6">Tuesday & Sunday 7:00–9:00 PM</p>
           <Link
-            href="/booking"
+            href="/packages/register?package=Volleyball"
             className="flex items-center justify-center rounded-lg bg-brand-green-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-green-dark"
           >
-            Book
+            Register now
           </Link>
         </div>
       </div>

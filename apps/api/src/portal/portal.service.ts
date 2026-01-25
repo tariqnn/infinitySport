@@ -1165,5 +1165,45 @@ export class PortalService {
       lowInventory,
     };
   }
+
+  // Package Registrations (public sign-ups for Basketball, Gymnastics, Volleyball, etc.)
+  async getPackageRegistrations(packageName?: string): Promise<Array<{
+    id: string;
+    packageName: string;
+    customerName: string;
+    customerPhone: string;
+    customerEmail: string | null;
+    isPaid: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+  }>> {
+    return this.prisma.packageRegistration.findMany({
+      where: packageName ? { packageName } : undefined,
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async createPackageRegistration(data: {
+    packageName: string;
+    customerName: string;
+    customerPhone: string;
+    customerEmail?: string | null;
+  }): Promise<{ id: string; packageName: string; customerName: string; customerPhone: string; customerEmail: string | null; isPaid: boolean; createdAt: Date }> {
+    return this.prisma.packageRegistration.create({
+      data: {
+        packageName: data.packageName,
+        customerName: data.customerName,
+        customerPhone: data.customerPhone,
+        customerEmail: data.customerEmail ?? null,
+      },
+    });
+  }
+
+  async updatePackageRegistration(id: string, data: { isPaid?: boolean }): Promise<{ id: string; packageName: string; customerName: string; customerPhone: string; customerEmail: string | null; isPaid: boolean; updatedAt: Date }> {
+    return this.prisma.packageRegistration.update({
+      where: { id },
+      data,
+    });
+  }
 }
 

@@ -250,6 +250,15 @@ export const dashboardApi = {
   },
 };
 
+export const packageRegistrationsApi = {
+  list: (packageName?: string) => {
+    const params = packageName ? `?packageName=${encodeURIComponent(packageName)}` : '';
+    return portalFetch<Array<{ id: string; packageName: string; customerName: string; customerPhone: string; customerEmail: string | null; isPaid: boolean; createdAt: string; updatedAt: string }>>(`/portal/package-registrations${params}`);
+  },
+  update: (id: string, data: { isPaid?: boolean }) =>
+    portalFetch<unknown>(`/portal/package-registrations/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+};
+
 // Helper to get first company (for initial setup)
 // Creates "Infinity Sporty" company in DB if none exists
 export async function getFirstCompany() {

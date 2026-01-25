@@ -11,7 +11,8 @@ import {
   Cog6ToothIcon,
   MapIcon,
   InboxStackIcon,
-  UserGroupIcon
+  UserGroupIcon,
+  ClipboardDocumentListIcon
 } from "@heroicons/react/24/outline";
 import clsx from "clsx";
 
@@ -21,6 +22,7 @@ const sidebarItems = [
   { label: "Coaches", href: "/coaches", icon: UserGroupIcon },
   { label: "Bookings", href: "/bookings", icon: CalendarIcon },
   { label: "Classes", href: "/classes", icon: MapIcon },
+  { label: "Registrations", href: "/registrations", icon: ClipboardDocumentListIcon },
   { label: "Financials", href: "/financials", icon: CreditCardIcon },
   { label: "Inventory", href: "/inventory", icon: InboxStackIcon },
   { label: "Staff Tools", href: "/staff", icon: ClipboardDocumentCheckIcon },

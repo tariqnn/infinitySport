@@ -487,5 +487,23 @@ export class PortalController {
   async getDashboardStats(@Query('companyId') companyId?: string) {
     return this.portalService.getDashboardStats(companyId);
   }
+
+  // Package Registrations (public POST for form; GET/PATCH for admin)
+  @Get('package-registrations')
+  async getPackageRegistrations(@Query('packageName') packageName?: string) {
+    return this.portalService.getPackageRegistrations(packageName);
+  }
+
+  @Post('package-registrations')
+  async createPackageRegistration(
+    @Body() data: { packageName: string; customerName: string; customerPhone: string; customerEmail?: string | null },
+  ) {
+    return this.portalService.createPackageRegistration(data);
+  }
+
+  @Patch('package-registrations/:id')
+  async updatePackageRegistration(@Param('id') id: string, @Body() data: { isPaid?: boolean }) {
+    return this.portalService.updatePackageRegistration(id, data);
+  }
 }
 

@@ -497,3 +497,18 @@ model CompanySettings {
 
   @@index([companyId])
 }
+
+// Public package registrations (Basketball, Gymnastics, Volleyball, etc.)
+model PackageRegistration {
+  id            String   @id @default(cuid())
+  packageName   String   // e.g. "Basketball - Little Kobes U10", "Gymnastics Package A", "Volleyball"
+  customerName  String
+  customerPhone String
+  customerEmail String?
+  isPaid        Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([packageName])
+  @@index([isPaid])
+}

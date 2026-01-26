@@ -4,6 +4,7 @@ import { fetchPrograms } from '../../lib/apiClient';
 import { getBasketballPackages } from '@infinity/mock-api';
 import { BasketballPackageCard } from './BasketballPackageCard';
 import { GymnasticsPackageCard } from './GymnasticsPackageCard';
+import { VolleyballPackageCard } from './VolleyballPackageCard';
 
 export const metadata = {
   title: 'Sports & Facilities'
@@ -101,32 +102,7 @@ export default async function SportsPage() {
         <div className="mb-8 text-center">
           <h2 className="text-3xl font-bold text-brand-black">Volleyball</h2>
         </div>
-        <div className="rounded-card border border-brand-lightBlue/20 bg-white p-8 shadow-card max-w-2xl mx-auto">
-          <div className="mb-6">
-            <span className="text-3xl font-bold text-brand-black">100 JOD</span>
-            <span className="text-gray-600"> for 10 sessions</span>
-          </div>
-          <p className="text-sm text-gray-600 mb-4">Starting age: 7 years and up</p>
-          <ul className="space-y-2 text-sm text-gray-600 mb-6">
-            <li className="flex items-center gap-2">
-              <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-              10% discount for siblings
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-              Special rate for groups
-            </li>
-          </ul>
-          <p className="text-xs text-gray-500 font-medium mb-1">Training Schedule</p>
-          <p className="text-sm text-gray-700 mb-6">Saturday 3:00–5:00 PM</p>
-          <p className="text-sm text-gray-700 mb-6">Tuesday & Sunday 7:00–9:00 PM</p>
-          <Link
-            href="/packages/register?package=Volleyball"
-            className="flex items-center justify-center rounded-lg bg-brand-green-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-green-dark"
-          >
-            Register now
-          </Link>
-        </div>
+        <VolleyballPackageCard />
       </div>
 
       {/* Featured Programs */}

@@ -10,7 +10,7 @@ const getApiBaseUrl = () => {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { packageName, customerName, customerPhone, customerEmail } = body ?? {};
+    const { packageName, customerName, customerPhone, customerEmail, customerAge } = body ?? {};
 
     if (!packageName || typeof packageName !== 'string' || !packageName.trim()) {
       return NextResponse.json({ error: 'Please select a package.' }, { status: 400 });
@@ -38,6 +38,7 @@ export async function POST(request: Request) {
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
         customerEmail: typeof customerEmail === 'string' && customerEmail.trim() ? customerEmail.trim() : undefined,
+        customerAge: typeof customerAge === 'number' && customerAge > 0 ? customerAge : undefined,
       }),
     });
 

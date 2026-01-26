@@ -496,7 +496,7 @@ export class PortalController {
 
   @Post('package-registrations')
   async createPackageRegistration(
-    @Body() data: { packageName: string; customerName: string; customerPhone: string; customerEmail?: string | null },
+    @Body() data: { packageName: string; customerName: string; customerPhone: string; customerEmail?: string | null; customerAge?: number | null },
   ) {
     return this.portalService.createPackageRegistration(data);
   }

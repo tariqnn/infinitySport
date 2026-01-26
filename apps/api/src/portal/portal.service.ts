@@ -1173,6 +1173,7 @@ export class PortalService {
     customerName: string;
     customerPhone: string;
     customerEmail: string | null;
+    customerAge: number | null;
     isPaid: boolean;
     createdAt: Date;
     updatedAt: Date;
@@ -1188,13 +1189,15 @@ export class PortalService {
     customerName: string;
     customerPhone: string;
     customerEmail?: string | null;
-  }): Promise<{ id: string; packageName: string; customerName: string; customerPhone: string; customerEmail: string | null; isPaid: boolean; createdAt: Date }> {
+    customerAge?: number | null;
+  }): Promise<{ id: string; packageName: string; customerName: string; customerPhone: string; customerEmail: string | null; customerAge: number | null; isPaid: boolean; createdAt: Date }> {
     return this.prisma.packageRegistration.create({
       data: {
         packageName: data.packageName,
         customerName: data.customerName,
         customerPhone: data.customerPhone,
         customerEmail: data.customerEmail ?? null,
+        customerAge: data.customerAge ?? null,
       },
     });
   }

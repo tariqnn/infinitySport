@@ -32,6 +32,7 @@ export function PackageRegisterForm() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [age, setAge] = useState('');
   const [packageName, setPackageName] = useState('');
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [error, setError] = useState('');
@@ -57,6 +58,7 @@ export function PackageRegisterForm() {
           customerName: name.trim(),
           customerPhone: phone.trim(),
           customerEmail: email.trim() || undefined,
+          customerAge: age.trim() ? parseInt(age.trim(), 10) : undefined,
         }),
       });
       const data = await res.json();
@@ -69,6 +71,7 @@ export function PackageRegisterForm() {
       setName('');
       setPhone('');
       setEmail('');
+      setAge('');
     } catch {
       setError('Unable to submit. Please try again.');
       setStatus('error');
@@ -147,6 +150,19 @@ export function PackageRegisterForm() {
           onChange={(e) => setEmail(e.target.value)}
           className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-gray-900 focus:border-brand-green-primary focus:outline-none focus:ring-1 focus:ring-brand-green-primary"
           placeholder="your@email.com"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-semibold text-gray-700 mb-1">Age (optional)</label>
+        <input
+          type="number"
+          value={age}
+          onChange={(e) => setAge(e.target.value)}
+          className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-gray-900 focus:border-brand-green-primary focus:outline-none focus:ring-1 focus:ring-brand-green-primary"
+          placeholder="e.g. 10"
+          min="1"
+          max="100"
         />
       </div>
 

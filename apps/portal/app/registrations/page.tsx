@@ -10,6 +10,7 @@ type Registration = {
   customerName: string;
   customerPhone: string;
   customerEmail: string | null;
+  customerAge: number | null;
   isPaid: boolean;
   createdAt: string;
   updatedAt: string;
@@ -73,6 +74,13 @@ export default function RegistrationsPage() {
       header: 'Email',
       render: (row: Registration) => (
         <span className="text-ui-textMuted">{row.customerEmail || '—'}</span>
+      ),
+    },
+    {
+      id: 'customerAge',
+      header: 'Age',
+      render: (row: Registration) => (
+        <span className="text-ui-textPrimary">{row.customerAge ? `${row.customerAge} years` : '—'}</span>
       ),
     },
     {

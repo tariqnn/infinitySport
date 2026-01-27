@@ -9,8 +9,8 @@
   ],
   "scripts": {
     "postinstall": "npm run prisma:generate || echo 'Prisma generate skipped (prisma not available)'",
-    "build": "npm run build:web",
-    "start": "npm run start:web",
+    "build": "npm run prisma:generate && npm run build:api && npm run build:web",
+    "start": "node start-combined.js",
     "dev": "npm run dev:web",
     "dev:web": "npm --workspace apps/web run dev",
     "dev:admin": "npm --workspace apps/admin run dev",

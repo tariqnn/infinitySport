@@ -1,0 +1,9 @@
+{
+  "framework": "nodejs",
+  "rootDirectory": "./",
+  "buildCommand": "npm install && npm run build",
+  "startCommand": "npm run start",
+  "outputDirectory": "",
+  "installCommand": "npm install",
+  "nodeVersion": "18"
+}

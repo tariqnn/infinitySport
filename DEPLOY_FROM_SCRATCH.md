@@ -26,9 +26,14 @@ In Hostinger's deployment settings, set:
 
 ### Framework Preset:
 ```
-Next.js
+Node.js
 ```
-(If this causes issues, try "Node.js" or "Custom")
+**OR** if available:
+```
+Custom
+```
+
+**⚠️ IMPORTANT:** Do NOT select "Next.js" - it will fail because the app is in `apps/web`, not at root.
 
 ### Branch:
 ```

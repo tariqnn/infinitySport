@@ -37,10 +37,6 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
-  // Disable static optimization for error pages to avoid React 19 RC issues
-  experimental: {
-    missingSuspenseWithCSRBailout: false,
-  },
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production' ? {
       exclude: ['error', 'warn'],

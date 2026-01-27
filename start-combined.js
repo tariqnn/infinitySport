@@ -14,6 +14,7 @@ console.log(`📡 API will run on port ${API_PORT} (internal)`);
 console.log(`🌐 Web will run on port ${WEB_PORT} (Hostinger assigned)`);
 
 // Start NestJS API
+console.log('📡 Starting API...');
 const apiProcess = spawn('node', ['apps/api/dist/main.js'], {
   cwd: process.cwd(),
   env: {
@@ -24,19 +25,28 @@ const apiProcess = spawn('node', ['apps/api/dist/main.js'], {
   stdio: 'inherit',
 });
 
-// Start Next.js Web
-const webProcess = spawn('npm', ['run', 'start:web'], {
-  cwd: process.cwd(),
-  env: {
-    ...process.env,
-    PORT: WEB_PORT,
-    NODE_ENV: 'production',
-    // Don't set NEXT_PUBLIC_API_BASE_URL - let it use relative URLs via rewrites
-    // NEXT_PUBLIC_API_SAME_DOMAIN and API_RUNNING_LOCALLY should be set via env vars
-  },
-  stdio: 'inherit',
-  shell: true,
-});
+// Wait a bit for API to start
+setTimeout(() => {
+  // Start Next.js Web
+  console.log('🌐 Starting Web App...');
+  const webProcess = spawn('npm', ['run', 'start:web'], {
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      PORT: WEB_PORT,
+      NODE_ENV: 'production',
+      // Don't set NEXT_PUBLIC_API_BASE_URL - let it use relative URLs via rewrites
+      // NEXT_PUBLIC_API_SAME_DOMAIN and API_RUNNING_LOCALLY should be set via env vars
+    },
+    stdio: 'inherit',
+    shell: true,
+  });
+
+  webProcess.on('exit', (code) => {
+    console.error(`❌ Web process exited with code ${code}`);
+    cleanup();
+  });
+}, 2000);
 
 // Handle process termination
 const cleanup = () => {
@@ -54,7 +64,4 @@ apiProcess.on('exit', (code) => {
   cleanup();
 });
 
-webProcess.on('exit', (code) => {
-  console.error(`❌ Web process exited with code ${code}`);
-  cleanup();
-});
+// webProcess is now created in setTimeout

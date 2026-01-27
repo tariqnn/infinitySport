@@ -3,7 +3,7 @@
   "rootDirectory": "./",
   "buildCommand": "npm run build:hostinger:web-only",
   "startCommand": "npm run start:hostinger:web-only",
-  "outputDirectory": "",
+  "outputDirectory": ".",
   "installCommand": "npm install",
   "nodeVersion": "18"
 }

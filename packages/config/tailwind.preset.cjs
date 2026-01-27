@@ -36,7 +36,9 @@ module.exports = {
           700: '#082340',
           600: '#0b2f54'
         },
-        slate: require('tailwindcss/colors').slate
+        slate: {
+          ...require('tailwindcss').colors.slate
+        }
       },
       fontFamily: {
         sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif'],

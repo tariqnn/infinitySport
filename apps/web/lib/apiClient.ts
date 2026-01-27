@@ -13,6 +13,12 @@ const getApiBaseUrl = () => {
   if (process.env.NEXT_PUBLIC_API_BASE_URL) {
     return process.env.NEXT_PUBLIC_API_BASE_URL;
   }
+  
+  // If API is running on the same server, use relative URL (works with Next.js rewrites)
+  if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_API_SAME_DOMAIN === 'true') {
+    return ''; // Relative URL - will use Next.js rewrites
+  }
+  
   return 'https://infinitysport.onrender.com';
 };
 

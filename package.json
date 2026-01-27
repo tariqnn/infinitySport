@@ -38,6 +38,7 @@
     "start:admin": "npm --workspace apps/admin run start",
     "start:web": "npm --workspace apps/web run start",
     "build:hostinger": "npm install && npm run prisma:generate && npm run build:api && npm run build:web",
+    "build:hostinger:web-only": "npm install && npm run prisma:generate && npm run build:web",
     "start:hostinger": "node start-combined.js",
     "start:hostinger:web-only": "npm --workspace apps/web run start",
     "prisma:studio": "npx prisma studio --schema=./prisma/schema.prisma",

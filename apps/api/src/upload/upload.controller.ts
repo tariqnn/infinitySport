@@ -9,6 +9,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import * as crypto from 'crypto';
+import type { Multer } from 'multer';
 
 @Controller('upload')
 export class UploadController {
@@ -35,7 +36,7 @@ export class UploadController {
       },
     }),
   )
-  async uploadImage(@UploadedFile() file: Express.Multer.File) {
+  async uploadImage(@UploadedFile() file: Multer.File) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
@@ -72,7 +73,7 @@ export class UploadController {
       },
     }),
   )
-  async uploadVideo(@UploadedFile() file: Express.Multer.File) {
+  async uploadVideo(@UploadedFile() file: Multer.File) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
@@ -116,7 +117,7 @@ export class UploadController {
       },
     }),
   )
-  async uploadMedia(@UploadedFile() file: Express.Multer.File) {
+  async uploadMedia(@UploadedFile() file: Multer.File) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }

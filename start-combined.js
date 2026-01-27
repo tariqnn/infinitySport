@@ -13,6 +13,16 @@ console.log('🚀 Starting Infinity Sports (API + Web)...');
 console.log(`📡 API will run on port ${API_PORT} (internal)`);
 console.log(`🌐 Web will run on port ${WEB_PORT} (Hostinger assigned)`);
 
+let webProcess = null;
+
+// Handle process termination
+const cleanup = () => {
+  console.log('\n🛑 Shutting down...');
+  if (apiProcess) apiProcess.kill();
+  if (webProcess) webProcess.kill();
+  process.exit(0);
+};
+
 // Start NestJS API
 console.log('📡 Starting API...');
 const apiProcess = spawn('node', ['apps/api/dist/main.js'], {
@@ -25,11 +35,18 @@ const apiProcess = spawn('node', ['apps/api/dist/main.js'], {
   stdio: 'inherit',
 });
 
-// Wait a bit for API to start
+apiProcess.on('exit', (code) => {
+  if (code !== 0) {
+    console.error(`❌ API process exited with code ${code}`);
+    cleanup();
+  }
+});
+
+// Wait a bit for API to start, then start Next.js Web
 setTimeout(() => {
   // Start Next.js Web
   console.log('🌐 Starting Web App...');
-  const webProcess = spawn('npm', ['run', 'start:web'], {
+  webProcess = spawn('npm', ['run', 'start:web'], {
     cwd: process.cwd(),
     env: {
       ...process.env,
@@ -43,25 +60,12 @@ setTimeout(() => {
   });
 
   webProcess.on('exit', (code) => {
-    console.error(`❌ Web process exited with code ${code}`);
-    cleanup();
+    if (code !== 0) {
+      console.error(`❌ Web process exited with code ${code}`);
+      cleanup();
+    }
   });
 }, 2000);
 
-// Handle process termination
-const cleanup = () => {
-  console.log('\n🛑 Shutting down...');
-  apiProcess.kill();
-  webProcess.kill();
-  process.exit(0);
-};
-
 process.on('SIGTERM', cleanup);
 process.on('SIGINT', cleanup);
-
-apiProcess.on('exit', (code) => {
-  console.error(`❌ API process exited with code ${code}`);
-  cleanup();
-});
-
-// webProcess is now created in setTimeout

@@ -37,10 +37,6 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
-  // Skip static generation for error pages to avoid React 19 RC issues
-  generateBuildId: async () => {
-    return 'build-' + Date.now();
-  },
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production' ? {
       exclude: ['error', 'warn'],

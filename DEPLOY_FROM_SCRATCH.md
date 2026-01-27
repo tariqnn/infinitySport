@@ -18,6 +18,13 @@ Before deploying, make sure:
    - Repository: `tariqnn/infinitySport` (or your repo name)
    - Branch: `main`
 
+**⚠️ IMPORTANT:** You'll see a warning:
+```
+Unsupported framework or invalid project structure
+```
+
+**This is NORMAL for monorepos!** Click on your repository anyway and proceed. We'll configure it manually in the next step.
+
 ---
 
 ## ⚙️ Step 2: Configure Build Settings

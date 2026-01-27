@@ -1,8 +1,7 @@
 {
-  "framework": "nextjs",
   "rootDirectory": "./",
-  "buildCommand": "npm install && npm run build:hostinger",
-  "startCommand": "npm run start:hostinger",
+  "buildCommand": "npm install && npm run prisma:generate && npm run build:web",
+  "startCommand": "npm run start:hostinger:web-only",
   "outputDirectory": "",
   "installCommand": "npm install",
   "nodeVersion": "18"

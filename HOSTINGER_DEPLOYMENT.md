@@ -1,5 +1,16 @@
 # Hostinger Deployment Guide
 
+## ⚠️ CRITICAL: This is a Node.js Application
+
+**This is NOT a static site.** Your Next.js app has:
+- ✅ API routes (`/api/booking`, `/api/contact`, etc.)
+- ✅ Server-side rendering (async server components)
+- ✅ Dynamic content
+
+**It MUST run as a Node.js process, NOT be served from `public_html` as static files.**
+
+If Hostinger is trying to serve from `public_html` and looking for `index.html`, you're on the **wrong hosting type**. You need **Node.js Hosting**, not Apache/Shared Hosting.
+
 ## Problem
 Hostinger doesn't recognize the monorepo structure because it expects a single Next.js app at the root, but this project has multiple apps in subdirectories. Additionally, the web app depends on shared packages from the monorepo.
 
@@ -103,6 +114,45 @@ If you still get "Unsupported framework" error:
    - Try running `npm run build:hostinger` locally to verify it works
    - Check that all workspace dependencies are properly installed
    - Ensure Prisma client is generated (the build script includes this)
+
+## 🔍 Troubleshooting 403 Forbidden Error
+
+If you get a **403 Forbidden** error after successful build:
+
+### 1. Check Hosting Type
+- ❌ **Wrong:** Apache/Shared Hosting (serves from `public_html`)
+- ✅ **Correct:** Node.js Hosting (runs Node.js process)
+
+If you only see `public_html` in your Hostinger panel, you're on the wrong hosting type. Contact Hostinger support to upgrade to Node.js hosting.
+
+### 2. Verify Start Command
+In Hostinger's deployment settings:
+- **Start Command:** `npm run start` (from dropdown)
+- Should NOT be empty or pointing to a static file
+
+### 3. Check Runtime Logs
+Look for **Runtime/Application Logs** (not build logs). You should see:
+```
+🚀 Starting Infinity Sports (API + Web)...
+📡 API will run on port...
+🌐 Web will run on port...
+Ready on http://localhost:...
+```
+
+If you don't see these, the app isn't starting.
+
+### 4. Verify Application Status
+In Hostinger, check:
+- **Application Status:** Should be "Running" (not "Stopped" or "Error")
+- **Process Status:** Should show the Node.js process is active
+
+### 5. Run Verification Script
+After deployment, you can run:
+```bash
+node verify-deployment.js
+```
+
+This checks if all build outputs and scripts are in place.
 
 ## Recommended: Use Vercel or Netlify Instead
 

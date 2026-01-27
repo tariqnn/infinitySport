@@ -1,9 +1,0 @@
-{
-  "framework": "nextjs",
-  "rootDirectory": "apps/web",
-  "buildCommand": "npm install && npm run prisma:generate && npm run build:web",
-  "startCommand": "npm run start:web",
-  "outputDirectory": "apps/web/.next",
-  "installCommand": "npm install",
-  "nodeVersion": "18"
-}

@@ -4,12 +4,14 @@
 const { spawn } = require('child_process');
 const path = require('path');
 
-const API_PORT = process.env.API_PORT || 4000;
-const WEB_PORT = process.env.PORT || 3000;
+// Hostinger will set PORT automatically for the main app (Next.js)
+// API runs on a separate internal port for communication
+const WEB_PORT = process.env.PORT || 3000; // Hostinger sets this automatically
+const API_PORT = process.env.API_PORT || (parseInt(WEB_PORT) + 1000); // Use a different port for API
 
 console.log('🚀 Starting Infinity Sports (API + Web)...');
-console.log(`📡 API will run on port ${API_PORT}`);
-console.log(`🌐 Web will run on port ${WEB_PORT}`);
+console.log(`📡 API will run on port ${API_PORT} (internal)`);
+console.log(`🌐 Web will run on port ${WEB_PORT} (Hostinger assigned)`);
 
 // Start NestJS API
 const apiProcess = spawn('node', ['apps/api/dist/main.js'], {

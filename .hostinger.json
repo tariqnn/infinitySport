@@ -1,8 +1,8 @@
 {
-  "framework": "nodejs",
+  "framework": "nextjs",
   "rootDirectory": "./",
-  "buildCommand": "npm install && npm run build",
-  "startCommand": "npm run start",
+  "buildCommand": "npm install && npm run build:hostinger",
+  "startCommand": "npm run start:hostinger",
   "outputDirectory": "",
   "installCommand": "npm install",
   "nodeVersion": "18"

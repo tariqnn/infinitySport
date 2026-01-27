@@ -3,6 +3,9 @@
 ## Problem
 Hostinger doesn't recognize the monorepo structure because it expects a single Next.js app at the root, but this project has multiple apps in subdirectories. Additionally, the web app depends on shared packages from the monorepo.
 
+## ✅ Solution Applied
+We've added Next.js detection files at the root (`next.config.js` and `next` in root `package.json`) so Hostinger can auto-detect the framework. The build still runs from root to access monorepo packages.
+
 ## Solution Options
 
 ### Option 1: Configure Build Settings in Hostinger Panel (Recommended)
@@ -19,10 +22,18 @@ Hostinger doesn't recognize the monorepo structure because it expects a single N
    ```bash
    npm install && npm run build:hostinger
    ```
+   OR (if Hostinger auto-detects Next.js, it might use):
+   ```bash
+   npm install && npm run build
+   ```
    
    **Start Command:**
    ```bash
    npm run start:hostinger
+   ```
+   OR (if auto-detected):
+   ```bash
+   npm run start
    ```
    
    **Output Directory:** `apps/web/.next`

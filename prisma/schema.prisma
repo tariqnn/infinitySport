@@ -147,6 +147,7 @@ enum InvoiceStatus {
   DRAFT
   SENT
   PAID
+  PARTIALLY_PAID
   OVERDUE
   CANCELLED
 }
@@ -302,12 +303,16 @@ model Invoice {
   subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
   number      String        @unique
   amount      Int
+  amountPaid  Int           @default(0)
   currency    String        @default("JOD")
   status      InvoiceStatus @default(DRAFT)
   dueDate     DateTime?
   issuedAt    DateTime      @default(now())
   paidAt      DateTime?
   description String?
+  companyEmail String?
+  companyPhone String?
+  note        String?       @db.Text
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 

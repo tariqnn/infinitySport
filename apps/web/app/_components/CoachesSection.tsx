@@ -26,7 +26,7 @@ const COACHES_DATA: Coach[] = [
     id: '2',
     sport: 'Basketball',
     name: 'Coach Naef Asfour',
-    description: 'Assistant Coach for AU Men\'s 2 years. Assistant Coach for the Jordan NT Men\'s. Head Coach For the Women\'s Jordan NT. 3 arab Championship 2023/ 2024 / 2025.',
+    description: 'Basketball Head Coach | FIBA Licensed. FIBA-licensed basketball coach with 7+ years of experience leading teams to championship success. Specialized in player development, performance optimization, and strategic game systems. Head Coach of Fuhies Women\'s Team, Arab Women\'s Champions 2024, with extensive experience across club and national team levels.',
     imageUrl: '/naef-asfour.jpeg'
   },
   {
@@ -41,7 +41,7 @@ const COACHES_DATA: Coach[] = [
     id: '4',
     sport: 'Gymnastics',
     name: 'Coach Ahmad Aldarawish',
-    description: 'Dedicated to creating strong athletes through strength and conditioning while aligning them with the core gymnastics program.',
+    description: 'My name is Ahmad Aldarawish, and I am a dedicated athlete with a strong commitment to maintaining a high level of physical fitness and performance. I actively engage in multiple sports, including squash, badminton, swimming, and strength training. Over the years, I have built a solid foundation in athletic conditioning, endurance development, and strength training, supported by consistent practice and a disciplined approach to training. My ongoing dedication to an active and healthy lifestyle has enabled me to develop a deep understanding of effective training methodologies and performance enhancement, reflecting my commitment to continuous personal growth and athletic excellence.',
     imageUrl: '/ahmad-aldarawesh.jpg'
   },
   {
@@ -184,8 +184,8 @@ export function CoachesSection() {
                 }}
                 className={`px-6 py-3 rounded-full text-sm font-semibold transition-all duration-300 ${
                   selectedSport === sport
-                    ? 'bg-brand-green-primary text-white shadow-lg transform scale-105'
-                    : 'bg-white text-brand-black border-2 border-brand-lightBlue/20 hover:border-brand-green-primary/60 hover:shadow-md'
+                    ? 'bg-[#003DA5] text-white shadow-lg transform scale-105'
+                    : 'bg-white text-brand-black border-2 border-brand-lightBlue/20 hover:border-[#003DA5]/60 hover:shadow-md'
                 }`}
               >
                 {sport}

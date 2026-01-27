@@ -79,7 +79,7 @@ export default function EventsPage() {
                     sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                   />
                   <div className="absolute top-4 left-4">
-                    <span className="rounded-full bg-brand-green-primary px-3 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-white shadow-lg">
+                    <span className="rounded-full bg-[#003DA5] px-3 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-white shadow-lg">
                       Registration Open
                     </span>
                   </div>
@@ -113,7 +113,7 @@ export default function EventsPage() {
                   )}
                   <Link
                     href="/contact"
-                    className="mt-6 rounded-full bg-gradient-button px-6 py-3 text-center text-sm font-bold text-white shadow-button transition-all duration-300 hover:scale-105 hover:shadow-button-hover"
+                    className="mt-6 rounded-full bg-[#003DA5] px-6 py-3 text-center text-sm font-bold text-white shadow-button transition-all duration-300 hover:scale-105 hover:shadow-button-hover hover:bg-[#003DA5]/90"
                   >
                     Secure slot
                   </Link>
@@ -131,7 +131,7 @@ export default function EventsPage() {
             </p>
             <Link
               href="/contact"
-              className="mt-6 inline-block rounded-full bg-gradient-button px-8 py-3 text-sm font-bold text-white shadow-button transition hover:shadow-button-hover"
+              className="mt-6 inline-block rounded-full bg-[#003DA5] px-8 py-3 text-sm font-bold text-white shadow-button transition hover:shadow-button-hover hover:bg-[#003DA5]/90"
             >
               Join waitlist
             </Link>

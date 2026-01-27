@@ -148,10 +148,12 @@ export const financeApi = {
   },
   // Invoices (create, delete, PDF via Nest API to avoid Node/fs in portal build)
   invoices: {
-    list: (companyId?: string, status?: string) => {
+    list: (companyId?: string, status?: string, startDate?: string, endDate?: string) => {
       const params = new URLSearchParams();
       if (companyId) params.append('companyId', companyId);
       if (status) params.append('status', status);
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
       const query = params.toString() ? `?${params.toString()}` : '';
       return portalFetch<unknown[]>(`/portal/invoices${query}`);
     },
@@ -251,12 +253,17 @@ export const dashboardApi = {
 };
 
 export const packageRegistrationsApi = {
-  list: (packageName?: string) => {
-    const params = packageName ? `?packageName=${encodeURIComponent(packageName)}` : '';
-    return portalFetch<Array<{ id: string; packageName: string; customerName: string; customerPhone: string; customerEmail: string | null; customerAge: number | null; isPaid: boolean; createdAt: string; updatedAt: string }>>(`/portal/package-registrations${params}`);
+  list: (packageName?: string, startDate?: string, endDate?: string) => {
+    const params = new URLSearchParams();
+    if (packageName) params.append('packageName', packageName);
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return portalFetch<Array<{ id: string; packageName: string; customerName: string; customerPhone: string; customerEmail: string | null; customerAge: number | null; isPaid: boolean; createdAt: string; updatedAt: string }>>(`/portal/package-registrations${query}`);
   },
   update: (id: string, data: { isPaid?: boolean }) =>
     portalFetch<unknown>(`/portal/package-registrations/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  delete: (id: string) => portalFetch<void>(`/portal/package-registrations/${id}`, { method: 'DELETE' }),
 };
 
 // Helper to get first company (for initial setup)

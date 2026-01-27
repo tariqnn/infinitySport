@@ -6,6 +6,7 @@ import { financeApi, membersApi, getFirstCompany } from '../../../lib/portalApi'
 import { useRouter } from 'next/navigation';
 import { getApiBaseUrl } from '../../../lib/getApiBaseUrl';
 import { getBasketballPackages } from '@infinity/mock-api';
+import { INVOICE_CONFIG } from '../../../lib/invoiceConfig';
 
 type LineItem = {
   id: string;
@@ -14,9 +15,7 @@ type LineItem = {
   unitPrice: number;
 };
 
-const COMPANY_NAME = 'Infinity Sporty';
 const API_BASE_URL = getApiBaseUrl();
-const DEFAULT_COMPANY_ADDRESS = 'Shemisani, Princess Alia College';
 
 export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
@@ -25,7 +24,9 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
   const [members, setMembers] = useState<any[]>([]);
 
   // Form state
-  const [companyAddress, setCompanyAddress] = useState(DEFAULT_COMPANY_ADDRESS);
+  const [companyAddress, setCompanyAddress] = useState(INVOICE_CONFIG.companyAddress);
+  const [companyEmail, setCompanyEmail] = useState(INVOICE_CONFIG.companyEmail);
+  const [companyPhone, setCompanyPhone] = useState(INVOICE_CONFIG.companyPhone);
   const [clientName, setClientName] = useState('');
   const [clientEmail, setClientEmail] = useState('');
   const [clientAddress, setClientAddress] = useState('-');
@@ -36,7 +37,9 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
   const [dueDate, setDueDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [tax, setTax] = useState<string>('');
   const [discount, setDiscount] = useState<string>('');
-  const [notes, setNotes] = useState('');
+  const [amountPaid, setAmountPaid] = useState<string>('');
+  const [notes, setNotes] = useState(''); // Payment terms/notes
+  const [note, setNote] = useState(''); // Invoice note field
   const [items, setItems] = useState<LineItem[]>([
     { id: crypto?.randomUUID?.() ?? String(Date.now()), description: 'Service', quantity: 1, unitPrice: 0 },
   ]);
@@ -81,9 +84,15 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
     const next: Record<string, string> = {};
 
     if (!companyAddress.trim()) next.companyAddress = 'Company address is required.';
+    if (!companyEmail.trim()) next.companyEmail = 'Company email is required.';
+    if (companyEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(companyEmail)) next.companyEmail = 'Enter a valid email address.';
+    if (!companyPhone.trim()) next.companyPhone = 'Company phone is required.';
+    if (companyPhone.trim().length < 8) next.companyPhone = 'Phone number must be at least 8 characters.';
     if (!clientName.trim()) next.clientName = 'Client name is required.';
     // Client email is optional (some members don't have an email); validate only if provided
     if (clientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail)) next.clientEmail = 'Enter a valid email address.';
+    // Note validation (optional but has max length)
+    if (note.length > INVOICE_CONFIG.noteMaxLength) next.note = `Note must be ${INVOICE_CONFIG.noteMaxLength} characters or less.`;
     // Client address is optional; keep it for PDF but don't block creation
     if (!issueDate) next.issueDate = 'Issue date is required.';
     if (!dueDate) next.dueDate = 'Due date is required.';
@@ -107,8 +116,13 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
     const discountVal = discount.trim() ? Number(discount) : 0;
     if (discount.trim() && (!Number.isFinite(discountVal) || discountVal < 0)) next.discount = 'Discount must be a valid number (0 or greater).';
 
+    const amountPaidVal = amountPaid.trim() ? Number(amountPaid) : 0;
+    if (amountPaid.trim() && (!Number.isFinite(amountPaidVal) || amountPaidVal < 0)) {
+      next.amountPaid = 'Amount paid must be a valid number (0 or greater).';
+    }
+
     return next;
-  }, [companyAddress, clientName, clientEmail, clientAddress, issueDate, dueDate, currency, items, tax, discount]);
+  }, [companyAddress, clientName, clientEmail, clientAddress, issueDate, dueDate, currency, items, tax, discount, amountPaid]);
 
   const computed = useMemo(() => {
     const lineTotals = items.map((it) => {
@@ -158,11 +172,21 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
         lineTotal: computed.lineTotals[idx] || 0,
       }));
 
+      const paidAmount = amountPaid.trim() ? Math.round(Number(amountPaid) || 0) : 0;
+      const totalAmount = Math.round(computed.total);
+      let invoiceStatus = 'DRAFT';
+      if (paidAmount > 0 && paidAmount < totalAmount) {
+        invoiceStatus = 'PARTIALLY_PAID';
+      } else if (paidAmount >= totalAmount && totalAmount > 0) {
+        invoiceStatus = 'PAID';
+      }
+
       const created = await financeApi.invoices.create({
         // Existing required fields
-        amount: Math.round(computed.total), // legacy int column (for dashboards/table); PDF uses lineItems for exact values
+        amount: totalAmount, // legacy int column (for dashboards/table); PDF uses lineItems for exact values
+        amountPaid: paidAmount,
         currency,
-        status: 'DRAFT',
+        status: invoiceStatus,
         paymentMethod,
         issuedAt: new Date(issueDate).toISOString(),
         dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
@@ -173,8 +197,10 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
         ...(memberId ? { member: { connect: { id: memberId } } } : {}),
 
         // Enterprise invoice fields (stored for client-ready PDF)
-        companyName: COMPANY_NAME,
+        companyName: INVOICE_CONFIG.companyName,
         companyAddress: companyAddress.trim(),
+        companyEmail: companyEmail.trim(),
+        companyPhone: companyPhone.trim(),
         clientName: clientName.trim(),
         clientEmail: clientEmail.trim(),
         clientAddress: clientAddress.trim(),
@@ -183,6 +209,7 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
         tax: tax.trim() ? Math.round(Number(tax) || 0) : undefined,
         discount: discount.trim() ? Math.round(Number(discount) || 0) : undefined,
         notes: notes.trim() ? notes.trim() : undefined,
+        note: note.trim() ? note.trim() : undefined,
         generatePdf: true,
       });
 
@@ -247,7 +274,7 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
 
         {/* Company */}
         <div className="grid grid-cols-2 gap-4">
-          <Input label="Company name" value={COMPANY_NAME} disabled />
+          <Input label="Company name" value={INVOICE_CONFIG.companyName} disabled />
           <Input
             label="Invoice number"
             value="Auto-generated on save"
@@ -262,6 +289,26 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
           error={fieldErrors.companyAddress}
           required
         />
+        <div className="grid grid-cols-2 gap-4">
+          <Input
+            label="Company email *"
+            type="email"
+            value={companyEmail}
+            onChange={(e) => setCompanyEmail(e.target.value)}
+            error={fieldErrors.companyEmail}
+            required
+            placeholder="info@company.com"
+          />
+          <Input
+            label="Company phone *"
+            type="tel"
+            value={companyPhone}
+            onChange={(e) => setCompanyPhone(e.target.value)}
+            error={fieldErrors.companyPhone}
+            required
+            placeholder="+962 6 123 4567"
+          />
+        </div>
 
         {/* Client */}
         <div className="grid grid-cols-2 gap-4">
@@ -481,17 +528,50 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
             step="0.01"
           />
           <Input
+            label="Amount Paid (optional)"
+            type="number"
+            value={amountPaid}
+            onChange={(e) => setAmountPaid(e.target.value)}
+            hint="Enter amount already paid. Status will be set to 'Partially Paid' if less than total."
+            min={0}
+            step="0.01"
+            max={computed.total}
+          />
+          <Input
             label="Grand total"
             value={computed.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             disabled
           />
+          {amountPaid.trim() && Number(amountPaid) > 0 && (
+            <div className="space-y-1 pt-2">
+              <div className="text-sm font-medium text-textPrimary">
+                Remaining: {currency} {(computed.total - (Number(amountPaid) || 0)).toFixed(2)}
+              </div>
+              {Number(amountPaid) < computed.total && (
+                <div className="text-xs text-amber-600">Status will be set to "Partially Paid"</div>
+              )}
+              {Number(amountPaid) >= computed.total && computed.total > 0 && (
+                <div className="text-xs text-green-600">Status will be set to "Paid"</div>
+              )}
+            </div>
+          )}
         </div>
 
         <Textarea
-          label="Notes / payment terms"
+          label="Notes / Payment Terms (optional)"
           rows={3}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
+          hint="Payment terms, special instructions, etc."
+        />
+        <Textarea
+          label="Note (optional)"
+          rows={4}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          error={fieldErrors.note}
+          hint={`Additional note to appear on the invoice. Max ${INVOICE_CONFIG.noteMaxLength} characters.`}
+          maxLength={INVOICE_CONFIG.noteMaxLength}
           hint="These will appear on the PDF invoice."
         />
       </form>

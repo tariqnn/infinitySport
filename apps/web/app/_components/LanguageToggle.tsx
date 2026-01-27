@@ -12,7 +12,7 @@ export function LanguageToggle() {
         onClick={() => setLanguage("en")}
         className={`px-3 py-1 text-xs font-semibold uppercase tracking-wide transition ${
           language === "en"
-            ? "rounded-full bg-brand-green-primary text-white"
+            ? "rounded-full bg-[#003DA5] text-white"
             : "text-gray-600 hover:text-brand-blue-primary"
         }`}
       >
@@ -23,7 +23,7 @@ export function LanguageToggle() {
         onClick={() => setLanguage("ar")}
         className={`px-3 py-1 text-xs font-semibold uppercase tracking-wide transition ${
           language === "ar"
-            ? "rounded-full bg-brand-green-primary text-white"
+            ? "rounded-full bg-[#003DA5] text-white"
             : "text-gray-600 hover:text-brand-blue-primary"
         }`}
       >

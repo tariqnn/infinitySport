@@ -88,7 +88,7 @@ export function PackageRegisterForm() {
         <button
           type="button"
           onClick={() => { setStatus('idle'); setError(''); }}
-          className="rounded-lg bg-brand-green-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-green-dark"
+          className="rounded-lg bg-[#003DA5] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#003DA5]/90"
         >
           Register another
         </button>
@@ -171,7 +171,7 @@ export function PackageRegisterForm() {
       <button
         type="submit"
         disabled={status === 'submitting'}
-        className="w-full rounded-lg bg-brand-green-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-green-dark disabled:opacity-70"
+        className="w-full rounded-lg bg-[#003DA5] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#003DA5]/90 disabled:opacity-70"
       >
         {status === 'submitting' ? 'Submitting...' : 'Submit'}
       </button>

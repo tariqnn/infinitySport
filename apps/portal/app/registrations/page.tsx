@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { PageHeader, Card, CardBody, DataTable, Badge } from '../_components/ui';
+import { PageHeader, Card, CardHeader, CardBody, DataTable, Badge, Select, Input } from '../_components/ui';
 import { packageRegistrationsApi } from '../../lib/portalApi';
+import { ExportCsvButton } from '../_components/ActionButtons';
+import { TrashIcon } from '@heroicons/react/24/outline';
 
 type Registration = {
   id: string;
@@ -20,19 +22,60 @@ export default function RegistrationsPage() {
   const [rows, setRows] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [packageFilter, setPackageFilter] = useState<string>('');
+  const [dateRange, setDateRange] = useState<string>('all');
+  const [customStartDate, setCustomStartDate] = useState<string>('');
+  const [customEndDate, setCustomEndDate] = useState<string>('');
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await packageRegistrationsApi.list(packageFilter || undefined);
+      
+      // Calculate date range
+      let dateFilters: { startDate?: string; endDate?: string } = {};
+      if (dateRange !== 'all') {
+        const today = new Date();
+        today.setHours(23, 59, 59, 999);
+        
+        if (dateRange === 'custom') {
+          dateFilters = {
+            startDate: customStartDate || undefined,
+            endDate: customEndDate || undefined,
+          };
+        } else {
+          const start = new Date();
+          if (dateRange === '1week') {
+            start.setDate(today.getDate() - 7);
+          } else if (dateRange === '1month') {
+            start.setMonth(today.getMonth() - 1);
+          } else if (dateRange === '3months') {
+            start.setMonth(today.getMonth() - 3);
+          } else if (dateRange === '6months') {
+            start.setMonth(today.getMonth() - 6);
+          } else if (dateRange === '1year') {
+            start.setFullYear(today.getFullYear() - 1);
+          }
+          start.setHours(0, 0, 0, 0);
+          dateFilters = {
+            startDate: start.toISOString().split('T')[0],
+            endDate: today.toISOString().split('T')[0],
+          };
+        }
+      }
+      
+      const data = await packageRegistrationsApi.list(
+        packageFilter || undefined,
+        dateFilters.startDate,
+        dateFilters.endDate
+      );
       setRows(data);
     } catch (e) {
       console.error('Failed to load registrations', e);
     } finally {
       setLoading(false);
     }
-  }, [packageFilter]);
+  }, [packageFilter, dateRange, customStartDate, customEndDate]);
 
   useEffect(() => {
     load();
@@ -48,6 +91,23 @@ export default function RegistrationsPage() {
       console.error('Failed to update paid status', e);
     } finally {
       setTogglingId(null);
+    }
+  }
+
+  async function handleDelete(r: Registration) {
+    if (!confirm(`Are you sure you want to delete the registration for ${r.customerName}?`)) {
+      return;
+    }
+    if (deletingId) return;
+    setDeletingId(r.id);
+    try {
+      await packageRegistrationsApi.delete(r.id);
+      setRows((prev) => prev.filter((x) => x.id !== r.id));
+    } catch (e) {
+      console.error('Failed to delete registration', e);
+      alert('Failed to delete registration. Please try again.');
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -110,6 +170,21 @@ export default function RegistrationsPage() {
         </span>
       ),
     },
+    {
+      id: 'actions',
+      header: 'Actions',
+      render: (row: Registration) => (
+        <button
+          onClick={() => handleDelete(row)}
+          disabled={deletingId === row.id}
+          className="inline-flex items-center gap-1 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 transition hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Delete registration"
+        >
+          <TrashIcon className="h-4 w-4" />
+          {deletingId === row.id ? 'Deleting...' : 'Delete'}
+        </button>
+      ),
+    },
   ];
 
   // Unique package names for filter dropdown (include current filter so it stays when no rows)
@@ -127,26 +202,102 @@ export default function RegistrationsPage() {
       />
 
       <Card>
-        <CardBody>
-          <div className="flex flex-col gap-4 sm:flex-row">
-            <label className="flex items-center gap-2 text-sm text-ui-textMuted">
-              Filter by package:
-              <select
-                value={packageFilter}
-                onChange={(e) => setPackageFilter(e.target.value)}
-                className="rounded-lg border border-ui-border bg-white px-3 py-2 text-sm text-ui-textPrimary focus:border-brand-primaryBlue focus:outline-none focus:ring-2 focus:ring-brand-primaryBlue/20"
-              >
-                <option value="">All packages</option>
-                {packageOpts.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-            </label>
+        <CardHeader>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <h3 className="text-lg font-semibold text-textPrimary">Registrations</h3>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-textMuted">Package:</label>
+                <Select
+                  value={packageFilter}
+                  onChange={(e) => setPackageFilter(e.target.value)}
+                  className="min-w-[150px]"
+                >
+                  <option value="">All packages</option>
+                  {packageOpts.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={dateRange}
+                  onChange={(e) => setDateRange(e.target.value)}
+                  className="min-w-[150px]"
+                >
+                  <option value="all">All Time</option>
+                  <option value="1week">Last 7 Days</option>
+                  <option value="1month">Last Month</option>
+                  <option value="3months">Last 3 Months</option>
+                  <option value="6months">Last 6 Months</option>
+                  <option value="1year">Last Year</option>
+                  <option value="custom">Custom Range</option>
+                </Select>
+                {dateRange === 'custom' && (
+                  <>
+                    <Input
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      placeholder="Start Date"
+                      className="min-w-[140px]"
+                    />
+                    <Input
+                      type="date"
+                      value={customEndDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                      placeholder="End Date"
+                      className="min-w-[140px]"
+                    />
+                  </>
+                )}
+              </div>
+              <ExportCsvButton
+                rows={rows.map(r => {
+                  const createdAt = new Date(r.createdAt);
+                  const updatedAt = new Date(r.updatedAt);
+                  
+                  // Format dates for Excel compatibility (MM/DD/YYYY format)
+                  const formatDateForExcel = (date: Date) => {
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const year = date.getFullYear();
+                    return `${month}/${day}/${year}`;
+                  };
+                  
+                  // Format time for Excel (HH:MM:SS)
+                  const formatTimeForExcel = (date: Date) => {
+                    const hours = String(date.getHours()).padStart(2, '0');
+                    const minutes = String(date.getMinutes()).padStart(2, '0');
+                    const seconds = String(date.getSeconds()).padStart(2, '0');
+                    return `${hours}:${minutes}:${seconds}`;
+                  };
+                  
+                  // Format date-time for Excel (MM/DD/YYYY HH:MM:SS)
+                  const formatDateTimeForExcel = (date: Date) => {
+                    return `${formatDateForExcel(date)} ${formatTimeForExcel(date)}`;
+                  };
+                  
+                  return {
+                    packageName: r.packageName || '',
+                    customerName: r.customerName || '',
+                    customerPhone: r.customerPhone || '',
+                    customerEmail: r.customerEmail || '',
+                    customerAge: r.customerAge ? String(r.customerAge) : '',
+                    isPaid: r.isPaid ? 'Yes' : 'No',
+                    registeredDate: formatDateForExcel(createdAt),
+                    registeredTime: formatTimeForExcel(createdAt),
+                    registeredDateTime: formatDateTimeForExcel(createdAt),
+                    lastUpdated: formatDateTimeForExcel(updatedAt),
+                  };
+                })}
+                columns={['packageName', 'customerName', 'customerPhone', 'customerEmail', 'customerAge', 'isPaid', 'registeredDate', 'registeredTime', 'registeredDateTime', 'lastUpdated']}
+                filename={`registrations-${dateRange}-${new Date().toISOString().split('T')[0]}.csv`}
+                label="Export Report"
+              />
+            </div>
           </div>
-        </CardBody>
-      </Card>
-
-      <Card>
+        </CardHeader>
         <CardBody className="p-0">
           <DataTable columns={columns} rows={rows} />
         </CardBody>

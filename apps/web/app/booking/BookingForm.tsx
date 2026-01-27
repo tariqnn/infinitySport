@@ -424,7 +424,7 @@ export function BookingForm() {
               isBlockedSlot({ date: selectedDate, time: selectedTime, courtId: selectedCourt, courts: COURTS }, blocked) ||
               isBookedSlot({ date: selectedDate, time: selectedTime, courtId: selectedCourt, courts: COURTS }, booked)
             }
-            className="rounded-full bg-gradient-button px-8 py-3 text-sm font-bold text-white shadow-button transition hover:shadow-button-hover disabled:opacity-50 disabled:cursor-not-allowed"
+            className="rounded-full bg-[#003DA5] px-8 py-3 text-sm font-bold text-white shadow-button transition hover:shadow-button-hover hover:bg-[#003DA5]/90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? tr(language, 'booking_submitting') : tr(language, 'booking_submit')}
           </button>

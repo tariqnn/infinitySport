@@ -4,12 +4,27 @@ import { useState, useEffect } from 'react';
 import { Modal, Input, Select, Textarea, Button } from '../../_components/ui';
 import { financeApi, membersApi, getFirstCompany } from '../../../lib/portalApi';
 import { useRouter } from 'next/navigation';
+import { INVOICE_CONFIG } from '../../../lib/invoiceConfig';
 
 export function EditInvoiceModal({ open, invoice, onClose }: { open: boolean; invoice: any; onClose: () => void }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [members, setMembers] = useState<any[]>([]);
+  
+  // Extract invoice meta data (for backward compatibility)
+  const invoiceMeta = (() => {
+    try {
+      if (invoice.description && typeof invoice.description === 'string') {
+        return JSON.parse(invoice.description);
+      }
+    } catch {}
+    return {};
+  })();
+  
+  const companyEmail = invoice.companyEmail || invoiceMeta.companyEmail || INVOICE_CONFIG.companyEmail;
+  const companyPhone = invoice.companyPhone || invoiceMeta.companyPhone || INVOICE_CONFIG.companyPhone;
+  const note = invoice.note || invoiceMeta.note || '';
 
   useEffect(() => {
     if (open) {
@@ -35,14 +50,22 @@ export function EditInvoiceModal({ open, invoice, onClose }: { open: boolean; in
     const formData = new FormData(e.currentTarget);
 
     try {
+      const amountPaid = formData.get('amountPaid') ? Math.round(Number(formData.get('amountPaid')) || 0) : undefined;
+      const amount = parseInt(String(formData.get('amount')));
+      const status = String(formData.get('status'));
+      
       await financeApi.invoices.update(invoice.id, {
-        amount: parseInt(String(formData.get('amount'))),
+        amount,
+        amountPaid,
         currency: String(formData.get('currency')),
-        status: String(formData.get('status')),
+        status,
         dueDate: formData.get('dueDate') ? new Date(String(formData.get('dueDate'))).toISOString() : undefined,
         description: formData.get('description') ? String(formData.get('description')) : undefined,
+        companyEmail: formData.get('companyEmail') ? String(formData.get('companyEmail')) : undefined,
+        companyPhone: formData.get('companyPhone') ? String(formData.get('companyPhone')) : undefined,
+        note: formData.get('note') ? String(formData.get('note')) : undefined,
         ...(formData.get('memberId') && { member: { connect: { id: String(formData.get('memberId')) } } }),
-        ...(formData.get('status') === 'PAID' && !invoice.paidAt && { paidAt: new Date().toISOString() }),
+        ...((status === 'PAID' || (amountPaid && amountPaid >= amount)) && !invoice.paidAt && { paidAt: new Date().toISOString() }),
       });
 
       router.refresh();
@@ -102,6 +125,23 @@ export function EditInvoiceModal({ open, invoice, onClose }: { open: boolean; in
             defaultValue={invoice.currency}
           />
         </div>
+        <div className="grid grid-cols-2 gap-4">
+          <Input 
+            label="Amount Paid" 
+            name="amountPaid" 
+            type="number" 
+            min="0" 
+            step="0.01" 
+            max={invoice.amount}
+            defaultValue={invoice.amountPaid || 0}
+            hint="Enter amount already paid. Status will auto-update based on this value."
+          />
+          <div className="space-y-1">
+            <div className="text-sm font-medium text-textPrimary">
+              Remaining: {invoice.currency} {((invoice.amount || 0) - (invoice.amountPaid || 0)).toFixed(2)}
+            </div>
+          </div>
+        </div>
         <Input label="Due Date" name="dueDate" type="date" defaultValue={dueDate} />
         <Select
           label="Status *"
@@ -110,11 +150,36 @@ export function EditInvoiceModal({ open, invoice, onClose }: { open: boolean; in
           options={[
             { value: 'DRAFT', label: 'Draft' },
             { value: 'SENT', label: 'Sent' },
+            { value: 'PARTIALLY_PAID', label: 'Partially Paid' },
             { value: 'PAID', label: 'Paid' },
             { value: 'OVERDUE', label: 'Overdue' },
             { value: 'CANCELLED', label: 'Cancelled' },
           ]}
           defaultValue={invoice.status}
+        />
+        <div className="grid grid-cols-2 gap-4">
+          <Input
+            label="Company Email *"
+            type="email"
+            name="companyEmail"
+            defaultValue={companyEmail}
+            required
+          />
+          <Input
+            label="Company Phone *"
+            type="tel"
+            name="companyPhone"
+            defaultValue={companyPhone}
+            required
+          />
+        </div>
+        <Textarea
+          label="Note (optional)"
+          name="note"
+          rows={4}
+          defaultValue={note}
+          hint={`Additional note to appear on the invoice. Max ${INVOICE_CONFIG.noteMaxLength} characters.`}
+          maxLength={INVOICE_CONFIG.noteMaxLength}
         />
         <Textarea label="Description" name="description" rows={3} defaultValue={invoice.description || ''} />
       </form>

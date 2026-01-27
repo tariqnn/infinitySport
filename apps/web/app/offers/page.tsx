@@ -68,7 +68,7 @@ export default async function OffersPage() {
                   </li>
                 ))}
               </ul>
-              <Link href={offer.link || "/contact"} className="mt-auto rounded-full bg-gradient-button px-6 py-3 text-center text-sm font-bold text-white shadow-button transition hover:shadow-button-hover">
+              <Link href={offer.link || "/contact"} className="mt-auto rounded-full bg-[#003DA5] px-6 py-3 text-center text-sm font-bold text-white shadow-button transition hover:shadow-button-hover hover:bg-[#003DA5]/90">
                 Book a call
               </Link>
             </div>

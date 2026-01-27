@@ -77,6 +77,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className={`${jakarta.variable} ${spaceGrotesk.variable} ${cairo.variable} bg-white text-brand-black antialiased`}>
         <LanguageProvider initialLanguage={lang}>
           <NavbarWithLanguage />
+          <div className="h-1 bg-[#003DA5]"></div>
           <main className="flex-1">{children}</main>
           <SiteFooter />
         </LanguageProvider>

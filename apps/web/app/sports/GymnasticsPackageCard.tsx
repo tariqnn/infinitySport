@@ -54,7 +54,7 @@ export function GymnasticsPackageCard({
           <Link
             href={`/packages/register?package=${encodeURIComponent(`Gymnastics ${title}`)}`}
             onClick={(e) => e.stopPropagation()}
-            className="flex items-center justify-center rounded-lg bg-brand-green-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-green-dark"
+            className="flex items-center justify-center rounded-lg bg-[#003DA5] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#003DA5]/90"
           >
             Register now
           </Link>

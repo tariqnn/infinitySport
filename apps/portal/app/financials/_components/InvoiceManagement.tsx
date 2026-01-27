@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardBody, CardHeader, DataTable, Badge, Button, KPIStatCard } from '../../_components/ui';
+import { Card, CardBody, CardHeader, DataTable, Badge, Button, KPIStatCard, Select, Input } from '../../_components/ui';
 import { financeApi, dashboardApi, getFirstCompany } from '../../../lib/portalApi';
 import { ExportCsvButton } from '../../_components/ActionButtons';
 import { CreateInvoiceFromSubscriptionModal } from './CreateInvoiceFromSubscriptionModal';
@@ -26,6 +26,9 @@ export function InvoiceManagement() {
   const [stats, setStats] = useState<any>(null);
   const [showCreateFromSubscriptionModal, setShowCreateFromSubscriptionModal] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<any | null>(null);
+  const [dateRange, setDateRange] = useState<string>('all');
+  const [customStartDate, setCustomStartDate] = useState<string>('');
+  const [customEndDate, setCustomEndDate] = useState<string>('');
 
   async function downloadInvoicePdf(row: any) {
     if (!row?.id) {
@@ -34,13 +37,24 @@ export function InvoiceManagement() {
     }
     try {
       const pdfUrl = financeApi.invoices.getPdfUrl(row.id);
+      console.log('Downloading invoice PDF from:', pdfUrl);
       const res = await fetch(pdfUrl, { cache: 'no-store' });
       if (!res.ok) {
+        const errorText = await res.text().catch(() => '');
+        console.error('Invoice PDF download failed:', res.status, errorText);
         const msg =
           res.status === 404
             ? 'Invoice not found.'
-            : 'PDF could not be generated for this invoice. Please try again.';
+            : res.status === 500
+            ? 'Server error generating PDF. Please check the API logs.'
+            : `PDF could not be generated (${res.status}). Please try again.`;
         alert(msg);
+        return;
+      }
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('pdf')) {
+        console.error('Response is not a PDF:', contentType);
+        alert('Server returned invalid content. Expected PDF but got: ' + contentType);
         return;
       }
       const blob = await res.blob();
@@ -53,22 +67,59 @@ export function InvoiceManagement() {
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e) {
-      console.error(e);
-      alert('Failed to download invoice PDF.');
+      console.error('Invoice PDF download error:', e);
+      alert('Failed to download invoice PDF. Please ensure the API server is running and try again.');
     }
   }
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [dateRange, customStartDate, customEndDate]);
+
+  function getDateRange(): { startDate?: string; endDate?: string } {
+    if (dateRange === 'all') {
+      return {};
+    }
+    
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    
+    if (dateRange === 'custom') {
+      return {
+        startDate: customStartDate || undefined,
+        endDate: customEndDate || undefined,
+      };
+    }
+    
+    const start = new Date();
+    if (dateRange === '1week') {
+      start.setDate(today.getDate() - 7);
+    } else if (dateRange === '1month') {
+      start.setMonth(today.getMonth() - 1);
+    } else if (dateRange === '3months') {
+      start.setMonth(today.getMonth() - 3);
+    } else if (dateRange === '6months') {
+      start.setMonth(today.getMonth() - 6);
+    } else if (dateRange === '1year') {
+      start.setFullYear(today.getFullYear() - 1);
+    }
+    start.setHours(0, 0, 0, 0);
+    
+    return {
+      startDate: start.toISOString().split('T')[0],
+      endDate: today.toISOString().split('T')[0],
+    };
+  }
 
   async function loadData() {
     try {
       setLoading(true);
       const company = await getFirstCompany();
       if (!company) return;
+      
+      const dateFilters = getDateRange();
       const [invs, dashboardStats] = await Promise.all([
-        financeApi.invoices.list(company?.id),
+        financeApi.invoices.list(company?.id, undefined, dateFilters.startDate, dateFilters.endDate),
         dashboardApi.stats(company?.id),
       ]);
       setInvoices(invs);
@@ -153,11 +204,23 @@ export function InvoiceManagement() {
     {
       id: 'amount',
       header: 'Amount',
-      render: (row: any) => (
-        <span className="font-semibold text-textPrimary">
-          {row.currency} {row.amount.toLocaleString()}
-        </span>
-      ),
+      render: (row: any) => {
+        const amountPaid = row.amountPaid || 0;
+        const total = row.amount || 0;
+        const remaining = total - amountPaid;
+        return (
+          <div className="space-y-1">
+            <span className="font-semibold text-textPrimary">
+              {row.currency} {total.toLocaleString()}
+            </span>
+            {amountPaid > 0 && (
+              <div className="text-xs text-textMuted">
+                Paid: {row.currency} {amountPaid.toLocaleString()} | Remaining: {row.currency} {remaining.toLocaleString()}
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       id: 'dueDate',
@@ -181,6 +244,7 @@ export function InvoiceManagement() {
         const isOverdue = dueDate && dueDate < new Date() && row.status !== 'PAID';
         const statusMap: Record<string, { variant: 'success' | 'warning' | 'danger' | 'neutral' | 'info'; label: string }> = {
           PAID: { variant: 'success', label: 'Paid' },
+          PARTIALLY_PAID: { variant: 'warning', label: 'Partially Paid' },
           SENT: { variant: 'info', label: 'Sent' },
           DRAFT: { variant: 'neutral', label: 'Draft' },
           OVERDUE: { variant: 'danger', label: 'Overdue' },
@@ -304,21 +368,84 @@ export function InvoiceManagement() {
       {/* Invoices Table */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="text-lg font-semibold text-textPrimary">Invoices</h3>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Select
+                  value={dateRange}
+                  onChange={(e) => setDateRange(e.target.value)}
+                  className="min-w-[150px]"
+                >
+                  <option value="all">All Time</option>
+                  <option value="1week">Last 7 Days</option>
+                  <option value="1month">Last Month</option>
+                  <option value="3months">Last 3 Months</option>
+                  <option value="6months">Last 6 Months</option>
+                  <option value="1year">Last Year</option>
+                  <option value="custom">Custom Range</option>
+                </Select>
+                {dateRange === 'custom' && (
+                  <>
+                    <Input
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      placeholder="Start Date"
+                      className="min-w-[140px]"
+                    />
+                    <Input
+                      type="date"
+                      value={customEndDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                      placeholder="End Date"
+                      className="min-w-[140px]"
+                    />
+                  </>
+                )}
+              </div>
               <ExportCsvButton
-                rows={invoices.map(i => ({
-                  number: i.number,
-                  member: i.member ? `${i.member.firstName} ${i.member.lastName}` : 'N/A',
-                  amount: i.amount,
-                  currency: i.currency,
-                  status: i.status,
-                  issuedAt: new Date(i.issuedAt).toLocaleDateString(),
-                  dueDate: i.dueDate ? new Date(i.dueDate).toLocaleDateString() : '',
-                }))}
-                columns={['number', 'member', 'amount', 'currency', 'status', 'issuedAt', 'dueDate']}
-                filename="invoices-report.csv"
+                rows={invoices.map(i => {
+                  const issuedAt = new Date(i.issuedAt);
+                  const dueDate = i.dueDate ? new Date(i.dueDate) : null;
+                  
+                  // Format dates for Excel compatibility (MM/DD/YYYY format)
+                  const formatDateForExcel = (date: Date) => {
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const year = date.getFullYear();
+                    return `${month}/${day}/${year}`;
+                  };
+                  
+                  // Format time for Excel (HH:MM:SS)
+                  const formatTimeForExcel = (date: Date) => {
+                    const hours = String(date.getHours()).padStart(2, '0');
+                    const minutes = String(date.getMinutes()).padStart(2, '0');
+                    const seconds = String(date.getSeconds()).padStart(2, '0');
+                    return `${hours}:${minutes}:${seconds}`;
+                  };
+                  
+                  // Format date-time for Excel (MM/DD/YYYY HH:MM:SS)
+                  const formatDateTimeForExcel = (date: Date) => {
+                    return `${formatDateForExcel(date)} ${formatTimeForExcel(date)}`;
+                  };
+                  
+                  return {
+                    number: i.number || '',
+                    member: i.member ? `${i.member.firstName} ${i.member.lastName}` : 'N/A',
+                    amount: i.amount || 0,
+                    currency: i.currency || 'JOD',
+                    status: i.status || '',
+                    issuedDate: formatDateForExcel(issuedAt),
+                    issuedTime: formatTimeForExcel(issuedAt),
+                    issuedDateTime: formatDateTimeForExcel(issuedAt),
+                    dueDate: dueDate ? formatDateForExcel(dueDate) : '',
+                    amountPaid: i.amountPaid || 0,
+                    remaining: (i.amount || 0) - (i.amountPaid || 0),
+                  };
+                })}
+                columns={['number', 'member', 'amount', 'currency', 'status', 'issuedDate', 'issuedTime', 'issuedDateTime', 'dueDate', 'amountPaid', 'remaining']}
+                filename={`invoices-report-${dateRange}-${new Date().toISOString().split('T')[0]}.csv`}
                 label="Export Report"
               />
               <Button onClick={() => setShowCreateFromSubscriptionModal(true)} leadingIcon={<PlusIcon className="h-5 w-5" />}>

@@ -30,21 +30,23 @@ export function NavbarWithLanguage() {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 lg:px-8">
         <div className="flex items-center gap-6">
           <button
-            className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-button text-white shadow-button transition-all duration-300 hover:scale-105 hover:shadow-button-hover lg:hidden"
+            className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#003DA5] text-white shadow-button transition-all duration-300 hover:scale-105 hover:shadow-button-hover lg:hidden"
             aria-label="Open menu"
             onClick={() => setIsOpen((prev) => !prev)}
           >
             <Bars3Icon className="h-6 w-6 transition-transform duration-300" />
           </button>
-          <Link href="/" className="flex items-center gap-3 font-display text-base font-black tracking-[0.2em] text-brand-black transition-all duration-300 hover:scale-105 sm:text-lg sm:tracking-[0.3em] md:text-xl">
+          <Link href="/" className="flex items-center gap-3 transition-all duration-300 hover:scale-105">
             <Image 
-              src="/infinity-logo.png" 
+              src="/infinity-logo.png?v=2" 
               alt="Infinity Sport Logo" 
-              width={40} 
-              height={40} 
-              className="h-8 w-8 sm:h-10 sm:w-10 object-contain"
+              width={128} 
+              height={128} 
+              className="h-20 w-20 sm:h-24 sm:w-24 md:h-28 md:w-28 lg:h-32 lg:w-32 object-contain flex-shrink-0"
             />
-            INFINITY SPORT
+            <span className="font-display text-lg font-bold tracking-tight text-brand-black sm:text-xl md:text-2xl lg:text-3xl">
+              INFINITY SPORT
+            </span>
           </Link>
         </div>
         <nav className="hidden items-center gap-8 text-sm font-bold lg:flex">
@@ -62,7 +64,7 @@ export function NavbarWithLanguage() {
               >
                 <span className="relative z-10">{tr(link.key)}</span>
                 {active && (
-                  <span className="absolute inset-x-0 bottom-0 h-1 bg-gradient-button rounded-full" />
+                  <span className="absolute inset-x-0 bottom-0 h-1 bg-[#003DA5] rounded-full" />
                 )}
                 {!active && (
                   <span className="absolute inset-x-0 bottom-0 h-0.5 origin-left scale-x-0 bg-brand-blue-primary transition-all duration-300 ease-out group-hover:scale-x-100 rounded-full" />
@@ -81,7 +83,7 @@ export function NavbarWithLanguage() {
           <LanguageToggle />
           <Link
             href="/contact"
-            className="rounded-full bg-gradient-button px-8 py-2.5 text-sm font-bold text-white shadow-button transition-all duration-300 hover:scale-105 hover:shadow-button-hover"
+            className="rounded-full bg-[#003DA5] px-8 py-2.5 text-sm font-bold text-white shadow-button transition-all duration-300 hover:scale-105 hover:shadow-button-hover hover:bg-[#003DA5]/90"
           >
             {tr("nav_join")}
           </Link>
@@ -106,7 +108,7 @@ export function NavbarWithLanguage() {
                   href={link.href}
                   className={`rounded-xl px-4 py-3 font-medium transition ${
                     active
-                      ? "bg-brand-green-primary/10 text-brand-black"
+                      ? "bg-[#003DA5]/10 text-brand-black"
                       : "text-gray-600 hover:bg-brand-blue-primary/10 hover:text-brand-blue-primary"
                   }`}
                   onClick={() => setIsOpen(false)}
@@ -120,7 +122,7 @@ export function NavbarWithLanguage() {
             </div>
             <Link
               href="/contact"
-              className="mt-4 rounded-full bg-gradient-button px-6 py-3 text-center text-sm font-semibold text-white shadow-button transition hover:shadow-button-hover"
+              className="mt-4 rounded-full bg-[#003DA5] px-6 py-3 text-center text-sm font-semibold text-white shadow-button transition hover:shadow-button-hover hover:bg-[#003DA5]/90"
               onClick={() => setIsOpen(false)}
             >
               {tr("nav_join")}

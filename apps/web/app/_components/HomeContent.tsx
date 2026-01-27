@@ -238,11 +238,6 @@ export function HomeContent({ content }: HomeContentProps) {
             />
           )}
         </div>
-        
-        {/* Cinematic Gradient Overlay: Top-left BLUE → Bottom-right GREEN */}
-        <div className="absolute inset-0 z-10 bg-gradient-to-br from-[#1426FF]/60 via-[#69FFDB]/30 to-[#61FF45]/60" />
-        {/* Darkening overlay for text readability */}
-        <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/20 via-black/30 to-black/60" />
 
         {/* Hero Content Container */}
         <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 pb-12 pt-24 sm:px-6 lg:px-8 lg:pt-32">
@@ -269,14 +264,14 @@ export function HomeContent({ content }: HomeContentProps) {
               <AnimatedText delay={300} className="flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
                 <Link
                   href={primaryCta.href}
-                  className="group inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-[#1426FF] via-[#69FFDB] to-[#61FF45] px-6 py-3.5 text-sm font-black text-white shadow-[0_8px_24px_rgba(20,38,255,0.4)] transition-all duration-300 hover:scale-105 hover:shadow-[0_12px_32px_rgba(20,38,255,0.6),0_0_30px_rgba(97,255,69,0.4)] sm:w-auto sm:px-8 sm:py-4 sm:text-base md:px-10 md:py-5"
+                  className="group inline-flex w-full items-center justify-center rounded-full bg-[#003DA5] px-6 py-3.5 text-sm font-black text-white shadow-[0_8px_24px_rgba(0,61,165,0.4)] transition-all duration-300 hover:scale-105 hover:shadow-[0_12px_32px_rgba(0,61,165,0.6)] hover:bg-[#003DA5]/90 sm:w-auto sm:px-8 sm:py-4 sm:text-base md:px-10 md:py-5"
                 >
                   {primaryCta.label || tr(language, 'home_explore_programs')}
                   <ArrowRightIcon className="ml-2 h-4 w-4 sm:h-5 sm:w-5 transition-transform duration-300 group-hover:translate-x-1" />
                 </Link>
                 <Link
                   href={secondaryCta.href}
-                  className="group inline-flex w-full items-center justify-center gap-2 rounded-full border-2 border-[#1C934E] bg-transparent px-6 py-3.5 text-sm font-bold text-white backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:bg-[#1C934E]/20 hover:border-[#61FF45] hover:shadow-[0_0_20px_rgba(28,147,78,0.5)] sm:w-auto sm:gap-3 sm:px-8 sm:py-4 sm:text-base md:px-10 md:py-5"
+                  className="group inline-flex w-full items-center justify-center gap-2 rounded-full border-2 border-[#003DA5] bg-transparent px-6 py-3.5 text-sm font-bold text-white backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:bg-[#003DA5]/20 hover:border-[#003DA5] hover:shadow-[0_0_20px_rgba(0,61,165,0.5)] sm:w-auto sm:gap-3 sm:px-8 sm:py-4 sm:text-base md:px-10 md:py-5"
                 >
                   <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/10 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12 sm:h-10 sm:w-10">
                     <PlayIcon className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -322,7 +317,7 @@ export function HomeContent({ content }: HomeContentProps) {
                     {facilityHighlight?.description || "State Of The Hard Gym"}
                   </p>
                   <button
-                    className="mt-4 inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-[#61FF45] bg-[#61FF45] text-white shadow-[0_4px_15px_rgba(97,255,69,0.5)] transition-all duration-300 hover:scale-110 hover:bg-[#69FFDB] hover:border-[#69FFDB] hover:shadow-[0_6px_20px_rgba(105,255,219,0.6)] hover:rotate-90 sm:mt-6 sm:h-12 sm:w-12"
+                    className="mt-4 inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-[#003DA5] bg-[#003DA5] text-white shadow-[0_4px_15px_rgba(0,61,165,0.5)] transition-all duration-300 hover:scale-110 hover:bg-[#003DA5]/90 hover:border-[#003DA5]/90 hover:shadow-[0_6px_20px_rgba(0,61,165,0.6)] hover:rotate-90 sm:mt-6 sm:h-12 sm:w-12"
                     aria-label="Discover facility highlights"
                   >
                     <PlusIcon className="h-4 w-4 transition-transform duration-300 sm:h-5 sm:w-5" />
@@ -491,7 +486,7 @@ export function HomeContent({ content }: HomeContentProps) {
       </section>
 
       {/* Premium Games Section with Gradient Background */}
-      <section id="games" className="relative bg-gradient-to-br from-[#141AFF] via-[#6BA5E8] to-[#60D066] py-12 sm:py-16 md:py-20 lg:py-24 overflow-hidden">
+      <section id="games" className="relative bg-[#003DA5] py-12 sm:py-16 md:py-20 lg:py-24 overflow-hidden">
         <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <ScrollAnimation direction="up">
@@ -549,7 +544,7 @@ export function HomeContent({ content }: HomeContentProps) {
                 <div className="group flex h-full flex-col rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2),0_0_0_1px_rgba(96,208,102,0.1)] hover:scale-105 sm:p-8">
                   <div className="flex items-center justify-between text-sm">
                     {offer.badge ? (
-                      <span className="rounded-full bg-gradient-button px-4 py-2 text-xs font-black uppercase tracking-[0.3em] text-white shadow-button">
+                      <span className="rounded-full bg-[#003DA5] px-4 py-2 text-xs font-black uppercase tracking-[0.3em] text-white shadow-button">
                         {offer.badge}
                       </span>
                     ) : (
@@ -627,7 +622,7 @@ export function HomeContent({ content }: HomeContentProps) {
                 <div className="mt-8 pt-8 border-t border-brand-lightBlue/20">
                   <Link
                     href="/contact"
-                    className="group inline-flex w-full items-center justify-center rounded-full bg-gradient-button px-6 py-3.5 text-sm font-black text-white shadow-[0_8px_24px_rgba(20,26,255,0.35)] transition-all duration-300 hover:scale-105 hover:shadow-[0_12px_32px_rgba(20,26,255,0.5),0_0_24px_rgba(96,208,102,0.3)] sm:w-auto sm:px-10 sm:py-4 sm:text-base"
+                    className="group inline-flex w-full items-center justify-center rounded-full bg-[#003DA5] px-6 py-3.5 text-sm font-black text-white shadow-[0_8px_24px_rgba(0,61,165,0.35)] transition-all duration-300 hover:scale-105 hover:shadow-[0_12px_32px_rgba(0,61,165,0.5)] hover:bg-[#003DA5]/90 sm:w-auto sm:px-10 sm:py-4 sm:text-base"
                   >
                     {tr(language, 'home_contact_to_book')}
                     <ArrowRightIcon className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1 sm:h-5 sm:w-5" />
@@ -698,7 +693,7 @@ export function HomeContent({ content }: HomeContentProps) {
                 <h3 className="text-2xl font-black text-brand-black sm:text-3xl">See what&apos;s next at Infinity</h3>
                 <Link
                   href="/events"
-                  className="group/link inline-flex items-center gap-2 text-sm font-bold text-white bg-gradient-button px-5 py-2.5 rounded-full shadow-button transition-all duration-300 hover:shadow-button-hover hover:gap-3"
+                  className="group/link inline-flex items-center gap-2 text-sm font-bold text-white bg-[#003DA5] px-5 py-2.5 rounded-full shadow-button transition-all duration-300 hover:shadow-button-hover hover:bg-[#003DA5]/90 hover:gap-3"
                 >
                   View Event Details
                   <ArrowRightIcon className="h-4 w-4 transition-transform duration-300 group-hover/link:translate-x-1" />
@@ -716,7 +711,7 @@ export function HomeContent({ content }: HomeContentProps) {
                       <p className="text-xs uppercase tracking-[0.35em] text-brand-green-dark font-bold">
                         {new Date(event.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                       </p>
-                      <span className="rounded-full bg-brand-green-primary/10 px-3 py-1 text-xs font-semibold text-brand-green-primary">
+                      <span className="rounded-full bg-[#003DA5]/10 px-3 py-1 text-xs font-semibold text-[#003DA5]">
                         Upcoming
                       </span>
                     </div>
@@ -741,7 +736,7 @@ export function HomeContent({ content }: HomeContentProps) {
       </section>
 
       {/* Premium Contact CTA Section with Gradient */}
-      <section id="contact" className="relative bg-gradient-to-br from-[#141AFF] via-[#6BA5E8] to-[#60D066] py-12 sm:py-16 md:py-20 lg:py-24 overflow-hidden">
+      <section id="contact" className="relative bg-[#003DA5] py-12 sm:py-16 md:py-20 lg:py-24 overflow-hidden">
         <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
         <div className="relative mx-auto flex max-w-4xl flex-col items-center gap-4 px-4 text-center sm:gap-6 sm:px-6">
           <ScrollAnimation direction="up">
@@ -832,7 +827,7 @@ export function HomeContent({ content }: HomeContentProps) {
               </div>
               <button
                 type="submit"
-                className="group mt-6 w-full rounded-xl bg-gradient-button px-6 py-3.5 text-sm font-black text-white shadow-[0_8px_24px_rgba(20,26,255,0.35)] transition-all duration-300 hover:scale-105 hover:shadow-[0_12px_32px_rgba(20,26,255,0.5),0_0_24px_rgba(96,208,102,0.3)] disabled:opacity-70 sm:mt-8 sm:px-8 sm:py-4 sm:text-base"
+                className="group mt-6 w-full rounded-xl bg-[#003DA5] px-6 py-3.5 text-sm font-black text-white shadow-[0_8px_24px_rgba(0,61,165,0.35)] transition-all duration-300 hover:scale-105 hover:shadow-[0_12px_32px_rgba(0,61,165,0.5)] hover:bg-[#003DA5]/90 disabled:opacity-70 sm:mt-8 sm:px-8 sm:py-4 sm:text-base"
                 disabled={contactSubmitting}
               >
                 {contactSubmitting ? tr(language, 'home_contact_sending') : tr(language, 'home_contact_send')}

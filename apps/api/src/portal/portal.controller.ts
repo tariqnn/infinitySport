@@ -159,8 +159,13 @@ export class PortalController {
 
   // Invoices
   @Get('invoices')
-  async getInvoices(@Query('companyId') companyId?: string, @Query('status') status?: string) {
-    return this.portalService.getInvoices(companyId, status as any);
+  async getInvoices(
+    @Query('companyId') companyId?: string,
+    @Query('status') status?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.portalService.getInvoices(companyId, status as any, startDate, endDate);
   }
 
   @Get('invoices/:id')
@@ -490,8 +495,12 @@ export class PortalController {
 
   // Package Registrations (public POST for form; GET/PATCH for admin)
   @Get('package-registrations')
-  async getPackageRegistrations(@Query('packageName') packageName?: string) {
-    return this.portalService.getPackageRegistrations(packageName);
+  async getPackageRegistrations(
+    @Query('packageName') packageName?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.portalService.getPackageRegistrations(packageName, startDate, endDate);
   }
 
   @Post('package-registrations')
@@ -504,6 +513,12 @@ export class PortalController {
   @Patch('package-registrations/:id')
   async updatePackageRegistration(@Param('id') id: string, @Body() data: { isPaid?: boolean }) {
     return this.portalService.updatePackageRegistration(id, data);
+  }
+
+  @Delete('package-registrations/:id')
+  async deletePackageRegistration(@Param('id') id: string) {
+    await this.portalService.deletePackageRegistration(id);
+    return { success: true };
   }
 }
 

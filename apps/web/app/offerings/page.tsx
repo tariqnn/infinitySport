@@ -57,7 +57,7 @@ export default function OfferingsPage() {
       <div className="mx-auto mt-16 max-w-4xl px-6 text-center lg:px-0">
         <Link
           href="/contact"
-          className="inline-flex items-center gap-2 rounded-full bg-gradient-button px-8 py-3 text-sm font-bold text-white shadow-button transition hover:shadow-button-hover"
+          className="inline-flex items-center gap-2 rounded-full bg-[#003DA5] px-8 py-3 text-sm font-bold text-white shadow-button transition hover:shadow-button-hover hover:bg-[#003DA5]/90"
         >
           Start a conversation
         </Link>

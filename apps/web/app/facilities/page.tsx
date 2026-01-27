@@ -27,7 +27,7 @@ export default async function FacilitiesPage() {
           Infinity offers multiple premium spaces for training, events, and private sessions.
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-4">
-          <Link href="/contact" className="rounded-xl bg-gradient-button px-8 py-3 font-bold text-white shadow-button transition hover:shadow-button-hover">
+          <Link href="/contact" className="rounded-xl bg-[#003DA5] px-8 py-3 font-bold text-white shadow-button transition hover:shadow-button-hover hover:bg-[#003DA5]/90">
             Book a Campus Tour
           </Link>
           <Link href="/#facilities" className="rounded-full border-2 border-brand-lightBlue px-6 py-3 text-sm font-semibold text-brand-blue-primary transition hover:border-brand-green-primary hover:text-brand-green-primary">

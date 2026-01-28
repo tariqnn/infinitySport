@@ -7,8 +7,9 @@ const fs = require('fs');
 const path = require('path');
 
 // Get the directory where this script is located
-const apiDir = __dirname;
-const rootDir = path.resolve(apiDir, '../..');
+// In Vercel, we're already in apps/api, but __dirname will be the script location
+const apiDir = process.cwd(); // Use current working directory (should be apps/api in Vercel)
+const rootDir = path.resolve(apiDir, '..', '..');
 const rootPackageJson = path.join(rootDir, 'package.json');
 
 // Temporarily rename root package.json to prevent workspace detection
@@ -30,16 +31,29 @@ if (fs.existsSync(rootPackageJson)) {
 }
 
 try {
-  // Run npm install
+  // Run npm install with workspace detection disabled
   console.log('Installing dependencies in apps/api...');
+  console.log('Current directory:', apiDir);
+  console.log('Root package.json path:', rootPackageJson);
+  
+  // Set environment variables to disable workspace detection
+  const env = {
+    ...process.env,
+    npm_config_workspaces: 'false',
+    npm_config_workspace: 'false',
+    NPM_CONFIG_WORKSPACES: 'false'
+  };
+  
   execSync('npm install --legacy-peer-deps', {
     cwd: apiDir,
     stdio: 'inherit',
-    env: { ...process.env, npm_config_workspaces: 'false' }
+    env: env
   });
   console.log('Installation completed successfully!');
 } catch (error) {
   console.error('Installation failed:', error.message);
+  if (error.stdout) console.error('stdout:', error.stdout.toString());
+  if (error.stderr) console.error('stderr:', error.stderr.toString());
   process.exit(1);
 } finally {
   // Restore root package.json if we hid it

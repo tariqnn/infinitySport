@@ -7,6 +7,21 @@ import { tr } from '../../lib/translations';
 
 type CourtType = 'Basketball AC' | 'Basketball 3x3' | 'Padel' | 'Volleyball';
 
+// Some courts share the same physical space. When one is booked/blocked,
+// the linked courts should also be treated as unavailable.
+const SHARED_COURT_GROUPS: CourtType[][] = [
+  ['Basketball AC', 'Volleyball'],
+];
+
+const getSharedCourtTypes = (type: CourtType): CourtType[] => {
+  for (const group of SHARED_COURT_GROUPS) {
+    if (group.includes(type)) {
+      return group;
+    }
+  }
+  return [type];
+};
+
 // Generate time slots from 7:00 AM to 11:00 PM, every hour (+ 12:00 AM shown at the end)
 const generateTimeSlots = () => {
   const slots: string[] = [];
@@ -57,8 +72,9 @@ const isBlockedSlot = (
   const court = opts.courts.find((c) => c.id === opts.courtId);
   if (!court) return false;
   const day = dayKey(opts.date);
-  const times = blocked[day]?.[court.type] ?? [];
-  return times.includes(opts.time);
+  const dayBlocked = blocked[day] ?? {};
+  const typesToCheck = getSharedCourtTypes(court.type);
+  return typesToCheck.some((t) => (dayBlocked[t] ?? []).includes(opts.time));
 };
 
 // Booked slots: existing (non‑cancelled) bookings; keyed by YYYY‑MM‑DD
@@ -68,8 +84,9 @@ const isBookedSlot = (
 ) => {
   const court = opts.courts.find((c) => c.id === opts.courtId);
   if (!court) return false;
-  const times = booked[opts.date]?.[court.type] ?? [];
-  return times.includes(opts.time);
+  const dayBooked = booked[opts.date] ?? {};
+  const typesToCheck = getSharedCourtTypes(court.type);
+  return typesToCheck.some((t) => (dayBooked[t] ?? []).includes(opts.time));
 };
 
 export function BookingForm() {

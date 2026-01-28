@@ -44,6 +44,7 @@ export default async function SportsPage() {
       <div className="mx-auto mt-16 max-w-5xl px-6 lg:px-8">
         <div className="mb-8 text-center">
           <h2 className="text-3xl font-bold text-brand-black">Basketball Packages</h2>
+          <p className="mt-1 text-sm font-semibold text-brand-blue-primary">Infinity Sports Basketball Academy</p>
           <p className="mt-2 text-sm text-gray-600">Age-group programmes built on fundamental movement skills, confidence, and teamwork.</p>
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -57,6 +58,7 @@ export default async function SportsPage() {
       <div className="mx-auto mt-24 max-w-5xl px-6 lg:px-8">
         <div className="mb-8 text-center">
           <h2 className="text-3xl font-bold text-brand-black">Gymnastics Programs</h2>
+          <p className="mt-1 text-sm font-semibold text-brand-blue-primary">Powered by Phoenix Academy</p>
           <p className="mt-2 text-gray-600 max-w-2xl mx-auto">
             Age-appropriate programs that build flexibility, balance, strength, and confidence.
           </p>
@@ -101,6 +103,7 @@ export default async function SportsPage() {
       <div id="volleyball" className="mx-auto mt-24 max-w-5xl px-6 lg:px-8 scroll-mt-24">
         <div className="mb-8 text-center">
           <h2 className="text-3xl font-bold text-brand-black">Volleyball</h2>
+          <p className="mt-1 text-sm font-semibold text-brand-blue-primary">Powered by Spikers Academy</p>
         </div>
         <VolleyballPackageCard />
       </div>

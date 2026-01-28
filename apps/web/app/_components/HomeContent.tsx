@@ -5,7 +5,6 @@ import type { ChangeEvent, FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRightIcon, PlayIcon } from "@heroicons/react/24/solid";
-import { PlusIcon } from "@heroicons/react/24/outline";
 import type { LandingContent } from "@infinity/types";
 import { AnimatedText } from "./AnimatedText";
 import { ScrollAnimation } from "./ScrollAnimation";
@@ -29,7 +28,7 @@ export function HomeContent({ content }: HomeContentProps) {
     "Infinity features a modern sports facility designed for both leisure and competitive environments. It's a place where athletes and parents can watch kids learn, adapt, and evolve into modern-day players. Learn, adapt, and evolve with cutting-edge innovation focused on youth development and high-performance training.";
   const heroVideoPath = hero.backgroundVideoUrl?.trim() || HERO_VIDEO_FALLBACK_PATH;
   const primaryCta = {
-    href: hero.primaryCtaLink || "/contact",
+    href: hero.primaryCtaLink || "/sports",
     label: hero.primaryCtaLabel || "Explore Programs"
   };
   const secondaryCta = hero.secondaryCtaLabel
@@ -303,65 +302,7 @@ export function HomeContent({ content }: HomeContentProps) {
               ) : null}
             </div>
 
-            {/* Glassmorphism Cards */}
-            <div className="mt-8 flex w-full max-w-3xl flex-col gap-4 sm:mt-12 sm:gap-6">
-              
-              {/* Facility Highlights Card - Floating Animation */}
-              <ScrollAnimation direction="up" delay={400}>
-                <div className="group relative rounded-2xl border border-white/30 bg-white/15 p-4 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.2)] transition-all duration-500 hover:-translate-y-3 hover:shadow-[0_16px_48px_rgba(0,0,0,0.3)] animate-[float_6s_ease-in-out_infinite] sm:p-6 md:p-8">
-                  <p className="text-[10px] uppercase tracking-[0.25em] text-[#61FF45] font-black sm:text-xs">{tr(language, 'home_facility_highlights')}</p>
-                  <h3 className="mt-2 text-xl font-black text-white sm:mt-3 sm:text-2xl">
-                    {facilityHighlight?.name || "Infinity Arena"}
-                  </h3>
-                  <p className="mt-2 text-xs text-white/90 leading-relaxed sm:text-sm">
-                    {facilityHighlight?.description || "State Of The Hard Gym"}
-                  </p>
-                  <button
-                    className="mt-4 inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-[#003DA5] bg-[#003DA5] text-white shadow-[0_4px_15px_rgba(0,61,165,0.5)] transition-all duration-300 hover:scale-110 hover:bg-[#003DA5]/90 hover:border-[#003DA5]/90 hover:shadow-[0_6px_20px_rgba(0,61,165,0.6)] hover:rotate-90 sm:mt-6 sm:h-12 sm:w-12"
-                    aria-label="Discover facility highlights"
-                  >
-                    <PlusIcon className="h-4 w-4 transition-transform duration-300 sm:h-5 sm:w-5" />
-                  </button>
-                </div>
-              </ScrollAnimation>
-
-              {/* Quote Card */}
-              <ScrollAnimation direction="up" delay={500}>
-                <div className="rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-xl shadow-[0_8px_24px_rgba(0,0,0,0.15)] transition-all duration-500 hover:-translate-y-2 hover:bg-white/15 hover:shadow-[0_12px_32px_rgba(0,0,0,0.2)] sm:p-6">
-                  <p className="text-xs leading-relaxed italic text-white/95 sm:text-sm md:text-base">
-                    &ldquo;{tr(language, 'home_elite_quote')}&rdquo;
-                  </p>
-                </div>
-              </ScrollAnimation>
-
-              {/* Plan Details Card */}
-              <ScrollAnimation direction="right" delay={600}>
-                <div className="rounded-2xl border border-white/30 bg-white/15 p-4 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.2)] transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_16px_48px_rgba(0,0,0,0.3)] sm:p-6 md:p-8">
-                  <p className="text-[10px] uppercase tracking-[0.3em] text-[#69FFDB] font-black sm:text-xs sm:tracking-[0.4em]">
-                    {featuredOffer?.badge || tr(language, 'home_featured_plan')}
-                  </p>
-                  <h4 className="mt-2 text-lg font-black text-white sm:mt-3 sm:text-xl">{featuredOffer?.name || tr(language, 'home_elite_membership')}</h4>
-                  <p className="mt-2 text-xs text-white/90 leading-relaxed sm:text-sm">
-                    {featuredOffer?.description || tr(language, 'home_membership_features')}
-                  </p>
-                  <ul className="mt-3 space-y-1.5 text-xs text-white/85 sm:mt-4 sm:space-y-2 sm:text-sm">
-                    {(featuredOffer?.features || []).slice(0, 3).map((feature) => (
-                      <li key={feature} className="flex items-center gap-2">
-                        <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#61FF45]" />
-                        <span className="line-clamp-1">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <Link
-                    href={featuredOffer?.link || "/offers"}
-                    className="group mt-4 inline-flex w-full items-center justify-center rounded-full border border-white/30 bg-white/10 px-4 py-2 text-xs font-bold text-white transition-all duration-300 hover:scale-105 hover:bg-white/20 hover:border-white/50 sm:mt-6 sm:w-auto sm:px-6 sm:py-2.5 sm:text-sm"
-                  >
-                    {tr(language, 'home_explore_offers')}
-                    <ArrowRightIcon className="ml-2 h-3 w-3 transition-transform duration-300 group-hover:translate-x-1 sm:h-4 sm:w-4" />
-                  </Link>
-                </div>
-              </ScrollAnimation>
-            </div>
+            {/* (removed) Glassmorphism Cards */}
           </div>
         </div>
       </section>
@@ -429,6 +370,7 @@ export function HomeContent({ content }: HomeContentProps) {
               <div className="flex flex-col gap-3 sm:gap-4 text-center cursor-pointer group">
                 <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">{tr(language, 'home_programs')}</p>
                 <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl group-hover:text-brand-green-primary transition-colors">{tr(language, 'home_basketball_programs')}</h2>
+                <p className="text-base font-semibold text-brand-green-primary">Infinity Sports Basketball Academy</p>
                 <p className="max-w-2xl mx-auto text-base text-gray-600 leading-relaxed sm:text-lg">
                   {tr(language, 'home_programs_desc')}
                 </p>
@@ -450,6 +392,7 @@ export function HomeContent({ content }: HomeContentProps) {
               <div className="flex flex-col gap-3 sm:gap-4 text-center cursor-pointer group">
                 <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">{tr(language, 'home_packages')}</p>
                 <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl group-hover:text-brand-green-primary transition-colors">{tr(language, 'home_gymnastics_programs')}</h2>
+                <p className="text-base font-semibold text-brand-green-primary">Powered by Phoenix Academy</p>
                 <p className="max-w-2xl mx-auto text-base text-gray-600 leading-relaxed sm:text-lg">
                   {tr(language, 'home_gymnastics_programs_desc')}
                 </p>
@@ -471,6 +414,7 @@ export function HomeContent({ content }: HomeContentProps) {
               <div className="flex flex-col gap-3 sm:gap-4 text-center cursor-pointer group">
                 <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">{tr(language, 'home_packages')}</p>
                 <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl group-hover:text-brand-green-primary transition-colors">{tr(language, 'home_volleyball')}</h2>
+                <p className="text-base font-semibold text-brand-green-primary">Powered by Spikers Academy</p>
                 <p className="max-w-2xl mx-auto text-base text-gray-600 leading-relaxed sm:text-lg">
                   {tr(language, 'home_volleyball_desc')}
                 </p>
@@ -491,7 +435,6 @@ export function HomeContent({ content }: HomeContentProps) {
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <ScrollAnimation direction="up">
             <div className="flex flex-col gap-3 sm:gap-4 text-center mx-auto">
-              <p className="text-xs uppercase tracking-[0.3em] text-white/90 font-bold sm:text-sm">{tr(language, 'home_programs')}</p>
               <h2 className="text-3xl font-black text-white leading-tight sm:text-4xl md:text-5xl">{tr(language, 'home_game_ready')}</h2>
               <p className="max-w-2xl mx-auto text-base text-white/95 leading-relaxed sm:text-lg">
                 {tr(language, 'home_game_ready_desc')}
@@ -504,7 +447,7 @@ export function HomeContent({ content }: HomeContentProps) {
                 <div className="group rounded-2xl border-2 border-white/30 bg-white/95 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.15)] backdrop-blur-sm transition-all duration-500 hover:-translate-y-3 hover:border-brand-blue-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.3)] hover:scale-105 sm:p-6">
                   <div className="flex items-center justify-between">
                     <p className="text-xs uppercase tracking-[0.35em] text-brand-green-dark font-bold">
-                      {program.sportType || "Program"}
+                      {(program.sportType || "Program").replace(/\b\w/g, (c) => c.toUpperCase())}
                     </p>
                     {program.badge ? (
                       <span className="rounded-full bg-white/30 px-3 py-1 text-[11px] font-semibold text-brand-blue-primary">
@@ -528,53 +471,7 @@ export function HomeContent({ content }: HomeContentProps) {
         </div>
       </section>
 
-      {/* Premium Offers Section */}
-      <section id="offers" className="bg-white py-12 sm:py-16 md:py-20 lg:py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <ScrollAnimation direction="up">
-            <div className="flex flex-col gap-3 sm:gap-4 text-center mx-auto">
-              <p className="text-xs uppercase tracking-[0.3em] text-brand-green-dark font-bold sm:text-sm">{tr(language, 'home_membership')}</p>
-              <h2 className="text-3xl font-black text-brand-black leading-tight sm:text-4xl md:text-5xl">{tr(language, 'home_membership_desc')}</h2>
-              <p className="max-w-2xl mx-auto text-base text-gray-600 leading-relaxed sm:text-lg">{tr(language, 'home_membership_subdesc')}</p>
-            </div>
-          </ScrollAnimation>
-          <div className="mt-8 grid gap-6 sm:mt-12 sm:gap-8 md:grid-cols-2 lg:mt-16 lg:grid-cols-3">
-            {offerCards.map((offer, idx) => (
-              <ScrollAnimation key={offer.id} direction="up" delay={idx * 100}>
-                <div className="group flex h-full flex-col rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-6 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2),0_0_0_1px_rgba(96,208,102,0.1)] hover:scale-105 sm:p-8">
-                  <div className="flex items-center justify-between text-sm">
-                    {offer.badge ? (
-                      <span className="rounded-full bg-[#003DA5] px-4 py-2 text-xs font-black uppercase tracking-[0.3em] text-white shadow-button">
-                        {offer.badge}
-                      </span>
-                    ) : (
-                      <span />
-                    )}
-                    <span className="text-2xl font-black text-brand-black">{offer.price}</span>
-                  </div>
-                  <h3 className="mt-6 text-2xl font-black text-brand-black">{offer.name}</h3>
-                  <p className="mt-3 text-sm text-gray-600 flex-1 leading-relaxed">{offer.description}</p>
-                  <ul className="mt-4 space-y-2 text-sm text-gray-700">
-                    {offer.features.map((feature) => (
-                      <li key={feature} className="flex items-center gap-2">
-                        <span className="h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                  <Link
-                    href={offer.link || "/offers"}
-                    className="group/link mt-6 inline-flex items-center gap-2 text-sm font-bold text-brand-blue-primary transition-colors duration-300 hover:text-brand-green-primary"
-                  >
-                    Get details
-                    <ArrowRightIcon className="h-4 w-4 transition-transform duration-300 group-hover/link:translate-x-1" />
-                  </Link>
-                </div>
-              </ScrollAnimation>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* (removed) Membership / Limited-time offers section */}
 
       {/* Booking Section */}
       <section id="booking" className="bg-gray-50 py-12 sm:py-16 md:py-20 lg:py-24">

@@ -43,7 +43,7 @@ export default async function FacilitiesPage() {
           <ul className="space-y-3 text-gray-600">
             <li className="flex items-center gap-2">
               <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-              IBA approved court 5x5
+              FIBA approved court 5x5
             </li>
             <li className="flex items-center gap-2">
               <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />

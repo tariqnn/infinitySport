@@ -79,7 +79,7 @@ export async function SiteFooter() {
                   {tr(lang, 'footer_tel')} :{' '}
                   <a
                     href={`tel:${phoneHref}`}
-                    className="transition-colors hover:text-brand-blue-primary"
+                    className="text-brand-blue-primary transition-colors"
                   >
                     {footer.phone || '07 9624 4059'}
                   </a>
@@ -91,18 +91,25 @@ export async function SiteFooter() {
                   href={instagram || 'https://instagram.com/infinity.sports.academy'} 
                   target="_blank" 
                   rel="noopener noreferrer" 
-                  className="transition-colors hover:text-brand-blue-primary"
+                  className="text-brand-blue-primary transition-colors"
                 >
                   Infinity.sports.academy
                 </a>
               </div>
               <div>
                 <p className="font-semibold text-black">{tr(lang, 'footer_location')}</p>
-                <p className="text-gray-600">{footer.address || 'Shemisani, Princess Alia College'}</p>
+                <a
+                  href="https://maps.app.goo.gl/25mE3pTSF2pnkLz46?g_st=iw"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-brand-blue-primary transition-colors"
+                >
+                  {footer.address || 'Shemisani, Princess Alia College'}
+                </a>
               </div>
               <div>
                 <p className="font-semibold text-black">{tr(lang, 'footer_email')}</p>
-                <a href={`mailto:${footer.email || 'infinitysportsacademyjo@gmail.com'}`} className="transition-colors hover:text-brand-blue-primary">
+                <a href={`mailto:${footer.email || 'infinitysportsacademyjo@gmail.com'}`} className="text-brand-blue-primary transition-colors">
                   {footer.email || 'infinitysportsacademyjo@gmail.com'}
                 </a>
               </div>

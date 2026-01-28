@@ -14,6 +14,14 @@ interface Coach {
   imageUrl?: string;
 }
 
+function academyBySport(sport: string): string | null {
+  const normalized = sport.trim().toLowerCase();
+  if (normalized === 'basketball') return 'Infinity Sports Basketball Academy';
+  if (normalized === 'volleyball') return 'Powered by Spikers Academy';
+  if (normalized === 'gymnastics') return 'Powered by Phoenix Academy';
+  return null;
+}
+
 const COACHES_DATA: Coach[] = [
   {
     id: '1',
@@ -241,6 +249,11 @@ export function CoachesSection() {
                       <div className="flex-grow flex flex-col min-w-0">
                         <div className="flex-shrink-0">
                           <p className="text-xs uppercase tracking-[0.35em] text-brand-green-dark font-bold">{coach.sport}</p>
+                          {academyBySport(coach.sport) ? (
+                            <p className="mt-1 text-sm font-semibold text-brand-blue-primary">
+                              {academyBySport(coach.sport)}
+                            </p>
+                          ) : null}
                           <h3 className={`mt-2 ${isExpanded ? 'text-2xl' : 'text-lg sm:text-xl'} font-black text-brand-black`}>{coach.name}</h3>
                         </div>
                         <div className={`${isExpanded ? 'mt-4' : 'mt-2'}`}>

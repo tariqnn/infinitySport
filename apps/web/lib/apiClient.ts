@@ -72,7 +72,7 @@ export type AnnouncementResponse = {
 
 // Fallback facilities when API returns none (used in landing + facilities page)
 const FALLBACK_FACILITIES: { id: string; name: string; description: string }[] = [
-  { id: 'iba-5x5', name: 'IBA Approved Court 5x5', description: 'Full-size basketball court meeting IBA standards for official 5x5 play.' },
+  { id: 'iba-5x5', name: 'FIBA Approved Court 5x5', description: 'Full-size basketball court meeting FIBA standards for official 5x5 play.' },
   { id: 'fiba-3x3', name: 'FIBA Approved 3x3 Court', description: 'FIBA-approved half-court for official 3x3 basketball.' },
   { id: 'multipurpose-hall', name: 'Multipurpose Hall', description: 'Suitable for Yoga, Pilates, Ballet, Kickboxing, and more.' },
   { id: 'padel-merry', name: 'Padel Court by Merry Sports', description: 'Professional padel court by Merry Sports.' },
@@ -185,7 +185,7 @@ async function _fetchLandingContent(): Promise<LandingContent> {
       title: 'Elevating Jordanian Athletes',
       subtitle: 'Infinity Sports delivers elite training programs, professional coaching, and world-class facilities for teams and individuals across the region.',
       primaryCtaLabel: 'Explore Programs',
-      primaryCtaLink: '/contact',
+      primaryCtaLink: '/sports',
       secondaryCtaLabel: 'Book a Tour',
       secondaryCtaLink: '/contact',
       backgroundImageUrl: undefined,

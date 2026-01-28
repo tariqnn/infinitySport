@@ -144,17 +144,39 @@ export function BookingForm() {
   maxDate.setDate(maxDate.getDate() + 30);
   const maxDateStr = maxDate.toISOString().split('T')[0];
 
-  // Filter out past time slots for today
+  // Filter out past time slots for today and apply day-specific restrictions
   const getAvailableTimeSlots = () => {
-    if (selectedDate !== today) {
-      return TIME_SLOTS;
+    if (!selectedDate) {
+      return [];
     }
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-    return TIME_SLOTS.filter(slot => {
-      // Allow selecting the next slot if we're already past it
-      return toMinutes(slot) > currentMinutes;
-    });
+    
+    const day = dayKey(selectedDate);
+    const isWeekday = day === 'SUNDAY' || day === 'MONDAY' || day === 'TUESDAY' || day === 'WEDNESDAY' || day === 'THURSDAY';
+    
+    // For Sunday-Thursday, only show slots from 3pm (15:00) onwards
+    // For Friday-Saturday, show all slots (7:00-23:00 + 00:00)
+    let availableSlots = TIME_SLOTS;
+    if (isWeekday) {
+      // Filter to only show slots from 15:00 (3pm) onwards
+      availableSlots = TIME_SLOTS.filter(slot => {
+        const slotMinutes = toMinutes(slot);
+        // 15:00 = 15 * 60 = 900 minutes
+        // Also include 00:00 (midnight) as it's shown at the end
+        return slotMinutes >= 900 || slot === '00:00';
+      });
+    }
+    
+    // If it's today, also filter out past time slots
+    if (selectedDate === today) {
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      availableSlots = availableSlots.filter(slot => {
+        // Allow selecting the next slot if we're already past it
+        return toMinutes(slot) > currentMinutes;
+      });
+    }
+    
+    return availableSlots;
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {

@@ -6,13 +6,17 @@ This API is configured for Vercel serverless deployment.
 
 ### Important: Vercel Project Settings
 
-**You must configure the following in your Vercel project settings:**
+**CRITICAL: You must configure the following in your Vercel project settings:**
 
-1. **Root Directory**: Set to `apps/api`
+1. **Root Directory**: Set to `apps/api` ⚠️ **This is the most important setting!**
+   - Go to your Vercel project → Settings → General
+   - Under "Root Directory", enter: `apps/api`
+   - This prevents Vercel from trying to install dependencies from the monorepo root
+
 2. **Framework Preset**: Other
-3. **Build Command**: `npm run build` (or leave default)
-4. **Output Directory**: `dist` (or leave empty)
-5. **Install Command**: `npm install` (or leave default)
+3. **Build Command**: `npm run build` (or leave default - vercel.json will handle it)
+4. **Output Directory**: Leave empty (vercel.json handles this)
+5. **Install Command**: Leave default (vercel.json uses `--no-workspaces` to prevent monorepo issues)
 
 ### Environment Variables
 

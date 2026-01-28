@@ -11,22 +11,42 @@ const path = require('path');
 const apiDir = process.cwd(); // Use current working directory (should be apps/api in Vercel)
 const rootDir = path.resolve(apiDir, '..', '..');
 const rootPackageJson = path.join(rootDir, 'package.json');
+const rootPackageLock = path.join(rootDir, 'package-lock.json');
 
-// Temporarily rename root package.json to prevent workspace detection
+// Hide root package.json and package-lock.json IMMEDIATELY to prevent workspace detection
 let rootPackageHidden = false;
+let rootLockHidden = false;
 const rootPackageBackup = rootPackageJson + '.vercel-backup';
+const rootLockBackup = rootPackageLock + '.vercel-backup';
 
+console.log('=== Vercel Standalone Install Script ===');
+console.log('API Directory:', apiDir);
+console.log('Root Directory:', rootDir);
+console.log('Root package.json:', rootPackageJson);
+
+// Hide root package.json FIRST, before any npm operations
 if (fs.existsSync(rootPackageJson)) {
   try {
     const rootPkg = JSON.parse(fs.readFileSync(rootPackageJson, 'utf8'));
-    // Only hide if it has workspaces defined
-    if (rootPkg.workspaces) {
+    // Hide if it has workspaces OR if it has Next.js/React (monorepo root)
+    if (rootPkg.workspaces || rootPkg.dependencies?.next || rootPkg.dependencies?.react) {
+      console.log('Hiding root package.json (has workspaces or frontend deps)...');
       fs.renameSync(rootPackageJson, rootPackageBackup);
       rootPackageHidden = true;
-      console.log('Temporarily hiding root package.json to prevent workspace detection...');
     }
   } catch (e) {
     console.warn('Could not read root package.json:', e.message);
+  }
+}
+
+// Also hide package-lock.json if it exists
+if (fs.existsSync(rootPackageLock)) {
+  try {
+    console.log('Hiding root package-lock.json...');
+    fs.renameSync(rootPackageLock, rootLockBackup);
+    rootLockHidden = true;
+  } catch (e) {
+    console.warn('Could not hide root package-lock.json:', e.message);
   }
 }
 
@@ -60,9 +80,19 @@ try {
   if (rootPackageHidden && fs.existsSync(rootPackageBackup)) {
     try {
       fs.renameSync(rootPackageBackup, rootPackageJson);
-      console.log('Restored root package.json');
+      console.log('✓ Restored root package.json');
     } catch (e) {
       console.warn('Could not restore root package.json:', e.message);
+    }
+  }
+  
+  // Restore root package-lock.json if we hid it
+  if (rootLockHidden && fs.existsSync(rootLockBackup)) {
+    try {
+      fs.renameSync(rootLockBackup, rootPackageLock);
+      console.log('✓ Restored root package-lock.json');
+    } catch (e) {
+      console.warn('Could not restore root package-lock.json:', e.message);
     }
   }
 }

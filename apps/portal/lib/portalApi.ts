@@ -252,6 +252,21 @@ export const dashboardApi = {
   },
 };
 
+export type PackageRegistrationRow = {
+  id: string;
+  packageName: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string | null;
+  customerAge: number | null;
+  isPaid: boolean;
+  periodEndsAt: string | null;
+  isFrozen: boolean;
+  frozenAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export const packageRegistrationsApi = {
   list: (packageName?: string, startDate?: string, endDate?: string) => {
     const params = new URLSearchParams();
@@ -259,10 +274,10 @@ export const packageRegistrationsApi = {
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
     const query = params.toString() ? `?${params.toString()}` : '';
-    return portalFetch<Array<{ id: string; packageName: string; customerName: string; customerPhone: string; customerEmail: string | null; customerAge: number | null; isPaid: boolean; createdAt: string; updatedAt: string }>>(`/portal/package-registrations${query}`);
+    return portalFetch<PackageRegistrationRow[]>(`/portal/package-registrations${query}`);
   },
-  update: (id: string, data: { isPaid?: boolean }) =>
-    portalFetch<unknown>(`/portal/package-registrations/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  update: (id: string, data: { isPaid?: boolean; isFrozen?: boolean }) =>
+    portalFetch<PackageRegistrationRow>(`/portal/package-registrations/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) => portalFetch<void>(`/portal/package-registrations/${id}`, { method: 'DELETE' }),
 };
 

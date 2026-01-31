@@ -2,21 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { PageHeader, Card, CardHeader, CardBody, DataTable, Badge, Select, Input } from '../_components/ui';
-import { packageRegistrationsApi } from '../../lib/portalApi';
+import { packageRegistrationsApi, type PackageRegistrationRow } from '../../lib/portalApi';
 import { ExportCsvButton } from '../_components/ActionButtons';
 import { TrashIcon } from '@heroicons/react/24/outline';
 
-type Registration = {
-  id: string;
-  packageName: string;
-  customerName: string;
-  customerPhone: string;
-  customerEmail: string | null;
-  customerAge: number | null;
-  isPaid: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
+type Registration = PackageRegistrationRow;
 
 export default function RegistrationsPage() {
   const [rows, setRows] = useState<Registration[]>([]);
@@ -26,7 +16,31 @@ export default function RegistrationsPage() {
   const [customStartDate, setCustomStartDate] = useState<string>('');
   const [customEndDate, setCustomEndDate] = useState<string>('');
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [freezingId, setFreezingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  /** Effective period end: periodEndsAt if set, else createdAt + 30 days (for display only). */
+  function getPeriodEnd(r: Registration): Date | null {
+    if (r.periodEndsAt) return new Date(r.periodEndsAt);
+    if (r.createdAt) {
+      const d = new Date(r.createdAt);
+      d.setDate(d.getDate() + 30);
+      return d;
+    }
+    return null;
+  }
+
+  /** Days remaining (positive) or 0 if expired. Returns null if frozen (countdown paused). */
+  function getDaysRemaining(r: Registration): number | null {
+    if (r.isFrozen) return null;
+    const end = getPeriodEnd(r);
+    if (!end) return null;
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+    const diff = Math.ceil((end.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+    return Math.max(0, diff);
+  }
 
   const load = useCallback(async () => {
     try {
@@ -91,6 +105,30 @@ export default function RegistrationsPage() {
       console.error('Failed to update paid status', e);
     } finally {
       setTogglingId(null);
+    }
+  }
+
+  async function toggleFreeze(r: Registration) {
+    if (freezingId) return;
+    setFreezingId(r.id);
+    try {
+      const updated = await packageRegistrationsApi.update(r.id, { isFrozen: !r.isFrozen });
+      setRows((prev) =>
+        prev.map((x) =>
+          x.id === r.id
+            ? {
+                ...x,
+                isFrozen: updated.isFrozen,
+                frozenAt: updated.frozenAt ?? null,
+                periodEndsAt: updated.periodEndsAt ?? null,
+              }
+            : x
+        )
+      );
+    } catch (e) {
+      console.error('Failed to toggle freeze', e);
+    } finally {
+      setFreezingId(null);
     }
   }
 
@@ -159,6 +197,50 @@ export default function RegistrationsPage() {
             {row.isPaid ? 'Paid' : 'Unpaid'}
           </Badge>
         </div>
+      ),
+    },
+    {
+      id: 'daysLeft',
+      header: '30-day period',
+      render: (row: Registration) => {
+        if (row.isFrozen) {
+          return (
+            <Badge variant="neutral" className="whitespace-nowrap">
+              Frozen
+            </Badge>
+          );
+        }
+        const days = getDaysRemaining(row);
+        const end = getPeriodEnd(row);
+        if (days === null && !end) return <span className="text-ui-textMuted">—</span>;
+        if (days !== null) {
+          if (days === 0) return <Badge variant="danger">Expired</Badge>;
+          return (
+            <span className="text-ui-textPrimary">
+              <strong>{days}</strong> day{days !== 1 ? 's' : ''} left
+            </span>
+          );
+        }
+        return <span className="text-ui-textMuted">—</span>;
+      },
+    },
+    {
+      id: 'freeze',
+      header: 'Freeze',
+      render: (row: Registration) => (
+        <button
+          type="button"
+          onClick={() => toggleFreeze(row)}
+          disabled={freezingId === row.id}
+          className={`inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed ${
+            row.isFrozen
+              ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
+              : 'border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100'
+          }`}
+          title={row.isFrozen ? 'Unfreeze (resume countdown)' : 'Freeze (pause 30-day countdown)'}
+        >
+          {freezingId === row.id ? '…' : row.isFrozen ? 'Unfreeze' : 'Freeze'}
+        </button>
       ),
     },
     {
@@ -278,6 +360,14 @@ export default function RegistrationsPage() {
                     return `${formatDateForExcel(date)} ${formatTimeForExcel(date)}`;
                   };
                   
+                  const periodEnd = r.periodEndsAt ? new Date(r.periodEndsAt) : null;
+                  const daysLeft = r.isFrozen ? 'Frozen' : periodEnd ? (() => {
+                    const now = new Date();
+                    now.setHours(0, 0, 0, 0);
+                    periodEnd.setHours(0, 0, 0, 0);
+                    const d = Math.ceil((periodEnd.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+                    return d <= 0 ? 'Expired' : `${d} days`;
+                  })() : '';
                   return {
                     packageName: r.packageName || '',
                     customerName: r.customerName || '',
@@ -285,15 +375,29 @@ export default function RegistrationsPage() {
                     customerEmail: r.customerEmail || '',
                     customerAge: r.customerAge ? String(r.customerAge) : '',
                     isPaid: r.isPaid ? 'Yes' : 'No',
+                    periodEndsAt: periodEnd ? formatDateTimeForExcel(periodEnd) : '',
+                    daysLeft,
+                    isFrozen: r.isFrozen ? 'Yes' : 'No',
                     registeredDate: formatDateForExcel(createdAt),
                     registeredTime: formatTimeForExcel(createdAt),
                     registeredDateTime: formatDateTimeForExcel(createdAt),
                     lastUpdated: formatDateTimeForExcel(updatedAt),
                   };
                 })}
-                columns={['packageName', 'customerName', 'customerPhone', 'customerEmail', 'customerAge', 'isPaid', 'registeredDate', 'registeredTime', 'registeredDateTime', 'lastUpdated']}
-                filename={`registrations-${dateRange}-${new Date().toISOString().split('T')[0]}.csv`}
-                label="Export Report"
+                columns={['packageName', 'customerName', 'customerPhone', 'customerEmail', 'customerAge', 'isPaid', 'periodEndsAt', 'daysLeft', 'isFrozen', 'registeredDate', 'registeredTime', 'registeredDateTime', 'lastUpdated']}
+                filename={(() => {
+                  const today = new Date().toISOString().split('T')[0];
+                  const packageSlug = packageFilter ? packageFilter.replace(/[^a-zA-Z0-9]+/g, '-').replace(/-+/g, '-').slice(0, 40) : 'all-packages';
+                  const rangeSlug = dateRange === 'custom' ? `${customStartDate || 'start'}-to-${customEndDate || 'end'}` : dateRange;
+                  return `registrations-${packageSlug}-${rangeSlug}-${today}.csv`;
+                })()}
+                prefixLines={[
+                  `Exported: ${new Date().toLocaleString()} (trace for records)`,
+                  `Filter - Package: ${packageFilter || 'All packages'}`,
+                  `Filter - Date range: ${dateRange === 'custom' ? `${customStartDate || '?'} to ${customEndDate || '?'}` : dateRange === 'all' ? 'All time' : dateRange}`,
+                  `Total rows: ${rows.length}`,
+                ]}
+                label="Export to Excel"
               />
             </div>
           </div>

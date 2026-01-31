@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -119,15 +120,47 @@ export class PortalController {
     await this.portalService.deleteBooking(id);
   }
 
-  // Blocked slots (booking availability: toggle which recurring slots are blocked vs free)
+  // Blocked slots (booking availability: toggle which recurring slots are blocked vs free; club bookings with label)
   @Get('blocked-slots')
   async getBlockedSlots() {
     return this.portalService.getBlockedSlots();
   }
 
+  @Post('blocked-slots')
+  async createBlockedSlot(@Body() data: { dayOfWeek: string; courtType: string; time: string; isBlocked?: boolean; label?: string | null; startDate?: string | null; endDate?: string | null }) {
+    return this.portalService.createBlockedSlot(data);
+  }
+
+  @Post('blocked-slots/bulk')
+  async createBlockedSlotsBulk(@Body() data: { courtType: string; time: string; daysOfWeek?: string[]; label?: string | null; startDate?: string | null; endDate?: string | null }) {
+    const daysOfWeek = Array.isArray(data.daysOfWeek) ? data.daysOfWeek : [];
+    if (!data.courtType || !data.time || daysOfWeek.length === 0) {
+      throw new BadRequestException('courtType, time, and at least one day in daysOfWeek are required.');
+    }
+    return this.portalService.createBlockedSlotsBulk({
+      courtType: data.courtType,
+      time: data.time,
+      daysOfWeek,
+      label: data.label ?? null,
+      startDate: data.startDate ?? null,
+      endDate: data.endDate ?? null,
+    });
+  }
+
   @Patch('blocked-slots/:id')
-  async updateBlockedSlot(@Param('id') id: string, @Body() data: { isBlocked: boolean }) {
+  async updateBlockedSlot(@Param('id') id: string, @Body() data: { isBlocked?: boolean; label?: string | null; startDate?: string | null; endDate?: string | null }) {
     return this.portalService.updateBlockedSlot(id, data);
+  }
+
+  @Delete('blocked-slots/:id')
+  async deleteBlockedSlot(@Param('id') id: string) {
+    await this.portalService.deleteBlockedSlot(id);
+  }
+
+  @Delete('blocked-slots/by-label/:label')
+  async deleteBlockedSlotsByLabel(@Param('label') label: string) {
+    const count = await this.portalService.deleteBlockedSlotsByLabel(decodeURIComponent(label));
+    return { deleted: count };
   }
 
   // Subscriptions
@@ -511,7 +544,7 @@ export class PortalController {
   }
 
   @Patch('package-registrations/:id')
-  async updatePackageRegistration(@Param('id') id: string, @Body() data: { isPaid?: boolean }) {
+  async updatePackageRegistration(@Param('id') id: string, @Body() data: { isPaid?: boolean; isFrozen?: boolean }) {
     return this.portalService.updatePackageRegistration(id, data);
   }
 

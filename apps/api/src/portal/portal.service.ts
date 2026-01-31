@@ -224,19 +224,105 @@ export class PortalService {
   }
 
   // Blocked slots (static booking blocks; isBlocked=false makes the slot free for public booking)
-  async getBlockedSlots(): Promise<{ id: string; dayOfWeek: string; courtType: string; time: string; isBlocked: boolean }[]> {
-    const rows = await (this.prisma as any).blockedSlot.findMany({
-      orderBy: [{ dayOfWeek: 'asc' }, { courtType: 'asc' }, { time: 'asc' }],
-    });
-    return rows;
+  async getBlockedSlots(): Promise<{ id: string; dayOfWeek: string; courtType: string; time: string; isBlocked: boolean; label: string | null; startDate: string | null; endDate: string | null }[]> {
+    try {
+      const rows = await (this.prisma as any).blockedSlot.findMany({
+        orderBy: [{ label: 'asc' }, { dayOfWeek: 'asc' }, { courtType: 'asc' }, { time: 'asc' }],
+      });
+      return rows.map((r: any) => ({
+        id: r.id,
+        dayOfWeek: r.dayOfWeek,
+        courtType: r.courtType,
+        time: r.time,
+        isBlocked: r.isBlocked,
+        label: r.label ?? null,
+        startDate: r.startDate ? r.startDate.toISOString() : null,
+        endDate: r.endDate ? r.endDate.toISOString() : null,
+      }));
+    } catch (e: any) {
+      console.error('getBlockedSlots error', e);
+      throw new InternalServerErrorException(
+        e?.message || 'Could not load blocked slots. Ensure database migrations are run (npm run prisma:migrate).',
+      );
+    }
   }
 
-  async updateBlockedSlot(id: string, data: { isBlocked: boolean }): Promise<{ id: string; dayOfWeek: string; courtType: string; time: string; isBlocked: boolean } | null> {
+  async updateBlockedSlot(id: string, data: { isBlocked?: boolean; label?: string | null; startDate?: string | null; endDate?: string | null }): Promise<{ id: string; dayOfWeek: string; courtType: string; time: string; isBlocked: boolean; label: string | null; startDate: string | null; endDate: string | null } | null> {
+    const updateData: any = { updatedAt: new Date() };
+    if (data.isBlocked !== undefined) updateData.isBlocked = data.isBlocked;
+    if (data.label !== undefined) updateData.label = data.label;
+    if (data.startDate !== undefined) updateData.startDate = data.startDate ? new Date(data.startDate) : null;
+    if (data.endDate !== undefined) updateData.endDate = data.endDate ? new Date(data.endDate) : null;
     const row = await (this.prisma as any).blockedSlot.update({
       where: { id },
-      data: { isBlocked: data.isBlocked, updatedAt: new Date() },
+      data: updateData,
     });
-    return row;
+    return {
+      id: row.id,
+      dayOfWeek: row.dayOfWeek,
+      courtType: row.courtType,
+      time: row.time,
+      isBlocked: row.isBlocked,
+      label: row.label ?? null,
+      startDate: row.startDate ? row.startDate.toISOString() : null,
+      endDate: row.endDate ? row.endDate.toISOString() : null,
+    };
+  }
+
+  async createBlockedSlot(data: { dayOfWeek: string; courtType: string; time: string; isBlocked?: boolean; label?: string | null; startDate?: string | null; endDate?: string | null }): Promise<{ id: string; dayOfWeek: string; courtType: string; time: string; isBlocked: boolean; label: string | null; startDate: string | null; endDate: string | null }> {
+    const row = await (this.prisma as any).blockedSlot.create({
+      data: {
+        dayOfWeek: data.dayOfWeek,
+        courtType: data.courtType,
+        time: data.time,
+        isBlocked: data.isBlocked ?? true,
+        label: data.label ?? null,
+        startDate: data.startDate ? new Date(data.startDate) : null,
+        endDate: data.endDate ? new Date(data.endDate) : null,
+      },
+    });
+    return {
+      id: row.id,
+      dayOfWeek: row.dayOfWeek,
+      courtType: row.courtType,
+      time: row.time,
+      isBlocked: row.isBlocked,
+      label: row.label ?? null,
+      startDate: row.startDate ? row.startDate.toISOString() : null,
+      endDate: row.endDate ? row.endDate.toISOString() : null,
+    };
+  }
+
+  async createBlockedSlotsBulk(data: { courtType: string; time: string; daysOfWeek: string[]; label?: string | null; startDate?: string | null; endDate?: string | null }): Promise<{ id: string; dayOfWeek: string; courtType: string; time: string; isBlocked: boolean; label: string | null; startDate: string | null; endDate: string | null }[]> {
+    const created: any[] = [];
+    for (const dayOfWeek of data.daysOfWeek) {
+      try {
+        const row = await this.createBlockedSlot({
+          dayOfWeek,
+          courtType: data.courtType,
+          time: data.time,
+          isBlocked: true,
+          label: data.label ?? null,
+          startDate: data.startDate ?? null,
+          endDate: data.endDate ?? null,
+        });
+        created.push(row);
+      } catch (e: any) {
+        // P2002 = unique constraint (dayOfWeek, courtType, time) already exists – skip this slot
+        if (e?.code === 'P2002') continue;
+        throw e;
+      }
+    }
+    return created;
+  }
+
+  async deleteBlockedSlot(id: string): Promise<void> {
+    await (this.prisma as any).blockedSlot.delete({ where: { id } });
+  }
+
+  async deleteBlockedSlotsByLabel(label: string): Promise<number> {
+    const result = await (this.prisma as any).blockedSlot.deleteMany({ where: { label } });
+    return result.count;
   }
 
   // Subscriptions
@@ -1503,6 +1589,7 @@ export class PortalService {
   }
 
   // Package Registrations (public sign-ups for Basketball, Gymnastics, Volleyball, etc.)
+  // 30-day period from registration; freeze pauses the countdown.
   async getPackageRegistrations(
     packageName?: string,
     startDate?: string,
@@ -1515,6 +1602,9 @@ export class PortalService {
     customerEmail: string | null;
     customerAge: number | null;
     isPaid: boolean;
+    periodEndsAt: Date | null;
+    isFrozen: boolean;
+    frozenAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
   }>> {
@@ -1537,10 +1627,24 @@ export class PortalService {
       }
     }
 
-    return this.prisma.packageRegistration.findMany({
+    const rows = await (this.prisma as any).packageRegistration.findMany({
       where,
       orderBy: { createdAt: 'desc' },
     });
+    return rows.map((r: any) => ({
+      id: r.id,
+      packageName: r.packageName,
+      customerName: r.customerName,
+      customerPhone: r.customerPhone,
+      customerEmail: r.customerEmail ?? null,
+      customerAge: r.customerAge ?? null,
+      isPaid: r.isPaid,
+      periodEndsAt: r.periodEndsAt ?? null,
+      isFrozen: r.isFrozen ?? false,
+      frozenAt: r.frozenAt ?? null,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+    }));
   }
 
   async createPackageRegistration(data: {
@@ -1549,27 +1653,82 @@ export class PortalService {
     customerPhone: string;
     customerEmail?: string | null;
     customerAge?: number | null;
-  }): Promise<{ id: string; packageName: string; customerName: string; customerPhone: string; customerEmail: string | null; customerAge: number | null; isPaid: boolean; createdAt: Date }> {
-    return this.prisma.packageRegistration.create({
+  }): Promise<{ id: string; packageName: string; customerName: string; customerPhone: string; customerEmail: string | null; customerAge: number | null; isPaid: boolean; periodEndsAt: Date | null; isFrozen: boolean; frozenAt: Date | null; createdAt: Date }> {
+    const now = new Date();
+    const periodEndsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // +30 days
+    const row = await (this.prisma as any).packageRegistration.create({
       data: {
         packageName: data.packageName,
         customerName: data.customerName,
         customerPhone: data.customerPhone,
         customerEmail: data.customerEmail ?? null,
         customerAge: data.customerAge ?? null,
+        periodEndsAt,
       },
     });
+    return {
+      id: row.id,
+      packageName: row.packageName,
+      customerName: row.customerName,
+      customerPhone: row.customerPhone,
+      customerEmail: row.customerEmail ?? null,
+      customerAge: row.customerAge ?? null,
+      isPaid: row.isPaid,
+      periodEndsAt: row.periodEndsAt ?? null,
+      isFrozen: row.isFrozen ?? false,
+      frozenAt: row.frozenAt ?? null,
+      createdAt: row.createdAt,
+    };
   }
 
-  async updatePackageRegistration(id: string, data: { isPaid?: boolean }): Promise<{ id: string; packageName: string; customerName: string; customerPhone: string; customerEmail: string | null; isPaid: boolean; updatedAt: Date }> {
-    return this.prisma.packageRegistration.update({
+  async updatePackageRegistration(
+    id: string,
+    data: { isPaid?: boolean; isFrozen?: boolean },
+  ): Promise<{ id: string; packageName: string; customerName: string; customerPhone: string; customerEmail: string | null; customerAge: number | null; isPaid: boolean; periodEndsAt: Date | null; isFrozen: boolean; frozenAt: Date | null; updatedAt: Date }> {
+    const existing = await (this.prisma as any).packageRegistration.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Package registration not found');
+
+    const updateData: any = {};
+    if (data.isPaid !== undefined) updateData.isPaid = data.isPaid;
+
+    if (data.isFrozen !== undefined) {
+      updateData.isFrozen = data.isFrozen;
+      if (data.isFrozen === true) {
+        updateData.frozenAt = new Date();
+      } else {
+        // Unfreeze: extend periodEndsAt by the time spent frozen
+        const frozenAt = (existing as any).frozenAt;
+        if (frozenAt) {
+          const now = new Date();
+          const frozenMs = now.getTime() - new Date(frozenAt).getTime();
+          const currentEnd = (existing as any).periodEndsAt ? new Date((existing as any).periodEndsAt) : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+          updateData.periodEndsAt = new Date(currentEnd.getTime() + frozenMs);
+        }
+        updateData.frozenAt = null;
+      }
+    }
+
+    const row = await (this.prisma as any).packageRegistration.update({
       where: { id },
-      data,
+      data: updateData,
     });
+    return {
+      id: row.id,
+      packageName: row.packageName,
+      customerName: row.customerName,
+      customerPhone: row.customerPhone,
+      customerEmail: row.customerEmail ?? null,
+      customerAge: row.customerAge ?? null,
+      isPaid: row.isPaid,
+      periodEndsAt: row.periodEndsAt ?? null,
+      isFrozen: row.isFrozen ?? false,
+      frozenAt: row.frozenAt ?? null,
+      updatedAt: row.updatedAt,
+    };
   }
 
   async deletePackageRegistration(id: string): Promise<void> {
-    await this.prisma.packageRegistration.delete({ where: { id } });
+    await (this.prisma as any).packageRegistration.delete({ where: { id } });
   }
 }
 

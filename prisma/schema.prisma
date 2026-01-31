@@ -258,19 +258,24 @@ model Booking {
   @@index([coachId])
 }
 
-// Recurring blocked time slots (e.g. static team bookings). isBlocked=false means the slot is free for public booking.
+// Recurring blocked time slots (e.g. static team bookings, club bookings). isBlocked=false means the slot is free for public booking.
+// label = club/booking name for grouping (e.g. "Little Kobes"). startDate/endDate = optional date range for the block.
 model BlockedSlot {
-  id         String   @id @default(cuid())
-  dayOfWeek  String   // MONDAY, TUESDAY, ... SUNDAY
-  courtType  String   // Basketball AC, Basketball 3x3, Padel, Volleyball
-  time       String   // HH:MM e.g. 17:00
-  isBlocked  Boolean  @default(true) // true = unavailable, false = free for booking
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id         String    @id @default(cuid())
+  dayOfWeek  String    // MONDAY, TUESDAY, ... SUNDAY
+  courtType  String    // Basketball AC, Basketball 3x3, Padel, Volleyball
+  time       String    // HH:MM e.g. 17:00
+  isBlocked  Boolean   @default(true) // true = unavailable, false = free for booking
+  label      String?   // Club/booking name (e.g. "Little Kobes") for grouping multiple days
+  startDate  DateTime? // Optional: block only from this date
+  endDate    DateTime? // Optional: block only until this date
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@unique([dayOfWeek, courtType, time])
   @@index([dayOfWeek])
   @@index([courtType])
+  @@index([label])
 }
 
 model Subscription {
@@ -504,17 +509,22 @@ model CompanySettings {
 }
 
 // Public package registrations (Basketball, Gymnastics, Volleyball, etc.)
+// 30-day period from registration; freeze pauses the countdown.
 model PackageRegistration {
-  id            String   @id @default(cuid())
-  packageName   String   // e.g. "Basketball - Little Kobes U10", "Gymnastics Package A", "Volleyball"
+  id            String    @id @default(cuid())
+  packageName   String    // e.g. "Basketball - Little Kobes U10", "Gymnastics Package A", "Volleyball"
   customerName  String
   customerPhone String
   customerEmail String?
   customerAge   Int?
-  isPaid        Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  isPaid        Boolean   @default(false)
+  periodEndsAt  DateTime? // end of 30-day period from registration (countdown); extended when unfreezing
+  isFrozen      Boolean   @default(false) // when true, countdown is paused
+  frozenAt      DateTime? // when they clicked freeze; used to extend periodEndsAt on unfreeze
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([packageName])
   @@index([isPaid])
+  @@index([periodEndsAt])
 }

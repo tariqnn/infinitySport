@@ -127,3 +127,38 @@ export async function updateBookingAction(
     return { status: 'error', message: 'Unable to update booking.' };
   }
 }
+
+export async function deleteBookingAction(
+  _prev: BookingState,
+  formData: FormData
+): Promise<BookingState> {
+  try {
+    const raw = formData.get('bookingId') ?? formData.get('id');
+    const bookingId = (typeof raw === 'string' ? raw : raw?.toString?.() ?? '').trim();
+
+    if (!bookingId) {
+      return { status: 'error', message: 'Missing booking ID.' };
+    }
+
+    const url = `${API_BASE_URL}/api/portal/bookings/${encodeURIComponent(bookingId)}`;
+    const response = await fetch(url, { method: 'DELETE' });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      const msg = (body as { message?: string }).message;
+      if (response.status === 404) {
+        return { status: 'error', message: msg || 'Booking not found. It may have been already deleted.' };
+      }
+      if (response.status === 400) {
+        return { status: 'error', message: msg || 'Invalid booking ID. Please refresh the list and try again.' };
+      }
+      return { status: 'error', message: msg || `Failed to delete booking (${response.status}).` };
+    }
+
+    revalidatePath('/bookings');
+    return { status: 'success', message: 'Booking deleted.' };
+  } catch (error) {
+    console.error('Booking delete error', error);
+    return { status: 'error', message: 'Unable to delete booking.' };
+  }
+}

@@ -171,20 +171,11 @@ export function BookingAvailabilityManager() {
     return <div className="py-8 text-center text-slate-500">Loading…</div>;
   }
 
-  if (slots.length === 0) {
+  if (loadError && slots.length === 0) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
-        {loadError ? (
-          <>
-            <p className="text-slate-600">{loadError}</p>
-            <p className="mt-2 text-sm text-slate-500">Start the API with: <code className="rounded bg-slate-100 px-1.5 py-0.5">npm run dev:api</code></p>
-          </>
-        ) : (
-          <p className="text-slate-600">No blocked slots defined. Run the database seed to create the default recurring blocks:</p>
-        )}
-        {!loadError && (
-          <p className="mt-2 text-sm font-mono text-slate-600">npm run prisma:seed-blocked-slots</p>
-        )}
+        <p className="text-slate-600">{loadError}</p>
+        <p className="mt-2 text-sm text-slate-500">Start the API with: <code className="rounded bg-slate-100 px-1.5 py-0.5">npm run dev:api</code></p>
         <button
           type="button"
           onClick={load}
@@ -394,7 +385,14 @@ export function BookingAvailabilityManager() {
               </tr>
             </thead>
             <tbody>
-              {Object.entries(grouped).map(([labelKey, groupSlots]) => {
+              {slots.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
+                    No blocked slots yet. Use <strong>Add Club Booking</strong> or <strong>Add Single Slot</strong> above to add slots. You can also run <code className="rounded bg-slate-100 px-1.5 py-0.5 text-sm">npm run prisma:seed-blocked-slots</code> to seed default slots.
+                  </td>
+                </tr>
+              ) : (
+              Object.entries(grouped).map(([labelKey, groupSlots]) => {
                 const labelDisplay = labelKey || '—';
                 const hasLabel = !!labelKey;
                 return (
@@ -482,7 +480,8 @@ export function BookingAvailabilityManager() {
                     ))}
                   </React.Fragment>
                 );
-              })}
+              })
+              ) }
             </tbody>
           </table>
         </div>

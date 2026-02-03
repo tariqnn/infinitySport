@@ -78,6 +78,12 @@ export class PortalController {
     await this.portalService.deleteMember(id);
   }
 
+  // Default company ID for public/mobile booking (call this first, then use in POST /bookings)
+  @Get('booking-defaults')
+  async getBookingDefaults() {
+    return this.portalService.getBookingDefaults();
+  }
+
   // Bookings
   @Get('bookings')
   async getBookings(
@@ -117,7 +123,11 @@ export class PortalController {
   @Delete('bookings/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteBooking(@Param('id') id: string) {
-    await this.portalService.deleteBooking(id);
+    const trimmed = (id ?? '').toString().trim();
+    if (!trimmed) {
+      throw new BadRequestException('Invalid or missing booking ID.');
+    }
+    await this.portalService.deleteBooking(trimmed);
   }
 
   // Blocked slots (booking availability: toggle which recurring slots are blocked vs free; club bookings with label)

@@ -1,0 +1,36 @@
+# Infinity Sports - API + PostgreSQL (optional: use Neon instead and run only api)
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: infinity-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: infinity
+      POSTGRES_PASSWORD: infinity
+      POSTGRES_DB: infinity_sports
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U infinity -d infinity_sports"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: infinity-api
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      DATABASE_URL: postgresql://infinity:infinity@postgres:5432/infinity_sports
+      PORT: 4000
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

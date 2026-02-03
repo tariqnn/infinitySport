@@ -286,7 +286,12 @@ export default function RegistrationsPage() {
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <h3 className="text-lg font-semibold text-textPrimary">Registrations</h3>
+            <h3 className="text-lg font-semibold text-textPrimary">
+              Registrations
+              <span className="ml-2 rounded-full bg-brand-blue-primary/10 px-2.5 py-0.5 text-sm font-semibold text-brand-blue-primary">
+                {loading ? '…' : rows.length}
+              </span>
+            </h3>
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">
                 <label className="text-sm text-textMuted">Package:</label>

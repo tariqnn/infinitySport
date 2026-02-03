@@ -36,17 +36,14 @@ export function NavbarWithLanguage() {
           >
             <Bars3Icon className="h-6 w-6 transition-transform duration-300" />
           </button>
-          <Link href="/" className="flex items-center gap-3 transition-all duration-300 hover:scale-105">
+          <Link href="/" className="flex items-center transition-all duration-300 hover:scale-105" aria-label="Infinity Sport Home">
             <Image 
               src="/infinity-logo.png?v=2" 
               alt="Infinity Sport Logo" 
-              width={128} 
-              height={128} 
-              className="h-20 w-20 sm:h-24 sm:w-24 md:h-28 md:w-28 lg:h-32 lg:w-32 object-contain flex-shrink-0"
+              width={160} 
+              height={160} 
+              className="h-28 w-28 sm:h-32 sm:w-32 md:h-36 md:w-36 lg:h-40 lg:w-40 object-contain flex-shrink-0"
             />
-            <span className="font-display text-lg font-bold tracking-tight text-brand-black sm:text-xl md:text-2xl lg:text-3xl">
-              INFINITY SPORT
-            </span>
           </Link>
         </div>
         <nav className="hidden items-center gap-8 text-sm font-bold lg:flex">

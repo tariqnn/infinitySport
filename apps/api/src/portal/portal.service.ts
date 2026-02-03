@@ -121,6 +121,17 @@ export class PortalService {
     await this.prisma.member.delete({ where: { id } });
   }
 
+  async getBookingDefaults(): Promise<{ companyId: string }> {
+    const company = await this.prisma.company.findFirst({
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (!company) {
+      throw new NotFoundException('No company found. Create a company in the admin first.');
+    }
+    return { companyId: company.id };
+  }
+
   // Bookings
   async getBookings(companyId?: string, startDate?: Date, endDate?: Date): Promise<Booking[]> {
     try {
@@ -220,7 +231,15 @@ export class PortalService {
   }
 
   async deleteBooking(id: string): Promise<void> {
-    await this.prisma.booking.delete({ where: { id } });
+    try {
+      await this.prisma.booking.delete({ where: { id } });
+    } catch (error: unknown) {
+      const prismaError = error as { code?: string };
+      if (prismaError?.code === 'P2025') {
+        throw new NotFoundException('Booking not found. It may have been already deleted.');
+      }
+      throw error;
+    }
   }
 
   // Blocked slots (static booking blocks; isBlocked=false makes the slot free for public booking)

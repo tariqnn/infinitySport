@@ -1,5 +1,6 @@
 # Infinity Sports API - run from project root
-FROM node:20-alpine
+# Node >=20.19.0 required for SWC / @swc/helpers compatibility (e.g. Alpine/musl)
+FROM node:20.19-alpine
 
 WORKDIR /app
 

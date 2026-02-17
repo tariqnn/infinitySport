@@ -27,7 +27,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${jakarta.variable} ${spaceGrotesk.variable} bg-[var(--bg-shell)] text-[var(--text-primary)]`}>
+      <body className={`${jakarta.variable} ${spaceGrotesk.variable} app-shell text-[var(--text-primary)]`}>
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>

@@ -212,6 +212,7 @@ export const landingAnnouncementSchema = z.object({
   titleAr: z.string().optional(),
   message: z.string(),
   messageAr: z.string().optional(),
+  imageUrl: z.string().url().optional(),
   isPinned: z.boolean().optional(),
   isActive: z.boolean().optional(),
   startDate: z.string().optional(),
@@ -263,4 +264,3 @@ export const contactSubmissionSchema = z.object({
   submittedAt: z.string(),
 });
 export type ContactSubmission = z.infer<typeof contactSubmissionSchema>;
-

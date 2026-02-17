@@ -47,19 +47,24 @@ export async function GET(request: Request) {
     );
     if (!res.ok) return NextResponse.json({ booked: {} });
 
-    const rows: Array<{ facilityArea: string | null; startTime: string; status: string }> = await res.json();
+    const rows: Array<{ facilityArea: string | null; startTime: string; endTime?: string; status: string }> = await res.json();
     const booked: Record<string, Record<string, string[]>> = {};
 
     for (const b of rows) {
       if (b.status === 'CANCELLED') continue;
       const ct = b.facilityArea && (COURT_TYPES as readonly string[]).includes(b.facilityArea) ? b.facilityArea : null;
       if (!ct) continue;
-      const d = new Date(b.startTime);
-      const dateStr = toDateStr(d);
-      const timeStr = toTimeStr(d);
-      if (!booked[dateStr]) booked[dateStr] = {};
-      if (!booked[dateStr][ct]) booked[dateStr][ct] = [];
-      if (!booked[dateStr][ct].includes(timeStr)) booked[dateStr][ct].push(timeStr);
+      const start = new Date(b.startTime);
+      const end = b.endTime ? new Date(b.endTime) : new Date(start.getTime() + 60 * 60 * 1000);
+      let slot = new Date(start);
+      while (slot.getTime() < end.getTime()) {
+        const dateStr = toDateStr(slot);
+        const timeStr = toTimeStr(slot);
+        if (!booked[dateStr]) booked[dateStr] = {};
+        if (!booked[dateStr][ct]) booked[dateStr][ct] = [];
+        if (!booked[dateStr][ct].includes(timeStr)) booked[dateStr][ct].push(timeStr);
+        slot.setTime(slot.getTime() + 60 * 60 * 1000);
+      }
     }
 
     return NextResponse.json({ booked });

@@ -28,7 +28,7 @@ export function Input({
       <input
         id={id}
         className={clsx(
-          'w-full rounded-lg border px-3 py-2 text-sm transition-colors',
+          'w-full rounded-xl border px-3 py-2.5 text-sm shadow-sm transition-colors',
           'focus:outline-none focus:ring-2 focus:ring-brand-primaryBlue/20 focus:border-brand-primaryBlue',
           error
             ? 'border-ui-danger bg-red-50'
@@ -70,7 +70,7 @@ export function Textarea({
       <textarea
         id={id}
         className={clsx(
-          'w-full rounded-lg border px-3 py-2 text-sm transition-colors resize-none',
+          'w-full rounded-xl border px-3 py-2.5 text-sm shadow-sm transition-colors resize-none',
           'focus:outline-none focus:ring-2 focus:ring-brand-primaryBlue/20 focus:border-brand-primaryBlue',
           error
             ? 'border-ui-danger bg-red-50'
@@ -116,7 +116,7 @@ export function Select({
       <select
         id={id}
         className={clsx(
-          'w-full rounded-lg border px-3 py-2 text-sm transition-colors',
+          'w-full rounded-xl border px-3 py-2.5 text-sm shadow-sm transition-colors',
           'focus:outline-none focus:ring-2 focus:ring-brand-primaryBlue/20 focus:border-brand-primaryBlue',
           error
             ? 'border-ui-danger bg-red-50'

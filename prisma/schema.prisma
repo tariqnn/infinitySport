@@ -77,6 +77,7 @@ model FacilityHighlight {
   name        String
   description String
   imageUrl    String?
+  order       Int       @default(0)
   bookings    Booking[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -508,23 +509,172 @@ model CompanySettings {
   @@index([companyId])
 }
 
+// Base price per package (FIXED). Null basePriceJod = manual / "Contact for pricing".
+// Kept for backward compatibility; Package is the single source of truth going forward.
+model PackagePricing {
+  id            String   @id @default(cuid())
+  packageName   String   @unique
+  basePriceJod  Int?     // null = manual pricing at registration time
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([packageName])
+}
+
+// Single source of truth for sellable packages (Landing + Portal). Admin CRUD.
+model Package {
+  id               String   @id @default(cuid())
+  sportType        String   // e.g. Basketball, Gymnastics, Volleyball
+  name             String   @unique // e.g. "Gymnastics Package A"
+  description      String?  @db.Text
+  descriptionBullets Json?  // array of strings for bullet points
+  sessionsCount    Int     @default(0) // 0 = not session-based (e.g. DAYS only)
+  trackingType     String  @default("SESSIONS") // SESSIONS | DAYS | BOTH
+  pricingType      String  @default("FIXED") // FIXED | MANUAL (MANUAL => "Contact for pricing")
+  currentPriceJod  Int?    // null when pricingType = MANUAL
+  timeSlots        Json?   // e.g. [{ "daysOfWeek": [0,2,4], "label": "Sun Tue Thu" }]
+  isActive         Boolean @default(true)
+  sortOrder        Int     @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([sportType])
+  @@index([isActive])
+  @@index([sortOrder])
+}
+
 // Public package registrations (Basketball, Gymnastics, Volleyball, etc.)
 // 30-day period from registration; freeze pauses the countdown.
+// Price locking: snapshot fields; package price changes do not affect existing registrations.
 model PackageRegistration {
-  id            String    @id @default(cuid())
-  packageName   String    // e.g. "Basketball - Little Kobes U10", "Gymnastics Package A", "Volleyball"
-  customerName  String
-  customerPhone String
-  customerEmail String?
-  customerAge   Int?
-  isPaid        Boolean   @default(false)
-  periodEndsAt  DateTime? // end of 30-day period from registration (countdown); extended when unfreezing
-  isFrozen      Boolean   @default(false) // when true, countdown is paused
-  frozenAt      DateTime? // when they clicked freeze; used to extend periodEndsAt on unfreeze
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  packageName      String
+  customerName     String
+  customerPhone    String
+  customerEmail    String?
+  customerAge      Int?
+  isPaid           Boolean   @default(false) // true when collected >= finalPriceJod
+  basePriceJod     Int       // snapshot at creation (from Package or manual)
+  discountType     String    @default("NONE") // NONE | PERCENT | AMOUNT (manual only)
+  discountValue    Int?      // required if discountType != NONE
+  discountReason   String?   @db.Text // required if discountType != NONE
+  discountAppliedBy String?  // audit: who applied discount
+  discountAppliedAt DateTime? // audit: when
+  finalPriceJod    Int       // snapshot: base - discount, clamped >= 0
+  billingPeriodKey String?   // e.g. "YYYY-MM" for price lock scope
+  priceLockedUntil DateTime? // optional end of billing period
+  periodEndsAt     DateTime?
+  isFrozen         Boolean   @default(false)
+  frozenAt         DateTime?
+  sessionsBonus    Int       @default(0)
+  status           String    @default("ACTIVE") // ACTIVE | TRANSFERRED | EXPIRED
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  receipts          Receipt[]
+  sessionAdjustments SessionAdjustment[]
+  freezes           Freeze[]
 
   @@index([packageName])
   @@index([isPaid])
   @@index([periodEndsAt])
+  @@index([customerPhone])
+  @@index([status])
+}
+
+// Receipts for registration payments (separate from Invoices). Created when marking as Paid.
+// status ACTIVE = counts toward collected; VOIDED = does not (voidReason required).
+model Receipt {
+  id              String    @id @default(cuid())
+  receiptId       String    @unique // human-readable e.g. RCP-2025-0001
+  registrationId  String
+  registration    PackageRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  personName      String
+  personPhone     String
+  packageName     String
+  dateTimeIssued  DateTime  @default(now())
+  amountPaid      Int       // in JOD (integer)
+  paymentMethod   String    // CASH | CARD | TRANSFER | OTHER
+  privateNote     String    @db.Text // required on create
+  status          String    @default("ACTIVE") // ACTIVE | VOIDED (voidReason required if VOIDED)
+  createdBy       String?
+  voidedAt        DateTime?
+  voidReason      String?   @db.Text // required when status = VOIDED
+  createdAt       DateTime  @default(now())
+
+  @@index([registrationId])
+  @@index([receiptId])
+  @@index([status])
+}
+
+// Manual session adjustments (+1 excuse, etc.). Logged for auditing.
+model SessionAdjustment {
+  id             String   @id @default(cuid())
+  registrationId String
+  registration   PackageRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  change         Int      // +1 or -1 (only +1 used for "excuse")
+  reason         String   @db.Text // required
+  createdBy      String?
+  createdAt      DateTime @default(now())
+
+  @@index([registrationId])
+}
+
+// Canceled session days (holiday, bad weather, etc.) — do NOT decrement sessions for these days.
+model PackageSessionCanceled {
+  id          String   @id @default(cuid())
+  packageName String
+  sessionDate DateTime @db.Date // the calendar day of the canceled session
+  reason      String   // HOLIDAY | BAD_WEATHER | TEACHER_UNAVAILABLE | OTHER
+  reasonDetail String? @db.Text // for OTHER
+  createdAt   DateTime @default(now())
+
+  @@index([packageName])
+  @@index([sessionDate])
+}
+
+// Class session: HELD = consumes 1 session for everyone in package; CANCELED = does not.
+model ClassSession {
+  id           String   @id @default(cuid())
+  packageName  String   // package identifier (or packageId when Package FK added)
+  sessionDate  DateTime @db.Date
+  status       String   @default("HELD") // HELD | CANCELED
+  cancelReason String?  // required if status = CANCELED (HOLIDAY | BAD_WEATHER | OTHER)
+  cancelDetail String?  @db.Text
+  createdBy    String?
+  createdAt    DateTime @default(now())
+
+  @@index([packageName])
+  @@index([sessionDate])
+  @@index([status])
+}
+
+// Freeze window: pauses DAYS-based expiry for a registration. Multiple freezes allowed (log).
+model Freeze {
+  id             String   @id @default(cuid())
+  registrationId String
+  registration   PackageRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  freezeFrom     DateTime
+  freezeTo       DateTime
+  reason         String   @db.Text // required
+  createdBy      String?
+  createdAt      DateTime @default(now())
+
+  @@index([registrationId])
+}
+
+// Audit log for key actions (receipt create/void, discount, session adjustment, freeze, transfer, price change, bulk import).
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?
+  actionType  String   // RECEIPT_CREATED | RECEIPT_VOIDED | DISCOUNT_APPLIED | SESSION_ADJUSTED | FREEZE_CREATED | TRANSFER_DONE | PRICE_CHANGED | BULK_IMPORT | etc.
+  entityType  String   // Registration | Receipt | Package | etc.
+  entityId    String?
+  metadata    Json?    // action-specific payload
+  createdAt   DateTime @default(now())
+
+  @@index([actionType])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([createdAt])
 }

@@ -20,18 +20,17 @@ export default async function LandingContentMapPage() {
       <PageHero
         eyebrow="Content map"
         title="Landing page architecture"
-        description="Every section below is editable inside this admin. Use it as a quick reference for the marketing site’s building blocks."
+        description="Every section below is editable inside this admin. Use it as a quick reference for the marketing site's building blocks."
       />
       <div className="grid gap-4 md:grid-cols-2">
         {sections.map((section) => (
-          <Link key={section.title} href={section.href} className="glass-card block p-5 transition hover:-translate-y-1">
-            <p className="text-xs uppercase tracking-[0.4em] text-slate-500">{section.title}</p>
-            <p className="mt-2 font-display text-2xl font-semibold text-slate-900">{section.description}</p>
-            <p className="mt-3 text-sm font-semibold text-brand-blue">Open {section.title.toLowerCase()}</p>
+          <Link key={section.title} href={section.href} className="glass-card block p-6 transition hover:shadow-card-hover">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">{section.title}</p>
+            <p className="mt-2 font-display text-xl font-semibold text-[var(--text-primary)]">{section.description}</p>
+            <p className="mt-3 text-sm font-semibold text-[var(--primary)]">Open {section.title.toLowerCase()} -></p>
           </Link>
         ))}
       </div>
     </>
   );
 }
-

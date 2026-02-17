@@ -291,7 +291,7 @@ export function ProgramsManager() {
               <div className="flex-1">
                 <p className="font-semibold text-slate-900">{program.title}</p>
                 <p className="text-xs text-slate-500">
-                  {program.sportType} · {program.link}
+                  {program.sportType} - {program.link}
                 </p>
               </div>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">

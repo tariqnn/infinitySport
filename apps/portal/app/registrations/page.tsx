@@ -1,10 +1,24 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { PageHeader, Card, CardHeader, CardBody, DataTable, Badge, Select, Input } from '../_components/ui';
-import { packageRegistrationsApi, type PackageRegistrationRow } from '../../lib/portalApi';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { PageHeader, Card, CardHeader, CardBody, Badge, Select, Input, Button } from '../_components/ui';
+import { packageRegistrationsApi, packageSessionCanceledApi, packagesApi, type PackageRegistrationRow } from '../../lib/portalApi';
 import { ExportCsvButton } from '../_components/ActionButtons';
-import { TrashIcon } from '@heroicons/react/24/outline';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { TrashIcon, BanknotesIcon, DocumentTextIcon, PlusCircleIcon, EllipsisVerticalIcon, PauseCircleIcon, PlayCircleIcon, CalendarIcon } from '@heroicons/react/24/outline';
+import { MarkAsPaidModal } from './_components/MarkAsPaidModal';
+import { ViewReceiptsModal } from './_components/ViewReceiptsModal';
+import { ReceiptDetailModal } from './_components/ViewReceiptsModal';
+import { BulkAddPeopleModal } from './_components/BulkAddPeopleModal';
+import { IncreaseSessionModal } from './_components/IncreaseSessionModal';
+import { RegistrationTotalsPanel } from './_components/RegistrationTotalsPanel';
+import { CancelSessionDayModal } from './_components/CancelSessionDayModal';
+import { AddRegistrationModal, type InitialPerson } from './_components/AddRegistrationModal';
+import { RegistrationDetailsModal } from './_components/RegistrationDetailsModal';
+import { RegisterInAnotherPackageModal } from './_components/RegisterInAnotherPackageModal';
+import { RegisterExistingPersonModal } from './_components/RegisterExistingPersonModal';
+import { RegisterPersonMultiPackageModal } from './_components/RegisterPersonMultiPackageModal';
+import { PersonDetailsModal } from './_components/PersonDetailsModal';
 
 type Registration = PackageRegistrationRow;
 
@@ -15,9 +29,84 @@ export default function RegistrationsPage() {
   const [dateRange, setDateRange] = useState<string>('all');
   const [customStartDate, setCustomStartDate] = useState<string>('');
   const [customEndDate, setCustomEndDate] = useState<string>('');
-  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [freezingId, setFreezingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [reregisteringId, setReregisteringId] = useState<string | null>(null);
+  const [canceledDatesByPackage, setCanceledDatesByPackage] = useState<Record<string, Set<string>>>({});
+
+  const [markPaidRegistration, setMarkPaidRegistration] = useState<Registration | null>(null);
+  const [viewReceiptsRegistration, setViewReceiptsRegistration] = useState<Registration | null>(null);
+  const [receiptDetailId, setReceiptDetailId] = useState<string | null>(null);
+  const [bulkAddOpen, setBulkAddOpen] = useState(false);
+  const [increaseSessionRegistration, setIncreaseSessionRegistration] = useState<Registration | null>(null);
+  const [cancelSessionDayOpen, setCancelSessionDayOpen] = useState(false);
+  const [addRegistrationOpen, setAddRegistrationOpen] = useState(false);
+  const [detailsModalRow, setDetailsModalRow] = useState<Registration | null>(null);
+  const [registerInAnotherPackageRow, setRegisterInAnotherPackageRow] = useState<Registration | null>(null);
+  const [registerExistingPersonOpen, setRegisterExistingPersonOpen] = useState(false);
+  const [addRegistrationInitialPerson, setAddRegistrationInitialPerson] = useState<InitialPerson | null>(null);
+  const [personDetailsPhone, setPersonDetailsPhone] = useState<string | null>(null);
+  const [registerPersonMultiOpen, setRegisterPersonMultiOpen] = useState(false);
+  const [registerPersonMultiInitialPerson, setRegisterPersonMultiInitialPerson] = useState<InitialPerson | null>(null);
+  const [bulkCreatedCount, setBulkCreatedCount] = useState<number | null>(null);
+  const [apiPackages, setApiPackages] = useState<Array<{ name: string; currentPriceJod: number | null }>>([]);
+
+  /**
+   * Package schedule catalog.
+   * Source-of-truth for days/sessions is the public landing page (apps/web sports cards).
+   * We duplicate a minimal mapping here so "days remaining" decreases by each scheduled session day.
+   */
+  function getPackageSchedule(packageName: string): { totalSessions: number; daysOfWeek: number[] } | null {
+    const name = (packageName ?? '').trim();
+    if (!name) return null;
+
+    // Basketball academy packages (12 sessions; scheduled on Sat/Mon/Wed/Fri)
+    if (name.startsWith('Basketball - ')) {
+      if (name.includes('Private') || name.includes('Small Groups')) return null; // flexible scheduling
+      return { totalSessions: 12, daysOfWeek: [6, 1, 3, 5] }; // Sat, Mon, Wed, Fri
+    }
+
+    // Gymnastics (sessions per month & days shown on landing)
+    if (name === 'Gymnastics Package A') return { totalSessions: 12, daysOfWeek: [0, 2, 4] }; // Sun, Tue, Thu
+    // Package B is "2 Days / Week" (landing shows Sun • Tue • Thu time window); we count 2 weekly session-days.
+    if (name === 'Gymnastics Package B') return { totalSessions: 8, daysOfWeek: [0, 2] }; // Sun, Tue
+    if (name === 'Gymnastics Package C') return { totalSessions: 18, daysOfWeek: [0, 2, 4] };
+    // Package D is "2 Days / Week" (landing shows Sun • Tue • Thu time window); we count 2 weekly session-days.
+    if (name === 'Gymnastics Package D') return { totalSessions: 12, daysOfWeek: [0, 2] }; // Sun, Tue
+
+    // Volleyball (10 sessions; Sat, Tue, Sun)
+    if (name === 'Volleyball') return { totalSessions: 10, daysOfWeek: [6, 2, 0] }; // Sat, Tue, Sun
+
+    return null;
+  }
+
+  function normalizeDate(d: Date) {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x;
+  }
+
+  function addDays(d: Date, days: number) {
+    const x = new Date(d);
+    x.setDate(x.getDate() + days);
+    return x;
+  }
+
+  /**
+   * Count how many scheduled session-days occurred between start..end (inclusive),
+   * using only day-of-week (time-of-day not tracked).
+   */
+  function countScheduledSessions(start: Date, end: Date, daysOfWeek: number[]) {
+    const s = normalizeDate(start);
+    const e = normalizeDate(end);
+    if (e.getTime() < s.getTime()) return 0;
+    const daySet = new Set(daysOfWeek);
+    let count = 0;
+    for (let d = new Date(s); d.getTime() <= e.getTime(); d = addDays(d, 1)) {
+      if (daySet.has(d.getDay())) count += 1;
+    }
+    return count;
+  }
 
   /** Effective period end: periodEndsAt if set, else createdAt + 30 days (for display only). */
   function getPeriodEnd(r: Registration): Date | null {
@@ -42,71 +131,101 @@ export default function RegistrationsPage() {
     return Math.max(0, diff);
   }
 
+  /**
+   * Sessions remaining (based on scheduled package days).
+   * Canceled session days do NOT decrement. Manual +1 (sessionsBonus) is added to remaining.
+   */
+  function getSessionsRemaining(r: Registration): { remaining: number; total: number; used: number } | null {
+    const schedule = getPackageSchedule(r.packageName);
+    if (!schedule) return null;
+    const start = r.createdAt ? new Date(r.createdAt) : null;
+    const end = getPeriodEnd(r);
+    if (!start || !end) return null;
+
+    const effectiveNow =
+      r.isFrozen && r.frozenAt ? new Date(r.frozenAt) : new Date();
+
+    const total = schedule.totalSessions;
+    const scheduledCount = countScheduledSessions(start, effectiveNow, schedule.daysOfWeek);
+    const canceledSet = canceledDatesByPackage[r.packageName];
+    let canceledInRange = 0;
+    if (canceledSet) {
+      for (let d = new Date(start); d.getTime() <= effectiveNow.getTime(); d = addDays(d, 1)) {
+        const key = d.toISOString().split('T')[0];
+        if (canceledSet.has(key)) canceledInRange += 1;
+      }
+    }
+    const used = Math.min(total, Math.max(0, scheduledCount - canceledInRange));
+    const bonus = Number(r.sessionsBonus) || 0;
+    const remaining = Math.max(0, total - used + bonus);
+    return { remaining, total, used };
+  }
+
+  const dateFilters = useMemo(() => {
+    let out: { startDate?: string; endDate?: string } = {};
+    if (dateRange !== 'all') {
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      if (dateRange === 'custom') {
+        out = { startDate: customStartDate || undefined, endDate: customEndDate || undefined };
+      } else {
+        const start = new Date();
+        if (dateRange === '1week') start.setDate(today.getDate() - 7);
+        else if (dateRange === '1month') start.setMonth(today.getMonth() - 1);
+        else if (dateRange === '3months') start.setMonth(today.getMonth() - 3);
+        else if (dateRange === '6months') start.setMonth(today.getMonth() - 6);
+        else if (dateRange === '1year') start.setFullYear(today.getFullYear() - 1);
+        start.setHours(0, 0, 0, 0);
+        out = {
+          startDate: start.toISOString().split('T')[0],
+          endDate: today.toISOString().split('T')[0],
+        };
+      }
+    }
+    return out;
+  }, [dateRange, customStartDate, customEndDate]);
+
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      
-      // Calculate date range
-      let dateFilters: { startDate?: string; endDate?: string } = {};
-      if (dateRange !== 'all') {
-        const today = new Date();
-        today.setHours(23, 59, 59, 999);
-        
-        if (dateRange === 'custom') {
-          dateFilters = {
-            startDate: customStartDate || undefined,
-            endDate: customEndDate || undefined,
-          };
-        } else {
-          const start = new Date();
-          if (dateRange === '1week') {
-            start.setDate(today.getDate() - 7);
-          } else if (dateRange === '1month') {
-            start.setMonth(today.getMonth() - 1);
-          } else if (dateRange === '3months') {
-            start.setMonth(today.getMonth() - 3);
-          } else if (dateRange === '6months') {
-            start.setMonth(today.getMonth() - 6);
-          } else if (dateRange === '1year') {
-            start.setFullYear(today.getFullYear() - 1);
-          }
-          start.setHours(0, 0, 0, 0);
-          dateFilters = {
-            startDate: start.toISOString().split('T')[0],
-            endDate: today.toISOString().split('T')[0],
-          };
-        }
-      }
-      
       const data = await packageRegistrationsApi.list(
         packageFilter || undefined,
         dateFilters.startDate,
         dateFilters.endDate
       );
       setRows(data);
+
+      try {
+        const canceledList = await packageSessionCanceledApi.list();
+        const byPkg: Record<string, Set<string>> = {};
+        for (const c of canceledList) {
+          if (!byPkg[c.packageName]) byPkg[c.packageName] = new Set();
+          byPkg[c.packageName].add(c.sessionDate);
+        }
+        setCanceledDatesByPackage(byPkg);
+      } catch {
+        setCanceledDatesByPackage({});
+      }
     } catch (e) {
       console.error('Failed to load registrations', e);
     } finally {
       setLoading(false);
     }
-  }, [packageFilter, dateRange, customStartDate, customEndDate]);
+  }, [packageFilter, dateFilters]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  async function togglePaid(r: Registration) {
-    if (togglingId) return;
-    setTogglingId(r.id);
-    try {
-      await packageRegistrationsApi.update(r.id, { isPaid: !r.isPaid });
-      setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, isPaid: !x.isPaid } : x)));
-    } catch (e) {
-      console.error('Failed to update paid status', e);
-    } finally {
-      setTogglingId(null);
-    }
-  }
+  useEffect(() => {
+    packagesApi.list().then((list) => setApiPackages(list.map((p) => ({ name: p.name, currentPriceJod: p.currentPriceJod })))).catch(() => setApiPackages([]));
+  }, []);
+
+  useEffect(() => {
+    if (bulkCreatedCount == null) return;
+    const t = setTimeout(() => setBulkCreatedCount(null), 4000);
+    return () => clearTimeout(t);
+  }, [bulkCreatedCount]);
 
   async function toggleFreeze(r: Registration) {
     if (freezingId) return;
@@ -149,128 +268,53 @@ export default function RegistrationsPage() {
     }
   }
 
-  const columns = [
-    {
-      id: 'packageName',
-      header: 'Package',
-      render: (row: Registration) => (
-        <span className="font-semibold text-ui-textPrimary">{row.packageName}</span>
-      ),
-    },
-    {
-      id: 'customerName',
-      header: 'Name',
-      render: (row: Registration) => <span className="text-ui-textPrimary">{row.customerName}</span>,
-    },
-    {
-      id: 'customerPhone',
-      header: 'Phone',
-      render: (row: Registration) => <span className="text-ui-textPrimary">{row.customerPhone}</span>,
-    },
-    {
-      id: 'customerEmail',
-      header: 'Email',
-      render: (row: Registration) => (
-        <span className="text-ui-textMuted">{row.customerEmail || '—'}</span>
-      ),
-    },
-    {
-      id: 'customerAge',
-      header: 'Age',
-      render: (row: Registration) => (
-        <span className="text-ui-textPrimary">{row.customerAge ? `${row.customerAge} years` : '—'}</span>
-      ),
-    },
-    {
-      id: 'isPaid',
-      header: 'Paid',
-      render: (row: Registration) => (
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={row.isPaid}
-            onChange={() => togglePaid(row)}
-            disabled={togglingId === row.id}
-            className="h-4 w-4 rounded border-ui-border accent-green-600 focus:ring-brand-primaryBlue"
-          />
-          <Badge variant={row.isPaid ? 'success' : 'warning'}>
-            {row.isPaid ? 'Paid' : 'Unpaid'}
-          </Badge>
-        </div>
-      ),
-    },
-    {
-      id: 'daysLeft',
-      header: '30-day period',
-      render: (row: Registration) => {
-        if (row.isFrozen) {
-          return (
-            <Badge variant="neutral" className="whitespace-nowrap">
-              Frozen
-            </Badge>
-          );
-        }
-        const days = getDaysRemaining(row);
-        const end = getPeriodEnd(row);
-        if (days === null && !end) return <span className="text-ui-textMuted">—</span>;
-        if (days !== null) {
-          if (days === 0) return <Badge variant="danger">Expired</Badge>;
-          return (
-            <span className="text-ui-textPrimary">
-              <strong>{days}</strong> day{days !== 1 ? 's' : ''} left
-            </span>
-          );
-        }
-        return <span className="text-ui-textMuted">—</span>;
-      },
-    },
-    {
-      id: 'freeze',
-      header: 'Freeze',
-      render: (row: Registration) => (
-        <button
-          type="button"
-          onClick={() => toggleFreeze(row)}
-          disabled={freezingId === row.id}
-          className={`inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed ${
-            row.isFrozen
-              ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
-              : 'border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100'
-          }`}
-          title={row.isFrozen ? 'Unfreeze (resume countdown)' : 'Freeze (pause 30-day countdown)'}
-        >
-          {freezingId === row.id ? '…' : row.isFrozen ? 'Unfreeze' : 'Freeze'}
-        </button>
-      ),
-    },
-    {
-      id: 'createdAt',
-      header: 'Registered',
-      render: (row: Registration) => (
-        <span className="text-ui-textMuted">
-          {new Date(row.createdAt).toLocaleDateString()} {new Date(row.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </span>
-      ),
-    },
-    {
-      id: 'actions',
-      header: 'Actions',
-      render: (row: Registration) => (
-        <button
-          onClick={() => handleDelete(row)}
-          disabled={deletingId === row.id}
-          className="inline-flex items-center gap-1 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 transition hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Delete registration"
-        >
-          <TrashIcon className="h-4 w-4" />
-          {deletingId === row.id ? 'Deleting...' : 'Delete'}
-        </button>
-      ),
-    },
-  ];
+  async function handleReregister(r: Registration) {
+    if (reregisteringId) return;
+    if (!confirm(`Create a new registration for ${r.customerName} (same package & price, unpaid)? The current registration will stay as-is.`)) return;
+    setReregisteringId(r.id);
+    try {
+      await packageRegistrationsApi.reregister(r.id);
+      load();
+    } catch (e) {
+      console.error('Failed to re-register', e);
+      alert('Failed to re-register. Please try again.');
+    } finally {
+      setReregisteringId(null);
+    }
+  }
 
-  // Unique package names for filter dropdown (include current filter so it stays when no rows)
-  const packageOpts = Array.from(new Set([...rows.map((r) => r.packageName), packageFilter].filter(Boolean))).sort();
+  function renderRemainingShort(row: Registration) {
+    if (row.isFrozen) return <Badge variant="neutral">Frozen</Badge>;
+    const end = getPeriodEnd(row);
+    const sessions = getSessionsRemaining(row);
+    if (sessions) {
+      if (sessions.remaining <= 0) return <Badge variant="danger">No sessions</Badge>;
+      return (
+        <span className="text-sm text-ui-textPrimary">
+          <strong>{sessions.remaining}</strong>/{sessions.total}
+          {end && <span className="block text-xs text-ui-textMuted">Ends {new Date(end).toLocaleDateString()}</span>}
+        </span>
+      );
+    }
+    const days = getDaysRemaining(row);
+    if (days === null) return <span className="text-ui-textMuted">—</span>;
+    if (days === 0) return <Badge variant="danger">Expired</Badge>;
+    return (
+      <span className="text-sm text-ui-textPrimary">
+        <strong>{days}</strong> day{days !== 1 ? 's' : ''}
+        {end && <span className="block text-xs text-ui-textMuted">Ends {new Date(end).toLocaleDateString()}</span>}
+      </span>
+    );
+  }
+
+  // Package list: from API when available, else from rows (so filter dropdown and modals have full list)
+  const packageOpts = apiPackages.length > 0
+    ? apiPackages.map((p) => p.name)
+    : Array.from(new Set([...rows.map((r) => r.packageName), packageFilter].filter(Boolean))).sort();
+  // Default price per package (from Package.currentPriceJod) for modals
+  const defaultPricesByPackage: Record<string, number> = Object.fromEntries(
+    apiPackages.filter((p) => p.currentPriceJod != null).map((p) => [p.name, p.currentPriceJod as number]),
+  );
 
   if (loading && rows.length === 0) {
     return <div className="py-12 text-center text-ui-textMuted">Loading registrations...</div>;
@@ -281,6 +325,12 @@ export default function RegistrationsPage() {
       <PageHeader
         title="Package Registrations"
         subtitle="Registrations from Basketball, Gymnastics, and Volleyball packages"
+      />
+
+      <RegistrationTotalsPanel
+        packageName={packageFilter || undefined}
+        startDate={dateFilters.startDate}
+        endDate={dateFilters.endDate}
       />
 
       <Card>
@@ -339,6 +389,19 @@ export default function RegistrationsPage() {
                   </>
                 )}
               </div>
+              <Button variant="secondary" onClick={() => setCancelSessionDayOpen(true)} className="inline-flex items-center gap-1">
+                Record canceled day
+              </Button>
+              <Button variant="secondary" onClick={() => setAddRegistrationOpen(true)} className="inline-flex items-center gap-1">
+                Add person
+              </Button>
+              <Button variant="secondary" onClick={() => { setRegisterPersonMultiInitialPerson(null); setRegisterPersonMultiOpen(true); }} className="inline-flex items-center gap-1">
+                Register existing person
+              </Button>
+              <Button variant="primary" onClick={() => setBulkAddOpen(true)} className="inline-flex items-center gap-1">
+                <PlusCircleIcon className="h-4 w-4" />
+                Add Multiple People
+              </Button>
               <ExportCsvButton
                 rows={rows.map(r => {
                   const createdAt = new Date(r.createdAt);
@@ -366,22 +429,49 @@ export default function RegistrationsPage() {
                   };
                   
                   const periodEnd = r.periodEndsAt ? new Date(r.periodEndsAt) : null;
-                  const daysLeft = r.isFrozen ? 'Frozen' : periodEnd ? (() => {
-                    const now = new Date();
-                    now.setHours(0, 0, 0, 0);
-                    periodEnd.setHours(0, 0, 0, 0);
-                    const d = Math.ceil((periodEnd.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
-                    return d <= 0 ? 'Expired' : `${d} days`;
-                  })() : '';
+                  const sessions = getSessionsRemaining(r as Registration);
+                  const daysRemaining = getDaysRemaining(r as Registration);
+
+                  const remainingType = r.isFrozen
+                    ? 'FROZEN'
+                    : sessions
+                      ? 'SESSIONS'
+                      : daysRemaining != null
+                        ? 'DAYS'
+                        : 'UNKNOWN';
+
+                  const remainingDisplay = (() => {
+                    if (r.isFrozen) return 'Frozen';
+                    if (sessions) {
+                      if (sessions.remaining <= 0) return 'No sessions left';
+                      return `${sessions.remaining}/${sessions.total} sessions`;
+                    }
+                    if (daysRemaining != null) {
+                      return daysRemaining <= 0 ? 'Expired' : `${daysRemaining} days`;
+                    }
+                    return '';
+                  })();
+                  const collected = r.collected ?? 0;
+                  const finalPrice = r.finalPriceJod ?? 0;
+                  const paymentStatus = collected >= finalPrice ? 'PAID' : collected > 0 ? 'PARTIAL' : 'UNPAID';
                   return {
                     packageName: r.packageName || '',
                     customerName: r.customerName || '',
                     customerPhone: r.customerPhone || '',
                     customerEmail: r.customerEmail || '',
                     customerAge: r.customerAge ? String(r.customerAge) : '',
+                    basePriceJod: String(r.basePriceJod ?? 0),
+                    finalPriceJod: String(finalPrice),
+                    collectedJod: String(collected),
+                    paymentStatus,
                     isPaid: r.isPaid ? 'Yes' : 'No',
                     periodEndsAt: periodEnd ? formatDateTimeForExcel(periodEnd) : '',
-                    daysLeft,
+                    remainingType,
+                    sessionsTotal: sessions ? String(sessions.total) : '',
+                    sessionsUsed: sessions ? String(sessions.used) : '',
+                    sessionsRemaining: sessions ? String(sessions.remaining) : '',
+                    daysRemaining: daysRemaining != null ? String(daysRemaining) : '',
+                    remainingDisplay,
                     isFrozen: r.isFrozen ? 'Yes' : 'No',
                     registeredDate: formatDateForExcel(createdAt),
                     registeredTime: formatTimeForExcel(createdAt),
@@ -389,7 +479,30 @@ export default function RegistrationsPage() {
                     lastUpdated: formatDateTimeForExcel(updatedAt),
                   };
                 })}
-                columns={['packageName', 'customerName', 'customerPhone', 'customerEmail', 'customerAge', 'isPaid', 'periodEndsAt', 'daysLeft', 'isFrozen', 'registeredDate', 'registeredTime', 'registeredDateTime', 'lastUpdated']}
+                columns={[
+                  'packageName',
+                  'customerName',
+                  'customerPhone',
+                  'customerEmail',
+                  'customerAge',
+                  'basePriceJod',
+                  'finalPriceJod',
+                  'collectedJod',
+                  'paymentStatus',
+                  'isPaid',
+                  'periodEndsAt',
+                  'remainingType',
+                  'sessionsTotal',
+                  'sessionsUsed',
+                  'sessionsRemaining',
+                  'daysRemaining',
+                  'remainingDisplay',
+                  'isFrozen',
+                  'registeredDate',
+                  'registeredTime',
+                  'registeredDateTime',
+                  'lastUpdated',
+                ]}
                 filename={(() => {
                   const today = new Date().toISOString().split('T')[0];
                   const packageSlug = packageFilter ? packageFilter.replace(/[^a-zA-Z0-9]+/g, '-').replace(/-+/g, '-').slice(0, 40) : 'all-packages';
@@ -408,9 +521,292 @@ export default function RegistrationsPage() {
           </div>
         </CardHeader>
         <CardBody className="p-0">
-          <DataTable columns={columns} rows={rows} />
+          <div className="max-h-[65vh] overflow-y-auto overflow-x-hidden">
+            <table className="w-full border-collapse text-left table-fixed" style={{ tableLayout: 'fixed' }}>
+              <thead className="sticky top-0 z-10 bg-ui-softBg border-b border-ui-border shadow-sm">
+                <tr>
+                  <th className="w-[17%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Package</th>
+                  <th className="w-[13%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Name</th>
+                  <th className="w-[15%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Contact</th>
+                  <th className="w-[5%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Age</th>
+                  <th className="w-[8%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Price</th>
+                  <th className="w-[11%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Payment</th>
+                  <th className="w-[11%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Remaining</th>
+                  <th className="w-[20%] min-w-0 sticky right-0 z-30 bg-ui-softBg border-l border-ui-border px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.06)]">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ui-border">
+                {rows.map((row) => {
+                  const collected = row.collected ?? 0;
+                  const finalPrice = row.finalPriceJod ?? 0;
+                  const paymentStatus = collected >= finalPrice ? 'PAID' : collected > 0 ? 'PARTIAL' : 'UNPAID';
+                  return (
+                    <tr key={row.id} className="hover:bg-ui-softBg/50">
+                      <td className="px-4 py-2 min-w-0">
+                        <span className="block truncate font-semibold text-ui-textPrimary" title={row.packageName}>{row.packageName}</span>
+                      </td>
+                      <td className="px-4 py-2 min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => setPersonDetailsPhone(row.customerPhone)}
+                          className="block truncate text-left w-full text-ui-textPrimary hover:text-brand-blue-primary hover:underline font-medium"
+                          title={`View all registrations for ${row.customerName}`}
+                        >
+                          {row.customerName}
+                        </button>
+                      </td>
+                      <td className="px-4 py-2 min-w-0">
+                        <span className="block truncate text-sm text-ui-textPrimary" title={row.customerEmail ? `${row.customerPhone} • ${row.customerEmail}` : row.customerPhone}>{row.customerPhone}</span>
+                        {row.customerEmail && <span className="block truncate text-xs text-ui-textMuted" title={row.customerEmail}>{row.customerEmail}</span>}
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap text-ui-textPrimary">{row.customerAge ? `${row.customerAge} y` : '—'}</td>
+                      <td className="px-4 py-2 whitespace-nowrap text-ui-textPrimary">{row.finalPriceJod ?? 0} JOD</td>
+                      <td className="px-4 py-2 min-w-0">
+                        <div className="flex flex-col gap-0.5">
+                          <Badge variant={paymentStatus === 'PAID' ? 'success' : paymentStatus === 'PARTIAL' ? 'warning' : 'danger'}>
+                            {paymentStatus === 'PAID' ? 'Paid' : paymentStatus === 'PARTIAL' ? 'Partial' : 'Unpaid'}
+                          </Badge>
+                          {collected > 0 && <span className="text-xs text-ui-textMuted">{collected} JOD</span>}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 min-w-0">{renderRemainingShort(row)}</td>
+                      <td className="sticky right-0 z-20 w-[20%] min-w-0 bg-background border-l border-ui-border px-4 py-2 overflow-visible">
+                        <DropdownMenu.Root>
+                          <DropdownMenu.Trigger asChild>
+                            <button type="button" className="inline-flex items-center justify-center rounded-lg p-2 text-ui-textMuted hover:bg-ui-softBg hover:text-ui-textPrimary outline-none" aria-label="Actions">
+                              <EllipsisVerticalIcon className="h-5 w-5" />
+                            </button>
+                          </DropdownMenu.Trigger>
+                          <DropdownMenu.Portal>
+                            <DropdownMenu.Content
+                              align="end"
+                              side="bottom"
+                              sideOffset={8}
+                              avoidCollisions
+                              collisionPadding={12}
+                              className="z-[60] min-w-[14rem] rounded-lg border border-ui-border bg-white py-1 shadow-lg focus:outline-none"
+                            >
+                              {paymentStatus !== 'PAID' && (
+                                <DropdownMenu.Item
+                                  className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
+                                  onSelect={() => setMarkPaidRegistration(row)}
+                                >
+                                  {paymentStatus === 'PARTIAL' ? 'Add payment' : 'Mark as Paid'}
+                                </DropdownMenu.Item>
+                              )}
+                              {(paymentStatus === 'PAID' || collected > 0) && (
+                                <DropdownMenu.Item
+                                  className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
+                                  onSelect={() => setViewReceiptsRegistration(row)}
+                                >
+                                  View Receipt(s)
+                                </DropdownMenu.Item>
+                              )}
+                              <DropdownMenu.Item
+                                className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg disabled:opacity-50"
+                                onSelect={() => toggleFreeze(row)}
+                                disabled={freezingId === row.id}
+                              >
+                                {row.isFrozen ? 'Unfreeze' : 'Freeze'}
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item
+                                className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
+                                onSelect={() => setIncreaseSessionRegistration(row)}
+                              >
+                                +1 Session
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item
+                                className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
+                                onSelect={() => { setRegisterPersonMultiInitialPerson({ customerName: row.customerName, customerPhone: row.customerPhone, customerEmail: row.customerEmail ?? undefined, customerAge: row.customerAge ?? undefined }); setRegisterPersonMultiOpen(true); }}
+                              >
+                                Add another package
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item
+                                className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
+                                onSelect={() => setRegisterInAnotherPackageRow(row)}
+                              >
+                                Register in one more package
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item
+                                className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg disabled:opacity-50"
+                                onSelect={() => handleReregister(row)}
+                                disabled={reregisteringId === row.id}
+                              >
+                                Re-register
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item
+                                className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
+                                onSelect={() => setDetailsModalRow(row)}
+                              >
+                                View details
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item
+                                className="cursor-pointer px-4 py-2 text-sm text-red-600 outline-none hover:bg-red-50 data-[highlighted]:bg-red-50 disabled:opacity-50"
+                                onSelect={() => handleDelete(row)}
+                                disabled={deletingId === row.id}
+                              >
+                                Delete
+                              </DropdownMenu.Item>
+                            </DropdownMenu.Content>
+                          </DropdownMenu.Portal>
+                        </DropdownMenu.Root>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </CardBody>
       </Card>
+
+      <MarkAsPaidModal
+        open={!!markPaidRegistration}
+        onClose={() => setMarkPaidRegistration(null)}
+        registration={markPaidRegistration}
+        onSuccess={() => {
+          setMarkPaidRegistration(null);
+          load();
+        }}
+      />
+
+      <ViewReceiptsModal
+        open={!!viewReceiptsRegistration}
+        onClose={() => setViewReceiptsRegistration(null)}
+        registration={viewReceiptsRegistration}
+        onViewReceipt={(id) => {
+          setReceiptDetailId(id);
+        }}
+        onVoided={() => {
+          load();
+        }}
+      />
+
+      <ReceiptDetailModal
+        receiptId={receiptDetailId ?? ''}
+        open={!!receiptDetailId}
+        onClose={() => setReceiptDetailId(null)}
+        onVoided={() => {
+          setReceiptDetailId(null);
+          load();
+        }}
+      />
+
+      <BulkAddPeopleModal
+        open={bulkAddOpen}
+        onClose={() => setBulkAddOpen(false)}
+        packageOptions={packageOpts}
+        defaultPricesByPackage={defaultPricesByPackage}
+        onSuccess={() => {
+          setBulkAddOpen(false);
+          load();
+        }}
+      />
+
+      {increaseSessionRegistration && (
+        <IncreaseSessionModal
+          open={true}
+          onClose={() => setIncreaseSessionRegistration(null)}
+          registration={increaseSessionRegistration}
+          onSuccess={() => {
+            setIncreaseSessionRegistration(null);
+            load();
+          }}
+        />
+      )}
+
+      <CancelSessionDayModal
+        open={cancelSessionDayOpen}
+        onClose={() => setCancelSessionDayOpen(false)}
+        packageOptions={packageOpts}
+        onSuccess={() => {
+          setCancelSessionDayOpen(false);
+          load();
+        }}
+      />
+
+      <AddRegistrationModal
+        open={addRegistrationOpen}
+        onClose={() => {
+          setAddRegistrationOpen(false);
+          setAddRegistrationInitialPerson(null);
+        }}
+        onSuccess={() => {
+          setAddRegistrationOpen(false);
+          setAddRegistrationInitialPerson(null);
+          load();
+        }}
+        packageOptions={packageOpts}
+        defaultPricesByPackage={defaultPricesByPackage}
+        initialPerson={addRegistrationInitialPerson}
+      />
+
+      <RegistrationDetailsModal
+        open={!!detailsModalRow}
+        onClose={() => setDetailsModalRow(null)}
+        registration={detailsModalRow}
+        onViewReceipts={(row) => {
+          setDetailsModalRow(null);
+          setViewReceiptsRegistration(row);
+        }}
+      />
+
+      <RegisterInAnotherPackageModal
+        open={!!registerInAnotherPackageRow}
+        onClose={() => setRegisterInAnotherPackageRow(null)}
+        onSuccess={() => {
+          setRegisterInAnotherPackageRow(null);
+          load();
+        }}
+        registration={registerInAnotherPackageRow}
+        packageOptions={packageOpts}
+        defaultPricesByPackage={defaultPricesByPackage}
+      />
+
+      <RegisterExistingPersonModal
+        open={registerExistingPersonOpen}
+        onClose={() => setRegisterExistingPersonOpen(false)}
+        rows={rows}
+        onSelectPerson={(person) => {
+          setRegisterExistingPersonOpen(false);
+          setAddRegistrationInitialPerson(person);
+          setAddRegistrationOpen(true);
+        }}
+      />
+
+      <PersonDetailsModal
+        open={!!personDetailsPhone}
+        onClose={() => setPersonDetailsPhone(null)}
+        registrations={personDetailsPhone ? rows.filter((r) => r.customerPhone === personDetailsPhone) : []}
+        onAddPackages={(person) => {
+          setPersonDetailsPhone(null);
+          setRegisterPersonMultiInitialPerson(person);
+          setRegisterPersonMultiOpen(true);
+        }}
+        onViewReceipts={(row) => setViewReceiptsRegistration(row)}
+        onMarkPaid={(row) => setMarkPaidRegistration(row)}
+      />
+
+      <RegisterPersonMultiPackageModal
+        open={registerPersonMultiOpen}
+        onClose={() => { setRegisterPersonMultiOpen(false); setRegisterPersonMultiInitialPerson(null); }}
+        onSuccess={(created) => {
+          setBulkCreatedCount(created);
+          load();
+          setRegisterPersonMultiOpen(false);
+          setRegisterPersonMultiInitialPerson(null);
+        }}
+        rows={rows}
+        packageOptions={packageOpts}
+        defaultPricesByPackage={defaultPricesByPackage}
+        initialPerson={registerPersonMultiInitialPerson}
+      />
+
+      {bulkCreatedCount != null && bulkCreatedCount > 0 && (
+        <div className="fixed bottom-6 right-6 z-[100] rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800 shadow-lg">
+          Created {bulkCreatedCount} registration{bulkCreatedCount !== 1 ? 's' : ''}
+        </div>
+      )}
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { UserPlusIcon, CalendarIcon, CurrencyDollarIcon, ClipboardDocumentCheckI
 import { QuickAction } from './PortalComponents';
 import { CreateMemberModal } from './CreateMemberModal';
 import { CreateBookingModal } from './CreateBookingModal';
-import { CreateInvoiceModal } from './CreateInvoiceModal';
+import { CreateInvoiceModal } from '../financials/_components/CreateInvoiceModal';
 
 export function QuickActions({ companyId }: { companyId?: string }) {
   const [memberModalOpen, setMemberModalOpen] = useState(false);
@@ -14,37 +14,38 @@ export function QuickActions({ companyId }: { companyId?: string }) {
 
   return (
     <>
-      <div className="grid gap-3 md:grid-cols-2">
-        <button onClick={() => setMemberModalOpen(true)}>
-          <QuickAction
-            icon={<UserPlusIcon className="h-4 w-4" />}
-            title="Add member"
-            description="Create athlete or family account"
-          />
-        </button>
-        <button onClick={() => setBookingModalOpen(true)}>
-          <QuickAction
-            icon={<CalendarIcon className="h-4 w-4" />}
-            title="Create booking"
-            description="Allocate courts, fields, rooms"
-          />
-        </button>
-        <button onClick={() => setInvoiceModalOpen(true)}>
-          <QuickAction
-            icon={<CurrencyDollarIcon className="h-4 w-4" />}
-            title="Generate invoice"
-            description="Send PDF to members"
-          />
-        </button>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <QuickAction
-          icon={<ClipboardDocumentCheckIcon className="h-4 w-4" />}
-          title="Assign coach"
-          description="Match athletes to staff"
+          onClick={() => setMemberModalOpen(true)}
+          icon={<UserPlusIcon className="h-5 w-5" />}
+          title="Add Member"
+          description="Registration"
+          variant="centered"
+        />
+        <QuickAction
+          onClick={() => setBookingModalOpen(true)}
+          icon={<CalendarIcon className="h-5 w-5" />}
+          title="Create Booking"
+          description="Reservation"
+          variant="centered"
+        />
+        <QuickAction
+          onClick={() => setInvoiceModalOpen(true)}
+          icon={<CurrencyDollarIcon className="h-5 w-5" />}
+          title="Generate Invoice"
+          description="Payments"
+          variant="centered"
+        />
+        <QuickAction
+          icon={<ClipboardDocumentCheckIcon className="h-5 w-5" />}
+          title="Assign Coach"
+          description="Schedules"
+          variant="centered"
         />
       </div>
       <CreateMemberModal open={memberModalOpen} onClose={() => setMemberModalOpen(false)} companyId={companyId} />
       <CreateBookingModal open={bookingModalOpen} onClose={() => setBookingModalOpen(false)} companyId={companyId} />
-      <CreateInvoiceModal open={invoiceModalOpen} onClose={() => setInvoiceModalOpen(false)} companyId={companyId} />
+      <CreateInvoiceModal open={invoiceModalOpen} onClose={() => setInvoiceModalOpen(false)} />
     </>
   );
 }

@@ -209,5 +209,32 @@ export class AdminController {
   async updateFooterSettings(@Body() data: Partial<FooterSettings>) {
     return this.landingService.updateFooterSettings(data);
   }
+
+  // Packages (sellable packages for Landing + Portal)
+  @Get('packages')
+  async getPackages() {
+    return this.landingService.getPackagesForAdmin();
+  }
+
+  @Get('packages/:id')
+  async getPackage(@Param('id') id: string) {
+    return this.landingService.getPackage(id);
+  }
+
+  @Post('packages')
+  async createPackage(@Body() data: Prisma.PackageCreateInput) {
+    return this.landingService.createPackage(data);
+  }
+
+  @Patch('packages/:id')
+  async updatePackage(@Param('id') id: string, @Body() data: Prisma.PackageUpdateInput) {
+    return this.landingService.updatePackage(id, data);
+  }
+
+  @Delete('packages/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deletePackage(@Param('id') id: string) {
+    await this.landingService.deletePackage(id);
+  }
 }
 

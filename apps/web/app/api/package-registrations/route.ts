@@ -44,9 +44,10 @@ export async function POST(request: Request) {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
+      const msg = (err as { message?: string }).message || (err as { error?: string }).error || 'Failed to submit registration.';
       return NextResponse.json(
-        { error: (err as { message?: string }).message || 'Failed to submit registration.' },
-        { status: res.status }
+        { error: typeof msg === 'string' ? msg : 'Failed to submit registration.' },
+        { status: res.status },
       );
     }
 
@@ -54,9 +55,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, id: data.id });
   } catch (e) {
     console.error('Package registration error', e);
+    const isNetwork =
+      e instanceof TypeError && (e.message === 'Failed to fetch' || e.message?.includes('fetch'));
     return NextResponse.json(
-      { error: 'Unable to submit registration. Please try again later.' },
-      { status: 500 }
+      {
+        error: isNetwork
+          ? 'Cannot reach the registration service. Make sure the API is running (e.g. on port 4000).'
+          : 'Unable to submit registration. Please try again later.',
+      },
+      { status: 500 },
     );
   }
 }

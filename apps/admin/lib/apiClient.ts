@@ -1,17 +1,14 @@
-// Use deployed API URL by default, allow override via environment variable
+// Use deployed API URL in production; in development use local API unless overridden
 const getApiBaseUrl = () => {
   const envUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-  
-  // If environment variable is set and it's NOT localhost, use it
-  if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
-    return envUrl;
-  }
-  
-  // Always default to deployed API (ignore localhost URLs)
+  if (envUrl) return envUrl;
+  // In development, talk to local API so admin packages and other routes work
+  if (process.env.NODE_ENV === 'development') return 'http://localhost:4000';
   return 'https://infinitysport.onrender.com';
 };
 
 const API_BASE_URL = getApiBaseUrl();
+const REQUEST_TIMEOUT_MS = 12000;
 
 class ApiClient {
   private baseUrl: string;
@@ -24,7 +21,7 @@ class ApiClient {
     }
   }
 
-  private async request<T>(
+  private async request<T = any>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
@@ -33,9 +30,13 @@ class ApiClient {
     const endpointPath = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     const url = `${baseUrl}${endpointPath}`;
     
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
     try {
       const response = await fetch(url, {
         ...options,
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           ...options.headers,
@@ -53,12 +54,17 @@ class ApiClient {
 
       return response.json();
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error(`Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s. Please try again.`);
+      }
       if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
         throw new Error(
           `Cannot connect to API at ${url}. Make sure the API server is running on ${this.baseUrl}`
         );
       }
       throw error;
+    } finally {
+      clearTimeout(timeout);
     }
   }
 
@@ -259,7 +265,35 @@ class ApiClient {
       body: JSON.stringify(data),
     });
   }
+
+  // Packages (sellable packages for Landing + Portal)
+  async getPackages() {
+    return this.request('/api/admin/packages');
+  }
+
+  async getPackage(id: string) {
+    return this.request(`/api/admin/packages/${id}`);
+  }
+
+  async createPackage(data: any) {
+    return this.request('/api/admin/packages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updatePackage(id: string, data: any) {
+    return this.request(`/api/admin/packages/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deletePackage(id: string) {
+    return this.request(`/api/admin/packages/${id}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const apiClient = new ApiClient();
-

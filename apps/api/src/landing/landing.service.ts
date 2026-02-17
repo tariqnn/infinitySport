@@ -9,6 +9,7 @@ import {
   FacilityHighlight,
   FooterLink,
   FooterSettings,
+  Package,
   Prisma,
 } from '@prisma/client';
 
@@ -154,7 +155,9 @@ export class LandingService {
 
   // Facility Highlights
   async getFacilities(): Promise<FacilityHighlight[]> {
-    return this.prisma.facilityHighlight.findMany();
+    return this.prisma.facilityHighlight.findMany({
+      orderBy: { order: 'asc' },
+    });
   }
 
   async getFacility(id: string): Promise<FacilityHighlight | null> {
@@ -221,6 +224,41 @@ export class LandingService {
     return this.prisma.footerSettings.create({
       data: data as Prisma.FooterSettingsCreateInput,
     });
+  }
+
+  // Packages (single source of truth for sellable packages; Landing + Portal)
+  async getPackages(): Promise<Package[]> {
+    return this.prisma.package.findMany({
+      where: { isActive: true },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    });
+  }
+
+  /** All packages for admin (including inactive). */
+  async getPackagesForAdmin(): Promise<Package[]> {
+    return this.prisma.package.findMany({
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    });
+  }
+
+  async getPackage(id: string): Promise<Package | null> {
+    return this.prisma.package.findUnique({ where: { id } });
+  }
+
+  async getPackageByName(name: string): Promise<Package | null> {
+    return this.prisma.package.findUnique({ where: { name } });
+  }
+
+  async createPackage(data: Prisma.PackageCreateInput): Promise<Package> {
+    return this.prisma.package.create({ data });
+  }
+
+  async updatePackage(id: string, data: Prisma.PackageUpdateInput): Promise<Package> {
+    return this.prisma.package.update({ where: { id }, data });
+  }
+
+  async deletePackage(id: string): Promise<void> {
+    await this.prisma.package.delete({ where: { id } });
   }
 
   // Combined landing content

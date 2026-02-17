@@ -11,16 +11,17 @@ type PageHeroProps = {
 
 export function PageHero({ eyebrow, title, description, actions, align = 'between' }: PageHeroProps) {
   return (
-    <div className="rounded-3xl border border-[rgba(15,23,42,0.06)] bg-white px-6 py-7 shadow-panel">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div className={clsx('space-y-3', align === 'start' && 'md:flex-1')}>
-          <p className="text-xs uppercase tracking-[0.25em] text-brand-blue">{eyebrow}</p>
-          <h2 className="font-display text-3xl font-bold text-[var(--text-primary)]">{title}</h2>
-          <p className="text-sm text-[var(--text-muted)]">{description}</p>
+    <div className="glass-card relative overflow-hidden px-6 py-6 sm:px-8 sm:py-7">
+      <div className={clsx('flex flex-col gap-5 sm:flex-row sm:items-end', align === 'between' ? 'sm:justify-between' : 'sm:justify-start')}>
+        <div className={clsx('space-y-3', align === 'start' && 'sm:flex-1')}>
+          <p className="inline-flex items-center rounded-full bg-[var(--primary-light)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--primary)]">
+            {eyebrow}
+          </p>
+          <h2 className="font-display text-2xl font-semibold text-[var(--text-primary)] sm:text-3xl">{title}</h2>
+          <p className="max-w-2xl text-sm text-[var(--text-muted)]">{description}</p>
         </div>
-        {actions ? <div className="flex flex-wrap gap-3">{actions}</div> : null}
+        {actions ? <div className="flex flex-shrink-0 flex-wrap gap-3">{actions}</div> : null}
       </div>
     </div>
   );
 }
-

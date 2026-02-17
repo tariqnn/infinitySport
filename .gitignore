@@ -12,6 +12,7 @@ node_modules/
 /.next/
 /out/
 apps/*/.next/
+apps/*/.next-*/
 apps/*/out/
 dist/
 apps/*/dist/

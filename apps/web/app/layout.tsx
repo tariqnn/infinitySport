@@ -64,6 +64,11 @@ export const metadata: Metadata = {
       'Train with national coaches, access world-class facilities, and activate partnerships through Infinity Sports.',
     images: ['https://images.unsplash.com/photo-1546519638-68e109498ffc']
   },
+  icons: {
+    icon: '/infinity-logo.png',
+    shortcut: '/infinity-logo.png',
+    apple: '/infinity-logo.png',
+  },
   metadataBase: new URL('https://infinitysports.jo')
 };
 

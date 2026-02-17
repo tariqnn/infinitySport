@@ -17,7 +17,7 @@ export function DataTable<T extends { id: string }>({
   onRowClick?: (row: T) => void;
 }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-ui-border bg-white">
+    <div className="overflow-x-auto rounded-xl border border-ui-border bg-white shadow-sm">
       <table className="w-full divide-y divide-ui-border">
         <thead className="bg-ui-softBg">
           <tr>

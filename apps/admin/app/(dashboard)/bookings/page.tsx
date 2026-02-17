@@ -7,13 +7,13 @@ export const metadata = {
 
 export default function BookingsPage() {
   return (
-    <>
+    <div className="space-y-8">
       <PageHero
         eyebrow="Bookings"
         title="Court & Facility Bookings"
         description="Manage all bookings from the landing page and track payment status."
       />
       <BookingsManager />
-    </>
+    </div>
   );
 }

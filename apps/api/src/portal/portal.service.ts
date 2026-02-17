@@ -585,8 +585,9 @@ export class PortalService {
     }
 
     // Use provided values or fallback to FooterSettings (single source of truth)
+    // NOTE: `description` stores JSON meta for PDF rendering and future editing.
     const meta = {
-      v: 1,
+      v: 2,
       companyName: (d.companyName && String(d.companyName)) || companyProfile.name,
       companyAddress: (d.companyAddress && String(d.companyAddress)) || companyProfile.address,
       companyEmail: (d.companyEmail && String(d.companyEmail)) || companyProfile.email,
@@ -596,6 +597,46 @@ export class PortalService {
       clientAddress: (d.clientAddress && String(d.clientAddress)) || '',
       currency: (d.currency && String(d.currency)) || 'JOD',
       paymentMethod,
+      // Academy-specific fields
+      student: {
+        fullName: (d.studentFullName && String(d.studentFullName)) || '',
+        age:
+          typeof d.studentAge === 'number'
+            ? d.studentAge
+            : d.studentAge != null && String(d.studentAge).trim()
+              ? Number(d.studentAge)
+              : null,
+        guardianName: (d.guardianName && String(d.guardianName)) || '',
+        emergencyPhone: (d.emergencyPhone && String(d.emergencyPhone)) || '',
+        membershipId: (d.membershipId && String(d.membershipId)) || null,
+      },
+      program: {
+        name: (d.programName && String(d.programName)) || '',
+        coachName: (d.coachName && String(d.coachName)) || '',
+        branch: (d.branch && String(d.branch)) || '',
+        trainingPeriodStart: d.trainingPeriodStart ? String(d.trainingPeriodStart) : null,
+        trainingPeriodEnd: d.trainingPeriodEnd ? String(d.trainingPeriodEnd) : null,
+        sessionsPerWeek:
+          typeof d.sessionsPerWeek === 'number'
+            ? d.sessionsPerWeek
+            : d.sessionsPerWeek != null && String(d.sessionsPerWeek).trim()
+              ? Number(d.sessionsPerWeek)
+              : null,
+        totalSessions:
+          typeof d.totalSessions === 'number'
+            ? d.totalSessions
+            : d.totalSessions != null && String(d.totalSessions).trim()
+              ? Number(d.totalSessions)
+              : null,
+      },
+      paymentDetails: {
+        bankName: (d.bankName && String(d.bankName)) || null,
+        accountName: (d.accountName && String(d.accountName)) || null,
+        iban: (d.iban && String(d.iban)) || null,
+        swift: (d.swift && String(d.swift)) || null,
+        cashAccepted: typeof d.cashAccepted === 'boolean' ? d.cashAccepted : true,
+      },
+      installments: Array.isArray(d.installments) ? d.installments : null,
       lineItems: Array.isArray(d.lineItems) ? d.lineItems : [],
       subtotal: typeof d.subtotal === 'number' ? d.subtotal : null,
       tax: typeof d.tax === 'number' ? d.tax : null,
@@ -892,7 +933,77 @@ export class PortalService {
     const items: Array<{ description: string; quantity: number; unitPrice: number; lineTotal: number }> =
       Array.isArray(itemsRaw) ? itemsRaw : [];
 
-    const tableTop = Math.max(issuedToY + 80, clientY + 25);
+    // ===================== ACADEMY DETAILS (STUDENT + PROGRAM) =====================
+    const detailsStartY = Math.max(issuedToY + 80, clientY + 25);
+    const student = ((input.meta as any)?.student ?? {}) as Record<string, any>;
+    const program = ((input.meta as any)?.program ?? {}) as Record<string, any>;
+    const hasDetails =
+      Boolean(student?.fullName) ||
+      student?.age != null ||
+      Boolean(student?.guardianName) ||
+      Boolean(student?.emergencyPhone) ||
+      Boolean(student?.membershipId) ||
+      Boolean(program?.name) ||
+      Boolean(program?.coachName) ||
+      Boolean(program?.branch) ||
+      Boolean(program?.trainingPeriodStart) ||
+      Boolean(program?.trainingPeriodEnd) ||
+      program?.sessionsPerWeek != null ||
+      program?.totalSessions != null;
+
+    let tableTop = detailsStartY;
+    if (hasDetails) {
+      const gap = 18;
+      const colGap = 18;
+      const colW = Math.floor((contentWidth - colGap) / 2);
+      const leftX = contentStartX;
+      const rightX = contentStartX + colW + colGap;
+
+      const studentLines: string[] = [];
+      if (student?.fullName) studentLines.push(`Name: ${String(student.fullName)}`);
+      if (student?.age != null && !Number.isNaN(Number(student.age))) studentLines.push(`Age: ${Number(student.age)}`);
+      if (student?.guardianName) studentLines.push(`Guardian: ${String(student.guardianName)}`);
+      if (student?.emergencyPhone) studentLines.push(`Emergency: ${String(student.emergencyPhone)}`);
+      if (student?.membershipId) studentLines.push(`Membership ID: ${String(student.membershipId)}`);
+
+      const programLines: string[] = [];
+      if (program?.name) programLines.push(`Program: ${String(program.name)}`);
+      if (program?.coachName) programLines.push(`Coach: ${String(program.coachName)}`);
+      if (program?.branch) programLines.push(`Branch: ${String(program.branch)}`);
+      if (program?.trainingPeriodStart || program?.trainingPeriodEnd) {
+        const start = program?.trainingPeriodStart ? new Date(String(program.trainingPeriodStart)) : null;
+        const end = program?.trainingPeriodEnd ? new Date(String(program.trainingPeriodEnd)) : null;
+        const s = start && !Number.isNaN(start.getTime()) ? start.toLocaleDateString() : '—';
+        const e = end && !Number.isNaN(end.getTime()) ? end.toLocaleDateString() : '—';
+        programLines.push(`Period: ${s} – ${e}`);
+      }
+      if (program?.sessionsPerWeek != null && !Number.isNaN(Number(program.sessionsPerWeek))) {
+        programLines.push(`Sessions/week: ${Number(program.sessionsPerWeek)}`);
+      }
+      if (program?.totalSessions != null && !Number.isNaN(Number(program.totalSessions))) {
+        programLines.push(`Total sessions: ${Number(program.totalSessions)}`);
+      }
+
+      // Section labels
+      doc.font('Helvetica-Bold').fontSize(9).fillColor('#111827');
+      doc.text('STUDENT', leftX, detailsStartY, { width: colW });
+      doc.text('PROGRAM', rightX, detailsStartY, { width: colW });
+
+      const bodyY = detailsStartY + 14;
+      const lineH = 12;
+      doc.font('Helvetica').fontSize(9).fillColor('#374151');
+      studentLines.forEach((line, i) => doc.text(line, leftX, bodyY + i * lineH, { width: colW }));
+      programLines.forEach((line, i) => doc.text(line, rightX, bodyY + i * lineH, { width: colW }));
+
+      const maxLines = Math.max(studentLines.length, programLines.length, 1);
+      const blockH = 14 + maxLines * lineH;
+
+      // Divider under details
+      const detailsBottom = detailsStartY + blockH + 10;
+      doc.moveTo(contentStartX, detailsBottom).lineTo(contentStartX + contentWidth, detailsBottom).lineWidth(0.5).strokeColor('#E5E7EB').stroke();
+      tableTop = detailsBottom + gap;
+    }
+
     const tableWidth = contentWidth; // 100% of container
     const tablePadding = 16; // Right padding so numbers never touch edge
     const rowHeight = 24; // Comfortable row spacing
@@ -1018,6 +1129,68 @@ export class PortalService {
       doc.text('Note', contentStartX, totalsY);
       doc.font('Helvetica').fontSize(9).fillColor('#6B7280');
       doc.text(note, contentStartX, totalsY + 14, { width: contentWidth, lineGap: 4 });
+      const noteHeight = doc.heightOfString(note, { width: contentWidth, lineGap: 4 });
+      totalsY = totalsY + 14 + noteHeight;
+    }
+
+    // ===================== PAYMENT DETAILS (BANK/CASH + INSTALLMENTS) =====================
+    const paymentDetails = ((input.meta as any)?.paymentDetails ?? {}) as Record<string, any>;
+    const installmentsRaw = (input.meta as any)?.installments;
+    const installments: Array<{ dueDate?: string; amount?: number; method?: string; isPaid?: boolean }> = Array.isArray(installmentsRaw)
+      ? installmentsRaw
+      : [];
+
+    const hasPaymentDetails =
+      Boolean(paymentDetails?.bankName) ||
+      Boolean(paymentDetails?.accountName) ||
+      Boolean(paymentDetails?.iban) ||
+      Boolean(paymentDetails?.swift) ||
+      typeof paymentDetails?.cashAccepted === 'boolean';
+
+    if (hasPaymentDetails || installments.length > 0) {
+      let infoY = totalsY + 22;
+
+      doc.font('Helvetica-Bold').fontSize(10).fillColor('#111827');
+      doc.text('Payment details', contentStartX, infoY);
+      infoY += 14;
+
+      doc.font('Helvetica').fontSize(9).fillColor('#6B7280');
+
+      const lines: string[] = [];
+      if (paymentDetails?.bankName) lines.push(`Bank: ${String(paymentDetails.bankName)}`);
+      if (paymentDetails?.accountName) lines.push(`Account name: ${String(paymentDetails.accountName)}`);
+      if (paymentDetails?.iban) lines.push(`IBAN: ${String(paymentDetails.iban)}`);
+      if (paymentDetails?.swift) lines.push(`SWIFT: ${String(paymentDetails.swift)}`);
+      if (typeof paymentDetails?.cashAccepted === 'boolean') lines.push(`Cash accepted: ${paymentDetails.cashAccepted ? 'Yes' : 'No'}`);
+
+      lines.forEach((line, i) => {
+        doc.text(line, contentStartX, infoY + i * 12, { width: contentWidth });
+      });
+      infoY += Math.max(lines.length, 1) * 12 + 10;
+
+      if (installments.length > 0) {
+        doc.font('Helvetica-Bold').fontSize(9).fillColor('#111827');
+        doc.text('Installments', contentStartX, infoY);
+        infoY += 12;
+
+        doc.font('Helvetica').fontSize(9).fillColor('#374151');
+        installments.slice(0, 6).forEach((ins) => {
+          const due = ins.dueDate ? new Date(String(ins.dueDate)) : null;
+          const dueText = due && !Number.isNaN(due.getTime()) ? due.toLocaleDateString() : '—';
+          const amountText = Number.isFinite(Number(ins.amount)) ? money(Number(ins.amount)) : '0.00';
+          const methodText = ins.method ? String(ins.method) : '—';
+          const paidText = ins.isPaid ? 'Paid' : 'Unpaid';
+          doc.text(`${dueText} • ${amountText} • ${methodText} • ${paidText}`, contentStartX, infoY, { width: contentWidth });
+          infoY += 12;
+        });
+        if (installments.length > 6) {
+          doc.font('Helvetica').fontSize(8).fillColor('#9CA3AF');
+          doc.text(`+ ${installments.length - 6} more installment(s)`, contentStartX, infoY, { width: contentWidth });
+          infoY += 10;
+        }
+      }
+
+      totalsY = infoY;
     }
 
     // ===================== FOOTER (TWO-COLUMN) =====================
@@ -1607,63 +1780,141 @@ export class PortalService {
     };
   }
 
-  // Package Registrations (public sign-ups for Basketball, Gymnastics, Volleyball, etc.)
-  // 30-day period from registration; freeze pauses the countdown.
+  async getPackagePricing(): Promise<Array<{ packageName: string; basePriceJod: number | null }>> {
+    const rows = await (this.prisma as any).packagePricing.findMany({ orderBy: { packageName: 'asc' } });
+    return rows.map((r: any) => ({ packageName: r.packageName, basePriceJod: r.basePriceJod ?? null }));
+  }
+
+  // Package Registrations: pricing + discounts (manual only). finalPriceJod = base - discount, clamp >= 0.
+  private computeFinalPriceJod(
+    basePriceJod: number,
+    discountType: string,
+    discountValue: number | null | undefined,
+  ): number {
+    const base = Math.max(0, basePriceJod);
+    if (!discountType || discountType === 'NONE' || discountValue == null) return base;
+    if (discountType === 'PERCENT') return Math.max(0, base - Math.round((base * Number(discountValue)) / 100));
+    if (discountType === 'AMOUNT') return Math.max(0, base - Number(discountValue));
+    return base;
+  }
+
+  /** Active packages for portal (registration form, default price). Uses Package table when available. */
+  async getPackages(): Promise<Array<{ id: string; sportType: string; name: string; description: string | null; sessionsCount: number; trackingType: string; pricingType: string; currentPriceJod: number | null; isActive: boolean; sortOrder: number }>> {
+    try {
+      const rows = await (this.prisma as any).package.findMany({
+        where: { isActive: true },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+        select: { id: true, sportType: true, name: true, description: true, sessionsCount: true, trackingType: true, pricingType: true, currentPriceJod: true, isActive: true, sortOrder: true },
+      });
+      return rows;
+    } catch {
+      return [];
+    }
+  }
+
   async getPackageRegistrations(
     packageName?: string,
     startDate?: string,
     endDate?: string,
-  ): Promise<Array<{
-    id: string;
-    packageName: string;
-    customerName: string;
-    customerPhone: string;
-    customerEmail: string | null;
-    customerAge: number | null;
-    isPaid: boolean;
-    periodEndsAt: Date | null;
-    isFrozen: boolean;
-    frozenAt: Date | null;
-    createdAt: Date;
-    updatedAt: Date;
-  }>> {
+    page?: number,
+    pageSize?: number,
+  ): Promise<
+    | Array<{
+        id: string;
+        packageName: string;
+        customerName: string;
+        customerPhone: string;
+        customerEmail: string | null;
+        customerAge: number | null;
+        isPaid: boolean;
+        basePriceJod: number;
+        discountType: string;
+        discountValue: number | null;
+        discountReason: string | null;
+        finalPriceJod: number;
+        periodEndsAt: Date | null;
+        isFrozen: boolean;
+        frozenAt: Date | null;
+        sessionsBonus: number;
+        createdAt: Date;
+        updatedAt: Date;
+      }>
+    | { rows: any[]; total: number; page: number; pageSize: number }
+  > {
     const where: any = {};
-    
-    if (packageName) {
-      where.packageName = packageName;
-    }
-
-    // Add date range filtering
+    if (packageName) where.packageName = packageName;
     if (startDate || endDate) {
       where.createdAt = {};
-      if (startDate) {
-        where.createdAt.gte = new Date(startDate);
-      }
+      if (startDate) where.createdAt.gte = new Date(startDate);
       if (endDate) {
         const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999); // Include the entire end date
+        end.setHours(23, 59, 59, 999);
         where.createdAt.lte = end;
       }
     }
 
-    const rows = await (this.prisma as any).packageRegistration.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-    });
-    return rows.map((r: any) => ({
-      id: r.id,
-      packageName: r.packageName,
-      customerName: r.customerName,
-      customerPhone: r.customerPhone,
-      customerEmail: r.customerEmail ?? null,
-      customerAge: r.customerAge ?? null,
-      isPaid: r.isPaid,
-      periodEndsAt: r.periodEndsAt ?? null,
-      isFrozen: r.isFrozen ?? false,
-      frozenAt: r.frozenAt ?? null,
-      createdAt: r.createdAt,
-      updatedAt: r.updatedAt,
-    }));
+    const usePagination = page != null && pageSize != null && pageSize > 0;
+    const skip = usePagination ? Math.max(0, (Math.max(1, page) - 1) * pageSize) : undefined;
+    const take = usePagination ? Math.min(500, Math.max(1, pageSize)) : undefined;
+
+    const [rows, total] = usePagination
+      ? await Promise.all([
+          (this.prisma as any).packageRegistration.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            skip,
+            take,
+            include: { receipts: { where: { voidedAt: null } } },
+          }),
+          (this.prisma as any).packageRegistration.count({ where }),
+        ])
+      : [
+          await (this.prisma as any).packageRegistration.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            include: { receipts: { where: { voidedAt: null } } },
+          }),
+          0,
+        ];
+
+    const mapRow = (r: any) => {
+      const collected = (r.receipts || []).reduce((s: number, rec: any) => s + (rec.amountPaid || 0), 0);
+      return {
+        id: r.id,
+        packageName: r.packageName,
+        customerName: r.customerName,
+        customerPhone: r.customerPhone,
+        customerEmail: r.customerEmail ?? null,
+        customerAge: r.customerAge ?? null,
+        isPaid: r.isPaid,
+        basePriceJod: Number(r.basePriceJod) ?? 0,
+        discountType: r.discountType ?? 'NONE',
+        discountValue: r.discountValue ?? null,
+        discountReason: r.discountReason ?? null,
+        finalPriceJod: Number(r.finalPriceJod) ?? 0,
+        collected,
+        periodEndsAt: r.periodEndsAt ?? null,
+        isFrozen: r.isFrozen ?? false,
+        frozenAt: r.frozenAt ?? null,
+        sessionsBonus: r.sessionsBonus ?? 0,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+      };
+    };
+
+    if (usePagination) {
+      return { rows: rows.map(mapRow), total, page: Math.max(1, page!), pageSize: take! };
+    }
+    return rows.map(mapRow);
+  }
+
+  /** Billing period key (YYYY-MM) and optional end-of-month for price locking. */
+  private billingPeriodFromDate(d: Date): { billingPeriodKey: string; priceLockedUntil: Date } {
+    const y = d.getFullYear();
+    const m = d.getMonth();
+    const billingPeriodKey = `${y}-${String(m + 1).padStart(2, '0')}`;
+    const priceLockedUntil = new Date(y, m + 1, 0, 23, 59, 59, 999);
+    return { billingPeriodKey, priceLockedUntil };
   }
 
   async createPackageRegistration(data: {
@@ -1672,19 +1923,56 @@ export class PortalService {
     customerPhone: string;
     customerEmail?: string | null;
     customerAge?: number | null;
-  }): Promise<{ id: string; packageName: string; customerName: string; customerPhone: string; customerEmail: string | null; customerAge: number | null; isPaid: boolean; periodEndsAt: Date | null; isFrozen: boolean; frozenAt: Date | null; createdAt: Date }> {
+    basePriceJod?: number;
+    discountType?: string;
+    discountValue?: number | null;
+    discountReason?: string | null;
+    createdBy?: string | null;
+  }) {
+    const pkg = (data.packageName || '').trim();
+    let basePriceJod = data.basePriceJod;
+    if (basePriceJod == null) {
+      const pricing = await (this.prisma as any).packagePricing.findUnique({ where: { packageName: pkg } }).catch(() => null);
+      basePriceJod = pricing?.basePriceJod ?? 0;
+    }
+    basePriceJod = Math.max(0, Number(basePriceJod) || 0);
+    const discountType = (data.discountType || 'NONE').toUpperCase();
+    const discountValue = discountType === 'NONE' ? null : (data.discountValue ?? 0);
+    if (discountType !== 'NONE' && (discountValue == null || (discountType === 'PERCENT' && (discountValue < 0 || discountValue > 100)) || (discountType === 'AMOUNT' && discountValue < 0)))
+      throw new BadRequestException('Invalid discount');
+    if (discountType !== 'NONE' && !(data.discountReason || '').trim())
+      throw new BadRequestException('Discount reason is required when applying a discount');
+    const finalPriceJod = this.computeFinalPriceJod(basePriceJod, discountType, discountValue);
     const now = new Date();
-    const periodEndsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // +30 days
+    const periodEndsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const { billingPeriodKey, priceLockedUntil } = this.billingPeriodFromDate(now);
+    const discountApplied = discountType !== 'NONE';
     const row = await (this.prisma as any).packageRegistration.create({
       data: {
-        packageName: data.packageName,
-        customerName: data.customerName,
-        customerPhone: data.customerPhone,
-        customerEmail: data.customerEmail ?? null,
+        packageName: pkg,
+        customerName: (data.customerName || '').trim(),
+        customerPhone: (data.customerPhone || '').trim(),
+        customerEmail: (data.customerEmail || '').trim() || null,
         customerAge: data.customerAge ?? null,
+        basePriceJod,
+        discountType,
+        discountValue: discountType === 'NONE' ? null : Number(discountValue),
+        discountReason: discountType === 'NONE' ? null : (data.discountReason || '').trim() || null,
+        discountAppliedBy: discountApplied ? (data.createdBy ?? null) : null,
+        discountAppliedAt: discountApplied ? now : null,
+        finalPriceJod,
+        billingPeriodKey,
+        priceLockedUntil,
         periodEndsAt,
       },
     });
+    if (discountApplied) {
+      await this.auditLog(data.createdBy ?? null, 'DISCOUNT_APPLIED', 'Registration', row.id, {
+        discountType,
+        discountValue: discountType === 'NONE' ? null : Number(discountValue),
+        finalPriceJod,
+      });
+    }
     return {
       id: row.id,
       packageName: row.packageName,
@@ -1693,6 +1981,11 @@ export class PortalService {
       customerEmail: row.customerEmail ?? null,
       customerAge: row.customerAge ?? null,
       isPaid: row.isPaid,
+      basePriceJod: row.basePriceJod,
+      discountType: row.discountType,
+      discountValue: row.discountValue ?? null,
+      discountReason: row.discountReason ?? null,
+      finalPriceJod: row.finalPriceJod,
       periodEndsAt: row.periodEndsAt ?? null,
       isFrozen: row.isFrozen ?? false,
       frozenAt: row.frozenAt ?? null,
@@ -1702,20 +1995,44 @@ export class PortalService {
 
   async updatePackageRegistration(
     id: string,
-    data: { isPaid?: boolean; isFrozen?: boolean },
-  ): Promise<{ id: string; packageName: string; customerName: string; customerPhone: string; customerEmail: string | null; customerAge: number | null; isPaid: boolean; periodEndsAt: Date | null; isFrozen: boolean; frozenAt: Date | null; updatedAt: Date }> {
+    data: {
+      isPaid?: boolean;
+      isFrozen?: boolean;
+      basePriceJod?: number;
+      discountType?: string;
+      discountValue?: number | null;
+      discountReason?: string | null;
+      createdBy?: string | null;
+    },
+  ) {
     const existing = await (this.prisma as any).packageRegistration.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Package registration not found');
 
     const updateData: any = {};
     if (data.isPaid !== undefined) updateData.isPaid = data.isPaid;
 
+    if (data.basePriceJod !== undefined || data.discountType !== undefined || data.discountValue !== undefined || data.discountReason !== undefined) {
+      const basePriceJod = Math.max(0, Number(data.basePriceJod ?? (existing as any).basePriceJod) ?? 0);
+      const discountType = (data.discountType ?? (existing as any).discountType ?? 'NONE').toUpperCase();
+      const discountValue = discountType === 'NONE' ? null : (data.discountValue ?? (existing as any).discountValue ?? 0);
+      if (discountType !== 'NONE' && !(data.discountReason ?? (existing as any).discountReason ?? '').trim())
+        throw new BadRequestException('Discount reason is required when applying a discount');
+      updateData.basePriceJod = basePriceJod;
+      updateData.discountType = discountType;
+      updateData.discountValue = discountType === 'NONE' ? null : Number(discountValue);
+      updateData.discountReason = discountType === 'NONE' ? null : (data.discountReason ?? (existing as any).discountReason ?? '').trim() || null;
+      updateData.finalPriceJod = this.computeFinalPriceJod(basePriceJod, discountType, discountValue);
+      if (discountType !== 'NONE') {
+        updateData.discountAppliedBy = data.createdBy ?? null;
+        updateData.discountAppliedAt = new Date();
+      }
+    }
+
     if (data.isFrozen !== undefined) {
       updateData.isFrozen = data.isFrozen;
       if (data.isFrozen === true) {
         updateData.frozenAt = new Date();
       } else {
-        // Unfreeze: extend periodEndsAt by the time spent frozen
         const frozenAt = (existing as any).frozenAt;
         if (frozenAt) {
           const now = new Date();
@@ -1731,6 +2048,13 @@ export class PortalService {
       where: { id },
       data: updateData,
     });
+    if (updateData.discountAppliedAt != null) {
+      await this.auditLog(data.createdBy ?? null, 'DISCOUNT_APPLIED', 'Registration', id, {
+        discountType: updateData.discountType,
+        discountValue: updateData.discountValue ?? null,
+        finalPriceJod: updateData.finalPriceJod,
+      });
+    }
     return {
       id: row.id,
       packageName: row.packageName,
@@ -1739,6 +2063,11 @@ export class PortalService {
       customerEmail: row.customerEmail ?? null,
       customerAge: row.customerAge ?? null,
       isPaid: row.isPaid,
+      basePriceJod: row.basePriceJod,
+      discountType: row.discountType,
+      discountValue: row.discountValue ?? null,
+      discountReason: row.discountReason ?? null,
+      finalPriceJod: row.finalPriceJod,
       periodEndsAt: row.periodEndsAt ?? null,
       isFrozen: row.isFrozen ?? false,
       frozenAt: row.frozenAt ?? null,
@@ -1748,6 +2077,549 @@ export class PortalService {
 
   async deletePackageRegistration(id: string): Promise<void> {
     await (this.prisma as any).packageRegistration.delete({ where: { id } });
+  }
+
+  /** Create a new registration with same person/package/pricing, unpaid and fresh period (re-register). */
+  async reregister(id: string) {
+    const existing = await (this.prisma as any).packageRegistration.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Registration not found');
+    const now = new Date();
+    const periodEndsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const { billingPeriodKey, priceLockedUntil } = this.billingPeriodFromDate(now);
+    const row = await (this.prisma as any).packageRegistration.create({
+      data: {
+        packageName: existing.packageName,
+        customerName: existing.customerName,
+        customerPhone: existing.customerPhone,
+        customerEmail: existing.customerEmail ?? null,
+        customerAge: existing.customerAge ?? null,
+        isPaid: false,
+        basePriceJod: existing.basePriceJod,
+        discountType: existing.discountType ?? 'NONE',
+        discountValue: existing.discountValue ?? null,
+        discountReason: existing.discountReason ?? null,
+        finalPriceJod: existing.finalPriceJod,
+        billingPeriodKey,
+        priceLockedUntil,
+        periodEndsAt,
+      },
+    });
+    return {
+      id: row.id,
+      packageName: row.packageName,
+      customerName: row.customerName,
+      customerPhone: row.customerPhone,
+      customerEmail: row.customerEmail ?? null,
+      customerAge: row.customerAge ?? null,
+      isPaid: row.isPaid,
+      basePriceJod: row.basePriceJod,
+      discountType: row.discountType,
+      discountValue: row.discountValue ?? null,
+      discountReason: row.discountReason ?? null,
+      finalPriceJod: row.finalPriceJod,
+      periodEndsAt: row.periodEndsAt ?? null,
+      isFrozen: row.isFrozen ?? false,
+      frozenAt: row.frozenAt ?? null,
+      sessionsBonus: row.sessionsBonus ?? 0,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
+  }
+
+  /** Write audit log entry (fire-and-forget; errors do not fail the main action). */
+  private async auditLog(actorUserId: string | null, actionType: string, entityType: string, entityId: string | null, metadata?: Record<string, unknown>): Promise<void> {
+    try {
+      await (this.prisma as any).auditLog.create({
+        data: {
+          actorUserId: actorUserId ?? undefined,
+          actionType,
+          entityType,
+          entityId: entityId ?? undefined,
+          metadata: metadata ?? undefined,
+        },
+      });
+    } catch {
+      // best-effort; do not fail main flow
+    }
+  }
+
+  // --- Receipts (registration payments; do not touch Invoice system) ---
+  private async generateReceiptId(): Promise<string> {
+    const year = new Date().getFullYear();
+    const count = await (this.prisma as any).receipt.count({ where: { receiptId: { startsWith: `RCP-${year}-` } } });
+    const seq = String(count + 1).padStart(4, '0');
+    return `RCP-${year}-${seq}`;
+  }
+
+  async createReceiptForMarkPaid(
+    registrationId: string,
+    data: { amountPaid: number; paymentMethod: string; privateNote: string; createdBy?: string },
+  ) {
+    const reg = await (this.prisma as any).packageRegistration.findUnique({ where: { id: registrationId } });
+    if (!reg) throw new NotFoundException('Registration not found');
+    if (!data.privateNote?.trim()) throw new BadRequestException('Private note is required');
+    const method = (data.paymentMethod || 'CASH').toUpperCase();
+    const validMethods = ['CASH', 'CARD', 'TRANSFER', 'OTHER'];
+    if (!validMethods.includes(method)) throw new BadRequestException('Invalid payment method');
+    const receiptId = await this.generateReceiptId();
+    const receipt = await (this.prisma as any).receipt.create({
+      data: {
+        receiptId,
+        registrationId,
+        personName: reg.customerName,
+        personPhone: reg.customerPhone,
+        packageName: reg.packageName,
+        amountPaid: Math.round(data.amountPaid) || 0,
+        paymentMethod: method,
+        privateNote: data.privateNote.trim(),
+        createdBy: data.createdBy ?? null,
+        status: 'ACTIVE',
+      },
+    });
+    const collected = await (this.prisma as any).receipt.aggregate({
+      where: { registrationId, voidedAt: null },
+      _sum: { amountPaid: true },
+    });
+    const totalCollected = (collected._sum?.amountPaid ?? 0) || 0;
+    const finalPriceJod = Number(reg.finalPriceJod) ?? 0;
+    await (this.prisma as any).packageRegistration.update({
+      where: { id: registrationId },
+      data: { isPaid: totalCollected >= finalPriceJod },
+    });
+    await this.auditLog(data.createdBy ?? null, 'RECEIPT_CREATED', 'Receipt', receipt.id, {
+      registrationId,
+      receiptId: receipt.receiptId,
+      amountPaid: receipt.amountPaid,
+    });
+    return receipt;
+  }
+
+  async getReceiptsByRegistration(registrationId: string) {
+    return (this.prisma as any).receipt.findMany({
+      where: { registrationId, voidedAt: null },
+      orderBy: { dateTimeIssued: 'desc' },
+    });
+  }
+
+  async getReceiptById(id: string) {
+    const r = await (this.prisma as any).receipt.findUnique({
+      where: { id },
+      include: { registration: true },
+    });
+    if (!r) throw new NotFoundException('Receipt not found');
+    return r;
+  }
+
+  async voidReceipt(id: string, voidReason: string) {
+    const reason = (voidReason ?? '').trim();
+    if (!reason) throw new BadRequestException('voidReason is required when voiding a receipt');
+    const r = await (this.prisma as any).receipt.findUnique({ where: { id }, include: { registration: true } });
+    if (!r) throw new NotFoundException('Receipt not found');
+    if (r.voidedAt || (r as any).status === 'VOIDED') throw new BadRequestException('Receipt is already voided');
+    await (this.prisma as any).receipt.update({
+      where: { id },
+      data: { status: 'VOIDED', voidedAt: new Date(), voidReason: reason },
+    });
+    await this.auditLog(null, 'RECEIPT_VOIDED', 'Receipt', id, {
+      registrationId: r.registrationId,
+      voidReason: reason,
+    });
+    const collected = await (this.prisma as any).receipt.aggregate({
+      where: { registrationId: r.registrationId, voidedAt: null },
+      _sum: { amountPaid: true },
+    });
+    const totalCollected = (collected._sum?.amountPaid ?? 0) || 0;
+    const finalPriceJod = Number((r.registration as any)?.finalPriceJod) ?? 0;
+    await (this.prisma as any).packageRegistration.update({
+      where: { id: r.registrationId },
+      data: { isPaid: totalCollected >= finalPriceJod },
+    });
+    return { success: true };
+  }
+
+  async getRegistrationTotals(packageName?: string, startDate?: string, endDate?: string) {
+    const where: any = {};
+    if (packageName) where.packageName = packageName;
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    }
+
+    const regs = await (this.prisma as any).packageRegistration.findMany({
+      where,
+      include: { receipts: { where: { voidedAt: null } } },
+    });
+
+    let paidCount = 0;
+    let partialCount = 0;
+    let unpaidCount = 0;
+    let expectedTotal = 0;
+    let collectedTotal = 0;
+    let discountsTotal = 0;
+    const byMethod: Record<string, number> = { CASH: 0, CARD: 0, TRANSFER: 0, OTHER: 0 };
+    const byPackage: Record<string, { registered: number; expected: number; collected: number; remaining: number }> = {};
+
+    for (const r of regs) {
+      const finalPrice = Number(r.finalPriceJod) ?? 0;
+      const basePrice = Number(r.basePriceJod) ?? 0;
+      const collected = (r.receipts || []).reduce((s: number, rec: any) => s + (rec.amountPaid || 0), 0);
+
+      expectedTotal += finalPrice;
+      collectedTotal += collected;
+      discountsTotal += Math.max(0, basePrice - finalPrice);
+
+      if (collected >= finalPrice) paidCount++;
+      else if (collected > 0) partialCount++;
+      else unpaidCount++;
+
+      for (const rec of r.receipts || []) {
+        const m = (rec.paymentMethod || 'CASH').toUpperCase();
+        if (byMethod[m] !== undefined) byMethod[m] += rec.amountPaid || 0;
+      }
+
+      if (!packageName) {
+        const pkg = r.packageName || '';
+        if (!byPackage[pkg]) byPackage[pkg] = { registered: 0, expected: 0, collected: 0, remaining: 0 };
+        byPackage[pkg].registered += 1;
+        byPackage[pkg].expected += finalPrice;
+        byPackage[pkg].collected += collected;
+        byPackage[pkg].remaining += Math.max(0, finalPrice - collected);
+      }
+    }
+
+    return {
+      totalRegistered: regs.length,
+      paidCount,
+      partialCount,
+      unpaidCount,
+      expectedTotal,
+      collectedTotal,
+      remainingTotal: expectedTotal - collectedTotal,
+      discountsTotal,
+      byMethod,
+      byPackage: !packageName ? byPackage : undefined,
+    };
+  }
+
+  async bulkCreatePackageRegistrations(
+    data: {
+      registrations: Array<{
+        packageName: string;
+        customerName: string;
+        customerPhone: string;
+        customerEmail?: string | null;
+        customerAge?: number | null;
+        basePriceJod?: number;
+        discountType?: string;
+        discountValue?: number | null;
+        discountReason?: string | null;
+      }>;
+    },
+  ) {
+    const results: { success: boolean; id?: string; row?: number; error?: string }[] = [];
+    const now = new Date();
+    const periodEndsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const { billingPeriodKey, priceLockedUntil } = this.billingPeriodFromDate(now);
+    const seen = new Set<string>();
+    const pricingCache: Record<string, number> = {};
+    for (let i = 0; i < data.registrations.length; i++) {
+      const r = data.registrations[i];
+      const pkg = (r.packageName || '').trim();
+      const key = `${pkg}|${(r.customerPhone || '').trim()}`;
+      if (!r.customerName?.trim() || !r.customerPhone?.trim()) {
+        results.push({ success: false, row: i + 1, error: 'Name and phone required' });
+        continue;
+      }
+      if (seen.has(key)) {
+        results.push({ success: false, row: i + 1, error: 'Duplicate phone in this batch' });
+        continue;
+      }
+      seen.add(key);
+      try {
+        const existing = await (this.prisma as any).packageRegistration.findFirst({
+          where: { packageName: pkg, customerPhone: (r.customerPhone || '').trim() },
+        });
+        if (existing) {
+          results.push({ success: false, row: i + 1, error: 'Duplicate registration (same package + phone)' });
+          continue;
+        }
+        let basePriceJod = r.basePriceJod;
+        if (basePriceJod == null && pricingCache[pkg] !== undefined) basePriceJod = pricingCache[pkg];
+        if (basePriceJod == null) {
+          const pricing = await (this.prisma as any).packagePricing.findUnique({ where: { packageName: pkg } }).catch(() => null);
+          basePriceJod = pricing?.basePriceJod ?? 0;
+          pricingCache[pkg] = basePriceJod;
+        }
+        basePriceJod = Math.max(0, Number(basePriceJod) || 0);
+        const discountType = (r.discountType || 'NONE').toUpperCase();
+        const discountValue = discountType === 'NONE' ? null : (r.discountValue ?? 0);
+        const finalPriceJod = this.computeFinalPriceJod(basePriceJod, discountType, discountValue);
+        const discountApplied = discountType !== 'NONE';
+        const row = await (this.prisma as any).packageRegistration.create({
+          data: {
+            packageName: pkg,
+            customerName: (r.customerName || '').trim(),
+            customerPhone: (r.customerPhone || '').trim(),
+            customerEmail: (r.customerEmail || '').trim() || null,
+            customerAge: r.customerAge ?? null,
+            basePriceJod,
+            discountType,
+            discountValue: discountType === 'NONE' ? null : Number(discountValue),
+            discountReason: discountType === 'NONE' ? null : (r.discountReason || '').trim() || null,
+            discountAppliedBy: discountApplied ? null : null,
+            discountAppliedAt: discountApplied ? now : null,
+            finalPriceJod,
+            billingPeriodKey,
+            priceLockedUntil,
+            periodEndsAt,
+          },
+        });
+        results.push({ success: true, id: row.id, row: i + 1 });
+      } catch (e: any) {
+        results.push({ success: false, row: i + 1, error: e?.message || 'Create failed' });
+      }
+    }
+    const successCount = results.filter((r) => r.success).length;
+    if (successCount > 0) {
+      await this.auditLog(null, 'BULK_IMPORT', 'Registration', null, {
+        successCount,
+        total: results.length,
+        failed: results.length - successCount,
+      });
+    }
+    return { results };
+  }
+
+  /**
+   * Create multiple registrations for the same person (one per package).
+   * Uses a transaction: either all created or none.
+   * Prevents duplicate active registration for same customerPhone + packageName.
+   */
+  async bulkCreateForPerson(data: {
+    person: { customerName: string; customerPhone: string; customerEmail?: string | null; customerAge?: number | null };
+    registrations: Array<{
+      packageName: string;
+      basePriceJod?: number;
+      discountType?: string;
+      discountValue?: number | null;
+      discountReason?: string | null;
+    }>;
+  }) {
+    const person = data.person;
+    const name = (person.customerName || '').trim();
+    const phone = (person.customerPhone || '').trim();
+    if (!name || !phone) throw new BadRequestException('Person name and phone are required');
+    if (!data.registrations?.length) throw new BadRequestException('At least one package is required');
+
+    const packages = data.registrations.map((r) => (r.packageName || '').trim()).filter(Boolean);
+    if (packages.length !== data.registrations.length)
+      throw new BadRequestException('Every registration must have a package name');
+
+    const prisma = this.prisma as any;
+    const existing = await prisma.packageRegistration.findMany({
+      where: { customerPhone: phone, packageName: { in: packages } },
+      select: { packageName: true },
+    });
+    const existingSet = new Set(existing.map((e: { packageName: string }) => e.packageName));
+    const duplicates = packages.filter((p) => existingSet.has(p));
+    if (duplicates.length > 0) {
+      throw new BadRequestException(
+        `Person already has an active registration for: ${duplicates.join(', ')}. Remove or use a different package.`,
+      );
+    }
+
+    const now = new Date();
+    const periodEndsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const { billingPeriodKey, priceLockedUntil } = this.billingPeriodFromDate(now);
+    const pricingList = await prisma.packagePricing.findMany({ where: { packageName: { in: packages } } });
+    const pricingMap = new Map<string, number | null>(
+      pricingList.map((p: { packageName: string; basePriceJod: number | null }) => [p.packageName, p.basePriceJod]),
+    );
+
+    const created = await prisma.$transaction(async (tx: any) => {
+      const out: any[] = [];
+      for (let i = 0; i < data.registrations.length; i++) {
+        const r = data.registrations[i];
+        const pkg = (r.packageName || '').trim();
+        let basePriceJod = r.basePriceJod;
+        if (basePriceJod == null) basePriceJod = pricingMap.get(pkg) ?? 0;
+        basePriceJod = Math.max(0, Number(basePriceJod) || 0);
+        const discountType = (r.discountType || 'NONE').toUpperCase();
+        const discountValue = discountType === 'NONE' ? null : (r.discountValue ?? 0);
+        if (discountType !== 'NONE' && (discountValue == null || (discountType === 'PERCENT' && (discountValue < 0 || discountValue > 100)) || (discountType === 'AMOUNT' && discountValue < 0)))
+          throw new BadRequestException(`Invalid discount for package ${pkg}`);
+        if (discountType !== 'NONE' && !(r.discountReason || '').trim())
+          throw new BadRequestException(`Discount reason required for package ${pkg}`);
+        const finalPriceJod = this.computeFinalPriceJod(basePriceJod, discountType, discountValue);
+        const discountApplied = discountType !== 'NONE';
+        const row = await tx.packageRegistration.create({
+          data: {
+            packageName: pkg,
+            customerName: name,
+            customerPhone: phone,
+            customerEmail: (person.customerEmail || '').trim() || null,
+            customerAge: person.customerAge ?? null,
+            basePriceJod,
+            discountType,
+            discountValue: discountType === 'NONE' ? null : Number(discountValue),
+            discountReason: discountType === 'NONE' ? null : (r.discountReason || '').trim() || null,
+            discountAppliedBy: discountApplied ? null : null,
+            discountAppliedAt: discountApplied ? now : null,
+            finalPriceJod,
+            billingPeriodKey,
+            priceLockedUntil,
+            periodEndsAt,
+          },
+        });
+        out.push({
+          id: row.id,
+          packageName: row.packageName,
+          customerName: row.customerName,
+          customerPhone: row.customerPhone,
+          customerEmail: row.customerEmail ?? null,
+          customerAge: row.customerAge ?? null,
+          isPaid: row.isPaid,
+          basePriceJod: row.basePriceJod,
+          discountType: row.discountType,
+          discountValue: row.discountValue ?? null,
+          discountReason: row.discountReason ?? null,
+          finalPriceJod: row.finalPriceJod,
+          periodEndsAt: row.periodEndsAt ?? null,
+          isFrozen: row.isFrozen ?? false,
+          frozenAt: row.frozenAt ?? null,
+          sessionsBonus: row.sessionsBonus ?? 0,
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+        });
+      }
+      return out;
+    });
+
+    return { created: created.length, registrations: created };
+  }
+
+  async addSessionAdjustment(registrationId: string, data: { reason: string; createdBy?: string }) {
+    const reg = await (this.prisma as any).packageRegistration.findUnique({ where: { id: registrationId } });
+    if (!reg) throw new NotFoundException('Registration not found');
+    if (!data.reason?.trim()) throw new BadRequestException('Reason is required');
+    const adj = await (this.prisma as any).sessionAdjustment.create({
+      data: {
+        registrationId,
+        change: 1,
+        reason: data.reason.trim(),
+        createdBy: data.createdBy ?? null,
+      },
+    });
+    const bonus = (Number(reg.sessionsBonus) || 0) + 1;
+    await (this.prisma as any).packageRegistration.update({
+      where: { id: registrationId },
+      data: { sessionsBonus: bonus },
+    });
+    await this.auditLog(data.createdBy ?? null, 'SESSION_ADJUSTED', 'SessionAdjustment', adj.id, {
+      registrationId,
+      change: 1,
+      reason: data.reason.trim(),
+      sessionsBonus: bonus,
+    });
+    return { success: true, sessionsBonus: bonus };
+  }
+
+  async getSessionAdjustments(registrationId: string) {
+    return (this.prisma as any).sessionAdjustment.findMany({
+      where: { registrationId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  // --- ClassSession (HELD / CANCELED; HELD = consume 1 for everyone in package) ---
+  async createClassSession(data: {
+    packageName: string;
+    sessionDate: string; // YYYY-MM-DD
+    status: 'HELD' | 'CANCELED';
+    cancelReason?: string | null;
+    cancelDetail?: string | null;
+    createdBy?: string | null;
+  }) {
+    const status = (data.status || 'HELD').toUpperCase();
+    if (status !== 'HELD' && status !== 'CANCELED')
+      throw new BadRequestException('status must be HELD or CANCELED');
+    if (status === 'CANCELED' && !(data.cancelReason || '').trim())
+      throw new BadRequestException('cancelReason is required when status is CANCELED');
+    const sessionDate = new Date(data.sessionDate);
+    if (isNaN(sessionDate.getTime())) throw new BadRequestException('Invalid sessionDate');
+    const session = await (this.prisma as any).classSession.create({
+      data: {
+        packageName: (data.packageName || '').trim(),
+        sessionDate,
+        status,
+        cancelReason: status === 'CANCELED' ? (data.cancelReason || '').trim() || null : null,
+        cancelDetail: status === 'CANCELED' ? (data.cancelDetail || '').trim() || null : null,
+        createdBy: data.createdBy ?? null,
+      },
+    });
+    return session;
+  }
+
+  async getClassSessions(packageName?: string, startDate?: string, endDate?: string) {
+    const where: any = {};
+    if (packageName) where.packageName = packageName;
+    if (startDate || endDate) {
+      where.sessionDate = {};
+      if (startDate) where.sessionDate.gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.sessionDate.lte = end;
+      }
+    }
+    return (this.prisma as any).classSession.findMany({
+      where,
+      orderBy: { sessionDate: 'desc' },
+    });
+  }
+
+  async getPackageSessionCanceled(packageName?: string, startDate?: string, endDate?: string) {
+    const where: any = {};
+    if (packageName) where.packageName = packageName;
+    if (startDate || endDate) {
+      where.sessionDate = {};
+      if (startDate) where.sessionDate.gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.sessionDate.lte = end;
+      }
+    }
+    return (this.prisma as any).packageSessionCanceled.findMany({
+      where,
+      orderBy: { sessionDate: 'desc' },
+    });
+  }
+
+  async createPackageSessionCanceled(data: {
+    packageName: string;
+    sessionDate: string;
+    reason: string;
+    reasonDetail?: string | null;
+  }) {
+    const validReasons = ['HOLIDAY', 'BAD_WEATHER', 'TEACHER_UNAVAILABLE', 'OTHER'];
+    const reason = (data.reason || 'OTHER').toUpperCase();
+    if (!validReasons.includes(reason)) throw new BadRequestException('Invalid reason');
+    const d = new Date(data.sessionDate);
+    if (isNaN(d.getTime())) throw new BadRequestException('Invalid session date');
+    return (this.prisma as any).packageSessionCanceled.create({
+      data: {
+        packageName: data.packageName.trim(),
+        sessionDate: d,
+        reason,
+        reasonDetail: data.reasonDetail?.trim() || null,
+      },
+    });
   }
 }
 

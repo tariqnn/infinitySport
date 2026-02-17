@@ -39,5 +39,10 @@ export class PublicController {
   async getFacilities() {
     return this.landingService.getFacilities();
   }
+
+  @Get('packages')
+  async getPackages() {
+    return this.landingService.getPackages();
+  }
 }
 

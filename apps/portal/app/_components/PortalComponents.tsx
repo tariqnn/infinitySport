@@ -65,18 +65,40 @@ export function StatCard({ label, value, delta, deltaTone = 'neutral', descripti
 export function QuickAction({
   icon,
   title,
-  description
+  description,
+  onClick,
+  variant = 'row',
 }: {
   icon: ReactNode;
   title: string;
   description: string;
+  onClick?: () => void;
+  variant?: 'row' | 'centered';
 }) {
   return (
-    <button className="flex items-start gap-3 rounded-2xl border border-[#e3e8f2] bg-[#f8fafc] px-4 py-3 text-left transition hover:-translate-y-0.5 hover:border-[#1426ff] hover:bg-white">
-      <div className="rounded-2xl bg-[#1426ff10] p-2 text-[#1426ff]">{icon}</div>
-      <div>
-        <p className="text-sm font-semibold text-[#0f1a2b]">{title}</p>
-        <p className="text-xs text-[#5c6475]">{description}</p>
+    <button
+      type="button"
+      onClick={onClick}
+      className={clsx(
+        'rounded-2xl border border-ui-border bg-white p-5 text-left shadow-portal-card transition',
+        'hover:-translate-y-0.5 hover:shadow-portal-card-hover focus:outline-none focus:ring-2 focus:ring-brand-primaryBlue/20 focus:ring-offset-2',
+        variant === 'row' && 'flex items-start gap-3',
+        variant === 'centered' && 'flex flex-col items-center justify-center text-center'
+      )}
+    >
+      <div
+        className={clsx(
+          'flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f0f5ff] text-brand-primaryBlue',
+          variant === 'row' ? 'mt-0' : 'mb-3'
+        )}
+      >
+        {icon}
+      </div>
+      <div className={clsx(variant === 'row' ? '' : '')}>
+        <p className="text-sm font-semibold text-ui-textPrimary">{title}</p>
+        <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-ui-textMuted">
+          {description}
+        </p>
       </div>
     </button>
   );

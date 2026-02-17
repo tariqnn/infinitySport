@@ -43,6 +43,10 @@
     color: var(--ui-text-primary);
   }
 
+  :focus-visible {
+    outline: none;
+  }
+
   ::selection {
     background: rgba(97, 255, 69, 0.35);
     color: #0f1a2b;
@@ -73,6 +77,10 @@
 }
 
 @layer components {
+  .portal-surface {
+    @apply rounded-2xl border border-ui-border bg-ui-cardBg shadow-portal-card;
+  }
+
   .glass-panel {
     @apply rounded-2xl border border-[#e3e8f2] bg-[var(--bg-glass)] shadow-[0_12px_30px_rgba(15,23,42,0.08)];
   }

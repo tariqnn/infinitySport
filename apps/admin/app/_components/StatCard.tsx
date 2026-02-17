@@ -5,22 +5,24 @@ type StatCardProps = {
   accent?: 'blue' | 'green' | 'teal';
 };
 
-const accentMap = {
-  blue: 'from-[#1426FF1a] to-transparent',
-  green: 'from-[#61FF451a] to-transparent',
-  teal: 'from-[#69FFDB1a] to-transparent'
+const accentStyles = {
+  blue: 'border-l-[var(--primary)] bg-[var(--primary-light)]',
+  green: 'border-l-[var(--accent-green)] bg-[rgba(34,197,94,0.08)]',
+  teal: 'border-l-[var(--accent-teal)] bg-[rgba(20,184,166,0.08)]',
 } as const;
 
 export function StatCard({ label, value, delta, accent = 'blue' }: StatCardProps) {
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-[rgba(15,23,42,0.08)] bg-white p-5 shadow-panel">
-      <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accentMap[accent]}`} />
-      <div className="relative space-y-2">
-        <p className="text-xs uppercase tracking-[0.2em] text-brand-blue">{label}</p>
-        <p className="font-display text-3xl font-bold text-[var(--text-primary)]">{value}</p>
-        {delta ? <p className="text-sm text-[var(--text-muted)]">{delta}</p> : null}
+    <div className={`glass-card border-l-4 ${accentStyles[accent]} p-5`}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">{label}</p>
+        {delta ? (
+          <span className="rounded-full bg-[var(--bg-card-strong)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-muted)]">
+            {delta}
+          </span>
+        ) : null}
       </div>
+      <p className="mt-4 font-display text-3xl font-semibold text-[var(--text-primary)] sm:text-4xl">{value}</p>
     </div>
   );
 }
-

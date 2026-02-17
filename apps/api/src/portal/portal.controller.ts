@@ -536,25 +536,115 @@ export class PortalController {
     return this.portalService.getDashboardStats(companyId);
   }
 
+  // Package pricing (base price per package; null = manual)
+  @Get('package-pricing')
+  async getPackagePricing() {
+    return this.portalService.getPackagePricing();
+  }
+
+  // Sellable packages (from Package table; for registration form and default price)
+  @Get('packages')
+  async getPackages() {
+    return this.portalService.getPackages();
+  }
+
   // Package Registrations (public POST for form; GET/PATCH for admin)
   @Get('package-registrations')
   async getPackageRegistrations(
     @Query('packageName') packageName?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
   ) {
-    return this.portalService.getPackageRegistrations(packageName, startDate, endDate);
+    const pageNum = page != null ? parseInt(page, 10) : undefined;
+    const pageSizeNum = pageSize != null ? parseInt(pageSize, 10) : undefined;
+    return this.portalService.getPackageRegistrations(
+      packageName,
+      startDate,
+      endDate,
+      pageNum,
+      pageSizeNum,
+    );
   }
 
   @Post('package-registrations')
   async createPackageRegistration(
-    @Body() data: { packageName: string; customerName: string; customerPhone: string; customerEmail?: string | null; customerAge?: number | null },
+    @Body()
+    data: {
+      packageName: string;
+      customerName: string;
+      customerPhone: string;
+      customerEmail?: string | null;
+      customerAge?: number | null;
+      basePriceJod?: number;
+      discountType?: string;
+      discountValue?: number | null;
+      discountReason?: string | null;
+    },
   ) {
     return this.portalService.createPackageRegistration(data);
   }
 
+  @Get('package-registrations/totals')
+  async getRegistrationTotals(
+    @Query('packageName') packageName?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.portalService.getRegistrationTotals(packageName, startDate, endDate);
+  }
+
+  @Post('package-registrations/bulk')
+  async bulkCreatePackageRegistrations(
+    @Body()
+    data: {
+      registrations: Array<{
+        packageName: string;
+        customerName: string;
+        customerPhone: string;
+        customerEmail?: string | null;
+        customerAge?: number | null;
+        basePriceJod?: number;
+        discountType?: string;
+        discountValue?: number | null;
+        discountReason?: string | null;
+      }>;
+    },
+  ) {
+    return this.portalService.bulkCreatePackageRegistrations(data);
+  }
+
+  @Post('package-registrations/bulk-for-person')
+  async bulkCreateForPerson(
+    @Body()
+    data: {
+      person: { customerName: string; customerPhone: string; customerEmail?: string | null; customerAge?: number | null };
+      registrations: Array<{
+        packageName: string;
+        basePriceJod?: number;
+        discountType?: string;
+        discountValue?: number | null;
+        discountReason?: string | null;
+      }>;
+    },
+  ) {
+    return this.portalService.bulkCreateForPerson(data);
+  }
+
   @Patch('package-registrations/:id')
-  async updatePackageRegistration(@Param('id') id: string, @Body() data: { isPaid?: boolean; isFrozen?: boolean }) {
+  async updatePackageRegistration(
+    @Param('id') id: string,
+    @Body()
+    data: {
+      isPaid?: boolean;
+      isFrozen?: boolean;
+      basePriceJod?: number;
+      discountType?: string;
+      discountValue?: number | null;
+      discountReason?: string | null;
+    },
+  ) {
     return this.portalService.updatePackageRegistration(id, data);
   }
 
@@ -562,6 +652,88 @@ export class PortalController {
   async deletePackageRegistration(@Param('id') id: string) {
     await this.portalService.deletePackageRegistration(id);
     return { success: true };
+  }
+
+  @Post('package-registrations/:id/reregister')
+  async reregister(@Param('id') id: string) {
+    return this.portalService.reregister(id);
+  }
+
+  @Post('package-registrations/:id/mark-paid')
+  async markRegistrationPaid(
+    @Param('id') id: string,
+    @Body() body: { amountPaid: number; paymentMethod: string; privateNote: string; createdBy?: string },
+  ) {
+    return this.portalService.createReceiptForMarkPaid(id, body);
+  }
+
+  @Get('package-registrations/:id/receipts')
+  async getReceiptsByRegistration(@Param('id') id: string) {
+    return this.portalService.getReceiptsByRegistration(id);
+  }
+
+  @Get('receipts/:id')
+  async getReceipt(@Param('id') id: string) {
+    return this.portalService.getReceiptById(id);
+  }
+
+  @Patch('receipts/:id/void')
+  async voidReceipt(@Param('id') id: string, @Body() body: { voidReason?: string }) {
+    await this.portalService.voidReceipt(id, body.voidReason ?? '');
+    return { success: true };
+  }
+
+  @Post('package-registrations/:id/session-adjustment')
+  async addSessionAdjustment(
+    @Param('id') id: string,
+    @Body() body: { reason: string; createdBy?: string },
+  ) {
+    return this.portalService.addSessionAdjustment(id, body);
+  }
+
+  @Get('package-registrations/:id/session-adjustments')
+  async getSessionAdjustments(@Param('id') id: string) {
+    return this.portalService.getSessionAdjustments(id);
+  }
+
+  @Get('package-session-canceled')
+  async getPackageSessionCanceled(
+    @Query('packageName') packageName?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.portalService.getPackageSessionCanceled(packageName, startDate, endDate);
+  }
+
+  @Post('package-session-canceled')
+  async createPackageSessionCanceled(
+    @Body() data: { packageName: string; sessionDate: string; reason: string; reasonDetail?: string | null },
+  ) {
+    return this.portalService.createPackageSessionCanceled(data);
+  }
+
+  @Get('class-sessions')
+  async getClassSessions(
+    @Query('packageName') packageName?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.portalService.getClassSessions(packageName, startDate, endDate);
+  }
+
+  @Post('class-sessions')
+  async createClassSession(
+    @Body()
+    data: {
+      packageName: string;
+      sessionDate: string;
+      status: 'HELD' | 'CANCELED';
+      cancelReason?: string | null;
+      cancelDetail?: string | null;
+      createdBy?: string | null;
+    },
+  ) {
+    return this.portalService.createClassSession(data);
   }
 }
 

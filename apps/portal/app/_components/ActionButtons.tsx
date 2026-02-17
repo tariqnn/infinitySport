@@ -5,7 +5,7 @@ import { PlusIcon, CalendarIcon, CurrencyDollarIcon, CubeIcon, UserPlusIcon } fr
 import { CreateMemberModal } from './CreateMemberModal';
 import { CreateBookingModal } from './CreateBookingModal';
 import { CreateClassModal } from './CreateClassModal';
-import { CreateInvoiceModal } from './CreateInvoiceModal';
+import { CreateInvoiceModal } from '../financials/_components/CreateInvoiceModal';
 import { CreateInventoryModal } from './CreateInventoryModal';
 import { CreateCoachModal } from './CreateCoachModal';
 import { ExportCsvButton } from './ExportCsvButton';
@@ -58,7 +58,7 @@ export function NewInvoiceButton({ companyId }: { companyId?: string }) {
         <CurrencyDollarIcon className="h-4 w-4" />
         Add Invoice
       </Button>
-      <CreateInvoiceModal open={open} onClose={() => setOpen(false)} companyId={companyId} />
+      <CreateInvoiceModal open={open} onClose={() => setOpen(false)} />
     </>
   );
 }

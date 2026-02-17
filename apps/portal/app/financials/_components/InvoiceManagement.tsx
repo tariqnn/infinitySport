@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardBody, CardHeader, DataTable, Badge, Button, KPIStatCard, Select, Input } from '../../_components/ui';
 import { financeApi, dashboardApi, getFirstCompany } from '../../../lib/portalApi';
 import { ExportCsvButton } from '../../_components/ActionButtons';
-import { CreateInvoiceFromSubscriptionModal } from './CreateInvoiceFromSubscriptionModal';
+import { CreateInvoiceModal } from './CreateInvoiceModal';
 import { EditInvoiceModal } from './EditInvoiceModal';
 import { ArrowDownTrayIcon, CurrencyDollarIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { DonutBreakdown, RevenueAreaChart } from '../../_components/PortalCharts';
@@ -24,7 +24,7 @@ export function InvoiceManagement() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
-  const [showCreateFromSubscriptionModal, setShowCreateFromSubscriptionModal] = useState(false);
+  const [showCreateInvoiceModal, setShowCreateInvoiceModal] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<any | null>(null);
   const [dateRange, setDateRange] = useState<string>('all');
   const [customStartDate, setCustomStartDate] = useState<string>('');
@@ -448,7 +448,7 @@ export function InvoiceManagement() {
                 filename={`invoices-report-${dateRange}-${new Date().toISOString().split('T')[0]}.csv`}
                 label="Export Report"
               />
-              <Button onClick={() => setShowCreateFromSubscriptionModal(true)} leadingIcon={<PlusIcon className="h-5 w-5" />}>
+              <Button onClick={() => setShowCreateInvoiceModal(true)} leadingIcon={<PlusIcon className="h-5 w-5" />}>
                 Create Invoice
               </Button>
             </div>
@@ -460,11 +460,11 @@ export function InvoiceManagement() {
       </Card>
 
       {/* Modals */}
-      {showCreateFromSubscriptionModal && (
-        <CreateInvoiceFromSubscriptionModal
-          open={showCreateFromSubscriptionModal}
+      {showCreateInvoiceModal && (
+        <CreateInvoiceModal
+          open={showCreateInvoiceModal}
           onClose={() => {
-            setShowCreateFromSubscriptionModal(false);
+            setShowCreateInvoiceModal(false);
             loadData();
           }}
         />

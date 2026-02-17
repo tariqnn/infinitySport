@@ -3,14 +3,29 @@
 @tailwind utilities;
 
 :root {
-  --bg-shell: #f6f8fb;
+  --bg-shell: #eef2f7;
+  --bg-shell-strong: #e3e9f2;
   --bg-card: #ffffff;
-  --bg-card-muted: #f0f3f9;
-  --border-muted: rgba(14, 21, 41, 0.06);
-  --text-primary: #111629;
-  --text-muted: #5a6378;
-  --text-dark: #0b0f1a;
-  --gradient-primary: linear-gradient(115deg, #1426ff 0%, #69ffdb 60%, #61ff45 100%);
+  --bg-card-muted: #f6f8fc;
+  --bg-card-strong: #edf2fb;
+  --border-muted: rgba(8, 21, 41, 0.12);
+  --border-input: rgba(8, 21, 41, 0.18);
+  --text-primary: #0b1324;
+  --text-muted: #475569;
+  --text-dark: #05080f;
+  --primary: #0f4ba0;
+  --primary-hover: #0b3b7f;
+  --primary-light: rgba(15, 75, 160, 0.12);
+  --accent-blue: #2f6bff;
+  --accent-green: #22c55e;
+  --accent-teal: #14b8a6;
+  --accent-amber: #f59e0b;
+  --gradient-primary: linear-gradient(135deg, #0f4ba0 0%, #1a7fc1 55%, #14b8a6 100%);
+  --gradient-hero: radial-gradient(900px circle at 10% -10%, rgba(15, 75, 160, 0.18), transparent 45%),
+    radial-gradient(800px circle at 90% 0%, rgba(20, 184, 166, 0.16), transparent 40%),
+    linear-gradient(135deg, #f8fafc 0%, #eef3f8 60%, #f2f6ff 100%);
+  --shadow-soft: 0 8px 24px rgba(11, 18, 36, 0.08);
+  --shadow-strong: 0 16px 40px rgba(11, 18, 36, 0.14);
 }
 
 @layer base {
@@ -21,22 +36,30 @@
   body {
     font-family: var(--font-sans), system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     background-color: var(--bg-shell);
-    background-image: radial-gradient(circle at 20% 20%, rgba(20, 38, 255, 0.07), transparent 45%),
-      radial-gradient(circle at 75% 0%, rgba(105, 255, 219, 0.12), transparent 35%);
+    background-image: var(--gradient-hero);
+    background-attachment: fixed;
     color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
   }
 
   ::selection {
-    background: rgba(20, 38, 255, 0.2);
-    color: #0b1020;
+    background: rgba(0, 61, 165, 0.2);
+    color: var(--text-dark);
   }
 }
 
 @layer components {
+  .app-shell {
+    min-height: 100vh;
+  }
+
   .glass-card {
-    @apply rounded-3xl border bg-[var(--bg-card)] shadow-panel;
+    @apply rounded-2xl border bg-[var(--bg-card)];
+    background-color: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(12px);
     border-color: var(--border-muted);
     color: var(--text-primary);
+    box-shadow: var(--shadow-soft);
   }
 
   .glass-card .muted,
@@ -47,39 +70,93 @@
   .glass-card input,
   .glass-card textarea,
   .glass-card select {
-    @apply rounded-2xl border px-3 py-2 text-sm;
-    background-color: #fff;
-    border-color: rgba(15, 23, 42, 0.12);
+    @apply rounded-2xl border px-3 py-2.5 text-sm transition-colors;
+    background-color: var(--bg-card);
+    border-color: var(--border-input);
     color: var(--text-primary);
+  }
+
+  .glass-card input:focus,
+  .glass-card textarea:focus,
+  .glass-card select:focus {
+    @apply outline-none ring-2 ring-brand-blue/20;
+    border-color: var(--primary);
   }
 
   .glass-card input::placeholder,
   .glass-card textarea::placeholder {
-    color: rgba(15, 23, 42, 0.4);
+    color: var(--text-muted);
+  }
+
+  .btn-primary {
+    background: var(--gradient-primary);
+    @apply rounded-2xl px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-[0.98];
+    box-shadow: var(--shadow-soft);
+  }
+
+  .btn-secondary {
+    @apply rounded-2xl border px-4 py-2.5 text-sm font-semibold text-[var(--text-primary)] transition-all active:scale-[0.98];
+    background-color: rgba(255, 255, 255, 0.85);
+    border-color: var(--border-muted);
   }
 
   .glow-button {
-    background-image: var(--gradient-primary);
-    @apply text-white shadow-aurora;
+    background: var(--gradient-primary);
+    @apply rounded-2xl px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-[0.98];
+    box-shadow: var(--shadow-soft);
+  }
+
+  .surface-input {
+    @apply w-full rounded-2xl border px-4 py-2 text-sm transition-colors;
+    background-color: rgba(255, 255, 255, 0.9);
+    border-color: var(--border-muted);
+    color: var(--text-primary);
+  }
+
+  .surface-input:focus {
+    @apply outline-none ring-2 ring-brand-blue/20;
+    border-color: var(--primary);
+  }
+
+  .section-kicker {
+    @apply text-xs font-semibold uppercase tracking-[0.2em];
+    color: var(--text-muted);
+  }
+
+  .section-title {
+    @apply font-display text-2xl font-semibold text-[var(--text-primary)] sm:text-3xl;
+  }
+
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+
+  .shadow-strong {
+    box-shadow: var(--shadow-strong);
   }
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .glass-card {
-    transition: transform 180ms ease, box-shadow 180ms ease;
+    transition: box-shadow 180ms ease, border-color 180ms ease, transform 180ms ease;
   }
 
   .glass-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.12);
+    box-shadow: var(--shadow-strong);
+    border-color: rgba(15, 75, 160, 0.2);
+    transform: translateY(-1px);
   }
 
-  .glow-button {
-    transition: transform 160ms ease, box-shadow 160ms ease;
+  .glow-button,
+  .btn-primary,
+  .btn-secondary {
+    transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
   }
 
-  .glow-button:hover {
-    transform: translateY(-2px) scale(1.02);
-    box-shadow: 0 20px 40px rgba(20, 38, 255, 0.25);
+  .glow-button:hover,
+  .btn-primary:hover,
+  .btn-secondary:hover {
+    box-shadow: var(--shadow-strong);
+    transform: translateY(-1px);
   }
 }

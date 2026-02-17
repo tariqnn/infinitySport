@@ -133,6 +133,32 @@ export async function fetchPrograms(): Promise<ProgramResponse[]> {
   }
 }
 
+export type PackageResponse = {
+  id: string;
+  sportType: string;
+  name: string;
+  description: string | null;
+  descriptionBullets: string[] | null;
+  sessionsCount: number;
+  trackingType: string;
+  pricingType: string;
+  currentPriceJod: number | null;
+  timeSlots: unknown;
+  isActive: boolean;
+  sortOrder: number;
+};
+
+export async function fetchPackages(): Promise<PackageResponse[]> {
+  try {
+    return await jsonFetch<PackageResponse[]>(`${API_BASE_URL}/api/public/packages`);
+  } catch (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('Failed to fetch packages:', error);
+    }
+    return [];
+  }
+}
+
 export async function fetchOffers(): Promise<OfferResponse[]> {
   try {
     return await jsonFetch<OfferResponse[]>(`${API_BASE_URL}/api/public/offers`);
@@ -155,8 +181,26 @@ export async function fetchEvents(): Promise<EventResponse[]> {
   }
 }
 
-// Our Facility & Venues: always use these 6 (excludes Padel Dome, Infinity Arena, etc.)
+// Fetch facilities from API (admin-driven); fallback to static list only on error.
 export async function fetchFacilities(): Promise<FacilityResponse[]> {
+  try {
+    const list = await jsonFetch<Array<{ id: string; name: string; description?: string; imageUrl?: string }>>(
+      `${API_BASE_URL}/api/public/facilities`,
+    );
+    if (list?.length) {
+      return list.map((f): FacilityResponse => ({
+        id: f.id,
+        name: f.name,
+        description: f.description ?? '',
+        imageUrl: f.imageUrl,
+        specs: undefined,
+      }));
+    }
+  } catch (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('Failed to fetch facilities:', error);
+    }
+  }
   return FALLBACK_FACILITIES.map((f): FacilityResponse => ({
     id: f.id,
     name: f.name,

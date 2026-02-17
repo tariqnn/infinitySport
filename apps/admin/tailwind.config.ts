@@ -14,13 +14,14 @@ const config: Config = {
         brand: {
           white: '#FFFFFF',
           offwhite: '#F6F8FB',
-          gray: '#E4E9F2',
-          charcoal: '#1C2437',
-          blue: '#1426FF',
-          teal: '#24D2C1',
-          lightblue: '#69FFDB',
-          green: '#61FF45',
-          greenDark: '#1C934E'
+          gray: '#E2E8F0',
+          charcoal: '#0f172a',
+          blue: '#003DA5',
+          blueBright: '#141AFF',
+          teal: '#4DD4C4',
+          lightblue: '#6BA5E8',
+          green: '#60D066',
+          greenDark: '#1A4D3A'
         }
       },
       fontFamily: {
@@ -28,14 +29,16 @@ const config: Config = {
         sans: ['var(--font-sans)']
       },
       borderRadius: {
-        '3xl': '1.75rem'
+        '3xl': '1.25rem',
+        'card': '1rem'
       },
       boxShadow: {
-        aurora: '0 15px 35px rgba(17, 27, 66, 0.12)',
-        panel: '0 20px 45px rgba(15, 23, 42, 0.10)'
+        aurora: '0 8px 24px rgba(0, 61, 165, 0.08)',
+        panel: '0 4px 20px rgba(0, 61, 165, 0.06)',
+        'card-hover': '0 8px 30px rgba(0, 61, 165, 0.1)'
       },
       backgroundImage: {
-        'hero-gradient': 'linear-gradient(115deg, rgba(20,38,255,0.15), rgba(36,210,193,0.12), rgba(97,255,69,0.12))'
+        'hero-gradient': 'linear-gradient(135deg, rgba(20,26,255,0.06), rgba(107,165,232,0.05), rgba(96,208,102,0.06))'
       }
     }
   },

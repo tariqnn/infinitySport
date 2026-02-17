@@ -244,7 +244,7 @@ export function EventsManager() {
               <div className="flex-1">
                 <p className="font-semibold text-slate-900">{event.title}</p>
                 <p className="text-xs text-slate-500">
-                  {new Date(event.date).toLocaleString()} · {event.location}
+                  {new Date(event.date).toLocaleString()} - {event.location}
                 </p>
               </div>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">

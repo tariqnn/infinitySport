@@ -1,7 +1,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { fetchPrograms } from '../../lib/apiClient';
+import { fetchPrograms, fetchPackages } from '../../lib/apiClient';
 import { getBasketballPackages } from '@infinity/mock-api';
+import type { BasketballPackage } from '@infinity/mock-api';
 import { BasketballPackageCard } from './BasketballPackageCard';
 import { GymnasticsPackageCard } from './GymnasticsPackageCard';
 import { VolleyballPackageCard } from './VolleyballPackageCard';
@@ -10,11 +11,28 @@ export const metadata = {
   title: 'Sports & Facilities'
 };
 
+function mapApiPackagesToBasketball(apiPackages: { id: string; name: string; description: string | null; descriptionBullets: string[] | null; currentPriceJod: number | null; timeSlots: unknown }[]): BasketballPackage[] {
+  return apiPackages.map((p) => ({
+    id: p.id,
+    title: p.name.replace(/^Basketball - /i, '').trim() || p.name,
+    features: p.descriptionBullets?.length ? p.descriptionBullets : (p.description ? [p.description] : []),
+    note: undefined,
+    price: p.currentPriceJod != null ? String(p.currentPriceJod) : undefined,
+    priceNote: null,
+    timeSlots: Array.isArray(p.timeSlots) ? (p.timeSlots as string[]) : undefined,
+  }));
+}
+
 export default async function SportsPage() {
-  const [programsData, basketballPackages] = await Promise.all([
+  const [programsData, apiPackages, mockBasketball] = await Promise.all([
     fetchPrograms(),
+    fetchPackages(),
     Promise.resolve(getBasketballPackages()),
   ]);
+  const basketballPackages =
+    apiPackages.filter((p) => (p.sportType || '').toUpperCase() === 'BASKETBALL').length > 0
+      ? mapApiPackagesToBasketball(apiPackages.filter((p) => (p.sportType || '').toUpperCase() === 'BASKETBALL'))
+      : mockBasketball;
   
   // Transform programs to match sports structure
   const sports = programsData.map((program) => ({

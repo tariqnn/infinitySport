@@ -260,11 +260,49 @@ export type PackageRegistrationRow = {
   customerEmail: string | null;
   customerAge: number | null;
   isPaid: boolean;
+  basePriceJod: number;
+  discountType: string;
+  discountValue: number | null;
+  discountReason: string | null;
+  finalPriceJod: number;
   periodEndsAt: string | null;
   isFrozen: boolean;
   frozenAt: string | null;
+  sessionsBonus: number;
+  collected?: number; // sum of active receipts (from API when available)
   createdAt: string;
   updatedAt: string;
+};
+
+export type PackagePricingRow = { packageName: string; basePriceJod: number | null };
+
+export type ReceiptRow = {
+  id: string;
+  receiptId: string;
+  registrationId: string;
+  personName: string;
+  personPhone: string;
+  packageName: string;
+  dateTimeIssued: string;
+  amountPaid: number;
+  paymentMethod: string;
+  privateNote: string;
+  voidedAt: string | null;
+  voidReason: string | null;
+  createdAt: string;
+};
+
+export type RegistrationTotals = {
+  totalRegistered: number;
+  paidCount: number;
+  partialCount: number;
+  unpaidCount: number;
+  expectedTotal: number;
+  collectedTotal: number;
+  remainingTotal: number;
+  discountsTotal: number;
+  byMethod: Record<string, number>;
+  byPackage?: Record<string, { registered: number; expected: number; collected: number; remaining: number }>;
 };
 
 export const packageRegistrationsApi = {
@@ -276,9 +314,91 @@ export const packageRegistrationsApi = {
     const query = params.toString() ? `?${params.toString()}` : '';
     return portalFetch<PackageRegistrationRow[]>(`/portal/package-registrations${query}`);
   },
+  create: (data: {
+    packageName: string;
+    customerName: string;
+    customerPhone: string;
+    customerEmail?: string | null;
+    customerAge?: number | null;
+    basePriceJod?: number;
+    discountType?: string;
+    discountValue?: number | null;
+    discountReason?: string | null;
+  }) =>
+    portalFetch<PackageRegistrationRow>('/portal/package-registrations', { method: 'POST', body: JSON.stringify(data) }),
+  getTotals: (packageName?: string, startDate?: string, endDate?: string) => {
+    const params = new URLSearchParams();
+    if (packageName) params.append('packageName', packageName);
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return portalFetch<RegistrationTotals>(`/portal/package-registrations/totals${query}`);
+  },
+  bulkCreate: (registrations: Array<{ packageName: string; customerName: string; customerPhone: string; customerEmail?: string | null; customerAge?: number | null; basePriceJod?: number }>) =>
+    portalFetch<{ results: Array<{ success: boolean; id?: string; row?: number; error?: string }> }>('/portal/package-registrations/bulk', { method: 'POST', body: JSON.stringify({ registrations }) }),
+  bulkCreateForPerson: (data: {
+    person: { customerName: string; customerPhone: string; customerEmail?: string | null; customerAge?: number | null };
+    registrations: Array<{
+      packageName: string;
+      basePriceJod?: number;
+      discountType?: string;
+      discountValue?: number | null;
+      discountReason?: string | null;
+    }>;
+  }) =>
+    portalFetch<{ created: number; registrations: PackageRegistrationRow[] }>('/portal/package-registrations/bulk-for-person', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: { isPaid?: boolean; isFrozen?: boolean }) =>
     portalFetch<PackageRegistrationRow>(`/portal/package-registrations/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) => portalFetch<void>(`/portal/package-registrations/${id}`, { method: 'DELETE' }),
+  reregister: (id: string) =>
+    portalFetch<PackageRegistrationRow>(`/portal/package-registrations/${id}/reregister`, { method: 'POST' }),
+  markPaid: (id: string, data: { amountPaid: number; paymentMethod: string; privateNote: string }) =>
+    portalFetch<ReceiptRow>(`/portal/package-registrations/${id}/mark-paid`, { method: 'POST', body: JSON.stringify(data) }),
+  getReceipts: (id: string) => portalFetch<ReceiptRow[]>(`/portal/package-registrations/${id}/receipts`),
+  addSessionAdjustment: (id: string, data: { reason: string }) =>
+    portalFetch<{ success: boolean; sessionsBonus: number }>(`/portal/package-registrations/${id}/session-adjustment`, { method: 'POST', body: JSON.stringify(data) }),
+  getSessionAdjustments: (id: string) =>
+    portalFetch<Array<{ id: string; change: number; reason: string; createdAt: string }>>(`/portal/package-registrations/${id}/session-adjustments`),
+};
+
+export type PackageOption = {
+  id: string;
+  sportType: string;
+  name: string;
+  description: string | null;
+  sessionsCount: number;
+  trackingType: string;
+  pricingType: string;
+  currentPriceJod: number | null;
+  isActive: boolean;
+  sortOrder: number;
+};
+
+export const packagePricingApi = {
+  list: () => portalFetch<Array<{ packageName: string; basePriceJod: number | null }>>('/portal/package-pricing'),
+};
+
+export const packagesApi = {
+  list: () => portalFetch<PackageOption[]>('/portal/packages'),
+};
+
+export const receiptsApi = {
+  get: (id: string) => portalFetch<ReceiptRow & { registration?: PackageRegistrationRow }>(`/portal/receipts/${id}`),
+  void: (id: string, voidReason: string) =>
+    portalFetch<void>(`/portal/receipts/${id}/void`, { method: 'PATCH', body: JSON.stringify({ voidReason }) }),
+};
+
+export const packageSessionCanceledApi = {
+  list: (packageName?: string, startDate?: string, endDate?: string) => {
+    const params = new URLSearchParams();
+    if (packageName) params.append('packageName', packageName);
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return portalFetch<Array<{ id: string; packageName: string; sessionDate: string; reason: string; reasonDetail: string | null }>>(`/portal/package-session-canceled${query}`);
+  },
+  create: (data: { packageName: string; sessionDate: string; reason: string; reasonDetail?: string | null }) =>
+    portalFetch<unknown>('/portal/package-session-canceled', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // Helper to get first company (for initial setup)

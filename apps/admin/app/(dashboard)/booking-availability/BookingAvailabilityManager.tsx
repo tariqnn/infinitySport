@@ -168,19 +168,15 @@ export function BookingAvailabilityManager() {
   const isEditingThisLabel = editingClub?.label != null;
 
   if (loading) {
-    return <div className="py-8 text-center text-slate-500">Loading…</div>;
+    return <div className="glass-card py-8 text-center text-[var(--text-muted)]">Loading…</div>;
   }
 
   if (loadError && slots.length === 0) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
-        <p className="text-slate-600">{loadError}</p>
-        <p className="mt-2 text-sm text-slate-500">Start the API with: <code className="rounded bg-slate-100 px-1.5 py-0.5">npm run dev:api</code></p>
-        <button
-          type="button"
-          onClick={load}
-          className="mt-4 rounded-xl bg-brand-blue px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90"
-        >
+      <div className="glass-card p-8 text-center">
+        <p className="text-[var(--text-muted)]">{loadError}</p>
+        <p className="mt-2 text-sm text-[var(--text-muted)]">Start the API with: <code className="rounded bg-[var(--bg-card-muted)] px-1.5 py-0.5 text-[var(--text-primary)]">npm run dev:api</code></p>
+        <button type="button" onClick={load} className="btn-primary mt-4">
           Retry
         </button>
       </div>
@@ -204,26 +200,26 @@ export function BookingAvailabilityManager() {
         <button
           type="button"
           onClick={() => { setShowAddClub(true); setShowAddSlot(false); setEditingClub(null); }}
-          className="rounded-xl bg-brand-blue px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90"
+          className="btn-primary"
         >
           Add Club Booking
         </button>
         <button
           type="button"
           onClick={() => { setShowAddSlot(true); setShowAddClub(false); setEditingClub(null); }}
-          className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          className="rounded-xl border border-[var(--border-muted)] bg-[var(--bg-card)] px-4 py-2 text-sm font-semibold text-[var(--text-muted)] hover:bg-[var(--bg-card-muted)]"
         >
           Add Single Slot
         </button>
       </div>
 
       {(showAddClub || isEditingThisLabel) && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-panel">
-          <h3 className="mb-4 text-lg font-semibold text-slate-800">
+        <div className="glass-card p-6">
+          <h3 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">
             {editingClub ? 'Edit Club Booking' : 'Add Club Booking'}
           </h3>
           {editingClub && (
-            <p className="mb-4 text-sm text-slate-600">
+            <p className="mb-4 text-sm text-[var(--text-muted)]">
               Editing will replace all slots for this club. Submit to save changes.
             </p>
           )}
@@ -307,7 +303,7 @@ export function BookingAvailabilityManager() {
             <div className="flex gap-2 sm:col-span-2 lg:col-span-3">
               <button
                 type="submit"
-                className="rounded-xl bg-brand-blue px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90"
+                className="btn-primary"
               >
                 {editingClub ? 'Save changes' : 'Create club booking'}
               </button>
@@ -324,8 +320,8 @@ export function BookingAvailabilityManager() {
       )}
 
       {showAddSlot && !isEditingThisLabel && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-panel">
-          <h3 className="mb-4 text-lg font-semibold text-slate-800">Add Single Blocked Slot</h3>
+        <div className="glass-card p-6">
+          <h3 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">Add Single Blocked Slot</h3>
           <form action={createSlotAction} className="grid gap-4 sm:grid-cols-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Day</label>
@@ -352,7 +348,7 @@ export function BookingAvailabilityManager() {
               </select>
             </div>
             <div className="flex gap-2 sm:col-span-3">
-              <button type="submit" className="rounded-xl bg-brand-blue px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90">
+              <button type="submit" className="btn-primary">
                 Add slot
               </button>
               <button
@@ -367,28 +363,28 @@ export function BookingAvailabilityManager() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-panel">
-        <p className="border-b border-slate-100 px-6 py-4 text-sm text-slate-600">
+      <div className="glass-card overflow-hidden">
+        <p className="border-b border-[var(--border-muted)] bg-[var(--bg-card-muted)] px-6 py-4 text-sm text-[var(--text-muted)]">
           Recurring blocked slots (e.g. club bookings, team training). Toggle to <strong>Free</strong> to allow public booking. Use <strong>Edit</strong> / <strong>Delete</strong> for club bookings grouped by label.
         </p>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/80">
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Label</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Day</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Court</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Time</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Date range</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Status</th>
-                <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">Actions</th>
+              <tr className="border-b border-[var(--border-muted)] bg-[var(--bg-card-muted)]">
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Label</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Day</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Court</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Time</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Date range</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Status</th>
+                <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Actions</th>
               </tr>
             </thead>
             <tbody>
               {slots.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
-                    No blocked slots yet. Use <strong>Add Club Booking</strong> or <strong>Add Single Slot</strong> above to add slots. You can also run <code className="rounded bg-slate-100 px-1.5 py-0.5 text-sm">npm run prisma:seed-blocked-slots</code> to seed default slots.
+                  <td colSpan={7} className="px-6 py-8 text-center text-[var(--text-muted)]">
+                    No blocked slots yet. Use <strong>Add Club Booking</strong> or <strong>Add Single Slot</strong> above to add slots. You can also run <code className="rounded bg-[var(--bg-card-muted)] px-1.5 py-0.5 text-sm text-[var(--text-primary)]">npm run prisma:seed-blocked-slots</code> to seed default slots.
                   </td>
                 </tr>
               ) : (

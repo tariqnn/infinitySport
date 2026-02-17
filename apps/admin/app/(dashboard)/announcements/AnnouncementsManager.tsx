@@ -21,7 +21,7 @@ function SubmitButton({ label, pending }: { label: string; pending: boolean }) {
       className="glow-button inline-flex items-center rounded-2xl px-4 py-2 text-sm font-semibold disabled:opacity-70" 
       disabled={pending}
     >
-      {pending ? 'Saving…' : label}
+      {pending ? 'Saving...' : label}
     </button>
   );
 }
@@ -44,7 +44,7 @@ export function AnnouncementsManager() {
   useEffect(() => {
     async function loadAnnouncements() {
       try {
-        const apiAnnouncements = await apiClient.getAnnouncements();
+        const apiAnnouncements = (await apiClient.getAnnouncements()) as any[];
         // Transform API announcements to LandingAnnouncement format
         const transformed: LandingAnnouncement[] = apiAnnouncements.map((a: any) => ({
           id: a.id,
@@ -107,7 +107,7 @@ export function AnnouncementsManager() {
       }
 
       // Reload announcements
-      const apiAnnouncements = await apiClient.getAnnouncements();
+      const apiAnnouncements = (await apiClient.getAnnouncements()) as any[];
         const transformed: LandingAnnouncement[] = apiAnnouncements.map((a: any) => ({
           id: a.id,
           title: a.title,
@@ -146,7 +146,7 @@ export function AnnouncementsManager() {
       setDeleteState({ status: 'success', message: 'Announcement deleted successfully!' });
       
       // Reload announcements
-      const apiAnnouncements = await apiClient.getAnnouncements();
+      const apiAnnouncements = (await apiClient.getAnnouncements()) as any[];
         const transformed: LandingAnnouncement[] = apiAnnouncements.map((a: any) => ({
           id: a.id,
           title: a.title,
@@ -274,7 +274,7 @@ export function AnnouncementsManager() {
               <div>
                 <p className="font-display text-xl font-semibold text-slate-900">{announcement.title}</p>
                 <p className="text-xs text-slate-500">
-                  {announcement.startDate ?? 'Now'} → {announcement.endDate ?? 'Open'}
+                  {announcement.startDate || 'Now'} - {announcement.endDate || 'Open'}
                 </p>
               </div>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">

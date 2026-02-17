@@ -175,7 +175,7 @@ async function fetchBlockedMap(): Promise<Record<string, Partial<Record<CourtTyp
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { courtId, courtName, date, time, name, phone, email } = body ?? {};
+    const { courtId, courtName, date, time, duration, name, phone, email } = body ?? {};
 
     // Validate required fields
     if (!courtId || !courtName || !date || !time || !name || !phone) {
@@ -184,6 +184,8 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    const durationHours = typeof duration === 'number' && duration > 0 ? Math.min(3, Math.max(0.5, duration)) : 1;
 
     // Validate phone number (server-side validation)
     const phoneValidation = isValidPhoneNumber(phone);
@@ -205,56 +207,69 @@ export async function POST(request: Request) {
       );
     }
 
-    // Reject slots marked as blocked in admin (Booking Availability). Admin can set isBlocked=false to free them.
+    // Reject if any slot in [time, time + duration] is blocked in admin (Booking Availability).
     const courtType = courtTypeForId(courtId);
     if (courtType) {
       const blockedMap = await fetchBlockedMap();
       const day = dayKey(date);
       const fullTimes = blockedMap[day]?.[courtType] ?? [];
-      if (fullTimes.includes(time)) {
-        return NextResponse.json(
-          { error: 'This time slot is fully booked. Please select another time.' },
-          { status: 409 }
-        );
+      const slotCount = Math.ceil(durationHours);
+      for (let i = 0; i < slotCount; i++) {
+        const [h, m] = time.split(':').map(Number);
+        const mins = (h || 0) * 60 + (m || 0) + i * 60;
+        const slotH = Math.floor(mins / 60) % 24;
+        const slotM = mins % 60;
+        const slotTime = `${String(slotH).padStart(2, '0')}:${String(slotM).padStart(2, '0')}`;
+        if (fullTimes.includes(slotTime)) {
+          return NextResponse.json(
+            { error: 'This time slot is fully booked. Please select another time.' },
+            { status: 409 }
+          );
+        }
       }
     }
 
-    // Check for existing bookings at this time and court (all companies – same venue)
-    try {
-      const startTime = new Date(`${date}T${time}:00`);
-      const endTime = new Date(startTime);
-      endTime.setHours(endTime.getHours() + 1);
+    // Compute end time from start + duration
+    const startTime = new Date(`${date}T${time}:00`);
+    const endTime = new Date(startTime);
+    endTime.setMinutes(endTime.getMinutes() + Math.round(durationHours * 60));
 
+    // Check for overlapping existing bookings (all companies – same venue)
+    try {
       const courtType = courtTypeForId(courtId);
       const bookingsRes = await fetch(
-          `${API_BASE_URL}/api/portal/bookings?startDate=${startTime.toISOString()}&endDate=${endTime.toISOString()}`,
-          { cache: 'no-store' }
-        );
-        if (bookingsRes.ok && courtType) {
-          const existingBookings: Array<{
-            facilityArea: string | null;
-            startTime: string;
-            status: string;
-          }> = await bookingsRes.json();
-          const conflictingBooking = existingBookings.find(
-            (b) =>
-              b.status !== 'CANCELLED' &&
-              (b.facilityArea === courtType || b.facilityArea === courtName) &&
-              new Date(b.startTime).getTime() === startTime.getTime()
+        `${API_BASE_URL}/api/portal/bookings?startDate=${new Date(startTime.getTime() - 24 * 60 * 60 * 1000).toISOString()}&endDate=${new Date(endTime.getTime() + 24 * 60 * 60 * 1000).toISOString()}`,
+        { cache: 'no-store' }
+      );
+      if (bookingsRes.ok && courtType) {
+        const existingBookings: Array<{
+          facilityArea: string | null;
+          startTime: string;
+          endTime: string;
+          status: string;
+        }> = await bookingsRes.json();
+        const conflictingBooking = existingBookings.find((b) => {
+          if (b.status === 'CANCELLED') return false;
+          if (b.facilityArea !== courtType && b.facilityArea !== courtName) return false;
+          const bStart = new Date(b.startTime).getTime();
+          const bEnd = new Date(b.endTime || b.startTime).getTime();
+          const reqStart = startTime.getTime();
+          const reqEnd = endTime.getTime();
+          return reqStart < bEnd && reqEnd > bStart;
+        });
+        if (conflictingBooking) {
+          return NextResponse.json(
+            { error: 'This time slot is already booked. Please select another time.' },
+            { status: 409 }
           );
-          if (conflictingBooking) {
-            return NextResponse.json(
-              { error: 'This time slot is already booked. Please select another time.' },
-              { status: 409 }
-            );
-          }
         }
+      }
     } catch (checkError) {
       console.error('Error checking existing bookings:', checkError);
-      // Continue with booking creation even if check fails
     }
 
-    // Send confirmation email
+    // Send confirmation email (include duration in message)
+    const endTimeStr = endTime.toTimeString().slice(0, 5);
     try {
       await sendBookingConfirmationEmail({
         name,
@@ -262,25 +277,20 @@ export async function POST(request: Request) {
         email: typeof email === 'string' ? email : undefined,
         courtName,
         date,
-        time,
+        time: `${time} – ${endTimeStr} (${durationHours}h)`,
       });
     } catch (emailError) {
       console.error('Email sending error:', emailError);
-      // Don't fail the booking if email fails, but log it
     }
 
-    // Best-effort WhatsApp confirmation (requires Twilio WhatsApp credentials)
     try {
-      await sendBookingWhatsAppMessage({ phone, courtName, date, time });
+      await sendBookingWhatsAppMessage({ phone, courtName, date, time: `${time} – ${endTimeStr}` });
     } catch (whatsAppError) {
       console.error('WhatsApp sending error:', whatsAppError);
     }
 
-    // Save booking to database
+    // Save booking to database with computed endTime
     try {
-      const startTime = new Date(`${date}T${time}:00`);
-      const endTime = new Date(startTime);
-      endTime.setHours(endTime.getHours() + 1);
 
       // Get or create company
       const companiesRes = await fetch(`${API_BASE_URL}/api/portal/companies`, {

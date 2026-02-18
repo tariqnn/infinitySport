@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardBody } from '../../_components/ui';
 import { packageRegistrationsApi, type RegistrationTotals } from '../../../lib/portalApi';
+import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 
 export function RegistrationTotalsPanel({
   packageName,
@@ -15,6 +16,7 @@ export function RegistrationTotalsPanel({
 }) {
   const [totals, setTotals] = useState<RegistrationTotals | null>(null);
   const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -34,9 +36,23 @@ export function RegistrationTotalsPanel({
 
   return (
     <Card>
-      <CardBody>
-        <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-ui-textMuted">Registration summary</h3>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <CardBody className="p-0">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-ui-bgMuted/50 transition-colors rounded-t-lg"
+          aria-expanded={open}
+        >
+          <h3 className="text-sm font-bold uppercase tracking-wide text-ui-textMuted">Registration summary</h3>
+          {open ? (
+            <ChevronUpIcon className="h-5 w-5 text-ui-textMuted shrink-0" aria-hidden />
+          ) : (
+            <ChevronDownIcon className="h-5 w-5 text-ui-textMuted shrink-0" aria-hidden />
+          )}
+        </button>
+        {open && (
+        <div className="px-4 pb-4 pt-0 border-t border-ui-border">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 pt-3">
           <div>
             <p className="text-xs text-ui-textMuted">Total registered</p>
             <p className="text-xl font-bold text-ui-textPrimary">{totals.totalRegistered}</p>
@@ -102,6 +118,8 @@ export function RegistrationTotalsPanel({
               </table>
             </div>
           </div>
+        )}
+        </div>
         )}
       </CardBody>
     </Card>

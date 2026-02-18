@@ -1,20 +1,11 @@
 import { NextResponse } from 'next/server';
 import { isValidPhoneNumber } from '../../../lib/phoneValidation';
 
-function getApiBaseUrl(request: Request) {
+// Same logic as /api/booking so both forms hit the same backend (Render in prod, localhost in dev).
+function getApiBaseUrl(): string {
   const envUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
   if (envUrl) return envUrl.replace(/\/$/, '');
-
-  const port = process.env.API_PORT || '4000';
-  const localApi = `http://localhost:${port}`;
-
-  if (process.env.NODE_ENV === 'development') return localApi;
-  if (process.env.API_RUNNING_LOCALLY === 'true') return localApi;
-
-  const hostname = new URL(request.url).hostname;
-  const isLocal = hostname === '0.0.0.0' || hostname === 'localhost' || hostname === '127.0.0.1';
-  if (isLocal) return localApi;
-
+  if (process.env.NODE_ENV === 'development') return `http://localhost:${process.env.API_PORT || '4000'}`;
   return 'https://infinitysport.onrender.com';
 }
 
@@ -41,7 +32,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const baseUrl = getApiBaseUrl(request);
+    const baseUrl = getApiBaseUrl();
     const apiUrl = `${baseUrl}/api/portal/package-registrations`;
     const res = await fetch(apiUrl, {
       method: 'POST',
@@ -86,7 +77,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, id: data.id });
   } catch (e) {
     const err = e as Error & { cause?: { code?: string } };
-    const baseUrl = getApiBaseUrl(request);
+    const baseUrl = getApiBaseUrl();
     const apiUrl = `${baseUrl}/api/portal/package-registrations`;
     console.error('[package-registrations] Error:', err.message, 'baseUrl:', baseUrl, err);
     const msg = err.message || '';

@@ -40,7 +40,9 @@ function todayISO() {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
-type RangePreset = 'day' | 'week' | 'month' | 'year' | 'custom';
+const BOOKING_PRICE_STORAGE_KEY = 'admin_booking_price_per_hour';
+
+type RangePreset = 'day' | '3d' | '4d' | '5d' | '6d' | '7d' | 'week' | 'month' | 'year' | 'custom';
 
 function getRangeBounds(
   preset: RangePreset,
@@ -63,6 +65,18 @@ function getRangeBounds(
   if (preset === 'day') {
     return {
       start: `${selectedDate}T00:00:00.000Z`,
+      end: `${selectedDate}T23:59:59.999Z`,
+    };
+  }
+  // Last N days ending on selected date
+  if (preset === '3d' || preset === '4d' || preset === '5d' || preset === '6d' || preset === '7d') {
+    const n = parseInt(preset, 10) as 3 | 4 | 5 | 6 | 7;
+    const end = new Date(Date.UTC(y, month0, d));
+    const start = new Date(end);
+    start.setUTCDate(start.getUTCDate() - (n - 1));
+    const startStr = `${start.getUTCFullYear()}-${pad(start.getUTCMonth() + 1)}-${pad(start.getUTCDate())}`;
+    return {
+      start: `${startStr}T00:00:00.000Z`,
       end: `${selectedDate}T23:59:59.999Z`,
     };
   }
@@ -92,6 +106,20 @@ function getRangeBounds(
   return { start: `${selectedDate}T00:00:00.000Z`, end: `${selectedDate}T23:59:59.999Z` };
 }
 
+function bookingHours(booking: Booking): number {
+  if (booking.status === 'CANCELLED') return 0;
+  const start = new Date(booking.startTime).getTime();
+  const end = new Date(booking.endTime).getTime();
+  return (end - start) / (60 * 60 * 1000);
+}
+
+function getStoredPrice(): number {
+  if (typeof window === 'undefined') return 0;
+  const v = localStorage.getItem(BOOKING_PRICE_STORAGE_KEY);
+  const n = parseFloat(v ?? '');
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
 export function BookingsManager() {
   const [rangePreset, setRangePreset] = useState<RangePreset>('day');
   const [selectedDate, setSelectedDate] = useState(todayISO);
@@ -101,7 +129,16 @@ export function BookingsManager() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [editing, setEditing] = useState<EditForm | null>(null);
+  const [pricePerHour, setPricePerHour] = useState<string>('');
+  const [savedPrice, setSavedPrice] = useState<number>(0);
+  const [priceSaveFeedback, setPriceSaveFeedback] = useState<string | null>(null);
   const [paymentState, paymentAction] = useActionState(updateBookingPaymentAction, initialState);
+
+  useEffect(() => {
+    const p = getStoredPrice();
+    setSavedPrice(p);
+    setPricePerHour(p ? String(p) : '');
+  }, []);
   const [statusState, statusAction] = useActionState(updateBookingStatusAction, initialState);
   const [editState, editAction] = useActionState(updateBookingAction, initialState);
   const [deleteState, deleteAction] = useActionState(deleteBookingAction, initialState);
@@ -198,11 +235,33 @@ export function BookingsManager() {
 
   const presetButtons: { value: RangePreset; label: string }[] = [
     { value: 'day', label: 'Day' },
+    { value: '3d', label: '3 days' },
+    { value: '4d', label: '4 days' },
+    { value: '5d', label: '5 days' },
+    { value: '6d', label: '6 days' },
+    { value: '7d', label: '7 days' },
     { value: 'week', label: 'Week' },
     { value: 'month', label: 'Month' },
     { value: 'year', label: 'Year' },
     { value: 'custom', label: 'Custom' },
   ];
+
+  const bookingsForSummary = bookings.filter((b) => b.status !== 'CANCELLED');
+  const totalHours = bookingsForSummary.reduce((sum, b) => sum + bookingHours(b), 0);
+  const totalRevenue = totalHours * savedPrice;
+
+  function handleSavePrice() {
+    const v = parseFloat(pricePerHour.replace(/,/g, '.'));
+    if (!Number.isFinite(v) || v < 0) {
+      setPriceSaveFeedback('Enter a valid number (e.g. 25)');
+      return;
+    }
+    localStorage.setItem(BOOKING_PRICE_STORAGE_KEY, String(v));
+    setSavedPrice(v);
+    setPricePerHour(String(v));
+    setPriceSaveFeedback('Saved');
+    setTimeout(() => setPriceSaveFeedback(null), 2000);
+  }
 
   return (
     <div className="space-y-6">
@@ -227,7 +286,7 @@ export function BookingsManager() {
           {rangePreset !== 'custom' && (
             <>
               <label htmlFor="booking-date" className="sr-only">
-                {rangePreset === 'day' ? 'Date' : rangePreset === 'week' ? 'Start date (week)' : rangePreset === 'month' ? 'Month' : 'Year'}
+                {rangePreset === 'day' ? 'Date' : rangePreset === 'week' ? 'Start date (week)' : rangePreset === 'month' ? 'Month' : rangePreset === 'year' ? 'Year' : 'End date'}
               </label>
               <input
                 id="booking-date"
@@ -289,7 +348,50 @@ export function BookingsManager() {
       ) : (
         <>
       <div className="glass-card overflow-hidden">
-        <p className="border-b border-[var(--border-muted)] bg-[var(--bg-card-muted)] px-6 py-4 text-sm text-[var(--text-muted)]">
+        <div className="border-b border-[var(--border-muted)] bg-[var(--bg-card-muted)] px-6 py-4">
+          <h3 className="text-sm font-bold uppercase tracking-wide text-[var(--text-muted)] mb-3">Booking summary</h3>
+          <p className="text-sm text-[var(--text-muted)] mb-4">
+            Summary uses the same date filter above. Set price per hour once and save; revenue = hours × price.
+          </p>
+          <div className="flex flex-wrap items-end gap-4">
+            <div>
+              <label htmlFor="booking-price-per-hour" className="block text-xs font-medium text-[var(--text-muted)] mb-1">Price per hour (JOD)</label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="booking-price-per-hour"
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  value={pricePerHour}
+                  onChange={(e) => { setPricePerHour(e.target.value); setPriceSaveFeedback(null); }}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSavePrice()}
+                  className="w-28 rounded-xl border border-[var(--border-input)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                />
+                <button type="button" onClick={handleSavePrice} className="rounded-xl bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
+                  Save
+                </button>
+                {priceSaveFeedback && (
+                  <span className={`text-sm ${priceSaveFeedback === 'Saved' ? 'text-green-600' : 'text-amber-600'}`}>{priceSaveFeedback}</span>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-6">
+              <div>
+                <p className="text-xs text-[var(--text-muted)]">Bookings (excl. cancelled)</p>
+                <p className="text-xl font-bold text-[var(--text-primary)]">{bookingsForSummary.length}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[var(--text-muted)]">Total hours booked</p>
+                <p className="text-xl font-bold text-[var(--text-primary)]">{totalHours.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[var(--text-muted)]">Revenue (hours × price)</p>
+                <p className="text-xl font-bold text-[var(--text-primary)]">{savedPrice > 0 ? `${totalRevenue.toFixed(2)} JOD` : '—'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p className="border-b border-[var(--border-muted)] bg-[var(--bg-card-muted)] px-6 py-3 text-sm text-[var(--text-muted)]">
           Manage bookings from the landing page. Toggle <strong>Paid</strong> or use <strong>Edit</strong> to change status, payment, notes, and court.
         </p>
         <div className="overflow-x-auto">

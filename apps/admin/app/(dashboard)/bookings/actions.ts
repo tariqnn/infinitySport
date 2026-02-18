@@ -9,7 +9,7 @@ const getApiBaseUrl = () => {
   if (process.env.NODE_ENV === 'development') {
     return 'http://localhost:4000';
   }
-  return 'https://infinitysport.onrender.com';
+  return 'http://localhost:4000';
 };
 
 const API_BASE_URL = getApiBaseUrl();

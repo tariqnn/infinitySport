@@ -19,7 +19,7 @@ const getApiBaseUrl = () => {
     return ''; // Relative URL - will use Next.js rewrites
   }
   
-  return 'https://infinitysport.onrender.com';
+  return 'http://localhost:4000';
 };
 
 const API_BASE_URL = getApiBaseUrl();

@@ -4,7 +4,7 @@ const getApiBaseUrl = () => {
   if (envUrl) return envUrl;
   // In development, talk to local API so admin packages and other routes work
   if (process.env.NODE_ENV === 'development') return 'http://localhost:4000';
-  return 'https://infinitysport.onrender.com';
+  return 'http://localhost:4000';
 };
 
 const API_BASE_URL = getApiBaseUrl();

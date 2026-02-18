@@ -1,12 +1,34 @@
 import { NextResponse } from 'next/server';
 import { isValidPhoneNumber } from '../../../lib/phoneValidation';
 
-// Same in production and development: localhost API unless env overrides.
+// Default: local API only. Set API_BASE_URL / NEXT_PUBLIC_API_BASE_URL if API is elsewhere.
 function getApiBaseUrl(): string {
   const envUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
   if (envUrl) return envUrl.replace(/\/$/, '');
   const port = process.env.API_PORT || '4000';
   return `http://localhost:${port}`;
+}
+
+// Fetch with timeout and retries (Render free tier can be slow to wake).
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  { timeoutMs = 25000, retries = 2 } = {}
+): Promise<Response> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timeout);
+      return res;
+    } catch (e) {
+      lastErr = e;
+      if (attempt < retries) await new Promise((r) => setTimeout(r, 1500));
+    }
+  }
+  throw lastErr;
 }
 
 export async function POST(request: Request) {
@@ -34,17 +56,22 @@ export async function POST(request: Request) {
 
     const baseUrl = getApiBaseUrl();
     const apiUrl = `${baseUrl}/api/portal/package-registrations`;
-    const res = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        packageName: packageName.trim(),
-        customerName: customerName.trim(),
-        customerPhone: customerPhone.trim(),
-        customerEmail: typeof customerEmail === 'string' && customerEmail.trim() ? customerEmail.trim() : undefined,
-        customerAge: typeof customerAge === 'number' && customerAge > 0 ? customerAge : undefined,
-      }),
-    });
+    const body = {
+      packageName: packageName.trim(),
+      customerName: customerName.trim(),
+      customerPhone: customerPhone.trim(),
+      customerEmail: typeof customerEmail === 'string' && customerEmail.trim() ? customerEmail.trim() : undefined,
+      customerAge: typeof customerAge === 'number' && customerAge > 0 ? customerAge : undefined,
+    };
+    const res = await fetchWithRetry(
+      apiUrl,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+      { timeoutMs: 25000, retries: 2 }
+    );
 
     const responseText = await res.text();
     if (!res.ok) {

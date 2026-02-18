@@ -28,7 +28,7 @@ export function FileUpload({
     if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
       return envUrl;
     }
-    return 'https://infinitysport.onrender.com';
+    return 'http://localhost:4000';
   };
   const API_BASE_URL = getApiBaseUrl();
 

@@ -76,19 +76,56 @@ export function PackageRegisterForm() {
     e.preventDefault();
     setError('');
     setStatus('submitting');
-    try {
-      const res = await fetch('/api/package-registrations', {
+    const payload = {
+      packageName: packageName || defaultPackage,
+      customerName: name.trim(),
+      customerPhone: phone.trim(),
+      customerEmail: email.trim() || undefined,
+      customerAge: age.trim() ? parseInt(age.trim(), 10) : undefined,
+    };
+
+    const trySubmit = async (url: string): Promise<Response> => {
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          packageName: packageName || defaultPackage,
-          customerName: name.trim(),
-          customerPhone: phone.trim(),
-          customerEmail: email.trim() || undefined,
-          customerAge: age.trim() ? parseInt(age.trim(), 10) : undefined,
-        }),
+        body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      return res;
+    };
+
+    const directApiUrl =
+      typeof window !== 'undefined'
+        ? (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/$/, '')
+        : '';
+    let res: Response | null = null;
+
+    try {
+      res = await trySubmit('/api/package-registrations');
+      const isProxyFailure = !res.ok && res.status >= 500;
+      if ((isProxyFailure || !res.ok) && directApiUrl && directApiUrl.startsWith('http')) {
+        try {
+          res = await trySubmit(`${directApiUrl}/api/portal/package-registrations`);
+        } catch {
+          /* keep first response */
+        }
+      }
+    } catch {
+      if (directApiUrl && directApiUrl.startsWith('http')) {
+        try {
+          res = await trySubmit(`${directApiUrl}/api/portal/package-registrations`);
+        } catch {
+          res = null;
+        }
+      }
+    }
+
+    try {
+      if (!res) {
+        setError('Unable to submit. Please try again.');
+        setStatus('error');
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError((data as { error?: string }).error || 'Submission failed. Please try again.');
         setStatus('error');

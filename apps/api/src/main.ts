@@ -21,8 +21,11 @@ async function bootstrap() {
     prefix: '/uploads/',
   });
   
-  // Enable CORS
-  const landingOrigin = process.env.LANDING_ORIGIN || 'http://localhost:3000';
+  // Enable CORS (LANDING_ORIGIN can be comma-separated for multiple domains, e.g. production + localhost)
+  const landingOrigins = (process.env.LANDING_ORIGIN || 'http://localhost:3000')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
   const adminOrigin = process.env.ADMIN_ORIGIN || 'http://localhost:3001';
   const portalOrigin = process.env.PORTAL_ORIGIN || 'http://localhost:3002';
   const productionOrigins = [
@@ -30,7 +33,7 @@ async function bootstrap() {
     'https://infinitysport-1.onrender.com',
   ];
   const origins = [
-    landingOrigin,
+    ...landingOrigins,
     adminOrigin,
     portalOrigin,
     'http://localhost:3000',

@@ -9,6 +9,6 @@ export function getApiBaseUrl() {
   if (typeof process !== 'undefined' && process.env.NODE_ENV === 'development') {
     return 'http://localhost:4000';
   }
-  return 'https://infinitysport.onrender.com';
+  return 'http://localhost:4000';
 }
 

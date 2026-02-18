@@ -2,12 +2,11 @@
 import { NextResponse } from 'next/server';
 import { isValidPhoneNumber } from '../../../lib/phoneValidation';
 
-// Same in production and development: localhost API unless env overrides.
+// Default: local API only. Set API_BASE_URL / NEXT_PUBLIC_API_BASE_URL if API is elsewhere.
 const getApiBaseUrl = () => {
   const envUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
   if (envUrl) return envUrl.replace(/\/$/, '');
-  const port = process.env.API_PORT || '4000';
-  return `http://localhost:${port}`;
+  return `http://localhost:${process.env.API_PORT || '4000'}`;
 };
 
 const API_BASE_URL = getApiBaseUrl();

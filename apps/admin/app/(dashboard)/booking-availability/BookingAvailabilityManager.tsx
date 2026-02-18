@@ -14,7 +14,7 @@ import {
 const getApiBaseUrl = () => {
   if (process.env.NEXT_PUBLIC_API_BASE_URL) return process.env.NEXT_PUBLIC_API_BASE_URL;
   if (process.env.NODE_ENV === 'development') return 'http://localhost:4000';
-  return 'https://infinitysport.onrender.com';
+  return 'http://localhost:4000';
 };
 
 interface BlockedSlot {

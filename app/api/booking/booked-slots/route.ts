@@ -2,9 +2,9 @@
 import { NextResponse } from 'next/server';
 
 const getApiBaseUrl = () => {
-  if (process.env.NEXT_PUBLIC_API_BASE_URL) return process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (process.env.NODE_ENV === 'development') return 'http://localhost:4000';
-  return 'https://infinitysport.onrender.com';
+  const envUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (envUrl) return envUrl.replace(/\/$/, '');
+  return `http://localhost:${process.env.API_PORT || '4000'}`;
 };
 
 const COURT_TYPES = ['Basketball AC', 'Basketball 3x3', 'Padel', 'Volleyball'] as const;

@@ -97,9 +97,11 @@ setTimeout(() => {
       ...process.env,
       PORT: WEB_PORT,
       NODE_ENV: 'production',
-      API_PORT: API_PORT,
-      // Don't set NEXT_PUBLIC_API_BASE_URL - let it use relative URLs via rewrites
-      // NEXT_PUBLIC_API_SAME_DOMAIN and API_RUNNING_LOCALLY should be set via env vars
+      API_PORT: String(API_PORT),
+      // So Next API routes (e.g. /api/package-registrations) can proxy to the local Nest API
+      API_BASE_URL: `http://127.0.0.1:${API_PORT}`,
+      // Enable Next rewrites so /api/* (browser) can proxy to Nest when needed
+      API_RUNNING_LOCALLY: 'true',
     },
     stdio: 'inherit',
     shell: true,

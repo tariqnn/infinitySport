@@ -3,17 +3,13 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Proxy API requests to the NestJS backend when running together
   async rewrites() {
-    // Only add rewrites if API is running locally (same server)
-    // This allows /api/* requests to be proxied to the NestJS API
-    if (process.env.API_RUNNING_LOCALLY === 'true') {
-      const apiPort = process.env.API_PORT || '4000';
-      return [
-        {
-          source: '/api/:path*',
-          destination: `http://localhost:${apiPort}/api/:path*`,
-        },
-      ];
-    }
+    // Only add rewrites if API is running locally (same server). Safe when env is missing.
+    try {
+      if (process.env.API_RUNNING_LOCALLY === 'true') {
+        const apiPort = process.env.API_PORT || '4000';
+        return [{ source: '/api/:path*', destination: `http://localhost:${apiPort}/api/:path*` }];
+      }
+    } catch (_) {}
     return [];
   },
   images: {

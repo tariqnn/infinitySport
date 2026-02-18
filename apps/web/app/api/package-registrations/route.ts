@@ -5,19 +5,16 @@ function getApiBaseUrl(request: Request) {
   const envUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
   if (envUrl) return envUrl.replace(/\/$/, '');
 
-  if (process.env.NODE_ENV === 'development') return 'http://localhost:4000';
+  const port = process.env.API_PORT || '4000';
+  const localApi = `http://localhost:${port}`;
 
-  // Same server: API runs on API_PORT (e.g. 4000), Next on PORT (e.g. 3000).
-  // request.url can be the internal bind (0.0.0.0:3000) — never use that for the API.
-  if (process.env.NEXT_PUBLIC_API_SAME_DOMAIN === 'true' || process.env.API_RUNNING_LOCALLY === 'true') {
-    const origin = new URL(request.url).hostname;
-    const isInternal = origin === '0.0.0.0' || origin === 'localhost' || origin === '127.0.0.1';
-    if (isInternal) {
-      const port = process.env.API_PORT || '4000';
-      return `http://127.0.0.1:${port}`;
-    }
-    return new URL(request.url).origin;
-  }
+  // Same API URL as local: use localhost:4000 when dev, or API on same server, or request from localhost.
+  if (process.env.NODE_ENV === 'development') return localApi;
+  if (process.env.API_RUNNING_LOCALLY === 'true') return localApi;
+
+  const hostname = new URL(request.url).hostname;
+  const isLocal = hostname === '0.0.0.0' || hostname === 'localhost' || hostname === '127.0.0.1';
+  if (isLocal) return localApi;
 
   return 'https://infinitysport.onrender.com';
 }
@@ -89,17 +86,23 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ success: true, id: data.id });
   } catch (e) {
+    const err = e as Error & { cause?: { code?: string } };
     const baseUrl = getApiBaseUrl(request);
-    console.error('[package-registrations] Error:', (e as Error).message, 'baseUrl:', baseUrl, e);
     const apiUrl = `${baseUrl}/api/portal/package-registrations`;
+    const msg = err?.message ?? '';
+    const causeCode = err.cause && typeof err.cause === 'object' && (err.cause as any).code;
+    const reason = [msg, causeCode].filter(Boolean).join(' ') || 'unknown';
+    console.error('[package-registrations] Error:', reason, 'apiUrl:', apiUrl, err);
+    const isConnectionRefused = causeCode === 'ECONNREFUSED' || msg.includes('ECONNREFUSED');
     const isNetwork =
-      e instanceof TypeError && (e.message === 'Failed to fetch' || e.message?.includes('fetch'));
+      isConnectionRefused ||
+      (e instanceof TypeError && (msg === 'Failed to fetch' || msg.includes('fetch')));
     return NextResponse.json(
       {
         error: isNetwork
-          ? 'Cannot reach the registration service. Make sure the API is running (e.g. on port 4000).'
+          ? 'Cannot reach the registration service. Make sure the API is running on port 4000.'
           : 'Unable to submit registration. Please try again later.',
-        debug: { apiUrl },
+        debug: { apiUrl, reason },
       },
       { status: 500 },
     );

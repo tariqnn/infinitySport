@@ -27,8 +27,9 @@ main
 
 ### Node Version:
 ```
-18.x
+20
 ```
+(Required: project uses Node >=20.18.0; Node 18 can cause build failure.)
 
 ### Root Directory:
 ```

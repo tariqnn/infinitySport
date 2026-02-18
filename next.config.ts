@@ -1,6 +1,15 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
+  transpilePackages: ['@infinity/types', '@infinity/mock-api'],
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@infinity/types': path.resolve(__dirname, 'packages/types/src'),
+    };
+    return config;
+  },
   // Proxy API requests to the NestJS backend when running together
   async rewrites() {
     // Only add rewrites if API is running locally (same server)

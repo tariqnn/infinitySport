@@ -8,7 +8,6 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { TrashIcon, BanknotesIcon, DocumentTextIcon, PlusCircleIcon, EllipsisVerticalIcon, PauseCircleIcon, PlayCircleIcon, CalendarIcon } from '@heroicons/react/24/outline';
 import { MarkAsPaidModal } from './_components/MarkAsPaidModal';
 import { ViewReceiptsModal } from './_components/ViewReceiptsModal';
-import { ReceiptDetailModal } from './_components/ViewReceiptsModal';
 import { BulkAddPeopleModal } from './_components/BulkAddPeopleModal';
 import { IncreaseSessionModal } from './_components/IncreaseSessionModal';
 import { RegistrationTotalsPanel } from './_components/RegistrationTotalsPanel';
@@ -36,7 +35,6 @@ export default function RegistrationsPage() {
 
   const [markPaidRegistration, setMarkPaidRegistration] = useState<Registration | null>(null);
   const [viewReceiptsRegistration, setViewReceiptsRegistration] = useState<Registration | null>(null);
-  const [receiptDetailId, setReceiptDetailId] = useState<string | null>(null);
   const [bulkAddOpen, setBulkAddOpen] = useState(false);
   const [increaseSessionRegistration, setIncreaseSessionRegistration] = useState<Registration | null>(null);
   const [cancelSessionDayOpen, setCancelSessionDayOpen] = useState(false);
@@ -675,19 +673,9 @@ export default function RegistrationsPage() {
         onClose={() => setViewReceiptsRegistration(null)}
         registration={viewReceiptsRegistration}
         onViewReceipt={(id) => {
-          setReceiptDetailId(id);
+          window.open(`/receipts/${id}`, '_blank', 'noopener,noreferrer');
         }}
         onVoided={() => {
-          load();
-        }}
-      />
-
-      <ReceiptDetailModal
-        receiptId={receiptDetailId ?? ''}
-        open={!!receiptDetailId}
-        onClose={() => setReceiptDetailId(null)}
-        onVoided={() => {
-          setReceiptDetailId(null);
           load();
         }}
       />

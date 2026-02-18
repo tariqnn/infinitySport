@@ -1,11 +1,21 @@
 import { NextResponse } from 'next/server';
 import { isValidPhoneNumber } from '../../../lib/phoneValidation';
 
-const getApiBaseUrl = () => {
-  if (process.env.NEXT_PUBLIC_API_BASE_URL) return process.env.NEXT_PUBLIC_API_BASE_URL;
+function getApiBaseUrl(request: Request) {
+  const envUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (envUrl) return envUrl.replace(/\/$/, '');
+
   if (process.env.NODE_ENV === 'development') return 'http://localhost:4000';
+
+  // When the API is deployed on the same server/domain (common in production),
+  // proxy to the same origin so `/api/portal/*` can be served by the backend.
+  if (process.env.NEXT_PUBLIC_API_SAME_DOMAIN === 'true') {
+    return new URL(request.url).origin;
+  }
+
+  // Fallback: legacy deployed API host
   return 'https://infinitysport.onrender.com';
-};
+}
 
 export async function POST(request: Request) {
   try {
@@ -30,7 +40,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const res = await fetch(`${getApiBaseUrl()}/api/portal/package-registrations`, {
+    const res = await fetch(`${getApiBaseUrl(request)}/api/portal/package-registrations`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -3,11 +3,18 @@
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import { XMarkIcon } from "@heroicons/react/24/outline";
+import { usePathname } from "next/navigation";
 import { PortalSidebar } from "./PortalSidebar";
 import { PortalTopbar } from "./PortalTopbar";
 
 export function PortalShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
+
+  // Print/view pages should not show portal chrome (sidebar/topbar/padding)
+  if (pathname?.startsWith("/receipts/")) {
+    return <div className="min-h-screen bg-white">{children}</div>;
+  }
 
   useEffect(() => {
     if (!mobileOpen) return;

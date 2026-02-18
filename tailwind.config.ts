@@ -5,6 +5,10 @@ import { brandColors } from './app/theme';
 const config: Config = {
   presets: [sharedPreset as Config],
   content: ['./pages/**/*.{js,ts,jsx,tsx,mdx}', './components/**/*.{js,ts,jsx,tsx,mdx}', './app/**/*.{js,ts,jsx,tsx,mdx}'],
+  safelist: [
+    // Booking duration buttons – ensure visible in production (Tailwind purge)
+    { pattern: /^(rounded-xl|border-2|px-4|py-2\.5|text-sm|font-medium|transition-all|border-brand-blue-primary|bg-brand-blue-primary|text-white|border-gray-200|text-brand-black)/ },
+  ],
   theme: {
     extend: {
       colors: {

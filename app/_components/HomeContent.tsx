@@ -10,6 +10,7 @@ import { AnimatedText } from "./AnimatedText";
 import { ScrollAnimation } from "./ScrollAnimation";
 import { useLanguage } from "./LanguageProvider";
 import { tr } from "../../lib/translations";
+import { BookingForm } from "../booking/BookingForm";
 
 interface HomeContentProps {
   content: LandingContent;
@@ -485,47 +486,9 @@ export function HomeContent({ content }: HomeContentProps) {
             </div>
           </ScrollAnimation>
           <div className="max-w-3xl mx-auto">
-            <ScrollAnimation direction="up" delay={100}>
-              <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-8 shadow-[0_8px_32px_rgba(0,0,0,0.08)] sm:p-12">
-                <div className="grid gap-6 sm:grid-cols-2">
-                  <div>
-                    <h3 className="text-xl font-black text-brand-black mb-4">{tr(language, 'home_court_bookings')}</h3>
-                    <p className="text-sm text-gray-600 leading-relaxed mb-4">
-                      Reserve basketball courts, paddle courts, or multipurpose halls for your training sessions or events.
-                    </p>
-                    <Link
-                      href="/contact"
-                      className="inline-flex items-center gap-2 text-sm font-bold text-brand-blue-primary transition-colors duration-300 hover:text-brand-green-primary"
-                    >
-                      {tr(language, 'home_book_court')}
-                      <ArrowRightIcon className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-                    </Link>
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-black text-brand-black mb-4">Training Sessions</h3>
-                    <p className="text-sm text-gray-600 leading-relaxed mb-4">
-                      {tr(language, 'home_book_training_desc')}
-                    </p>
-                    <Link
-                      href="/contact"
-                      className="inline-flex items-center gap-2 text-sm font-bold text-brand-blue-primary transition-colors duration-300 hover:text-brand-green-primary"
-                    >
-                      {tr(language, 'home_book_training')}
-                      <ArrowRightIcon className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-                    </Link>
-                  </div>
-                </div>
-                <div className="mt-8 pt-8 border-t border-brand-lightBlue/20">
-                  <Link
-                    href="/contact"
-                    className="group inline-flex w-full items-center justify-center rounded-full bg-[#003DA5] px-6 py-3.5 text-sm font-black text-white shadow-[0_8px_24px_rgba(0,61,165,0.35)] transition-all duration-300 hover:scale-105 hover:shadow-[0_12px_32px_rgba(0,61,165,0.5)] hover:bg-[#003DA5]/90 sm:w-auto sm:px-10 sm:py-4 sm:text-base"
-                  >
-                    {tr(language, 'home_contact_to_book')}
-                    <ArrowRightIcon className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1 sm:h-5 sm:w-5" />
-                  </Link>
-                </div>
-              </div>
-            </ScrollAnimation>
+            <div className="rounded-2xl border-2 border-brand-lightBlue/20 bg-white p-8 shadow-[0_8px_32px_rgba(0,0,0,0.08)] sm:p-12">
+              <BookingForm />
+            </div>
           </div>
         </div>
       </section>

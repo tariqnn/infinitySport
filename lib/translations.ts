@@ -50,6 +50,10 @@ export const translations = {
     // Booking form
     booking_select_court: 'Select Court',
     booking_select_date: 'Select Date',
+    booking_duration: 'Duration',
+    booking_duration_1h: '1 hour',
+    booking_duration_1_5h: '1.5 hours',
+    booking_duration_2h: '2 hours',
     booking_select_time: 'Select Time Slot',
     booking_full_name: 'Full Name',
     booking_email: 'Email',
@@ -178,6 +182,10 @@ export const translations = {
     // Booking form
     booking_select_court: 'اختر الملعب',
     booking_select_date: 'اختر التاريخ',
+    booking_duration: 'المدة',
+    booking_duration_1h: 'ساعة واحدة',
+    booking_duration_1_5h: 'ساعة ونصف',
+    booking_duration_2h: 'ساعتان',
     booking_select_time: 'اختر الوقت',
     booking_full_name: 'الاسم الكامل',
     booking_email: 'البريد الإلكتروني',
@@ -266,6 +274,8 @@ export function normalizeLanguage(value: string | undefined | null): Language {
 }
 
 export function tr(lang: Language, key: TranslationKey): string {
-  return translations[lang][key];
+  const langMap = translations[lang] ?? translations.en;
+  const value = langMap[key];
+  return value ?? (translations.en[key] as string) ?? String(key);
 }
 

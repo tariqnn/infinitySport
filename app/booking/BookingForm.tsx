@@ -47,6 +47,27 @@ const toMinutes = (hhmm: string) => {
   return (h || 0) * 60 + (m || 0);
 };
 
+/** Duration in hours (1, 1.5, 2). Returns array of slot strings covered by startTime + duration. */
+const getSlotsInRange = (startHhmm: string, durationHours: number): string[] => {
+  const slots: string[] = [];
+  const startMins = toMinutes(startHhmm);
+  const slotCount = Math.ceil(durationHours);
+  for (let i = 0; i < slotCount; i++) {
+    let mins = startMins + i * 60;
+    if (mins >= 24 * 60) mins -= 24 * 60;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+  }
+  return slots;
+};
+
+const DURATION_OPTIONS = [
+  { value: 1, labelKey: 'booking_duration_1h' as const, fallback: '1 hour' },
+  { value: 1.5, labelKey: 'booking_duration_1_5h' as const, fallback: '1.5 hours' },
+  { value: 2, labelKey: 'booking_duration_2h' as const, fallback: '2 hours' },
+];
+
 const formatSlotLabel = (hhmm: string, lang: 'en' | 'ar') => {
   const [h] = hhmm.split(':').map((n) => Number(n));
   const hour = h ?? 0;
@@ -89,6 +110,20 @@ const isBookedSlot = (
   return typesToCheck.some((t) => (dayBooked[t] ?? []).includes(opts.time));
 };
 
+/** True if any slot in [startTime, startTime + duration] is blocked or booked. */
+const isRangeBlockedOrBooked = (
+  opts: { date: string; startTime: string; durationHours: number; courtId: string; courts: Array<{ id: string; type: CourtType }> },
+  blocked: Record<string, Partial<Record<CourtType, string[]>>>,
+  booked: Record<string, Partial<Record<CourtType, string[]>>>
+) => {
+  const range = getSlotsInRange(opts.startTime, opts.durationHours);
+  return range.some(
+    (time) =>
+      isBlockedSlot({ date: opts.date, time, courtId: opts.courtId, courts: opts.courts }, blocked) ||
+      isBookedSlot({ date: opts.date, time, courtId: opts.courtId, courts: opts.courts }, booked)
+  );
+};
+
 export function BookingForm() {
   const { language } = useLanguage();
   const [blocked, setBlocked] = useState<Record<string, Partial<Record<CourtType, string[]>>>>(FALLBACK_BLOCKED);
@@ -96,6 +131,7 @@ export function BookingForm() {
   const [selectedCourt, setSelectedCourt] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
+  const [selectedDuration, setSelectedDuration] = useState<number>(1);
   const [name, setName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
@@ -179,13 +215,22 @@ export function BookingForm() {
     return availableSlots;
   };
 
+  /** Time slots valid for selected duration (full range must be in available list). */
+  const getTimeSlotsForDuration = () => {
+    const available = getAvailableTimeSlots();
+    return available.filter((slot) => {
+      const range = getSlotsInRange(slot, selectedDuration);
+      return range.every((s) => available.includes(s));
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
     setSubmitStatus('idle');
     setSubmitMessage('');
 
-    if (!selectedCourt || !selectedDate || !selectedTime || !name || !phone) {
+    if (!selectedCourt || !selectedDate || !selectedTime || !name || !phone || !selectedDuration) {
       setSubmitStatus('error');
       setSubmitMessage('Please fill in all required fields.');
       setIsSubmitting(false);
@@ -203,13 +248,13 @@ export function BookingForm() {
     }
     setPhoneError('');
 
-    if (isBlockedSlot({ date: selectedDate, time: selectedTime, courtId: selectedCourt, courts: COURTS }, blocked)) {
-      setSubmitStatus('error');
-      setSubmitMessage(tr(language, 'booking_slot_full'));
-      setIsSubmitting(false);
-      return;
-    }
-    if (isBookedSlot({ date: selectedDate, time: selectedTime, courtId: selectedCourt, courts: COURTS }, booked)) {
+    if (
+      isRangeBlockedOrBooked(
+        { date: selectedDate, startTime: selectedTime, durationHours: selectedDuration, courtId: selectedCourt, courts: COURTS },
+        blocked,
+        booked
+      )
+    ) {
       setSubmitStatus('error');
       setSubmitMessage(tr(language, 'booking_slot_full'));
       setIsSubmitting(false);
@@ -225,6 +270,7 @@ export function BookingForm() {
           courtName: COURTS.find(c => c.id === selectedCourt)?.name || selectedCourt,
           date: selectedDate,
           time: selectedTime,
+          duration: selectedDuration,
           name,
           email: email || undefined,
           phone,
@@ -248,6 +294,7 @@ export function BookingForm() {
       setSelectedCourt('');
       setSelectedDate('');
       setSelectedTime('');
+      setSelectedDuration(1);
       setName('');
       setEmail('');
       setPhone('');
@@ -300,11 +347,37 @@ export function BookingForm() {
             value={selectedDate}
             onChange={(e) => {
               setSelectedDate(e.target.value);
-              setSelectedTime(''); // Reset time when date changes
+              setSelectedTime('');
             }}
             required
             className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-brand-black focus:border-brand-blue-primary focus:outline-none focus:ring-2 focus:ring-brand-blue-primary/20 transition"
           />
+        </div>
+
+        {/* Duration – 1h, 1.5h, 2h (ensure visible in production) */}
+        <div id="booking-duration" className="block" role="group" aria-labelledby="booking-duration-label">
+          <label id="booking-duration-label" className="block text-sm font-semibold text-brand-black mb-2">
+            {tr(language, 'booking_duration')} <span className="text-red-500">*</span>
+          </label>
+          <div className="flex flex-wrap gap-3">
+            {DURATION_OPTIONS.map((opt) => (
+              <button
+                key={`duration-${String(opt.value)}`}
+                type="button"
+                onClick={() => {
+                  setSelectedDuration(opt.value);
+                  setSelectedTime('');
+                }}
+                className={`rounded-xl border-2 px-4 py-2.5 text-sm font-medium transition-all ${
+                  selectedDuration === opt.value
+                    ? 'border-brand-blue-primary bg-brand-blue-primary text-white'
+                    : 'border-gray-200 text-brand-black hover:border-brand-blue-primary/50 hover:bg-brand-blue-primary/5'
+                }`}
+              >
+                {(typeof tr === 'function' ? tr(language, opt.labelKey) : null) || opt.fallback}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Time Slot Selection */}
@@ -314,14 +387,14 @@ export function BookingForm() {
               {tr(language, 'booking_select_time')} <span className="text-red-500">*</span>
             </label>
             <div className="grid grid-cols-4 gap-3 sm:grid-cols-6 md:grid-cols-8">
-              {getAvailableTimeSlots().map((time) => {
-                const blockedSlot = selectedCourt
-                  ? isBlockedSlot({ date: selectedDate, time, courtId: selectedCourt, courts: COURTS }, blocked)
+              {getTimeSlotsForDuration().map((time) => {
+                const full = selectedCourt
+                  ? isRangeBlockedOrBooked(
+                      { date: selectedDate, startTime: time, durationHours: selectedDuration, courtId: selectedCourt, courts: COURTS },
+                      blocked,
+                      booked
+                    )
                   : false;
-                const bookedSlot = selectedCourt
-                  ? isBookedSlot({ date: selectedDate, time, courtId: selectedCourt, courts: COURTS }, booked)
-                  : false;
-                const full = blockedSlot || bookedSlot;
 
                 return (
                   <button
@@ -348,7 +421,7 @@ export function BookingForm() {
                 );
               })}
             </div>
-            {getAvailableTimeSlots().length === 0 && (
+            {getTimeSlotsForDuration().length === 0 && (
               <p className="mt-2 text-sm text-gray-500">{tr(language, 'booking_no_slots_today')}</p>
             )}
           </div>

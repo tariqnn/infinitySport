@@ -274,6 +274,8 @@ export function normalizeLanguage(value: string | undefined | null): Language {
 }
 
 export function tr(lang: Language, key: TranslationKey): string {
-  return translations[lang][key];
+  const langMap = translations[lang] ?? translations.en;
+  const value = langMap[key];
+  return value ?? (translations.en[key] as string) ?? String(key);
 }
 

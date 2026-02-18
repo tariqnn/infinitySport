@@ -48,9 +48,9 @@ const getSlotsInRange = (startHhmm: string, durationHours: number): string[] => 
 };
 
 const DURATION_OPTIONS = [
-  { value: 1, labelKey: 'booking_duration_1h' as const },
-  { value: 1.5, labelKey: 'booking_duration_1_5h' as const },
-  { value: 2, labelKey: 'booking_duration_2h' as const },
+  { value: 1, labelKey: 'booking_duration_1h' as const, fallback: '1 hour' },
+  { value: 1.5, labelKey: 'booking_duration_1_5h' as const, fallback: '1.5 hours' },
+  { value: 2, labelKey: 'booking_duration_2h' as const, fallback: '2 hours' },
 ];
 
 const formatSlotLabel = (hhmm: string, lang: 'en' | 'ar') => {
@@ -337,15 +337,15 @@ export function BookingForm() {
           />
         </div>
 
-        {/* Duration */}
-        <div>
-          <label className="block text-sm font-semibold text-brand-black mb-2">
+        {/* Duration – 1h, 1.5h, 2h (ensure visible in production) */}
+        <div id="booking-duration" className="block" role="group" aria-labelledby="booking-duration-label">
+          <label id="booking-duration-label" className="block text-sm font-semibold text-brand-black mb-2">
             {tr(language, 'booking_duration')} <span className="text-red-500">*</span>
           </label>
           <div className="flex flex-wrap gap-3">
             {DURATION_OPTIONS.map((opt) => (
               <button
-                key={opt.value}
+                key={`duration-${String(opt.value)}`}
                 type="button"
                 onClick={() => {
                   setSelectedDuration(opt.value);
@@ -357,7 +357,7 @@ export function BookingForm() {
                     : 'border-gray-200 text-brand-black hover:border-brand-blue-primary/50 hover:bg-brand-blue-primary/5'
                 }`}
               >
-                {tr(language, opt.labelKey)}
+                {(typeof tr === 'function' ? tr(language, opt.labelKey) : null) || opt.fallback}
               </button>
             ))}
           </div>

@@ -66,7 +66,13 @@ export async function POST(request: Request) {
       if (res.status >= 500) {
         console.error('[package-registrations] Upstream 5xx:', res.status, apiUrl, responseText.slice(0, 500));
       }
-      return NextResponse.json({ error: typeof msg === 'string' ? msg : 'Failed to submit registration.' }, { status: res.status });
+      return NextResponse.json(
+        {
+          error: typeof msg === 'string' ? msg : 'Failed to submit registration.',
+          debug: { apiUrl, status: res.status },
+        },
+        { status: res.status },
+      );
     }
 
     let data: { id?: string };
@@ -80,9 +86,13 @@ export async function POST(request: Request) {
   } catch (e) {
     const baseUrl = getApiBaseUrl(request);
     console.error('[package-registrations] Error:', (e as Error).message, 'baseUrl:', baseUrl, e);
+    const apiUrl = `${baseUrl}/api/portal/package-registrations`;
     return NextResponse.json(
-      { error: 'Unable to submit registration. Please try again later.' },
-      { status: 500 }
+      {
+        error: 'Unable to submit registration. Please try again later.',
+        debug: { apiUrl },
+      },
+      { status: 500 },
     );
   }
 }

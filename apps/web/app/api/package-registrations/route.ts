@@ -67,7 +67,7 @@ export async function POST(request: Request) {
         console.error('[package-registrations] Upstream 5xx:', res.status, apiUrl, responseText.slice(0, 500));
       }
       return NextResponse.json(
-        { error: typeof msg === 'string' ? msg : 'Failed to submit registration.' },
+        { error: typeof msg === 'string' ? msg : 'Failed to submit registration.', debug: { apiUrl, status: res.status } },
         { status: res.status },
       );
     }
@@ -86,6 +86,7 @@ export async function POST(request: Request) {
   } catch (e) {
     const baseUrl = getApiBaseUrl(request);
     console.error('[package-registrations] Error:', (e as Error).message, 'baseUrl:', baseUrl, e);
+    const apiUrl = `${baseUrl}/api/portal/package-registrations`;
     const isNetwork =
       e instanceof TypeError && (e.message === 'Failed to fetch' || e.message?.includes('fetch'));
     return NextResponse.json(
@@ -93,6 +94,7 @@ export async function POST(request: Request) {
         error: isNetwork
           ? 'Cannot reach the registration service. Make sure the API is running (e.g. on port 4000).'
           : 'Unable to submit registration. Please try again later.',
+        debug: { apiUrl },
       },
       { status: 500 },
     );

@@ -1950,35 +1950,61 @@ export class PortalService {
 
     // Production safety: some deployments may have an older DB schema (missing newer columns).
     // Avoid selecting/writing optional newer fields so the public registration endpoint stays available.
-    const row = await (this.prisma as any).packageRegistration.create({
-      data: {
-        packageName: pkg,
-        customerName: (data.customerName || '').trim(),
-        customerPhone: (data.customerPhone || '').trim(),
-        customerEmail: (data.customerEmail || '').trim() || null,
-        customerAge: data.customerAge ?? null,
-        basePriceJod,
-        discountType,
-        discountValue: discountType === 'NONE' ? null : Number(discountValue),
-        discountReason: discountType === 'NONE' ? null : (data.discountReason || '').trim() || null,
-        finalPriceJod,
-      },
-      select: {
-        id: true,
-        packageName: true,
-        customerName: true,
-        customerPhone: true,
-        customerEmail: true,
-        customerAge: true,
-        isPaid: true,
-        basePriceJod: true,
-        discountType: true,
-        discountValue: true,
-        discountReason: true,
-        finalPriceJod: true,
-        createdAt: true,
-      },
-    });
+    let row: {
+      id: string;
+      packageName: string;
+      customerName: string;
+      customerPhone: string;
+      customerEmail: string | null;
+      customerAge: number | null;
+      isPaid: boolean;
+      basePriceJod: number;
+      discountType: string;
+      discountValue: number | null;
+      discountReason: string | null;
+      finalPriceJod: number;
+      createdAt: Date;
+    };
+
+    try {
+      row = await (this.prisma as any).packageRegistration.create({
+        data: {
+          packageName: pkg,
+          customerName: (data.customerName || '').trim(),
+          customerPhone: (data.customerPhone || '').trim(),
+          customerEmail: (data.customerEmail || '').trim() || null,
+          customerAge: data.customerAge ?? null,
+          basePriceJod,
+          discountType,
+          discountValue: discountType === 'NONE' ? null : Number(discountValue),
+          discountReason: discountType === 'NONE' ? null : (data.discountReason || '').trim() || null,
+          finalPriceJod,
+        },
+        select: {
+          id: true,
+          packageName: true,
+          customerName: true,
+          customerPhone: true,
+          customerEmail: true,
+          customerAge: true,
+          isPaid: true,
+          basePriceJod: true,
+          discountType: true,
+          discountValue: true,
+          discountReason: true,
+          finalPriceJod: true,
+          createdAt: true,
+        },
+      });
+    } catch (e: any) {
+      // Ensure we ALWAYS see why production fails.
+      console.error('[portal] createPackageRegistration failed', {
+        message: e?.message,
+        code: e?.code,
+        meta: e?.meta,
+      });
+      throw e;
+    }
 
     // Best-effort: try to persist newer fields when supported by the DB schema.
     // If the DB is missing these columns, ignore and continue.

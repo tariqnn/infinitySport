@@ -1,3 +1,4 @@
+/// <reference lib="es2022" />
 import { NextResponse } from 'next/server';
 import { isValidPhoneNumber } from '../../../lib/phoneValidation';
 

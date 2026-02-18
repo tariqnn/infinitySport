@@ -7,13 +7,18 @@ function getApiBaseUrl(request: Request) {
 
   if (process.env.NODE_ENV === 'development') return 'http://localhost:4000';
 
-  // When the API is deployed on the same server/domain (common in production),
-  // proxy to the same origin so `/api/portal/*` can be served by the backend.
-  if (process.env.NEXT_PUBLIC_API_SAME_DOMAIN === 'true') {
+  // Same server: API runs on API_PORT (e.g. 4000), Next on PORT (e.g. 3000).
+  // request.url can be the internal bind (0.0.0.0:3000) — never use that for the API.
+  if (process.env.NEXT_PUBLIC_API_SAME_DOMAIN === 'true' || process.env.API_RUNNING_LOCALLY === 'true') {
+    const origin = new URL(request.url).hostname;
+    const isInternal = origin === '0.0.0.0' || origin === 'localhost' || origin === '127.0.0.1';
+    if (isInternal) {
+      const port = process.env.API_PORT || '4000';
+      return `http://127.0.0.1:${port}`;
+    }
     return new URL(request.url).origin;
   }
 
-  // Fallback: legacy deployed API host
   return 'https://infinitysport.onrender.com';
 }
 

@@ -2,12 +2,12 @@
 import { NextResponse } from 'next/server';
 import { isValidPhoneNumber } from '../../../lib/phoneValidation';
 
-// Same base URL as /api/package-registrations: env override, then dev → localhost, else Render.
+// Same in production and development: localhost API unless env overrides.
 const getApiBaseUrl = () => {
   const envUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
   if (envUrl) return envUrl.replace(/\/$/, '');
-  if (process.env.NODE_ENV === 'development') return `http://localhost:${process.env.API_PORT || '4000'}`;
-  return 'https://infinitysport.onrender.com';
+  const port = process.env.API_PORT || '4000';
+  return `http://localhost:${port}`;
 };
 
 const API_BASE_URL = getApiBaseUrl();

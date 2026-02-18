@@ -48,7 +48,7 @@
     "db:setup": "npm run prisma:generate && npm run prisma:migrate && npm run prisma:seed"
   },
   "engines": {
-    "node": ">=20.19.0",
+    "node": ">=20.18.0",
     "npm": ">=9.0.0"
   },
   "dependencies": {

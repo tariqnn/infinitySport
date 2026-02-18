@@ -7,6 +7,23 @@ import { tr } from '../../lib/translations';
 
 type CourtType = 'Basketball AC' | 'Basketball 3x3' | 'Padel' | 'Volleyball';
 
+const PHONE_COUNTRIES: Array<{ value: string; label: string }> = [
+  { value: '+962', label: 'Jordan (+962)' },
+  { value: '+966', label: 'Saudi Arabia (+966)' },
+  { value: '+971', label: 'UAE (+971)' },
+  { value: '+965', label: 'Kuwait (+965)' },
+  { value: '+974', label: 'Qatar (+974)' },
+  { value: '+973', label: 'Bahrain (+973)' },
+  { value: '+20', label: 'Egypt (+20)' },
+  { value: '+964', label: 'Iraq (+964)' },
+  { value: '+961', label: 'Lebanon (+961)' },
+  { value: '+963', label: 'Syria (+963)' },
+  { value: '+970', label: 'Palestine (+970)' },
+  { value: '+90', label: 'Turkey (+90)' },
+  { value: '+44', label: 'UK (+44)' },
+  { value: '+1', label: 'USA/Canada (+1)' },
+];
+
 // Some courts share the same physical space. When one is booked/blocked,
 // the linked courts should also be treated as unavailable.
 const SHARED_COURT_GROUPS: CourtType[][] = [
@@ -134,11 +151,15 @@ export function BookingForm() {
   const [selectedDuration, setSelectedDuration] = useState<number>(1);
   const [name, setName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
-  const [phone, setPhone] = useState<string>('');
+  const [phoneCountry, setPhoneCountry] = useState<string>('+962');
+  const [phoneLocal, setPhoneLocal] = useState<string>('');
   const [phoneError, setPhoneError] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [submitMessage, setSubmitMessage] = useState('');
+
+  const phoneDigits = phoneLocal.replace(/[^\d]/g, '');
+  const phone = `${phoneCountry}${phoneDigits}`;
 
   useEffect(() => {
     fetch('/api/booking/blocked-slots')
@@ -230,7 +251,7 @@ export function BookingForm() {
     setSubmitStatus('idle');
     setSubmitMessage('');
 
-    if (!selectedCourt || !selectedDate || !selectedTime || !name || !phone || !selectedDuration) {
+    if (!selectedCourt || !selectedDate || !selectedTime || !name || !phoneDigits || !selectedDuration) {
       setSubmitStatus('error');
       setSubmitMessage('Please fill in all required fields.');
       setIsSubmitting(false);
@@ -297,7 +318,7 @@ export function BookingForm() {
       setSelectedDuration(1);
       setName('');
       setEmail('');
-      setPhone('');
+      setPhoneLocal('');
     } catch (error) {
       console.error('Booking submission error', error);
       setSubmitStatus('error');
@@ -460,49 +481,60 @@ export function BookingForm() {
 
         {/* Phone Input */}
         <div>
-          <label htmlFor="phone" className="block text-sm font-semibold text-brand-black mb-2">
+          <label htmlFor="phoneLocal" className="block text-sm font-semibold text-brand-black mb-2">
             {tr(language, 'booking_phone')} <span className="text-red-500">*</span>
           </label>
-          <input
-            id="phone"
-            type="tel"
-            value={phone}
-            onChange={(e) => {
-              const value = e.target.value;
-              setPhone(value);
-              // Clear error when user starts typing
-              if (phoneError) {
-                setPhoneError('');
-              }
-              // Validate on blur or when user stops typing
-              if (value.trim()) {
-                const validation = isValidPhoneNumber(value);
-                if (!validation.valid) {
-                  setPhoneError(validation.error || tr(language, 'booking_invalid_phone'));
-                } else {
-                  setPhoneError('');
+          <div className="flex gap-2">
+            <select
+              aria-label="Country code"
+              value={phoneCountry}
+              onChange={(e) => {
+                setPhoneCountry(e.target.value);
+                if (phoneError) setPhoneError('');
+              }}
+              className={`h-[46px] w-[170px] rounded-xl border bg-white px-3 text-sm text-brand-black focus:outline-none focus:ring-2 transition ${
+                phoneError
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                  : 'border-gray-300 focus:border-brand-blue-primary focus:ring-brand-blue-primary/20'
+              }`}
+            >
+              {PHONE_COUNTRIES.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+            <input
+              id="phoneLocal"
+              type="tel"
+              inputMode="numeric"
+              value={phoneLocal}
+              onChange={(e) => {
+                const value = e.target.value;
+                setPhoneLocal(value);
+                if (phoneError) setPhoneError('');
+                const digits = value.replace(/[^\d]/g, '');
+                if (digits) {
+                  const validation = isValidPhoneNumber(`${phoneCountry}${digits}`);
+                  setPhoneError(validation.valid ? '' : (validation.error || tr(language, 'booking_invalid_phone')));
                 }
-              }
-            }}
-            onBlur={(e) => {
-              const value = e.target.value;
-              if (value.trim()) {
-                const validation = isValidPhoneNumber(value);
-                if (!validation.valid) {
-                  setPhoneError(validation.error || tr(language, 'booking_invalid_phone'));
-                } else {
-                  setPhoneError('');
+              }}
+              onBlur={(e) => {
+                const digits = e.target.value.replace(/[^\d]/g, '');
+                if (digits) {
+                  const validation = isValidPhoneNumber(`${phoneCountry}${digits}`);
+                  setPhoneError(validation.valid ? '' : (validation.error || tr(language, 'booking_invalid_phone')));
                 }
-              }
-            }}
-            placeholder={tr(language, 'booking_placeholder_phone')}
-            required
-            className={`w-full rounded-xl border bg-white px-4 py-3 text-sm text-brand-black placeholder:text-gray-400 focus:outline-none focus:ring-2 transition ${
-              phoneError
-                ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
-                : 'border-gray-300 focus:border-brand-blue-primary focus:ring-brand-blue-primary/20'
-            }`}
-          />
+              }}
+              placeholder={tr(language, 'booking_placeholder_phone')}
+              required
+              className={`min-w-0 flex-1 rounded-xl border bg-white px-4 py-3 text-sm text-brand-black placeholder:text-gray-400 focus:outline-none focus:ring-2 transition ${
+                phoneError
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                  : 'border-gray-300 focus:border-brand-blue-primary focus:ring-brand-blue-primary/20'
+              }`}
+            />
+          </div>
           {phoneError && (
             <p className="mt-1.5 text-sm text-red-600">{phoneError}</p>
           )}

@@ -40,7 +40,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const res = await fetch(`${getApiBaseUrl(request)}/api/portal/package-registrations`, {
+    const baseUrl = getApiBaseUrl(request);
+    const apiUrl = `${baseUrl}/api/portal/package-registrations`;
+    const res = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -52,18 +54,32 @@ export async function POST(request: Request) {
       }),
     });
 
+    const responseText = await res.text();
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      return NextResponse.json(
-        { error: (err as { message?: string }).message || 'Failed to submit registration.' },
-        { status: res.status }
-      );
+      let msg = 'Failed to submit registration.';
+      try {
+        const err = responseText ? JSON.parse(responseText) : {};
+        msg = (err as { message?: string }).message ?? (err as { error?: string }).error ?? msg;
+      } catch {
+        if (responseText && responseText.length < 200) msg = responseText;
+      }
+      if (res.status >= 500) {
+        console.error('[package-registrations] Upstream 5xx:', res.status, apiUrl, responseText.slice(0, 500));
+      }
+      return NextResponse.json({ error: typeof msg === 'string' ? msg : 'Failed to submit registration.' }, { status: res.status });
     }
 
-    const data = await res.json();
+    let data: { id?: string };
+    try {
+      data = responseText ? JSON.parse(responseText) : {};
+    } catch {
+      console.error('[package-registrations] Upstream returned invalid JSON:', responseText.slice(0, 200));
+      return NextResponse.json({ error: 'Invalid response from registration service. Please try again.' }, { status: 502 });
+    }
     return NextResponse.json({ success: true, id: data.id });
   } catch (e) {
-    console.error('Package registration error', e);
+    const baseUrl = getApiBaseUrl(request);
+    console.error('[package-registrations] Error:', (e as Error).message, 'baseUrl:', baseUrl, e);
     return NextResponse.json(
       { error: 'Unable to submit registration. Please try again later.' },
       { status: 500 }

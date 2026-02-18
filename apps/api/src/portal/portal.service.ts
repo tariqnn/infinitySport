@@ -1947,6 +1947,9 @@ export class PortalService {
     const periodEndsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     const { billingPeriodKey, priceLockedUntil } = this.billingPeriodFromDate(now);
     const discountApplied = discountType !== 'NONE';
+
+    // Production safety: some deployments may have an older DB schema (missing newer columns).
+    // Avoid selecting/writing optional newer fields so the public registration endpoint stays available.
     const row = await (this.prisma as any).packageRegistration.create({
       data: {
         packageName: pkg,
@@ -1958,14 +1961,42 @@ export class PortalService {
         discountType,
         discountValue: discountType === 'NONE' ? null : Number(discountValue),
         discountReason: discountType === 'NONE' ? null : (data.discountReason || '').trim() || null,
-        discountAppliedBy: discountApplied ? (data.createdBy ?? null) : null,
-        discountAppliedAt: discountApplied ? now : null,
         finalPriceJod,
-        billingPeriodKey,
-        priceLockedUntil,
-        periodEndsAt,
+      },
+      select: {
+        id: true,
+        packageName: true,
+        customerName: true,
+        customerPhone: true,
+        customerEmail: true,
+        customerAge: true,
+        isPaid: true,
+        basePriceJod: true,
+        discountType: true,
+        discountValue: true,
+        discountReason: true,
+        finalPriceJod: true,
+        createdAt: true,
       },
     });
+
+    // Best-effort: try to persist newer fields when supported by the DB schema.
+    // If the DB is missing these columns, ignore and continue.
+    try {
+      await (this.prisma as any).packageRegistration.update({
+        where: { id: row.id },
+        data: {
+          billingPeriodKey,
+          priceLockedUntil,
+          periodEndsAt,
+          discountAppliedBy: discountApplied ? (data.createdBy ?? null) : null,
+          discountAppliedAt: discountApplied ? now : null,
+        },
+      });
+    } catch {
+      // ignore
+    }
+
     if (discountApplied) {
       await this.auditLog(data.createdBy ?? null, 'DISCOUNT_APPLIED', 'Registration', row.id, {
         discountType,
@@ -1986,9 +2017,9 @@ export class PortalService {
       discountValue: row.discountValue ?? null,
       discountReason: row.discountReason ?? null,
       finalPriceJod: row.finalPriceJod,
-      periodEndsAt: row.periodEndsAt ?? null,
-      isFrozen: row.isFrozen ?? false,
-      frozenAt: row.frozenAt ?? null,
+      periodEndsAt,
+      isFrozen: false,
+      frozenAt: null,
       createdAt: row.createdAt,
     };
   }

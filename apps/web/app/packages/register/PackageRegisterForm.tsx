@@ -4,6 +4,23 @@ import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { fetchPackages } from '../../../lib/apiClient';
 
+const PHONE_COUNTRIES: Array<{ value: string; label: string }> = [
+  { value: '+962', label: 'Jordan (+962)' },
+  { value: '+966', label: 'Saudi Arabia (+966)' },
+  { value: '+971', label: 'UAE (+971)' },
+  { value: '+965', label: 'Kuwait (+965)' },
+  { value: '+974', label: 'Qatar (+974)' },
+  { value: '+973', label: 'Bahrain (+973)' },
+  { value: '+20', label: 'Egypt (+20)' },
+  { value: '+964', label: 'Iraq (+964)' },
+  { value: '+961', label: 'Lebanon (+961)' },
+  { value: '+963', label: 'Syria (+963)' },
+  { value: '+970', label: 'Palestine (+970)' },
+  { value: '+90', label: 'Turkey (+90)' },
+  { value: '+44', label: 'UK (+44)' },
+  { value: '+1', label: 'USA/Canada (+1)' },
+];
+
 const FALLBACK_PACKAGE_OPTIONS = [
   'Basketball - Little Kobes U10',
   'Basketball - Ballers & Hoopers U12–U14',
@@ -32,12 +49,16 @@ export function PackageRegisterForm() {
 
   const [packagesFromApi, setPackagesFromApi] = useState<Array<{ name: string }>>([]);
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [phoneCountry, setPhoneCountry] = useState('+962');
+  const [phoneLocal, setPhoneLocal] = useState('');
   const [email, setEmail] = useState('');
   const [age, setAge] = useState('');
   const [packageName, setPackageName] = useState('');
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [error, setError] = useState('');
+
+  const phoneDigits = phoneLocal.replace(/[^\d]/g, '');
+  const phone = `${phoneCountry}${phoneDigits}`;
 
   useEffect(() => {
     fetchPackages().then((list) => setPackagesFromApi(list.map((p) => ({ name: p.name })))).catch(() => setPackagesFromApi([]));
@@ -75,7 +96,7 @@ export function PackageRegisterForm() {
       }
       setStatus('success');
       setName('');
-      setPhone('');
+      setPhoneLocal('');
       setEmail('');
       setAge('');
     } catch {
@@ -138,14 +159,29 @@ export function PackageRegisterForm() {
 
       <div>
         <label className="block text-sm font-semibold text-gray-700 mb-1">Phone *</label>
-        <input
-          type="tel"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-gray-900 focus:border-brand-green-primary focus:outline-none focus:ring-1 focus:ring-brand-green-primary"
-          placeholder="+962 7 9000 2200"
-          required
-        />
+        <div className="flex gap-2">
+          <select
+            aria-label="Country code"
+            value={phoneCountry}
+            onChange={(e) => setPhoneCountry(e.target.value)}
+            className="h-[42px] w-[170px] rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:border-brand-green-primary focus:outline-none focus:ring-1 focus:ring-brand-green-primary"
+          >
+            {PHONE_COUNTRIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+          <input
+            type="tel"
+            inputMode="numeric"
+            value={phoneLocal}
+            onChange={(e) => setPhoneLocal(e.target.value)}
+            className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2.5 text-gray-900 focus:border-brand-green-primary focus:outline-none focus:ring-1 focus:ring-brand-green-primary"
+            placeholder="7 9000 2200"
+            required
+          />
+        </div>
       </div>
 
       <div>

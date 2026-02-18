@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { isValidPhoneNumber } from '../../../lib/phoneValidation';
 
-// Default: local API only. Set API_BASE_URL / NEXT_PUBLIC_API_BASE_URL if API is elsewhere.
+// Default: local API only. Use 127.0.0.1 so server-side fetch works on Windows.
 function getApiBaseUrl(): string {
   const envUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
   if (envUrl) return envUrl.replace(/\/$/, '');
   const port = process.env.API_PORT || '4000';
-  return `http://localhost:${port}`;
+  return `http://127.0.0.1:${port}`;
 }
 
 // Fetch with timeout and retries (Render free tier can be slow to wake).

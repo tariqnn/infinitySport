@@ -85,43 +85,40 @@ export function PackageRegisterForm() {
     };
 
     const trySubmit = async (url: string): Promise<Response> => {
-      const res = await fetch(url, {
+      return fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      return res;
     };
 
-    const directApiUrl =
-      typeof window !== 'undefined'
-        ? (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/$/, '')
-        : '';
+    // When in browser: try direct API first (avoids server-side fetch failing on localhost)
+    const isBrowser = typeof window !== 'undefined';
+    const directUrl = isBrowser
+      ? (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/$/, '') || 'http://127.0.0.1:4000'
+      : '';
+    const apiPostUrl = directUrl ? `${directUrl}/api/portal/package-registrations` : '';
+
     let res: Response | null = null;
 
-    try {
-      res = await trySubmit('/api/package-registrations');
-      const isProxyFailure = !res.ok && res.status >= 500;
-      if ((isProxyFailure || !res.ok) && directApiUrl && directApiUrl.startsWith('http')) {
-        try {
-          res = await trySubmit(`${directApiUrl}/api/portal/package-registrations`);
-        } catch {
-          /* keep first response */
-        }
+    if (apiPostUrl) {
+      try {
+        res = await trySubmit(apiPostUrl);
+      } catch {
+        res = null;
       }
-    } catch {
-      if (directApiUrl && directApiUrl.startsWith('http')) {
-        try {
-          res = await trySubmit(`${directApiUrl}/api/portal/package-registrations`);
-        } catch {
-          res = null;
-        }
+    }
+    if (!res) {
+      try {
+        res = await trySubmit('/api/package-registrations');
+      } catch {
+        res = null;
       }
     }
 
     try {
       if (!res) {
-        setError('Unable to submit. Please try again.');
+        setError('Cannot reach the registration service. Make sure the API is running on port 4000 (npm run dev:api).');
         setStatus('error');
         return;
       }

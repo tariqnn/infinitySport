@@ -130,10 +130,13 @@ export class PortalController {
     await this.portalService.deleteBooking(trimmed);
   }
 
-  // Blocked slots (booking availability: toggle which recurring slots are blocked vs free; club bookings with label)
+  // Blocked slots (booking availability). Optional startDate/endDate filter so slots only active in that range are returned (for single-date blocks).
   @Get('blocked-slots')
-  async getBlockedSlots() {
-    return this.portalService.getBlockedSlots();
+  async getBlockedSlots(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.portalService.getBlockedSlots(startDate || undefined, endDate || undefined);
   }
 
   @Post('blocked-slots')

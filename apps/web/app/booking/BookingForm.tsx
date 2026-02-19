@@ -145,13 +145,14 @@ export function BookingForm() {
   const phone = `${phoneCountry}${phoneDigits}`;
 
   useEffect(() => {
-    fetch('/api/booking/blocked-slots')
+    const url = selectedDate ? `/api/booking/blocked-slots?date=${encodeURIComponent(selectedDate)}` : '/api/booking/blocked-slots';
+    fetch(url)
       .then((r) => r.json())
       .then((d) => {
         if (d?.blocked && typeof d.blocked === 'object') setBlocked(d.blocked);
       })
       .catch(() => {});
-  }, []);
+  }, [selectedDate]);
 
   const fetchBooked = () => {
     const today = new Date().toISOString().split('T')[0];

@@ -154,6 +154,7 @@ export function BookingAvailabilityManager() {
     if (!start && !end) return '—';
     const s = start ? new Date(start).toLocaleDateString() : '…';
     const e = end ? new Date(end).toLocaleDateString() : '…';
+    if (start && end && start.slice(0, 10) === end.slice(0, 10)) return s;
     return `${s} – ${e}`;
   };
 
@@ -321,15 +322,17 @@ export function BookingAvailabilityManager() {
 
       {showAddSlot && !isEditingThisLabel && (
         <div className="glass-card p-6">
-          <h3 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">Add Single Blocked Slot</h3>
+          <h3 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">Add Single Blocked Slot (by date)</h3>
           <form action={createSlotAction} className="grid gap-4 sm:grid-cols-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Day</label>
-              <select name="dayOfWeek" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-800">
-                {DAYS_OF_WEEK.map((d) => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Date</label>
+              <input
+                type="date"
+                name="slotDate"
+                required
+                min={new Date().toISOString().slice(0, 10)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-800"
+              />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Court type</label>

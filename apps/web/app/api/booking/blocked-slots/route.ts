@@ -7,10 +7,16 @@ const getApiBaseUrl = () => {
   return `http://localhost:${process.env.API_PORT || '4000'}`;
 };
 
-// Returns { [day]: { [courtType]: time[] } } for slots where isBlocked=true (unavailable for booking).
-export async function GET() {
+// Returns { [day]: { [courtType]: time[] } } for slots where isBlocked=true. Pass ?date=YYYY-MM-DD to only get slots active on that date (for single-date blocks).
+export async function GET(request: Request) {
   try {
-    const res = await fetch(`${getApiBaseUrl()}/api/portal/blocked-slots`, { cache: 'no-store' });
+    const { searchParams } = new URL(request.url);
+    const date = searchParams.get('date');
+    let url = `${getApiBaseUrl()}/api/portal/blocked-slots`;
+    if (date) {
+      url += `?startDate=${encodeURIComponent(date)}&endDate=${encodeURIComponent(date)}`;
+    }
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return NextResponse.json({ blocked: {} });
     const rows: { id: string; dayOfWeek: string; courtType: string; time: string; isBlocked: boolean }[] = await res.json();
     const blocked: Record<string, Record<string, string[]>> = {};

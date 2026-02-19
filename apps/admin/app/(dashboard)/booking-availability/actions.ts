@@ -87,23 +87,30 @@ export async function createClubBookingAction(
   }
 }
 
+const DAY_NAMES = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+
 export async function createSingleSlotAction(
   _prev: BookingAvailabilityState,
   formData: FormData
 ): Promise<BookingAvailabilityState> {
   try {
-    const dayOfWeek = formData.get('dayOfWeek')?.toString();
+    const slotDate = formData.get('slotDate')?.toString();
     const courtType = formData.get('courtType')?.toString();
     const time = formData.get('time')?.toString();
 
-    if (!dayOfWeek || !courtType || !time) {
-      return { status: 'error', message: 'Day, court type, and time are required.' };
+    if (!slotDate || !courtType || !time) {
+      return { status: 'error', message: 'Date, court type, and time are required.' };
     }
+
+    const d = new Date(slotDate + 'T12:00:00');
+    const dayOfWeek = DAY_NAMES[d.getDay()];
+    const startDate = slotDate;
+    const endDate = slotDate;
 
     const res = await fetch(`${getApiBaseUrl()}/api/portal/blocked-slots`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dayOfWeek, courtType, time, isBlocked: true }),
+      body: JSON.stringify({ dayOfWeek, courtType, time, isBlocked: true, startDate, endDate }),
     });
 
     if (!res.ok) {

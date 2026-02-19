@@ -242,10 +242,21 @@ export class PortalService {
     }
   }
 
-  // Blocked slots (static booking blocks; isBlocked=false makes the slot free for public booking)
-  async getBlockedSlots(): Promise<{ id: string; dayOfWeek: string; courtType: string; time: string; isBlocked: boolean; label: string | null; startDate: string | null; endDate: string | null }[]> {
+  // Blocked slots (static booking blocks; isBlocked=false makes the slot free for public booking).
+  // If startDate/endDate provided, only return slots active in that range (slot.startDate <= endDate and slot.endDate >= startDate, or no dates set).
+  async getBlockedSlots(startDate?: string, endDate?: string): Promise<{ id: string; dayOfWeek: string; courtType: string; time: string; isBlocked: boolean; label: string | null; startDate: string | null; endDate: string | null }[]> {
     try {
+      const where: any = {};
+      if (startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        where.AND = [
+          { OR: [{ startDate: null }, { startDate: { lte: end } }] },
+          { OR: [{ endDate: null }, { endDate: { gte: start } }] },
+        ];
+      }
       const rows = await (this.prisma as any).blockedSlot.findMany({
+        where,
         orderBy: [{ label: 'asc' }, { dayOfWeek: 'asc' }, { courtType: 'asc' }, { time: 'asc' }],
       });
       return rows.map((r: any) => ({

@@ -6,6 +6,8 @@ import { BasketballPackageCard } from './BasketballPackageCard';
 import { GymnasticsPackageCard } from './GymnasticsPackageCard';
 import { VolleyballPackageCard } from './VolleyballPackageCard';
 
+export const dynamic = 'force-static';
+
 export const metadata = {
   title: 'Sports & Facilities'
 };

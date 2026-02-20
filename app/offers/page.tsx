@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { fetchOffers } from '../../lib/apiClient';
 
+export const dynamic = 'force-static';
+
 export const metadata = {
   title: 'Offers & Memberships'
 };

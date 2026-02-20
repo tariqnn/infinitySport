@@ -2,11 +2,9 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Plus_Jakarta_Sans, Space_Grotesk } from 'next/font/google';
 import { Cairo } from 'next/font/google';
-import { cookies } from 'next/headers';
 import { LanguageProvider } from './_components/LanguageProvider';
 import { NavbarWithLanguage } from './_components/NavbarWithLanguage';
 import { SiteFooter } from './_components/SiteFooter';
-import { normalizeLanguage } from '../lib/translations';
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -67,15 +65,11 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://infinitysports.jo')
 };
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const cookieStore = await cookies();
-  const lang = normalizeLanguage(cookieStore.get('infinity-language')?.value);
-  const dir = lang === 'ar' ? 'rtl' : 'ltr';
-
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang={lang} dir={dir} suppressHydrationWarning>
+    <html lang="en" dir="ltr" suppressHydrationWarning>
       <body className={`${jakarta.variable} ${spaceGrotesk.variable} ${cairo.variable} bg-white text-brand-black antialiased`}>
-        <LanguageProvider initialLanguage={lang}>
+        <LanguageProvider initialLanguage="en">
           <NavbarWithLanguage />
           <div className="h-1 bg-[#003DA5]"></div>
           <main className="flex-1">{children}</main>

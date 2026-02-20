@@ -1,14 +1,18 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { fetchLandingContent } from '../../lib/apiClient';
-import { cookies } from 'next/headers';
-import { normalizeLanguage, tr } from '../../lib/translations';
+import { tr } from '../../lib/translations';
 
 export async function SiteFooter() {
-  const content = await fetchLandingContent();
+  let content;
+  try {
+    content = await fetchLandingContent();
+  } catch {
+    const { getLandingFallback } = await import('../../lib/apiClient');
+    content = getLandingFallback();
+  }
   const footer = content.footer;
-  const cookieStore = await cookies();
-  const lang = normalizeLanguage(cookieStore.get('infinity-language')?.value);
+  const lang = 'en';
   const instagram: string | undefined = Array.isArray(footer.socialLinks)
     ? footer.socialLinks.find((l) => l.label?.toLowerCase().includes('instagram'))?.href
     : undefined;

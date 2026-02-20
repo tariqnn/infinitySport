@@ -82,6 +82,7 @@ export function BulkAddPeopleModal({
 }) {
   const packageList = packageOptions?.length ? packageOptions : PACKAGE_OPTIONS;
   const [tab, setTab] = useState<'manual' | 'paste'>('manual');
+  const [startDate, setStartDate] = useState('');
   const [rows, setRows] = useState<Row[]>(() => [createEmptyRow()]);
   const [pasteText, setPasteText] = useState('');
   const [pastePreview, setPastePreview] = useState<Row[] | null>(null);
@@ -178,7 +179,10 @@ export function BulkAddPeopleModal({
 
     setLoading(true);
     try {
-      const { results } = await packageRegistrationsApi.bulkCreate(registrations);
+      const { results } = await packageRegistrationsApi.bulkCreate({
+        startDate: startDate.trim() || undefined,
+        registrations,
+      });
       const failed = results.filter((r) => !r.success).map((r) => ({ row: r.row!, error: r.error! }));
       const success = results.filter((r) => r.success).length;
       setResult({ success, failed });
@@ -243,6 +247,17 @@ export function BulkAddPeopleModal({
           >
             Paste
           </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="text-sm font-medium text-ui-textMuted">Start date (optional)</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="rounded-lg border border-ui-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primaryBlue/20"
+          />
+          <span className="text-xs text-ui-textMuted">When they start/started. Leave empty for today.</span>
         </div>
 
         {tab === 'manual' && (

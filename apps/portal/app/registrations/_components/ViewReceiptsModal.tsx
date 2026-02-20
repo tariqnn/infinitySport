@@ -19,6 +19,7 @@ export function ViewReceiptsModal({
 }) {
   const [receipts, setReceipts] = useState<ReceiptRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [voidingId, setVoidingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (open && registration) {
@@ -27,13 +28,26 @@ export function ViewReceiptsModal({
     } else setReceipts([]);
   }, [open, registration?.id]);
 
+  async function handleVoid(r: ReceiptRow) {
+    const reason = window.prompt('Void reason (required):');
+    if (!reason?.trim()) return;
+    setVoidingId(r.id);
+    try {
+      await receiptsApi.void(r.id, reason.trim());
+      onVoided?.();
+      setReceipts((prev) => prev.filter((x) => x.id !== r.id));
+    } finally {
+      setVoidingId(null);
+    }
+  }
+
   if (!registration) return null;
 
   return (
     <Modal open={open} onClose={onClose} title="Receipts" size="md">
       <div className="space-y-4">
         <p className="text-sm text-ui-textMuted">
-          Receipts for <strong>{registration.customerName}</strong> — {registration.packageName}
+          Receipts for <strong>{registration.customerName}</strong> — {registration.packageName}. Voiding a receipt marks it unpaid and updates the registration.
         </p>
         {loading ? (
           <p className="text-ui-textMuted">Loading…</p>
@@ -44,7 +58,7 @@ export function ViewReceiptsModal({
             {receipts.map((r) => (
               <li
                 key={r.id}
-                className="flex items-center justify-between rounded-xl border border-ui-border bg-white p-3"
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-ui-border bg-white p-3"
               >
                 <div>
                   <span className="font-semibold text-ui-textPrimary">{r.receiptId}</span>
@@ -52,9 +66,19 @@ export function ViewReceiptsModal({
                     {r.amountPaid} JOD · {r.paymentMethod} · {new Date(r.dateTimeIssued).toLocaleDateString()}
                   </span>
                 </div>
-                <Button variant="secondary" size="sm" onClick={() => onViewReceipt(r.id)}>
-                  View / Print
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="secondary" size="sm" onClick={() => onViewReceipt(r.id)}>
+                    View / Print
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleVoid(r)}
+                    disabled={!!voidingId}
+                  >
+                    {voidingId === r.id ? 'Voiding…' : 'Void (mark unpaid)'}
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>

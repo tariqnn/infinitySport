@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { isValidPhoneNumber } from '../../lib/phoneValidation';
+import { getClientApiBase } from '../../lib/clientApi';
 import { useLanguage } from '../_components/LanguageProvider';
 import { tr } from '../../lib/translations';
 
@@ -161,21 +162,27 @@ export function BookingForm() {
   const phoneDigits = phoneLocal.replace(/[^\d]/g, '');
   const phone = `${phoneCountry}${phoneDigits}`;
 
+  const apiBase = getClientApiBase();
+  const blockedSlotsUrl = apiBase ? `${apiBase}/api/portal/blocked-slots` : '/api/booking/blocked-slots';
+  const bookedSlotsUrl = (start: string, end: string) =>
+    apiBase ? `${apiBase}/api/portal/bookings?startDate=${start}&endDate=${end}` : `/api/booking/booked-slots?startDate=${start}&endDate=${end}`;
+  const bookingPostUrl = apiBase ? `${apiBase}/api/portal/bookings` : '/api/booking';
+
   useEffect(() => {
-    fetch('/api/booking/blocked-slots')
+    fetch(blockedSlotsUrl)
       .then((r) => r.json())
       .then((d) => {
         if (d?.blocked && typeof d.blocked === 'object') setBlocked(d.blocked);
       })
       .catch(() => {});
-  }, []);
+  }, [blockedSlotsUrl]);
 
   const fetchBooked = () => {
     const today = new Date().toISOString().split('T')[0];
     const max = new Date();
     max.setDate(max.getDate() + 30);
     const end = max.toISOString().split('T')[0];
-    fetch(`/api/booking/booked-slots?startDate=${today}&endDate=${end}`)
+    fetch(bookedSlotsUrl(today, end))
       .then((r) => r.json())
       .then((d) => {
         if (d?.booked && typeof d.booked === 'object') setBooked(d.booked);
@@ -283,7 +290,7 @@ export function BookingForm() {
     }
 
     try {
-      const response = await fetch('/api/booking', {
+      const response = await fetch(bookingPostUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

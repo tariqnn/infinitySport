@@ -10,6 +10,7 @@ import { AnimatedText } from "./AnimatedText";
 import { ScrollAnimation } from "./ScrollAnimation";
 import { useLanguage } from "./LanguageProvider";
 import { tr } from "../../lib/translations";
+import { getClientApiBase } from "../../lib/clientApi";
 import { BookingForm } from "../booking/BookingForm";
 
 interface HomeContentProps {
@@ -125,7 +126,9 @@ export function HomeContent({ content }: HomeContentProps) {
     if (contactSubmitting) return;
     setContactSubmitting(true);
     try {
-      const response = await fetch("/api/contact", {
+      const base = getClientApiBase();
+      const url = base ? `${base}/api/contact` : '/api/contact';
+      const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(contactForm)

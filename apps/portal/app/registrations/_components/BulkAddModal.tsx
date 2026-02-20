@@ -82,7 +82,7 @@ export function BulkAddModal({
 
     setLoading(true);
     try {
-      const { results } = await packageRegistrationsApi.bulkCreate(registrations);
+      const { results } = await packageRegistrationsApi.bulkCreate({ registrations });
       const failed = results.filter((r) => !r.success).map((r) => ({ row: r.row!, error: r.error! }));
       const success = results.filter((r) => r.success).length;
       setResult({ success, failed });

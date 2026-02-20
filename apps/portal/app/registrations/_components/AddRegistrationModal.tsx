@@ -53,6 +53,7 @@ export function AddRegistrationModal({
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerAge, setCustomerAge] = useState('');
   const [basePriceJod, setBasePriceJod] = useState<string>('');
+  const [startDate, setStartDate] = useState('');
   const [discountOpen, setDiscountOpen] = useState(false);
   const [discountType, setDiscountType] = useState<'NONE' | 'PERCENT' | 'AMOUNT'>('NONE');
   const [discountValue, setDiscountValue] = useState<string>('');
@@ -128,6 +129,7 @@ export function AddRegistrationModal({
         discountType,
         discountValue: discountType === 'NONE' ? null : discountVal,
         discountReason: discountType === 'NONE' ? undefined : discountReason.trim(),
+        periodStartsAt: startDate.trim() ? startDate.trim() : undefined,
       });
       onSuccess();
       onClose();
@@ -164,6 +166,14 @@ export function AddRegistrationModal({
         <Input label="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} required placeholder="Phone" />
         <Input label="Email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} placeholder="Email (optional)" />
         <Input label="Age" type="number" value={customerAge} onChange={(e) => setCustomerAge(e.target.value)} placeholder="Age (optional)" />
+
+        <Input
+          label="Start date (optional)"
+          type="date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+        />
+        <p className="text-xs text-ui-textMuted -mt-2">When they start or started the package. Leave empty for today.</p>
 
         <div>
           <label className="mb-1 block text-sm font-medium text-ui-textMuted">Base price (JOD)</label>

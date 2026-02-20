@@ -1,15 +1,13 @@
 import { BookingForm } from './BookingForm';
-import { cookies } from 'next/headers';
-import { normalizeLanguage, tr } from '../../lib/translations';
+import { tr } from '../../lib/translations';
 
 export const metadata = {
   title: 'Book a Court - Infinity Sport',
   description: 'Book a court at Infinity Sport. Choose your preferred court and time slot.'
 };
 
-export default async function BookingPage() {
-  const cookieStore = await cookies();
-  const lang = normalizeLanguage(cookieStore.get('infinity-language')?.value);
+export default function BookingPage() {
+  const lang = 'en';
 
   return (
     <div className="bg-white py-24">

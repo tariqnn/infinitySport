@@ -593,6 +593,7 @@ export class PortalController {
       discountType?: string;
       discountValue?: number | null;
       discountReason?: string | null;
+      periodStartsAt?: string | null;
     },
   ) {
     return this.portalService.createPackageRegistration(data);
@@ -611,6 +612,7 @@ export class PortalController {
   async bulkCreatePackageRegistrations(
     @Body()
     data: {
+      startDate?: string | null;
       registrations: Array<{
         packageName: string;
         customerName: string;
@@ -632,6 +634,7 @@ export class PortalController {
     @Body()
     data: {
       person: { customerName: string; customerPhone: string; customerEmail?: string | null; customerAge?: number | null };
+      periodStartsAt?: string | null;
       registrations: Array<{
         packageName: string;
         basePriceJod?: number;
@@ -655,6 +658,8 @@ export class PortalController {
       discountType?: string;
       discountValue?: number | null;
       discountReason?: string | null;
+      periodStartsAt?: string | null;
+      periodEndsAt?: string | null;
     },
   ) {
     return this.portalService.updatePackageRegistration(id, data);
@@ -677,6 +682,14 @@ export class PortalController {
     @Body() body: { amountPaid: number; paymentMethod: string; privateNote: string; createdBy?: string },
   ) {
     return this.portalService.createReceiptForMarkPaid(id, body);
+  }
+
+  @Post('package-registrations/:id/mark-unpaid')
+  async markRegistrationUnpaid(
+    @Param('id') id: string,
+    @Body() body?: { voidReason?: string },
+  ) {
+    return this.portalService.markRegistrationUnpaid(id, body?.voidReason ?? '');
   }
 
   @Get('package-registrations/:id/receipts')

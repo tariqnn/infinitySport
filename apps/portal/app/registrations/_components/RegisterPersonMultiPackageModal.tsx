@@ -78,6 +78,7 @@ export function RegisterPersonMultiPackageModal({
   const [newAge, setNewAge] = useState('');
   const [selectedPackages, setSelectedPackages] = useState<Set<string>>(new Set());
   const [packageConfigs, setPackageConfigs] = useState<Record<string, PackageConfig>>({});
+  const [startDate, setStartDate] = useState('');
   const [pricing, setPricing] = useState<Array<{ packageName: string; basePriceJod: number | null }>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -183,6 +184,7 @@ export function RegisterPersonMultiPackageModal({
       });
       const res = await packageRegistrationsApi.bulkCreateForPerson({
         person: currentPerson,
+        periodStartsAt: startDate.trim() || undefined,
         registrations,
       });
       onSuccess(res.created);
@@ -261,6 +263,15 @@ export function RegisterPersonMultiPackageModal({
           <p className="mb-4 text-sm text-ui-textMuted">
             Person: <strong>{currentPerson?.customerName}</strong> ({currentPerson?.customerPhone}). Select one or more packages.
           </p>
+          <div className="mb-4">
+            <Input
+              label="Start date (optional)"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+            <p className="mt-0.5 text-xs text-ui-textMuted">When they start/started. Leave empty for today.</p>
+          </div>
           <div className="max-h-[40vh] overflow-y-auto rounded-lg border border-ui-border p-3">
             {packageList.map((pkg) => (
               <label key={pkg} className="flex items-center gap-3 py-2 hover:bg-ui-softBg/50 rounded px-2">

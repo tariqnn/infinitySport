@@ -30,6 +30,7 @@ export default function RegistrationsPage() {
   const [customEndDate, setCustomEndDate] = useState<string>('');
   const [freezingId, setFreezingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [markingUnpaidId, setMarkingUnpaidId] = useState<string | null>(null);
   const [reregisteringId, setReregisteringId] = useState<string | null>(null);
   const [canceledDatesByPackage, setCanceledDatesByPackage] = useState<Record<string, Set<string>>>({});
 
@@ -263,6 +264,21 @@ export default function RegistrationsPage() {
       alert('Failed to delete registration. Please try again.');
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function handleMarkUnpaid(r: Registration) {
+    if (markingUnpaidId) return;
+    if (!confirm(`Mark ${r.customerName} as unpaid? All receipts for this registration will be voided.`)) return;
+    setMarkingUnpaidId(r.id);
+    try {
+      await packageRegistrationsApi.markUnpaid(r.id);
+      load();
+    } catch (e) {
+      console.error('Failed to mark as unpaid', e);
+      alert('Failed to mark as unpaid. Please try again.');
+    } finally {
+      setMarkingUnpaidId(null);
     }
   }
 
@@ -598,6 +614,15 @@ export default function RegistrationsPage() {
                                   onSelect={() => setViewReceiptsRegistration(row)}
                                 >
                                   View Receipt(s)
+                                </DropdownMenu.Item>
+                              )}
+                              {(paymentStatus === 'PAID' || collected > 0) && (
+                                <DropdownMenu.Item
+                                  className="cursor-pointer px-4 py-2 text-sm text-amber-700 outline-none hover:bg-amber-50 data-[highlighted]:bg-amber-50 disabled:opacity-50"
+                                  onSelect={() => handleMarkUnpaid(row)}
+                                  disabled={markingUnpaidId === row.id}
+                                >
+                                  {markingUnpaidId === row.id ? 'Marking unpaid…' : 'Mark as unpaid'}
                                 </DropdownMenu.Item>
                               )}
                               <DropdownMenu.Item

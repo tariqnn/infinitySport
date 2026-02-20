@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
+  output: 'export',
   transpilePackages: ['@infinity/types', '@infinity/mock-api'],
   webpack: (config) => {
     config.resolve.alias = {
@@ -10,17 +11,15 @@ const nextConfig: NextConfig = {
     };
     return config;
   },
-  // Proxy API requests to the NestJS backend when running together
   async rewrites() {
-    try {
-      if (process.env.API_RUNNING_LOCALLY === 'true') {
-        const apiPort = process.env.API_PORT || '4000';
-        return [{ source: '/api/:path*', destination: `http://localhost:${apiPort}/api/:path*` }];
-      }
-    } catch (_) {}
+    if (process.env.NODE_ENV !== 'production' && process.env.API_RUNNING_LOCALLY === 'true') {
+      const apiPort = process.env.API_PORT || '4000';
+      return [{ source: '/api/:path*', destination: `http://localhost:${apiPort}/api/:path*` }];
+    }
     return [];
   },
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',

@@ -1906,6 +1906,7 @@ export class PortalService {
         discountReason: r.discountReason ?? null,
         finalPriceJod: Number(r.finalPriceJod) ?? 0,
         collected,
+        periodStartsAt: r.periodStartsAt ?? null,
         periodEndsAt: r.periodEndsAt ?? null,
         isFrozen: r.isFrozen ?? false,
         frozenAt: r.frozenAt ?? null,
@@ -1941,6 +1942,7 @@ export class PortalService {
     discountValue?: number | null;
     discountReason?: string | null;
     createdBy?: string | null;
+    periodStartsAt?: string | null;
   }) {
     const pkg = (data.packageName || '').trim();
     let basePriceJod = data.basePriceJod;
@@ -1957,8 +1959,9 @@ export class PortalService {
       throw new BadRequestException('Discount reason is required when applying a discount');
     const finalPriceJod = this.computeFinalPriceJod(basePriceJod, discountType, discountValue);
     const now = new Date();
-    const periodEndsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    const { billingPeriodKey, priceLockedUntil } = this.billingPeriodFromDate(now);
+    const periodStartsAt = data.periodStartsAt ? new Date(data.periodStartsAt) : now;
+    const periodEndsAt = new Date(periodStartsAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const { billingPeriodKey, priceLockedUntil } = this.billingPeriodFromDate(periodStartsAt);
     const discountApplied = discountType !== 'NONE';
 
     // Production safety: some deployments may have an older DB schema (missing newer columns).
@@ -2027,6 +2030,7 @@ export class PortalService {
         data: {
           billingPeriodKey,
           priceLockedUntil,
+          periodStartsAt,
           periodEndsAt,
           discountAppliedBy: discountApplied ? (data.createdBy ?? null) : null,
           discountAppliedAt: discountApplied ? now : null,
@@ -2056,6 +2060,7 @@ export class PortalService {
       discountValue: row.discountValue ?? null,
       discountReason: row.discountReason ?? null,
       finalPriceJod: row.finalPriceJod,
+      periodStartsAt,
       periodEndsAt,
       isFrozen: false,
       frozenAt: null,
@@ -2073,6 +2078,8 @@ export class PortalService {
       discountValue?: number | null;
       discountReason?: string | null;
       createdBy?: string | null;
+      periodStartsAt?: string | null;
+      periodEndsAt?: string | null;
     },
   ) {
     const existing = await (this.prisma as any).packageRegistration.findUnique({ where: { id } });
@@ -2097,6 +2104,9 @@ export class PortalService {
         updateData.discountAppliedAt = new Date();
       }
     }
+
+    if (data.periodStartsAt !== undefined) updateData.periodStartsAt = data.periodStartsAt ? new Date(data.periodStartsAt) : null;
+    if (data.periodEndsAt !== undefined) updateData.periodEndsAt = data.periodEndsAt ? new Date(data.periodEndsAt) : null;
 
     if (data.isFrozen !== undefined) {
       updateData.isFrozen = data.isFrozen;
@@ -2138,6 +2148,7 @@ export class PortalService {
       discountValue: row.discountValue ?? null,
       discountReason: row.discountReason ?? null,
       finalPriceJod: row.finalPriceJod,
+      periodStartsAt: row.periodStartsAt ?? null,
       periodEndsAt: row.periodEndsAt ?? null,
       isFrozen: row.isFrozen ?? false,
       frozenAt: row.frozenAt ?? null,
@@ -2431,6 +2442,20 @@ export class PortalService {
     return { success: true };
   }
 
+  /** Void all active receipts for a registration so it shows as unpaid (e.g. marked paid by mistake). */
+  async markRegistrationUnpaid(registrationId: string, voidReason: string) {
+    const reason = (voidReason ?? '').trim() || 'Marked as unpaid by staff';
+    const reg = await (this.prisma as any).packageRegistration.findUnique({ where: { id: registrationId } });
+    if (!reg) throw new NotFoundException('Registration not found');
+    const activeReceipts = await (this.prisma as any).receipt.findMany({
+      where: { registrationId, status: 'ACTIVE' },
+    });
+    for (const r of activeReceipts) {
+      await this.voidReceipt(r.id, reason);
+    }
+    return { success: true, voidedCount: activeReceipts.length };
+  }
+
   async getRegistrationTotals(packageName?: string, startDate?: string, endDate?: string) {
     const where: any = {};
     if (packageName) where.packageName = packageName;
@@ -2502,6 +2527,7 @@ export class PortalService {
 
   async bulkCreatePackageRegistrations(
     data: {
+      startDate?: string | null;
       registrations: Array<{
         packageName: string;
         customerName: string;
@@ -2517,8 +2543,9 @@ export class PortalService {
   ) {
     const results: { success: boolean; id?: string; row?: number; error?: string }[] = [];
     const now = new Date();
-    const periodEndsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    const { billingPeriodKey, priceLockedUntil } = this.billingPeriodFromDate(now);
+    const periodStartsAt = data.startDate ? new Date(data.startDate) : now;
+    const periodEndsAt = new Date(periodStartsAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const { billingPeriodKey, priceLockedUntil } = this.billingPeriodFromDate(periodStartsAt);
     const seen = new Set<string>();
     const pricingCache: Record<string, number> = {};
     for (let i = 0; i < data.registrations.length; i++) {
@@ -2570,6 +2597,7 @@ export class PortalService {
             finalPriceJod,
             billingPeriodKey,
             priceLockedUntil,
+            periodStartsAt,
             periodEndsAt,
           },
         });
@@ -2596,6 +2624,7 @@ export class PortalService {
    */
   async bulkCreateForPerson(data: {
     person: { customerName: string; customerPhone: string; customerEmail?: string | null; customerAge?: number | null };
+    periodStartsAt?: string | null;
     registrations: Array<{
       packageName: string;
       basePriceJod?: number;
@@ -2628,8 +2657,9 @@ export class PortalService {
     }
 
     const now = new Date();
-    const periodEndsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    const { billingPeriodKey, priceLockedUntil } = this.billingPeriodFromDate(now);
+    const periodStartsAt = data.periodStartsAt ? new Date(data.periodStartsAt) : now;
+    const periodEndsAt = new Date(periodStartsAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const { billingPeriodKey, priceLockedUntil } = this.billingPeriodFromDate(periodStartsAt);
     const pricingList = await prisma.packagePricing.findMany({ where: { packageName: { in: packages } } });
     const pricingMap = new Map<string, number | null>(
       pricingList.map((p: { packageName: string; basePriceJod: number | null }) => [p.packageName, p.basePriceJod]),
@@ -2667,6 +2697,7 @@ export class PortalService {
             finalPriceJod,
             billingPeriodKey,
             priceLockedUntil,
+            periodStartsAt,
             periodEndsAt,
           },
         });

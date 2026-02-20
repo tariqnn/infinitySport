@@ -265,6 +265,7 @@ export type PackageRegistrationRow = {
   discountValue: number | null;
   discountReason: string | null;
   finalPriceJod: number;
+  periodStartsAt: string | null;
   periodEndsAt: string | null;
   isFrozen: boolean;
   frozenAt: string | null;
@@ -324,6 +325,7 @@ export const packageRegistrationsApi = {
     discountType?: string;
     discountValue?: number | null;
     discountReason?: string | null;
+    periodStartsAt?: string | null;
   }) =>
     portalFetch<PackageRegistrationRow>('/portal/package-registrations', { method: 'POST', body: JSON.stringify(data) }),
   getTotals: (packageName?: string, startDate?: string, endDate?: string) => {
@@ -334,10 +336,11 @@ export const packageRegistrationsApi = {
     const query = params.toString() ? `?${params.toString()}` : '';
     return portalFetch<RegistrationTotals>(`/portal/package-registrations/totals${query}`);
   },
-  bulkCreate: (registrations: Array<{ packageName: string; customerName: string; customerPhone: string; customerEmail?: string | null; customerAge?: number | null; basePriceJod?: number }>) =>
-    portalFetch<{ results: Array<{ success: boolean; id?: string; row?: number; error?: string }> }>('/portal/package-registrations/bulk', { method: 'POST', body: JSON.stringify({ registrations }) }),
+  bulkCreate: (data: { startDate?: string | null; registrations: Array<{ packageName: string; customerName: string; customerPhone: string; customerEmail?: string | null; customerAge?: number | null; basePriceJod?: number }> }) =>
+    portalFetch<{ results: Array<{ success: boolean; id?: string; row?: number; error?: string }> }>('/portal/package-registrations/bulk', { method: 'POST', body: JSON.stringify(data) }),
   bulkCreateForPerson: (data: {
     person: { customerName: string; customerPhone: string; customerEmail?: string | null; customerAge?: number | null };
+    periodStartsAt?: string | null;
     registrations: Array<{
       packageName: string;
       basePriceJod?: number;
@@ -354,6 +357,11 @@ export const packageRegistrationsApi = {
     portalFetch<PackageRegistrationRow>(`/portal/package-registrations/${id}/reregister`, { method: 'POST' }),
   markPaid: (id: string, data: { amountPaid: number; paymentMethod: string; privateNote: string }) =>
     portalFetch<ReceiptRow>(`/portal/package-registrations/${id}/mark-paid`, { method: 'POST', body: JSON.stringify(data) }),
+  markUnpaid: (id: string, voidReason?: string) =>
+    portalFetch<{ success: boolean; voidedCount: number }>(`/portal/package-registrations/${id}/mark-unpaid`, {
+      method: 'POST',
+      body: JSON.stringify({ voidReason: voidReason ?? 'Marked as unpaid by staff' }),
+    }),
   getReceipts: (id: string) => portalFetch<ReceiptRow[]>(`/portal/package-registrations/${id}/receipts`),
   addSessionAdjustment: (id: string, data: { reason: string }) =>
     portalFetch<{ success: boolean; sessionsBonus: number }>(`/portal/package-registrations/${id}/session-adjustment`, { method: 'POST', body: JSON.stringify(data) }),

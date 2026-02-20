@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { getClientApiBase } from '../../../lib/clientApi';
 
 const PHONE_COUNTRIES: Array<{ value: string; label: string }> = [
   { value: '+962', label: 'Jordan (+962)' },
@@ -71,7 +72,9 @@ export function PackageRegisterForm() {
     setError('');
     setStatus('submitting');
     try {
-      const res = await fetch('/api/package-registrations', {
+      const base = getClientApiBase();
+      const url = base ? `${base}/api/portal/package-registrations` : '/api/package-registrations';
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

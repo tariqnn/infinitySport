@@ -10,6 +10,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@prisma/client": "^5.22.0",
     "@infinity/mock-api": "file:../../packages/mock-api",
     "@infinity/types": "file:../../packages/types",
     "@infinity/ui": "file:../../packages/ui",

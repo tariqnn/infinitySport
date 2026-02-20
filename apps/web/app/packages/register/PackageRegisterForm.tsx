@@ -84,46 +84,21 @@ export function PackageRegisterForm() {
       customerAge: age.trim() ? parseInt(age.trim(), 10) : undefined,
     };
 
-    const trySubmit = async (url: string): Promise<Response> => {
-      return fetch(url, {
+    // Always use the Next.js API route so the same origin is used (works on Hostinger and locally).
+    let res: Response | null = null;
+    try {
+      res = await fetch('/api/package-registrations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-    };
-
-    // In production (or when not on localhost), only use the proxy so we never hit localhost.
-    const isBrowser = typeof window !== 'undefined';
-    const isProduction = isBrowser && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(window.location.origin);
-    const directUrl = isBrowser && !isProduction
-      ? (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/$/, '') || 'http://127.0.0.1:4000'
-      : '';
-    const apiPostUrl = directUrl ? `${directUrl}/api/portal/package-registrations` : '';
-
-    let res: Response | null = null;
-
-    if (apiPostUrl) {
-      try {
-        res = await trySubmit(apiPostUrl);
-      } catch {
-        res = null;
-      }
-    }
-    if (!res) {
-      try {
-        res = await trySubmit('/api/package-registrations');
-      } catch {
-        res = null;
-      }
+    } catch {
+      res = null;
     }
 
     try {
       if (!res) {
-        setError(
-          isProduction
-            ? 'Unable to submit right now. Please try again later or contact us.'
-            : 'Cannot reach the registration service. Make sure the API is running on port 4000 (npm run dev:api).',
-        );
+        setError('Unable to submit right now. Please try again later or contact us.');
         setStatus('error');
         return;
       }

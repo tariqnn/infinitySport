@@ -1,17 +1,53 @@
 import { NextResponse } from 'next/server';
 import { isValidPhoneNumber } from '../../../lib/phoneValidation';
+import { prisma } from '../../../lib/db';
 
 // Production: never call localhost. Local dev defaults to 127.0.0.1:4000.
 function getApiBaseUrl(): string | null {
   const envUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
   const base = envUrl && envUrl.trim() ? envUrl.trim().replace(/\/$/, '') : null;
-  // In production, never use localhost/127.0.0.1 (API is not deployed there)
   if (process.env.NODE_ENV === 'production') {
     if (!base) return null;
     if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(base)) return null;
     return base;
   }
   return base ?? `http://127.0.0.1:${process.env.API_PORT || '4000'}`;
+}
+
+async function getBasePriceJod(packageName: string): Promise<number> {
+  const pkg = await prisma.package.findUnique({ where: { name: packageName } }).catch(() => null);
+  if (pkg?.currentPriceJod != null) return pkg.currentPriceJod;
+  const pricing = await prisma.packagePricing.findUnique({ where: { packageName } }).catch(() => null);
+  return pricing?.basePriceJod ?? 0;
+}
+
+/** Insert registration directly into the database (no API). */
+async function createRegistrationInDb(payload: {
+  packageName: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string | null;
+  customerAge?: number | null;
+}): Promise<{ id: string } | null> {
+  if (!process.env.DATABASE_URL?.trim()) return null;
+  const basePriceJod = Math.max(0, await getBasePriceJod(payload.packageName));
+  const finalPriceJod = basePriceJod;
+  const row = await prisma.packageRegistration.create({
+    data: {
+      packageName: payload.packageName,
+      customerName: payload.customerName,
+      customerPhone: payload.customerPhone,
+      customerEmail: payload.customerEmail?.trim() || null,
+      customerAge: payload.customerAge ?? null,
+      basePriceJod,
+      discountType: 'NONE',
+      discountValue: null,
+      discountReason: null,
+      finalPriceJod,
+    },
+    select: { id: true },
+  });
+  return { id: row.id };
 }
 
 // Fetch with timeout and retries (Render free tier can be slow to wake).
@@ -59,7 +95,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const baseUrl = getApiBaseUrl();
     const payload = {
       packageName: packageName.trim(),
       customerName: customerName.trim(),
@@ -68,9 +103,19 @@ export async function POST(request: Request) {
       customerAge: typeof customerAge === 'number' && customerAge > 0 ? customerAge : undefined,
     };
 
+    // 1) Prefer direct DB write when DATABASE_URL is set (works without the API).
+    const dbResult = await createRegistrationInDb(payload).catch((e) => {
+      console.warn('[package-registrations] DB create failed:', (e as Error)?.message);
+      return null;
+    });
+    if (dbResult) {
+      return NextResponse.json({ success: true, id: dbResult.id });
+    }
+
+    // 2) Fallback: call the API if configured.
+    const baseUrl = getApiBaseUrl();
     if (!baseUrl) {
-      // Production with no API: show success so form says "Submitted". API not deployed / runs only locally.
-      console.warn('[package-registrations] No API URL; accepting submission and returning success (data not stored).');
+      console.warn('[package-registrations] No DATABASE_URL and no API URL; submission not stored.');
       return NextResponse.json({ success: true });
     }
 
@@ -115,11 +160,11 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ success: true, id: data.id });
   } catch (e) {
-    // API unreachable (e.g. not running): still show "Submitted" so form never errors. No email.
     const err = e as Error & { cause?: { code?: string } };
-    const baseUrl = getApiBaseUrl();
-    const apiUrl = baseUrl ? `${baseUrl}/api/portal/package-registrations` : '(API_BASE_URL not set)';
-    console.warn('[package-registrations] API unreachable, returning success anyway:', err?.message, 'apiUrl:', apiUrl);
-    return NextResponse.json({ success: true });
+    console.warn('[package-registrations] Error:', err?.message);
+    return NextResponse.json(
+      { error: 'Unable to submit right now. Please try again later or contact us.' },
+      { status: 503 },
+    );
   }
 }

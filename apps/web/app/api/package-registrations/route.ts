@@ -1,16 +1,12 @@
 import { NextResponse } from 'next/server';
 import { isValidPhoneNumber } from '../../../lib/phoneValidation';
 
-// Production: never call localhost. Local dev defaults to 127.0.0.1:4000.
-function getApiBaseUrl(): string | null {
+// Same in production and development: localhost API unless env overrides (commit 67e5a67).
+function getApiBaseUrl(): string {
   const envUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
-  const base = envUrl && envUrl.trim() ? envUrl.trim().replace(/\/$/, '') : null;
-  if (process.env.NODE_ENV === 'production') {
-    if (!base) return null;
-    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(base)) return null;
-    return base;
-  }
-  return base ?? `http://127.0.0.1:${process.env.API_PORT || '4000'}`;
+  if (envUrl) return envUrl.trim().replace(/\/$/, '');
+  const port = process.env.API_PORT || '4000';
+  return `http://localhost:${port}`;
 }
 
 /** Insert registration directly into the database (no API). Only runs when DATABASE_URL is set; avoids loading Prisma otherwise. */
@@ -119,13 +115,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, id: dbResult.id });
     }
 
-    // 2) Fallback: call the API if configured.
+    // 2) Fallback: call the API (localhost or env override).
     const baseUrl = getApiBaseUrl();
-    if (!baseUrl) {
-      console.warn('[package-registrations] No DATABASE_URL and no API URL; submission not stored.');
-      return NextResponse.json({ success: true });
-    }
-
     const apiUrl = `${baseUrl}/api/portal/package-registrations`;
     const res = await fetchWithRetry(
       apiUrl,

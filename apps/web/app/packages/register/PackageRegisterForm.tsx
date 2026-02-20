@@ -92,9 +92,10 @@ export function PackageRegisterForm() {
       });
     };
 
-    // When in browser: try direct API first (avoids server-side fetch failing on localhost)
+    // In production (or when not on localhost), only use the proxy so we never hit localhost.
     const isBrowser = typeof window !== 'undefined';
-    const directUrl = isBrowser
+    const isProduction = isBrowser && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(window.location.origin);
+    const directUrl = isBrowser && !isProduction
       ? (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/$/, '') || 'http://127.0.0.1:4000'
       : '';
     const apiPostUrl = directUrl ? `${directUrl}/api/portal/package-registrations` : '';
@@ -118,7 +119,11 @@ export function PackageRegisterForm() {
 
     try {
       if (!res) {
-        setError('Cannot reach the registration service. Make sure the API is running on port 4000 (npm run dev:api).');
+        setError(
+          isProduction
+            ? 'Unable to submit right now. Please try again later or contact us.'
+            : 'Cannot reach the registration service. Make sure the API is running on port 4000 (npm run dev:api).',
+        );
         setStatus('error');
         return;
       }

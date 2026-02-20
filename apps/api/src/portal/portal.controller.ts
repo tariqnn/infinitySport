@@ -11,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
   StreamableFile,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { PortalService } from './portal.service';
 import { Prisma } from '@prisma/client';
@@ -560,15 +561,23 @@ export class PortalController {
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
-    const pageNum = page != null ? parseInt(page, 10) : undefined;
-    const pageSizeNum = pageSize != null ? parseInt(pageSize, 10) : undefined;
-    return this.portalService.getPackageRegistrations(
-      packageName,
-      startDate,
-      endDate,
-      pageNum,
-      pageSizeNum,
-    );
+    try {
+      const pageNum = page != null ? parseInt(page, 10) : undefined;
+      const pageSizeNum = pageSize != null ? parseInt(pageSize, 10) : undefined;
+      return await this.portalService.getPackageRegistrations(
+        packageName,
+        startDate,
+        endDate,
+        pageNum,
+        pageSizeNum,
+      );
+    } catch (err: any) {
+      const message = err?.message ?? String(err);
+      console.error('[portal] getPackageRegistrations failed:', message, err);
+      throw new InternalServerErrorException(
+        process.env.NODE_ENV !== 'production' ? message : 'Failed to load registrations',
+      );
+    }
   }
 
   @Post('package-registrations')

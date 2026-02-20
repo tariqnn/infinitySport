@@ -1868,22 +1868,24 @@ export class PortalService {
     const skip = usePagination ? Math.max(0, (Math.max(1, page) - 1) * pageSize) : undefined;
     const take = usePagination ? Math.min(500, Math.max(1, pageSize)) : undefined;
 
+    const includeReceipts = { receipts: { where: { status: 'ACTIVE' as const } } };
+
     const [rows, total] = usePagination
       ? await Promise.all([
-          (this.prisma as any).packageRegistration.findMany({
+          this.prisma.packageRegistration.findMany({
             where,
             orderBy: { createdAt: 'desc' },
             skip,
             take,
-            include: { receipts: { where: { voidedAt: null } } },
+            include: includeReceipts,
           }),
-          (this.prisma as any).packageRegistration.count({ where }),
+          this.prisma.packageRegistration.count({ where }),
         ])
       : [
-          await (this.prisma as any).packageRegistration.findMany({
+          await this.prisma.packageRegistration.findMany({
             where,
             orderBy: { createdAt: 'desc' },
-            include: { receipts: { where: { voidedAt: null } } },
+            include: includeReceipts,
           }),
           0,
         ];

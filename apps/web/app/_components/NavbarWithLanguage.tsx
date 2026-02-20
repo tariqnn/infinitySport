@@ -7,6 +7,30 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useLanguage } from "./LanguageProvider";
 
+const LOGO_SRC = "/infinity-logo.png";
+
+function LogoImage() {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <span className="flex h-28 w-28 items-center justify-center rounded-lg bg-[#003DA5] px-2 text-center text-sm font-bold text-white sm:h-32 sm:w-32 md:h-36 md:w-36 lg:h-40 lg:w-40">
+        Infinity Sport
+      </span>
+    );
+  }
+  return (
+    <Image
+      src={LOGO_SRC}
+      alt="Infinity Sport Logo"
+      width={160}
+      height={160}
+      className="h-28 w-28 sm:h-32 sm:w-32 md:h-36 md:w-36 lg:h-40 lg:w-40 object-contain flex-shrink-0"
+      unoptimized
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 const navLinks = [
   { key: "nav_home", href: "/#home" },
   { key: "nav_facilities", href: "/facilities" },
@@ -37,13 +61,7 @@ export function NavbarWithLanguage() {
             <Bars3Icon className="h-6 w-6 transition-transform duration-300" />
           </button>
           <Link href="/" className="flex items-center transition-all duration-300 hover:scale-105" aria-label="Infinity Sport Home">
-            <Image 
-              src="/infinity-logo.png?v=2" 
-              alt="Infinity Sport Logo" 
-              width={160} 
-              height={160} 
-              className="h-28 w-28 sm:h-32 sm:w-32 md:h-36 md:w-36 lg:h-40 lg:w-40 object-contain flex-shrink-0"
-            />
+            <LogoImage />
           </Link>
         </div>
         <nav className="hidden items-center gap-8 text-sm font-bold lg:flex">

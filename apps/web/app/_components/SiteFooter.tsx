@@ -29,7 +29,7 @@ export async function SiteFooter() {
                 width={48}
                 height={48}
                 className="h-12 w-12 object-contain"
-                priority
+                unoptimized
               />
               <span className="text-xl font-bold text-black">Infinity Sports</span>
             </div>

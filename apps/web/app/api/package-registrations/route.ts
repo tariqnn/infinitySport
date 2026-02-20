@@ -1,13 +1,17 @@
 import { NextResponse } from 'next/server';
 import { isValidPhoneNumber } from '../../../lib/phoneValidation';
 
-// Production requires API_BASE_URL or NEXT_PUBLIC_API_BASE_URL. Local dev defaults to 127.0.0.1:4000.
+// Production: never call localhost. Local dev defaults to 127.0.0.1:4000.
 function getApiBaseUrl(): string | null {
   const envUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (envUrl && envUrl.trim()) return envUrl.trim().replace(/\/$/, '');
-  if (process.env.NODE_ENV === 'production') return null;
-  const port = process.env.API_PORT || '4000';
-  return `http://127.0.0.1:${port}`;
+  const base = envUrl && envUrl.trim() ? envUrl.trim().replace(/\/$/, '') : null;
+  // In production, never use localhost/127.0.0.1 (API is not deployed there)
+  if (process.env.NODE_ENV === 'production') {
+    if (!base) return null;
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(base)) return null;
+    return base;
+  }
+  return base ?? `http://127.0.0.1:${process.env.API_PORT || '4000'}`;
 }
 
 // Fetch with timeout and retries (Render free tier can be slow to wake).

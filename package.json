@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "postinstall": "npm run prisma:generate || echo 'Prisma generate skipped (prisma not available)'",
-    "build": "npm run prisma:generate && next build",
+    "build": "next build",
     "start": "next start",
     "start:combined": "node start-combined.js",
     "dev": "npm run dev:web",
@@ -62,12 +62,12 @@
     "prisma": "^5.22.0",
     "react": "19.0.0-rc-66855b96-20241106",
     "react-dom": "19.0.0-rc-66855b96-20241106",
-    "tailwindcss": "^3.4.1"
+    "tailwindcss": "^3.4.1",
+    "@swc/helpers": "^0.5.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.3.0",
     "@next/swc-wasm-nodejs": "^15.0.3",
-    "@swc/helpers": "^0.5.18",
     "@types/node": "^20.17.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
@@ -81,7 +81,7 @@
   "overrides": {
     "react": "19.0.0-rc-66855b96-20241106",
     "react-dom": "19.0.0-rc-66855b96-20241106",
-    "@swc/helpers": "^0.5.18",
+    "@swc/helpers": "^0.5.0",
     "fontkit": {
       "@swc/helpers": "0.3.13"
     },

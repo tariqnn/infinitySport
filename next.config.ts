@@ -2,7 +2,6 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
-  output: 'export',
   transpilePackages: ['@infinity/types', '@infinity/mock-api'],
   webpack: (config) => {
     config.resolve.alias = {
@@ -19,7 +18,6 @@ const nextConfig: NextConfig = {
     return [];
   },
   images: {
-    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',

@@ -1,11 +1,16 @@
 import type { NextConfig } from "next";
 import path from "path";
 
+interface WebpackConfigWithResolve {
+  resolve: { alias?: Record<string, string> };
+}
+
 const nextConfig: NextConfig = {
   transpilePackages: ['@infinity/types', '@infinity/mock-api'],
-  webpack: (config) => {
-    config.resolve.alias = {
-      ...config.resolve.alias,
+  webpack: (config: unknown) => {
+    const c = config as WebpackConfigWithResolve;
+    c.resolve.alias = {
+      ...c.resolve.alias,
       '@infinity/types': path.resolve(__dirname, 'packages/types/src'),
     };
     return config;

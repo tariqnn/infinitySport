@@ -228,7 +228,7 @@ export async function fetchAnnouncements(): Promise<AnnouncementResponse[]> {
   }
 }
 
-function getLandingFallback(): LandingContent {
+export function getLandingFallback(): LandingContent {
   return {
     hero: {
       title: 'Elevating Jordanian Athletes',

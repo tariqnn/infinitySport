@@ -13,16 +13,23 @@ const getApiBaseUrl = () => {
   if (process.env.NEXT_PUBLIC_API_BASE_URL) {
     return process.env.NEXT_PUBLIC_API_BASE_URL;
   }
-  
   // If API is running on the same server, use relative URL (works with Next.js rewrites)
   if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_API_SAME_DOMAIN === 'true') {
     return ''; // Relative URL - will use Next.js rewrites
   }
-  
   return 'http://localhost:4000';
 };
 
 const API_BASE_URL = getApiBaseUrl();
+
+// In production, never call localhost (API is not on the same box). Skip fetch and use fallback so the page never 503s.
+function isLandingApiReachable(): boolean {
+  if (process.env.NODE_ENV !== 'production') return true;
+  const url = (API_BASE_URL || '').trim();
+  if (!url) return false;
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(url)) return false;
+  return true;
+}
 
 export type ProgramResponse = {
   id: string;
@@ -221,7 +228,48 @@ export async function fetchAnnouncements(): Promise<AnnouncementResponse[]> {
   }
 }
 
+function getLandingFallback(): LandingContent {
+  return {
+    hero: {
+      title: 'Elevating Jordanian Athletes',
+      subtitle: 'Infinity Sports delivers elite training programs, professional coaching, and world-class facilities for teams and individuals across the region.',
+      primaryCtaLabel: 'Explore Programs',
+      primaryCtaLink: '/contact',
+      secondaryCtaLabel: 'Book a Tour',
+      secondaryCtaLink: '/contact',
+      backgroundImageUrl: undefined,
+      backgroundVideoUrl: undefined,
+    },
+    highlights: [],
+    programs: [],
+    offers: [],
+    events: [],
+    announcements: [],
+    facilityHighlights: FALLBACK_FACILITIES.map((f): LandingFacilityHighlight => ({
+      id: f.id,
+      name: f.name,
+      description: f.description,
+      mediaUrl: undefined,
+      badge: undefined,
+    })),
+    footer: {
+      address: 'Shemisani, Princess Alia College',
+      phone: '07 9624 4059',
+      email: 'infinitysportsacademyjo@gmail.com',
+      contactRecipientEmail: 'infinitysportsacademyjo@gmail.com',
+      socialLinks: [
+        { id: 'instagram', label: 'Instagram', href: 'https://instagram.com/infinity.sports.academy' },
+      ],
+    },
+    updatedAt: new Date().toISOString(),
+    updatedBy: 'System',
+  };
+}
+
 async function _fetchLandingContent(): Promise<LandingContent> {
+  if (!isLandingApiReachable()) {
+    return getLandingFallback();
+  }
   try {
     const data = await jsonFetch<LandingApiResponse>(`${API_BASE_URL}/api/public/landing`);
 
@@ -352,41 +400,7 @@ async function _fetchLandingContent(): Promise<LandingContent> {
     if (process.env.NODE_ENV !== 'production') {
       console.warn('Failed to fetch landing content:', error);
     }
-    // Return fallback data
-    return {
-      hero: {
-        title: 'Elevating Jordanian Athletes',
-        subtitle: 'Infinity Sports delivers elite training programs, professional coaching, and world-class facilities for teams and individuals across the region.',
-        primaryCtaLabel: 'Explore Programs',
-        primaryCtaLink: '/contact',
-        secondaryCtaLabel: 'Book a Tour',
-        secondaryCtaLink: '/contact',
-        backgroundImageUrl: undefined,
-      },
-      highlights: [],
-      programs: [],
-      offers: [],
-      events: [],
-      announcements: [],
-      facilityHighlights: FALLBACK_FACILITIES.map((f): LandingFacilityHighlight => ({
-        id: f.id,
-        name: f.name,
-        description: f.description,
-        mediaUrl: undefined,
-        badge: undefined,
-      })),
-      footer: {
-        address: 'Shemisani, Princess Alia College',
-        phone: '07 9624 4059',
-        email: 'infinitysportsacademyjo@gmail.com',
-        contactRecipientEmail: 'infinitysportsacademyjo@gmail.com',
-        socialLinks: [
-          { id: 'instagram', label: 'Instagram', href: 'https://instagram.com/infinity.sports.academy' },
-        ],
-      },
-      updatedAt: new Date().toISOString(),
-      updatedBy: 'System',
-    } as LandingContent;
+    return getLandingFallback();
   }
 }
 

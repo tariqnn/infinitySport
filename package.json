@@ -8,7 +8,7 @@
     "packages/*"
   ],
   "scripts": {
-    "postinstall": "npm run prisma:generate || echo 'Prisma generate skipped (prisma not available)'",
+    "postinstall": "(npm run prisma:generate || echo 'Prisma generate skipped (prisma not available)') && npm install @swc/helpers@0.5.18 --ignore-scripts",
     "build": "next build",
     "start": "next start",
     "start:combined": "node start-combined.js",

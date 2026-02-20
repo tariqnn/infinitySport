@@ -4,12 +4,10 @@
 
 ### 1. **package.json**
 
-- **`@swc/helpers`** added to **dependencies** (not devDependencies): `"@swc/helpers": "^0.5.0"`, so it is installed in production and the server no longer crashes with `Cannot find module '@swc/helpers/esm/_interop_require_default.js'`.
-- **Scripts** updated for Hostinger Node:
-  - `"build": "next build"`
-  - `"start": "next start"`
-- **overrides** updated to `"@swc/helpers": "^0.5.0"` for consistency.
-- **devDependencies**: `@swc/helpers` removed from devDependencies (it is only in dependencies now).
+- **`@swc/helpers`** in **dependencies** as **exact** `"0.5.18"` (version that includes `esm/_interop_require_default.js`). **overrides** force the same version everywhere (including `fontkit`).
+- **postinstall** runs `npm install @swc/helpers@0.5.18 --ignore-scripts` so the package is always present after any `npm install` (fixes Hostinger when the ESM file was missing).
+- **Scripts** for Hostinger Node: `"build": "next build"`, `"start": "next start"`.
+- **devDependencies**: `@swc/helpers` is not in devDependencies (only in dependencies so production installs get it).
 
 ### 2. **next.config.ts**
 

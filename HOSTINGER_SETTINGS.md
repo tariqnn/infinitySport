@@ -39,13 +39,15 @@ main
 
 ### Build Command:
 ```
-npm install && npm run build
+npm install && npm run build:hostinger:web-only
 ```
+(This builds only the web app in `apps/web` and avoids root monorepo build issues.)
 
 ### Start Command:
 ```
-npm run start
+npm run start:hostinger:web-only
 ```
+(This starts Next.js from `apps/web` with the correct PORT.)
 
 ### Output Directory:
 ```

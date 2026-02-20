@@ -383,9 +383,44 @@ export const packagesApi = {
 };
 
 export const receiptsApi = {
-  get: (id: string) => portalFetch<ReceiptRow & { registration?: PackageRegistrationRow }>(`/portal/receipts/${id}`),
+  get: (id: string) => portalFetch<ReceiptRow & { registration?: PackageRegistrationRow; user?: { id: string; email: string; name: string | null; isActive: boolean } }>(`/portal/receipts/${id}`),
   void: (id: string, voidReason: string) =>
     portalFetch<void>(`/portal/receipts/${id}/void`, { method: 'PATCH', body: JSON.stringify({ voidReason }) }),
+};
+
+async function memberFetch<T>(endpoint: string, memberEmail: string, options?: RequestInit): Promise<T> {
+  const url = `${API_BASE_URL}/api${endpoint}`;
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'x-member-email': memberEmail.trim(),
+      ...options?.headers,
+    },
+    cache: 'no-store',
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ message: response.statusText }));
+    throw new Error((err as { message?: string }).message || `API ${response.status}`);
+  }
+  return response.json();
+}
+
+export type MemberInvoiceRow = {
+  id: string;
+  invoiceNumber: string;
+  date: string;
+  amount: number;
+  currency: string;
+  status: string;
+  registrationId?: string;
+  packageName?: string;
+};
+
+export const meApi = {
+  getMe: (email: string) => memberFetch<{ id: string; email: string; name: string | null; phone: string | null; role: string; isActive: boolean }>('/portal/me', email),
+  getInvoices: (email: string) => memberFetch<MemberInvoiceRow[]>('/portal/me/invoices', email),
+  getReceipt: (id: string, email: string) => memberFetch<ReceiptRow & { registration?: PackageRegistrationRow }>(`/portal/me/receipts/${id}`, email),
 };
 
 export const packageSessionCanceledApi = {

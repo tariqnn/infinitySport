@@ -28,10 +28,7 @@ async function bootstrap() {
     .filter(Boolean);
   const adminOrigin = process.env.ADMIN_ORIGIN || 'http://localhost:3001';
   const portalOrigin = process.env.PORTAL_ORIGIN || 'http://localhost:3002';
-  const productionOrigins = [
-    'https://infinitysport.onrender.com',
-    'https://infinitysport-1.onrender.com',
-  ];
+  const productionOrigins: string[] = [];
   const origins = [
     ...landingOrigins,
     adminOrigin,
@@ -49,7 +46,7 @@ async function bootstrap() {
     origin: origins,
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-company-id'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-company-id', 'x-member-email'],
   });
 
   // Set global prefix

@@ -11,7 +11,7 @@ Use this document when building a **separate app** (booking, player tracing, sub
 - **Env variable:** `NEXT_PUBLIC_API_BASE_URL` (optional)
 - **Defaults:**
   - Development: `http://localhost:4000`
-  - Production: `https://infinitysport.onrender.com`
+  - Production: your deployed API URL (set `NEXT_PUBLIC_API_BASE_URL` or `API_BASE_URL`)
 
 ### CORS
 
@@ -355,7 +355,7 @@ To have **the same booking** in your app as on the landing (same courts, same sl
 Use the same as §1. Example:
 
 ```ts
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? (process.env.NODE_ENV === 'development' ? 'http://localhost:4000' : 'https://infinitysport.onrender.com');
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? (process.env.NODE_ENV === 'development' ? 'http://localhost:4000' : '');
 ```
 
 ### 7.2 Courts (same list and IDs)

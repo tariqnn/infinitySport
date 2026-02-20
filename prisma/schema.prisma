@@ -259,6 +259,23 @@ model Booking {
   @@index([coachId])
 }
 
+// Member account (login): created/activated when registration is marked paid. Email = unique link.
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String?
+  phone        String?
+  role         String    @default("MEMBER") // MEMBER | STAFF
+  isActive     Boolean   @default(true)
+  passwordHash String?   // null = must set password or use OTP
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  receipts     Receipt[]
+
+  @@index([email])
+  @@index([isActive])
+}
+
 // Recurring blocked time slots (e.g. static team bookings, club bookings). isBlocked=false means the slot is free for public booking.
 // label = club/booking name for grouping (e.g. "Little Kobes"). startDate/endDate = optional date range for the block.
 model BlockedSlot {
@@ -583,12 +600,15 @@ model PackageRegistration {
 }
 
 // Receipts for registration payments (separate from Invoices). Created when marking as Paid.
+// Linked to User so member can view all their invoices in app/portal.
 // status ACTIVE = counts toward collected; VOIDED = does not (voidReason required).
 model Receipt {
   id              String    @id @default(cuid())
   receiptId       String    @unique // human-readable e.g. RCP-2025-0001
   registrationId  String
   registration    PackageRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  userId          String?   // set when mark-paid; links receipt to member account
+  user            User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
   personName      String
   personPhone     String
   packageName     String
@@ -605,6 +625,7 @@ model Receipt {
   @@index([registrationId])
   @@index([receiptId])
   @@index([status])
+  @@index([userId])
 }
 
 // Manual session adjustments (+1 excuse, etc.). Logged for auditing.

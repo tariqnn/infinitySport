@@ -48,3 +48,6 @@ prisma/migrations/
 # uploads
 apps/api/uploads/
 uploads/
+
+# Flutter mobile app (do not push to GitHub)
+mobile-app/

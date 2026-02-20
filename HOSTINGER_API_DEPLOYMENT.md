@@ -95,7 +95,7 @@ If your API is already deployed elsewhere (e.g., Render), just update the web ap
 
 1. **Environment Variables in Hostinger (Web App):**
    ```
-   NEXT_PUBLIC_API_BASE_URL=https://infinitysport.onrender.com
+   NEXT_PUBLIC_API_BASE_URL=https://your-api-url.com
    ```
 
 2. **No changes needed** - the web app already defaults to this.

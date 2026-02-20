@@ -39,10 +39,8 @@ async function createApp() {
   const adminOrigin = process.env.ADMIN_ORIGIN || 'http://localhost:3001';
   const portalOrigin = process.env.PORTAL_ORIGIN || 'http://localhost:3002';
   const productionOrigins = [
-    'https://infinitysport.onrender.com',
-    'https://infinitysport-1.onrender.com',
     process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
-  ].filter(Boolean);
+  ].filter(Boolean) as string[];
   
   const origins = [
     landingOrigin,

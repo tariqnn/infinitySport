@@ -2211,6 +2211,44 @@ export class PortalService {
     }
   }
 
+  // --- User (member account): find or create when registration marked paid; link receipts ---
+  /**
+   * Find existing user by email or create/activate one from registration.
+   * When staff marks a registration as paid, we ensure an account exists and link the receipt to it.
+   */
+  async findOrCreateUserFromRegistration(reg: {
+    customerEmail?: string | null;
+    customerName: string;
+    customerPhone: string;
+  }): Promise<{ id: string } | null> {
+    const email = (reg.customerEmail ?? '').trim().toLowerCase();
+    if (!email) return null;
+
+    const prisma = this.prisma as any;
+    let user = await prisma.user.findUnique({ where: { email } });
+    if (user) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          isActive: true,
+          ...(user.name ? {} : { name: (reg.customerName || '').trim() || null }),
+          ...(user.phone ? {} : { phone: (reg.customerPhone || '').trim() || null }),
+        },
+      });
+      return { id: user.id };
+    }
+    user = await prisma.user.create({
+      data: {
+        email,
+        name: (reg.customerName || '').trim() || null,
+        phone: (reg.customerPhone || '').trim() || null,
+        role: 'MEMBER',
+        isActive: true,
+      },
+    });
+    return { id: user.id };
+  }
+
   // --- Receipts (registration payments; do not touch Invoice system) ---
   private async generateReceiptId(): Promise<string> {
     const year = new Date().getFullYear();
@@ -2229,11 +2267,14 @@ export class PortalService {
     const method = (data.paymentMethod || 'CASH').toUpperCase();
     const validMethods = ['CASH', 'CARD', 'TRANSFER', 'OTHER'];
     if (!validMethods.includes(method)) throw new BadRequestException('Invalid payment method');
+
+    const user = await this.findOrCreateUserFromRegistration(reg);
     const receiptId = await this.generateReceiptId();
     const receipt = await (this.prisma as any).receipt.create({
       data: {
         receiptId,
         registrationId,
+        userId: user?.id ?? null,
         personName: reg.customerName,
         personPhone: reg.customerPhone,
         packageName: reg.packageName,
@@ -2258,6 +2299,7 @@ export class PortalService {
       registrationId,
       receiptId: receipt.receiptId,
       amountPaid: receipt.amountPaid,
+      userId: user?.id ?? undefined,
     });
     return receipt;
   }
@@ -2272,10 +2314,92 @@ export class PortalService {
   async getReceiptById(id: string) {
     const r = await (this.prisma as any).receipt.findUnique({
       where: { id },
+      include: {
+        registration: true,
+        user: { select: { id: true, email: true, name: true, isActive: true } },
+      },
+    });
+    if (!r) throw new NotFoundException('Receipt not found');
+    return r;
+  }
+
+  /** Get user by email (for member auth / me endpoints). */
+  async getUserByEmail(email: string): Promise<{ id: string; email: string; name: string | null; phone: string | null; role: string; isActive: boolean } | null> {
+    const e = (email ?? '').trim().toLowerCase();
+    if (!e) return null;
+    const user = await (this.prisma as any).user.findUnique({
+      where: { email: e },
+      select: { id: true, email: true, name: true, phone: true, role: true, isActive: true },
+    });
+    return user;
+  }
+
+  /** List receipts (invoices) for a member, most recent first. */
+  async getReceiptsByUserId(userId: string) {
+    return (this.prisma as any).receipt.findMany({
+      where: { userId },
+      include: { registration: { select: { finalPriceJod: true, customerName: true, packageName: true } } },
+      orderBy: { dateTimeIssued: 'desc' },
+    });
+  }
+
+  /** Get one receipt if it belongs to the user. */
+  async getReceiptByIdForUser(receiptId: string, userId: string) {
+    const r = await (this.prisma as any).receipt.findFirst({
+      where: { id: receiptId, userId },
       include: { registration: true },
     });
     if (!r) throw new NotFoundException('Receipt not found');
     return r;
+  }
+
+  /** Generate receipt PDF buffer for member download. */
+  async getReceiptPdfBuffer(receiptId: string, userId: string): Promise<{ buffer: Buffer; filename: string }> {
+    const r = await this.getReceiptByIdForUser(receiptId, userId);
+    const buffer = await this.generateReceiptPdfToBuffer(r);
+    const safe = (r.receiptId || receiptId).replace(/[^a-zA-Z0-9-_]/g, '_');
+    return { buffer, filename: `${safe}.pdf` };
+  }
+
+  private async generateReceiptPdfToBuffer(receipt: any): Promise<Buffer> {
+    const PDFDocument = require('pdfkit');
+    const companyProfile = await this.getCompanyProfile();
+    return new Promise<Buffer>((resolve, reject) => {
+      try {
+        const doc = new PDFDocument({ size: 'A4', margins: { top: 50, bottom: 50, left: 50, right: 50 } });
+        const chunks: Buffer[] = [];
+        const w = new Writable({
+          write(chunk: Buffer | string, _enc, cb) {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+            cb();
+          },
+          final(cb) {
+            resolve(Buffer.concat(chunks));
+            cb();
+          },
+        });
+        doc.pipe(w);
+        doc.fontSize(20).text('Receipt', { align: 'center' });
+        doc.moveDown();
+        doc.fontSize(10)
+          .text(companyProfile.name || 'Infinity Sport', { align: 'center' })
+          .text(companyProfile.address || '', { align: 'center' })
+          .text(companyProfile.email || '', { align: 'center' });
+        doc.moveDown(2);
+        doc.text(`Receipt #: ${receipt.receiptId || receipt.id}`);
+        doc.text(`Date: ${receipt.dateTimeIssued ? new Date(receipt.dateTimeIssued).toLocaleString() : '-'}`);
+        doc.text(`Customer: ${receipt.personName || '-'}`);
+        doc.text(`Phone: ${receipt.personPhone || '-'}`);
+        doc.text(`Package: ${receipt.packageName || '-'}`);
+        doc.moveDown();
+        doc.text(`Amount paid: ${receipt.amountPaid ?? 0} JOD`);
+        doc.text(`Payment method: ${receipt.paymentMethod || 'CASH'}`);
+        doc.text(`Status: ${receipt.status || 'ACTIVE'}`);
+        doc.end();
+      } catch (err: any) {
+        reject(err);
+      }
+    });
   }
 
   async voidReceipt(id: string, voidReason: string) {

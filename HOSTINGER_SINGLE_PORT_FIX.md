@@ -8,7 +8,7 @@ Hostinger provides **ONLY ONE port** via `process.env.PORT`. The app must use th
 
 Since Hostinger only provides one port, we're running **ONLY the Next.js web app** which:
 1. Uses `process.env.PORT` automatically (Next.js does this by default)
-2. Connects to external API at `https://infinitysport.onrender.com`
+2. Connects to external API (set API_BASE_URL to your deployed API URL)
 3. No local API needed
 
 ## 📋 Current Configuration
@@ -43,5 +43,5 @@ LANDING_ORIGIN=https://infinitysportsjo.com
 
 1. Hostinger sets `process.env.PORT` (e.g., 3000)
 2. Next.js automatically uses this PORT
-3. Web app connects to external API at `https://infinitysport.onrender.com`
+3. Web app connects to external API (API_BASE_URL)
 4. Everything works with single port!

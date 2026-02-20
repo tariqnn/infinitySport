@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { PortalController } from './portal.controller';
+import { MeController } from './me.controller';
 import { PortalService } from './portal.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
   imports: [PrismaModule],
-  controllers: [PortalController],
+  controllers: [PortalController, MeController],
   providers: [PortalService],
   exports: [PortalService],
 })

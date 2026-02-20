@@ -80,7 +80,10 @@ export function ReceiptDetailModal({
   onClose: () => void;
   onVoided?: () => void;
 }) {
-  const [receipt, setReceipt] = useState<(ReceiptRow & { registration?: PackageRegistrationRow }) | null>(null);
+  const [receipt, setReceipt] = useState<(ReceiptRow & {
+    registration?: PackageRegistrationRow;
+    user?: { id: string; email: string; name: string | null; isActive: boolean };
+  }) | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -119,6 +122,11 @@ export function ReceiptDetailModal({
                 <h3 className="text-lg font-bold">Infinity Sports</h3>
                 <p className="text-sm text-ui-textMuted">Receipt {receipt.receiptId}</p>
               </div>
+              {(receipt as { user?: { email: string } }).user && (
+                <p className="mb-3 rounded-lg bg-ui-primary/10 px-3 py-2 text-sm text-ui-primary">
+                  Linked account: {(receipt as { user: { email: string } }).user.email}
+                </p>
+              )}
               <table className="w-full text-sm">
                 <tbody>
                   <tr><td className="py-1 text-ui-textMuted">Date</td><td>{new Date(receipt.dateTimeIssued).toLocaleString()}</td></tr>

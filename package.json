@@ -47,10 +47,6 @@
     "prisma:studio": "npx prisma studio --schema=./prisma/schema.prisma",
     "db:setup": "npm run prisma:generate && npm run prisma:migrate && npm run prisma:seed"
   },
-  "engines": {
-    "node": ">=20.18.0",
-    "npm": ">=9.0.0"
-  },
   "dependencies": {
     "@infinity/mock-api": "file:./packages/mock-api",
     "@infinity/types": "file:./packages/types",

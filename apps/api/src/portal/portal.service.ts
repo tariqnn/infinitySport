@@ -1943,7 +1943,6 @@ export class PortalService {
     discountReason?: string | null;
     periodStartsAt?: string | null; // ISO date when they will start (optional)
     createdBy?: string | null;
-    periodStartsAt?: string | null;
   }) {
     const pkg = (data.packageName || '').trim();
     let basePriceJod = data.basePriceJod;

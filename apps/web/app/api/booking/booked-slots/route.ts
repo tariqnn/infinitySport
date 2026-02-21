@@ -41,38 +41,44 @@ export async function GET(request: Request) {
     const endDateIso = toDateStr(endNext);
 
     if (process.env.DATABASE_URL?.trim()) {
-      const { prisma } = await import('../../../../lib/db');
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(endDateIso);
-      end.setHours(23, 59, 59, 999);
-      const rows = await prisma.booking.findMany({
-        where: {
-          startTime: { lt: end },
-          endTime: { gt: start },
-          status: { not: 'CANCELLED' },
-          facilityArea: { in: [...COURT_TYPES] },
-        },
-        select: { facilityArea: true, startTime: true, endTime: true, status: true },
-      });
-      const booked: Record<string, Record<string, string[]>> = {};
-      for (const b of rows) {
-        if (b.status === 'CANCELLED') continue;
-        const ct = b.facilityArea && (COURT_TYPES as readonly string[]).includes(b.facilityArea) ? b.facilityArea : null;
-        if (!ct) continue;
-        const startT = new Date(b.startTime);
-        const endT = b.endTime ? new Date(b.endTime) : new Date(startT.getTime() + 60 * 60 * 1000);
-        let slot = new Date(startT);
-        while (slot.getTime() < endT.getTime()) {
-          const dateStr = toDateStr(slot);
-          const timeStr = toTimeStr(slot);
-          if (!booked[dateStr]) booked[dateStr] = {};
-          if (!booked[dateStr][ct]) booked[dateStr][ct] = [];
-          if (!booked[dateStr][ct].includes(timeStr)) booked[dateStr][ct].push(timeStr);
-          slot.setTime(slot.getTime() + 60 * 60 * 1000);
+      try {
+        const { prisma } = await import('../../../../lib/db');
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(endDateIso);
+        end.setHours(23, 59, 59, 999);
+        const rows = await prisma.booking.findMany({
+          where: {
+            startTime: { lt: end },
+            endTime: { gt: start },
+            status: { not: 'CANCELLED' },
+            facilityArea: { in: [...COURT_TYPES] },
+          },
+          select: { facilityArea: true, startTime: true, endTime: true, status: true },
+        });
+        const booked: Record<string, Record<string, string[]>> = {};
+        for (const b of rows) {
+          if (b.status === 'CANCELLED') continue;
+          const ct = b.facilityArea && (COURT_TYPES as readonly string[]).includes(b.facilityArea) ? b.facilityArea : null;
+          if (!ct) continue;
+          const startT = new Date(b.startTime);
+          const endT = b.endTime ? new Date(b.endTime) : new Date(startT.getTime() + 60 * 60 * 1000);
+          let slot = new Date(startT);
+          while (slot.getTime() < endT.getTime()) {
+            const dateStr = toDateStr(slot);
+            const timeStr = toTimeStr(slot);
+            if (!booked[dateStr]) booked[dateStr] = {};
+            if (!booked[dateStr][ct]) booked[dateStr][ct] = [];
+            if (!booked[dateStr][ct].includes(timeStr)) booked[dateStr][ct].push(timeStr);
+            slot.setTime(slot.getTime() + 60 * 60 * 1000);
+          }
         }
+        return NextResponse.json({ booked });
+      } catch (e) {
+        const err = e as Error;
+        console.error('[booked-slots] DB read failed:', err?.message ?? String(e));
+        return NextResponse.json({ booked: {} });
       }
-      return NextResponse.json({ booked });
     }
 
     const res = await fetch(
@@ -100,7 +106,9 @@ export async function GET(request: Request) {
       }
     }
     return NextResponse.json({ booked });
-  } catch {
+  } catch (e) {
+    const err = e as Error;
+    console.error('[booked-slots] Error:', err?.message ?? String(e));
     return NextResponse.json({ booked: {} });
   }
 }

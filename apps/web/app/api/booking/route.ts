@@ -363,7 +363,8 @@ export async function POST(request: Request) {
           },
         });
       } catch (dbError) {
-        console.error('Database error (booking create):', dbError);
+        const err = dbError as Error;
+        console.error('[booking] DB create failed:', err?.message ?? String(dbError));
         return NextResponse.json(
           { error: 'Failed to save booking. Please try again or contact us.' },
           { status: 500 }

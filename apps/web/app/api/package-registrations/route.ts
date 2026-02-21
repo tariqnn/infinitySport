@@ -38,7 +38,9 @@ async function createRegistrationInDb(payload: {
       select: { id: true },
     });
     return { id: row.id };
-  } catch {
+  } catch (e) {
+    const err = e as Error;
+    console.error('[package-registrations] DB create failed:', err?.message, err?.name);
     return null;
   }
 }
@@ -112,14 +114,15 @@ export async function POST(request: Request) {
         console.warn('[package-registrations] DB create failed:', (e as Error)?.message);
         return null;
       });
-      if (dbResult) {
-        return NextResponse.json({ success: true, id: dbResult.id });
-      }
-      return NextResponse.json(
-        { error: 'Unable to save registration. Please try again or contact us.' },
-        { status: 500 }
-      );
+    if (dbResult) {
+      return NextResponse.json({ success: true, id: dbResult.id });
     }
+    console.error('[package-registrations] DATABASE_URL is set but DB create returned null – check logs above for Prisma/connection error');
+    return NextResponse.json(
+      { error: 'Unable to save registration. Please try again or contact us.' },
+      { status: 500 }
+    );
+  }
 
     // 2) Fallback: call the API when DATABASE_URL is not set (e.g. API on another host).
     const baseUrl = getApiBaseUrl();

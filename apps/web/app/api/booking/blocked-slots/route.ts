@@ -28,24 +28,30 @@ export async function GET(request: Request) {
     const date = searchParams.get('date');
 
     if (process.env.DATABASE_URL?.trim()) {
-      const { prisma } = await import('../../../../lib/db');
-      const where: { isBlocked?: boolean; AND?: unknown[] } = { isBlocked: true };
-      if (date) {
-        const d = new Date(date);
-        const start = new Date(d);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(d);
-        end.setHours(23, 59, 59, 999);
-        where.AND = [
-          { OR: [{ startDate: null }, { startDate: { lte: end } }] },
-          { OR: [{ endDate: null }, { endDate: { gte: start } }] },
-        ];
+      try {
+        const { prisma } = await import('../../../../lib/db');
+        const where: { isBlocked?: boolean; AND?: unknown[] } = { isBlocked: true };
+        if (date) {
+          const d = new Date(date);
+          const start = new Date(d);
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(d);
+          end.setHours(23, 59, 59, 999);
+          where.AND = [
+            { OR: [{ startDate: null }, { startDate: { lte: end } }] },
+            { OR: [{ endDate: null }, { endDate: { gte: start } }] },
+          ];
+        }
+        const rows = await prisma.blockedSlot.findMany({
+          where,
+          select: { dayOfWeek: true, courtType: true, time: true, isBlocked: true },
+        });
+        return NextResponse.json({ blocked: buildBlockedMap(rows) });
+      } catch (e) {
+        const err = e as Error;
+        console.error('[blocked-slots] DB read failed:', err?.message ?? String(e));
+        return NextResponse.json({ blocked: {} });
       }
-      const rows = await prisma.blockedSlot.findMany({
-        where,
-        select: { dayOfWeek: true, courtType: true, time: true, isBlocked: true },
-      });
-      return NextResponse.json({ blocked: buildBlockedMap(rows) });
     }
 
     let url = `${getApiBaseUrl()}/api/portal/blocked-slots`;
@@ -56,7 +62,9 @@ export async function GET(request: Request) {
     if (!res.ok) return NextResponse.json({ blocked: {} });
     const rows: Array<{ dayOfWeek: string; courtType: string; time: string; isBlocked: boolean }> = await res.json();
     return NextResponse.json({ blocked: buildBlockedMap(rows) });
-  } catch {
+  } catch (e) {
+    const err = e as Error;
+    console.error('[blocked-slots] Error:', err?.message ?? String(e));
     return NextResponse.json({ blocked: {} });
   }
 }

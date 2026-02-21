@@ -11,16 +11,67 @@ export const metadata = {
   title: 'Sports & Facilities'
 };
 
-function mapApiPackagesToBasketball(apiPackages: { id: string; name: string; description: string | null; descriptionBullets: string[] | null; currentPriceJod: number | null; timeSlots: unknown }[]): BasketballPackage[] {
-  return apiPackages.map((p) => ({
-    id: p.id,
-    title: p.name.replace(/^Basketball - /i, '').trim() || p.name,
-    features: p.descriptionBullets?.length ? p.descriptionBullets : (p.description ? [p.description] : []),
-    note: undefined,
-    price: p.currentPriceJod != null ? String(p.currentPriceJod) : undefined,
-    priceNote: null,
-    timeSlots: Array.isArray(p.timeSlots) ? (p.timeSlots as string[]) : undefined,
-  }));
+type BasketballPackageOverride = {
+  title?: string;
+  note?: string;
+  price?: string;
+  priceNote?: string | null;
+  timeSlots?: string[];
+  features?: string[];
+};
+
+function normalizeBasketballTitle(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const BASKETBALL_PACKAGE_OVERRIDES: Record<string, BasketballPackageOverride> = {
+  [normalizeBasketballTitle('Little Kobes U10')]: {
+    priceNote: 'for 12 sessions',
+    timeSlots: ['Sat / Mon / Wed: 5:00 PM - 6:00 PM', 'Friday: 10:00 AM - 11:00 AM'],
+  },
+  [normalizeBasketballTitle('Ballers & Hoopers U12-U14')]: {
+    title: 'Ballers & Hoopers U12-U14',
+    priceNote: 'for 12 sessions',
+    timeSlots: ['Sat / Mon / Wed: 6:00 PM - 7:00 PM', 'Friday: 11:00 AM - 12:00 PM'],
+  },
+  [normalizeBasketballTitle('Warriors')]: {
+    priceNote: 'for 12 sessions',
+    timeSlots: ['Sat / Mon / Wed: 7:00 PM - 8:00 PM', 'Friday: 12:00 PM - 1:00 PM'],
+  },
+  [normalizeBasketballTitle('Private 1v1 Sessions')]: {
+    note: 'Private sessions (1v1) are available.',
+    timeSlots: ['Available on request'],
+  },
+  [normalizeBasketballTitle('Small Groups')]: {
+    note: 'Small group sessions are available.',
+    timeSlots: ['Available on request'],
+  },
+};
+
+function getBasketballOverride(title: string): BasketballPackageOverride | undefined {
+  return BASKETBALL_PACKAGE_OVERRIDES[normalizeBasketballTitle(title)];
+}
+
+function mapApiPackagesToBasketball(apiPackages: { id: string; name: string; description: string | null; descriptionBullets: string[] | null; sessionsCount: number; currentPriceJod: number | null; timeSlots: unknown }[]): BasketballPackage[] {
+  return apiPackages.map((p) => {
+    const rawTitle = p.name.replace(/^Basketball - /i, '').trim() || p.name;
+    const override = getBasketballOverride(rawTitle);
+    const fallbackFeatures = p.descriptionBullets?.length ? p.descriptionBullets : p.description ? [p.description] : [];
+
+    return {
+      id: p.id,
+      title: override?.title ?? rawTitle,
+      features: override?.features ?? fallbackFeatures,
+      note: override?.note,
+      price: p.currentPriceJod != null ? String(p.currentPriceJod) : override?.price,
+      priceNote: override?.priceNote ?? (p.sessionsCount > 0 ? `for ${p.sessionsCount} sessions` : null),
+      timeSlots: override?.timeSlots ?? (Array.isArray(p.timeSlots) ? (p.timeSlots as string[]) : undefined),
+    };
+  });
 }
 
 export default async function SportsPage() {
@@ -174,4 +225,3 @@ export default async function SportsPage() {
     </div>
   );
 }
-

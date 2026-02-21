@@ -2,73 +2,75 @@
   {
     "id": "bb-pkg-u10",
     "title": "Little Kobes U10",
-    "note": "Age may be accepted according to fundamental movement skills.",
+    "note": "All sessions 120 JOD for 12 sessions.",
     "price": "120",
     "priceNote": "for 12 sessions",
     "timeSlots": [
-      "Sat 5–6pm",
-      "Mon 5–6pm",
-      "Wed 5–6pm",
-      "Fri 10–11am"
+      "Sat / Mon / Wed: 5:00 PM - 6:00 PM",
+      "Friday: 10:00 AM - 11:00 AM"
     ],
     "features": [
-      "Have fun and grow in health",
-      "Ball handling and dribbling fundamentals",
-      "Basic shot skills and types of passing"
+      "Fundamentals and confidence building",
+      "Ball handling and dribbling",
+      "Basic shooting and passing"
     ]
   },
   {
     "id": "bb-pkg-u12-u14",
-    "title": "Ballers & Hoopers U12–U14",
+    "title": "Ballers & Hoopers U12-U14",
+    "note": "All sessions 120 JOD for 12 sessions.",
     "price": "120",
     "priceNote": "for 12 sessions",
     "timeSlots": [
-      "Sat 6–7pm",
-      "Mon 6–7pm",
-      "Wed 6–7pm",
-      "Fri 11am–12pm"
+      "Sat / Mon / Wed: 6:00 PM - 7:00 PM",
+      "Friday: 11:00 AM - 12:00 PM"
     ],
     "features": [
-      "Always stay confident",
       "Shooting with footwork",
-      "Different types of finish"
+      "Finishing techniques",
+      "Confidence and game IQ"
     ]
   },
   {
     "id": "bb-pkg-warriors",
     "title": "Warriors",
+    "note": "All sessions 120 JOD for 12 sessions.",
     "price": "120",
     "priceNote": "for 12 sessions",
     "timeSlots": [
-      "Sat 7–8pm",
-      "Mon 7–8pm",
-      "Wed 7–8pm",
-      "Fri 12–1pm"
+      "Sat / Mon / Wed: 7:00 PM - 8:00 PM",
+      "Friday: 12:00 PM - 1:00 PM"
     ],
     "features": [
+      "Advanced offensive and defensive skills",
       "Reading game situations",
-      "Be a good teammate",
-      "Refine offensive and defensive skills"
+      "Teamwork and leadership"
     ]
   },
   {
     "id": "bb-pkg-private",
     "title": "Private 1v1 Sessions",
+    "note": "Private sessions (1v1) are available.",
     "price": "Contact for pricing",
     "priceNote": null,
-    "timeSlots": ["Available"],
+    "timeSlots": [
+      "Available on request"
+    ],
     "features": [
       "One-on-one coaching",
-      "Personalised skill development",
+      "Personalized skill development",
       "Flexible scheduling"
     ]
   },
   {
     "id": "bb-pkg-small",
     "title": "Small Groups",
+    "note": "Small group sessions are available.",
     "price": "Contact for pricing",
     "priceNote": null,
-    "timeSlots": ["Available"],
+    "timeSlots": [
+      "Available on request"
+    ],
     "features": [
       "Semi-private sessions",
       "Small group dynamics",

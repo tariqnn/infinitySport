@@ -10,6 +10,7 @@
   "scripts": {
     "postinstall": "(npm run prisma:generate || echo 'Prisma generate skipped (prisma not available)') && npm install @swc/helpers@0.5.18 --ignore-scripts",
     "build": "npm run build:web",
+    "postbuild": "node sync-web-next-output.js",
     "start": "npm run start:web",
     "start:combined": "node start-combined.js",
     "dev": "npm run dev:web",

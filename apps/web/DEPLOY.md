@@ -10,6 +10,14 @@ The landing booking form is **directly connected to the database**:
 
 There is **no external booking API** in between: the same Next.js app uses Prisma to read and write the same database as admin/portal. In **production**, `DATABASE_URL` is **required**; if it is missing, the app returns 503 and does not call any external API.
 
+## Package registrations: direct to database (no external API)
+
+The landing package registration form submits **directly to the database**:
+
+- **Submit registration** – when `DATABASE_URL` is set, the form POST goes to `/api/package-registrations`, which writes to the DB via Prisma (same DB as admin/portal). No external API.
+
+In **production**, `DATABASE_URL` is **required** for registrations; if it is missing, the app returns 503.
+
 ## If DATABASE_URL is set but it still doesn’t work in production
 
 ### 1. Check production logs

@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server';
 
 /**
  * Landing booking: blocked slots (red/unavailable) are read DIRECTLY from the database.
- * When DATABASE_URL is set we use only Prisma – no external API. Same DB as admin/portal.
+ * Same data as Admin "Recurring blocked slots" (e.g. AL Muqawiloon, Apex Academy) – those show as red on the landing.
+ * When DATABASE_URL is set we use only Prisma – no external API.
  */
 
 const getApiBaseUrl = () => {
@@ -53,7 +54,9 @@ export async function GET(request: Request) {
           where,
           select: { dayOfWeek: true, courtType: true, time: true, isBlocked: true },
         });
-        return NextResponse.json({ blocked: buildBlockedMap(rows) });
+        const res = NextResponse.json({ blocked: buildBlockedMap(rows) });
+        res.headers.set('Cache-Control', 'no-store');
+        return res;
       } catch (e) {
         const err = e as Error;
         console.error('[blocked-slots] DB read failed:', err?.message ?? String(e));

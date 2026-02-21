@@ -78,7 +78,9 @@ export async function GET(request: Request) {
             slot.setTime(slot.getTime() + 60 * 60 * 1000);
           }
         }
-        return NextResponse.json({ booked });
+        const res = NextResponse.json({ booked });
+        res.headers.set('Cache-Control', 'no-store');
+        return res;
       } catch (e) {
         const err = e as Error;
         console.error('[booked-slots] DB read failed:', err?.message ?? String(e));

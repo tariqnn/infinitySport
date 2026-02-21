@@ -269,7 +269,7 @@ export default function RegistrationsPage() {
 
   async function handleMarkUnpaid(r: Registration) {
     if (markingUnpaidId) return;
-    if (!confirm(`Mark ${r.customerName} as unpaid? All receipts for this registration will be voided.`)) return;
+    if (!confirm(`Mark ${r.customerName} as unpaid? All receipts for this registration will be voided. This cannot be undone.`)) return;
     setMarkingUnpaidId(r.id);
     try {
       await packageRegistrationsApi.markUnpaid(r.id);
@@ -297,19 +297,11 @@ export default function RegistrationsPage() {
     }
   }
 
-  async function handleMarkUnpaid(r: Registration) {
-    if (markingUnpaidId) return;
-    if (!confirm(`Mark ${r.customerName} as unpaid? All receipts for this registration will be voided. This cannot be undone.`)) return;
-    setMarkingUnpaidId(r.id);
-    try {
-      await packageRegistrationsApi.markUnpaid(r.id);
-      load();
-    } catch (e) {
-      console.error('Failed to mark as unpaid', e);
-      alert('Failed to mark as unpaid. Please try again.');
-    } finally {
-      setMarkingUnpaidId(null);
-    }
+  function getPaymentStatus(row: Registration): 'PAID' | 'PARTIAL' | 'UNPAID' {
+    const collected = row.collected ?? 0;
+    if (row.isPaid) return 'PAID';
+    if (collected > 0) return 'PARTIAL';
+    return 'UNPAID';
   }
 
   function renderRemainingShort(row: Registration) {
@@ -483,7 +475,7 @@ export default function RegistrationsPage() {
                   })();
                   const collected = r.collected ?? 0;
                   const finalPrice = r.finalPriceJod ?? 0;
-                  const paymentStatus = collected >= finalPrice ? 'PAID' : collected > 0 ? 'PARTIAL' : 'UNPAID';
+                  const paymentStatus = getPaymentStatus(r);
                   return {
                     packageName: r.packageName || '',
                     customerName: r.customerName || '',
@@ -571,8 +563,7 @@ export default function RegistrationsPage() {
               <tbody className="divide-y divide-ui-border">
                 {rows.map((row) => {
                   const collected = row.collected ?? 0;
-                  const finalPrice = row.finalPriceJod ?? 0;
-                  const paymentStatus = collected >= finalPrice ? 'PAID' : collected > 0 ? 'PARTIAL' : 'UNPAID';
+                  const paymentStatus = getPaymentStatus(row);
                   return (
                     <tr key={row.id} className="hover:bg-ui-softBg/50">
                       <td className="px-4 py-2 min-w-0">

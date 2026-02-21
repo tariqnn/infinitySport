@@ -53,7 +53,6 @@ export function AddRegistrationModal({
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerAge, setCustomerAge] = useState('');
   const [basePriceJod, setBasePriceJod] = useState<string>('');
-  const [startDate, setStartDate] = useState('');
   const [discountOpen, setDiscountOpen] = useState(false);
   const [discountType, setDiscountType] = useState<'NONE' | 'PERCENT' | 'AMOUNT'>('NONE');
   const [discountValue, setDiscountValue] = useState<string>('');
@@ -118,6 +117,8 @@ export function AddRegistrationModal({
       setError('Discount reason is required when applying a discount.');
       return;
     }
+    const basePricePayload = hasDefaultPrice && base === 0 ? undefined : base;
+
     setLoading(true);
     try {
       await packageRegistrationsApi.create({
@@ -126,7 +127,7 @@ export function AddRegistrationModal({
         customerPhone: customerPhone.trim(),
         customerEmail: customerEmail.trim() || undefined,
         customerAge: customerAge.trim() ? parseInt(customerAge, 10) : undefined,
-        basePriceJod: base,
+        basePriceJod: basePricePayload,
         discountType,
         discountValue: discountType === 'NONE' ? null : discountVal,
         discountReason: discountType === 'NONE' ? undefined : discountReason.trim(),
@@ -175,14 +176,6 @@ export function AddRegistrationModal({
           onChange={(e) => setPeriodStartsAt(e.target.value)}
           placeholder="Optional start date"
         />
-
-        <Input
-          label="Start date (optional)"
-          type="date"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-        />
-        <p className="text-xs text-ui-textMuted -mt-2">When they start or started the package. Leave empty for today.</p>
 
         <div>
           <label className="mb-1 block text-sm font-medium text-ui-textMuted">Base price (JOD)</label>

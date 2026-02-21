@@ -7,6 +7,7 @@ const ACTIVE_RECEIPT_WHERE = {
 };
 
 type Params = { slug: string[] };
+type MaybePromise<T> = T | Promise<T>;
 
 type RegistrationInput = {
   packageName: string;
@@ -24,6 +25,10 @@ type RegistrationInput = {
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ message }, { status });
+}
+
+async function resolveRouteParams(params: MaybePromise<Params>): Promise<Params> {
+  return await Promise.resolve(params);
 }
 
 function clampNonNegative(value: number): number {
@@ -67,6 +72,54 @@ function billingPeriodFromDate(date: Date): { billingPeriodKey: string; priceLoc
   return { billingPeriodKey, priceLockedUntil };
 }
 
+function hasUnknownArgument(error: unknown, argName: string): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes(`Unknown argument \`${argName}\``);
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === 'string') return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return 'Unexpected server error';
+  }
+}
+
+function withoutPeriodStartsAt<T extends { periodStartsAt?: unknown }>(data: T): Omit<T, 'periodStartsAt'> {
+  const next = { ...data } as T;
+  delete next.periodStartsAt;
+  return next;
+}
+
+async function createPackageRegistrationCompat(
+  delegate: { create: (args: any) => Promise<any> },
+  args: { data: Record<string, unknown>; include?: Record<string, unknown> },
+) {
+  try {
+    return await delegate.create(args as any);
+  } catch (error) {
+    if (hasUnknownArgument(error, 'periodStartsAt') && 'periodStartsAt' in args.data) {
+      return delegate.create({ ...args, data: withoutPeriodStartsAt(args.data) } as any);
+    }
+    throw error;
+  }
+}
+
+async function updatePackageRegistrationCompat(
+  args: { where: { id: string }; data: Record<string, unknown>; include?: Record<string, unknown> },
+) {
+  try {
+    return await prisma.packageRegistration.update(args as any);
+  } catch (error) {
+    if (hasUnknownArgument(error, 'periodStartsAt') && 'periodStartsAt' in args.data) {
+      return prisma.packageRegistration.update({ ...args, data: withoutPeriodStartsAt(args.data) } as any);
+    }
+    throw error;
+  }
+}
+
 async function getBasePriceJod(packageName: string): Promise<number> {
   const pkg = await prisma.package.findUnique({ where: { name: packageName } }).catch(() => null);
   if (pkg?.currentPriceJod != null) return clampNonNegative(pkg.currentPriceJod);
@@ -76,6 +129,7 @@ async function getBasePriceJod(packageName: string): Promise<number> {
 }
 
 function mapRegistrationRow(row: any) {
+  const finalPriceJod = Number(row.finalPriceJod) || 0;
   const collected = (row.receipts || []).reduce((sum: number, rec: any) => sum + (rec.amountPaid || 0), 0);
   return {
     id: row.id,
@@ -84,12 +138,12 @@ function mapRegistrationRow(row: any) {
     customerPhone: row.customerPhone,
     customerEmail: row.customerEmail ?? null,
     customerAge: row.customerAge ?? null,
-    isPaid: row.isPaid,
+    isPaid: Boolean(row.isPaid) && finalPriceJod > 0,
     basePriceJod: Number(row.basePriceJod) || 0,
     discountType: row.discountType ?? 'NONE',
     discountValue: row.discountValue ?? null,
     discountReason: row.discountReason ?? null,
-    finalPriceJod: Number(row.finalPriceJod) || 0,
+    finalPriceJod,
     collected,
     periodStartsAt: row.periodStartsAt ?? null,
     periodEndsAt: row.periodEndsAt ?? null,
@@ -108,38 +162,66 @@ async function findOrCreateUserFromRegistration(reg: {
 }): Promise<{ id: string } | null> {
   const email = (reg.customerEmail ?? '').trim().toLowerCase();
   if (!email) return null;
+  try {
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      await prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          isActive: true,
+          ...(existing.name ? {} : { name: reg.customerName.trim() || null }),
+          ...(existing.phone ? {} : { phone: reg.customerPhone.trim() || null }),
+        },
+      });
+      return { id: existing.id };
+    }
 
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    await prisma.user.update({
-      where: { id: existing.id },
-      data: {
-        isActive: true,
-        ...(existing.name ? {} : { name: reg.customerName.trim() || null }),
-        ...(existing.phone ? {} : { phone: reg.customerPhone.trim() || null }),
-      },
-    });
-    return { id: existing.id };
+    try {
+      const created = await prisma.user.create({
+        data: {
+          email,
+          name: reg.customerName.trim() || null,
+          phone: reg.customerPhone.trim() || null,
+          role: 'MEMBER',
+          isActive: true,
+        },
+        select: { id: true },
+      });
+
+      return created;
+    } catch (error: any) {
+      // Race-safe fallback: if another request created the same email first, reuse it.
+      if (error?.code === 'P2002') {
+        const again = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+        if (again) return again;
+      }
+      throw error;
+    }
+  } catch (error) {
+    // User-linking must never block payment receipt creation.
+    console.warn('[portal-db-api] user linking skipped', error);
+    return null;
   }
-
-  const created = await prisma.user.create({
-    data: {
-      email,
-      name: reg.customerName.trim() || null,
-      phone: reg.customerPhone.trim() || null,
-      role: 'MEMBER',
-      isActive: true,
-    },
-    select: { id: true },
-  });
-
-  return created;
 }
 
 async function generateReceiptId(): Promise<string> {
   const year = new Date().getFullYear();
-  const count = await prisma.receipt.count({ where: { receiptId: { startsWith: `RCP-${year}-` } } });
-  return `RCP-${year}-${String(count + 1).padStart(4, '0')}`;
+  const prefix = `RCP-${year}-`;
+  const latest = await prisma.receipt.findFirst({
+    where: { receiptId: { startsWith: prefix } },
+    select: { receiptId: true },
+    orderBy: { receiptId: 'desc' },
+  });
+
+  const nextNumber = (() => {
+    if (!latest?.receiptId) return 1;
+    const match = latest.receiptId.match(/^RCP-\d{4}-(\d+)$/);
+    if (!match) return 1;
+    const parsed = Number(match[1]);
+    return Number.isFinite(parsed) ? parsed + 1 : 1;
+  })();
+
+  return `${prefix}${String(nextNumber).padStart(4, '0')}`;
 }
 
 async function createPackageRegistration(payload: RegistrationInput) {
@@ -176,25 +258,28 @@ async function createPackageRegistration(payload: RegistrationInput) {
     : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
   const { billingPeriodKey, priceLockedUntil } = billingPeriodFromDate(now);
 
-  const row = await prisma.packageRegistration.create({
-    data: {
-      packageName,
-      customerName,
-      customerPhone,
-      customerEmail: (payload.customerEmail || '').trim() || null,
-      customerAge: payload.customerAge ?? null,
-      basePriceJod,
-      discountType,
-      discountValue: discountType === 'NONE' ? null : Number(discountValue),
-      discountReason: discountType === 'NONE' ? null : (payload.discountReason || '').trim() || null,
-      discountAppliedBy: discountType === 'NONE' ? null : payload.createdBy ?? null,
-      discountAppliedAt: discountType === 'NONE' ? null : now,
-      finalPriceJod,
-      billingPeriodKey,
-      priceLockedUntil,
-      periodStartsAt: periodStartsAt ?? undefined,
-      periodEndsAt,
-    },
+  const createData: Record<string, unknown> = {
+    packageName,
+    customerName,
+    customerPhone,
+    customerEmail: (payload.customerEmail || '').trim() || null,
+    customerAge: payload.customerAge ?? null,
+    isPaid: false,
+    basePriceJod,
+    discountType,
+    discountValue: discountType === 'NONE' ? null : Number(discountValue),
+    discountReason: discountType === 'NONE' ? null : (payload.discountReason || '').trim() || null,
+    discountAppliedBy: discountType === 'NONE' ? null : payload.createdBy ?? null,
+    discountAppliedAt: discountType === 'NONE' ? null : now,
+    finalPriceJod,
+    billingPeriodKey,
+    priceLockedUntil,
+    periodEndsAt,
+  };
+  if (periodStartsAt) createData.periodStartsAt = periodStartsAt;
+
+  const row = await createPackageRegistrationCompat(prisma.packageRegistration, {
+    data: createData,
     include: { receipts: { where: ACTIVE_RECEIPT_WHERE } },
   });
 
@@ -268,7 +353,8 @@ async function getRegistrationTotals(request: NextRequest) {
     collectedTotal += collected;
     discountsTotal += Math.max(0, basePrice - finalPrice);
 
-    if (collected >= finalPrice) paidCount += 1;
+    const regIsPaid = Boolean(reg.isPaid) && finalPrice > 0;
+    if (regIsPaid) paidCount += 1;
     else if (collected > 0) partialCount += 1;
     else unpaidCount += 1;
 
@@ -400,53 +486,54 @@ async function bulkCreateForPerson(request: NextRequest) {
     return jsonError('At least one package is required');
   }
 
-  const packageNames = body.registrations.map((r) => (r.packageName || '').trim()).filter(Boolean);
-  if (packageNames.length !== body.registrations.length) return jsonError('Every registration must have a package name');
+  try {
+    const packageNames = body.registrations.map((r) => (r.packageName || '').trim()).filter(Boolean);
+    if (packageNames.length !== body.registrations.length) return jsonError('Every registration must have a package name');
 
-  const existing = await prisma.packageRegistration.findMany({
-    where: {
-      customerPhone,
-      packageName: { in: packageNames },
-    },
-    select: { packageName: true },
-  });
-  if (existing.length > 0) {
-    return jsonError(
-      `Person already has an active registration for: ${existing.map((row) => row.packageName).join(', ')}`,
-      409,
-    );
-  }
-
-  const created = await prisma.$transaction(async (tx) => {
-    const out: any[] = [];
-
-    for (const entry of body.registrations) {
-      const packageName = (entry.packageName || '').trim();
-      const basePriceJod = clampNonNegative(
-        entry.basePriceJod != null ? Number(entry.basePriceJod) : await getBasePriceJod(packageName),
+    const existing = await prisma.packageRegistration.findMany({
+      where: {
+        customerPhone,
+        packageName: { in: packageNames },
+      },
+      select: { packageName: true },
+    });
+    if (existing.length > 0) {
+      return jsonError(
+        `Person already has an active registration for: ${existing.map((row) => row.packageName).join(', ')}`,
+        409,
       );
-      const discountType = (entry.discountType || 'NONE').toUpperCase();
-      const discountValue = discountType === 'NONE' ? null : Number(entry.discountValue ?? 0);
-      const finalPriceJod = computeFinalPriceJod(basePriceJod, discountType, discountValue);
+    }
 
-      const now = new Date();
-      const periodStartsAt = entry.periodStartsAt
-        ? new Date(entry.periodStartsAt)
-        : body.periodStartsAt
-          ? new Date(body.periodStartsAt)
-          : null;
-      const periodEndsAt = periodStartsAt
-        ? new Date(periodStartsAt.getTime() + 30 * 24 * 60 * 60 * 1000)
-        : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-      const { billingPeriodKey, priceLockedUntil } = billingPeriodFromDate(now);
+    const created = await prisma.$transaction(async (tx) => {
+      const out: any[] = [];
 
-      const row = await tx.packageRegistration.create({
-        data: {
+      for (const entry of body.registrations) {
+        const packageName = (entry.packageName || '').trim();
+        const basePriceJod = clampNonNegative(
+          entry.basePriceJod != null ? Number(entry.basePriceJod) : await getBasePriceJod(packageName),
+        );
+        const discountType = (entry.discountType || 'NONE').toUpperCase();
+        const discountValue = discountType === 'NONE' ? null : Number(entry.discountValue ?? 0);
+        const finalPriceJod = computeFinalPriceJod(basePriceJod, discountType, discountValue);
+
+        const now = new Date();
+        const periodStartsAt = entry.periodStartsAt
+          ? new Date(entry.periodStartsAt)
+          : body.periodStartsAt
+            ? new Date(body.periodStartsAt)
+            : null;
+        const periodEndsAt = periodStartsAt
+          ? new Date(periodStartsAt.getTime() + 30 * 24 * 60 * 60 * 1000)
+          : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+        const { billingPeriodKey, priceLockedUntil } = billingPeriodFromDate(now);
+
+        const createData: Record<string, unknown> = {
           packageName,
           customerName,
           customerPhone,
           customerEmail: (body.person.customerEmail || '').trim() || null,
           customerAge: body.person.customerAge ?? null,
+          isPaid: false,
           basePriceJod,
           discountType,
           discountValue: discountType === 'NONE' ? null : Number(discountValue),
@@ -456,19 +543,29 @@ async function bulkCreateForPerson(request: NextRequest) {
           finalPriceJod,
           billingPeriodKey,
           priceLockedUntil,
-          periodStartsAt: periodStartsAt ?? undefined,
           periodEndsAt,
-        },
-        include: { receipts: { where: ACTIVE_RECEIPT_WHERE } },
-      });
+        };
+        if (periodStartsAt) createData.periodStartsAt = periodStartsAt;
 
-      out.push(mapRegistrationRow(row));
+        const row = await createPackageRegistrationCompat(tx.packageRegistration, {
+          data: createData,
+          include: { receipts: { where: ACTIVE_RECEIPT_WHERE } },
+        });
+
+        out.push(mapRegistrationRow(row));
+      }
+
+      return out;
+    });
+
+    return NextResponse.json({ created: created.length, registrations: created });
+  } catch (error: any) {
+    const code = error?.code as string | undefined;
+    if (code === 'P2002') {
+      return jsonError('Duplicate registration detected. Please refresh and try again.', 409);
     }
-
-    return out;
-  });
-
-  return NextResponse.json({ created: created.length, registrations: created });
+    return jsonError(getErrorMessage(error), 500);
+  }
 }
 
 async function updatePackageRegistration(id: string, request: NextRequest) {
@@ -536,7 +633,7 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
     }
   }
 
-  const row = await prisma.packageRegistration.update({
+  const row = await updatePackageRegistrationCompat({
     where: { id },
     data: updateData,
     include: { receipts: { where: ACTIVE_RECEIPT_WHERE } },
@@ -585,6 +682,8 @@ async function markRegistrationPaid(id: string, request: NextRequest) {
 
   const method = (body.paymentMethod || 'CASH').toUpperCase();
   if (!['CASH', 'CARD', 'TRANSFER', 'OTHER'].includes(method)) return jsonError('Invalid payment method');
+  const amountPaid = Math.round(Number(body.amountPaid) || 0);
+  if (amountPaid <= 0) return jsonError('Amount paid must be greater than 0');
 
   const user = await findOrCreateUserFromRegistration(registration);
 
@@ -596,15 +695,13 @@ async function markRegistrationPaid(id: string, request: NextRequest) {
         data: {
           receiptId,
           registrationId: id,
-          userId: user?.id ?? null,
           personName: registration.customerName,
           personPhone: registration.customerPhone,
           packageName: registration.packageName,
-          amountPaid: Math.round(Number(body.amountPaid) || 0),
+          amountPaid,
           paymentMethod: method,
           privateNote: body.privateNote.trim(),
           createdBy: body.createdBy ?? null,
-          status: 'ACTIVE',
         },
       });
       break;
@@ -617,15 +714,28 @@ async function markRegistrationPaid(id: string, request: NextRequest) {
     return jsonError('Unable to generate receipt ID. Please retry.', 500);
   }
 
+  if (user?.id) {
+    try {
+      await prisma.receipt.update({
+        where: { id: receipt.id },
+        data: { userId: user.id },
+      });
+    } catch (error) {
+      // Payment must succeed even if optional user-linking schema is not yet migrated.
+      console.warn('[portal-db-api] receipt user linking skipped', error);
+    }
+  }
+
   const aggregate = await prisma.receipt.aggregate({
     where: { registrationId: id, ...ACTIVE_RECEIPT_WHERE },
     _sum: { amountPaid: true },
   });
   const totalCollected = aggregate._sum.amountPaid ?? 0;
+  const targetPrice = Number(registration.finalPriceJod || 0);
 
   await prisma.packageRegistration.update({
     where: { id },
-    data: { isPaid: totalCollected >= Number(registration.finalPriceJod || 0) },
+    data: { isPaid: targetPrice > 0 && totalCollected >= targetPrice },
   });
 
   return NextResponse.json(receipt);
@@ -644,20 +754,22 @@ async function markRegistrationUnpaid(id: string, request: NextRequest) {
   });
 
   const now = new Date();
-  for (const receipt of activeReceipts) {
-    await prisma.receipt.update({
-      where: { id: receipt.id },
-      data: {
-        status: 'VOIDED',
-        voidedAt: now,
-        voidReason,
-      },
-    });
-  }
+  await prisma.$transaction(async (tx) => {
+    if (activeReceipts.length > 0) {
+      await tx.receipt.updateMany({
+        where: { id: { in: activeReceipts.map((r) => r.id) } },
+        data: {
+          status: 'VOIDED',
+          voidedAt: now,
+          voidReason,
+        },
+      });
+    }
 
-  await prisma.packageRegistration.update({
-    where: { id },
-    data: { isPaid: false },
+    await tx.packageRegistration.update({
+      where: { id },
+      data: { isPaid: false },
+    });
   });
 
   return NextResponse.json({ success: true, voidedCount: activeReceipts.length });
@@ -704,13 +816,22 @@ async function listSessionAdjustments(id: string) {
 }
 
 async function getReceipt(id: string) {
-  const receipt = await prisma.receipt.findUnique({
-    where: { id },
-    include: {
-      registration: true,
-      user: { select: { id: true, email: true, name: true, isActive: true } },
-    },
-  });
+  let receipt: any = null;
+  try {
+    receipt = await prisma.receipt.findUnique({
+      where: { id },
+      include: {
+        registration: true,
+        user: { select: { id: true, email: true, name: true, isActive: true } },
+      },
+    });
+  } catch (error) {
+    console.warn('[portal-db-api] receipt user relation unavailable, retrying without user include', error);
+    receipt = await prisma.receipt.findUnique({
+      where: { id },
+      include: { registration: true },
+    });
+  }
   if (!receipt) return jsonError('Receipt not found', 404);
   return NextResponse.json(receipt);
 }
@@ -737,10 +858,11 @@ async function voidReceipt(id: string, request: NextRequest) {
     _sum: { amountPaid: true },
   });
   const totalCollected = aggregate._sum.amountPaid ?? 0;
+  const targetPrice = Number(receipt.registration.finalPriceJod || 0);
 
   await prisma.packageRegistration.update({
     where: { id: receipt.registrationId },
-    data: { isPaid: totalCollected >= Number(receipt.registration.finalPriceJod || 0) },
+    data: { isPaid: targetPrice > 0 && totalCollected >= targetPrice },
   });
 
   return NextResponse.json({ success: true });
@@ -1157,38 +1279,38 @@ async function dispatchDelete(_request: NextRequest, params: Params) {
   return jsonError('Not found', 404);
 }
 
-export async function GET(request: NextRequest, context: { params: Params }) {
+export async function GET(request: NextRequest, context: { params: MaybePromise<Params> }) {
   try {
-    return await dispatchGet(request, context.params);
+    return await dispatchGet(request, await resolveRouteParams(context.params));
   } catch (error) {
     console.error('[portal-db-api][GET] error', error);
-    return jsonError('Unexpected server error', 500);
+    return jsonError(error instanceof Error ? error.message : 'Unexpected server error', 500);
   }
 }
 
-export async function POST(request: NextRequest, context: { params: Params }) {
+export async function POST(request: NextRequest, context: { params: MaybePromise<Params> }) {
   try {
-    return await dispatchPost(request, context.params);
+    return await dispatchPost(request, await resolveRouteParams(context.params));
   } catch (error) {
     console.error('[portal-db-api][POST] error', error);
-    return jsonError('Unexpected server error', 500);
+    return jsonError(error instanceof Error ? error.message : 'Unexpected server error', 500);
   }
 }
 
-export async function PATCH(request: NextRequest, context: { params: Params }) {
+export async function PATCH(request: NextRequest, context: { params: MaybePromise<Params> }) {
   try {
-    return await dispatchPatch(request, context.params);
+    return await dispatchPatch(request, await resolveRouteParams(context.params));
   } catch (error) {
     console.error('[portal-db-api][PATCH] error', error);
-    return jsonError('Unexpected server error', 500);
+    return jsonError(error instanceof Error ? error.message : 'Unexpected server error', 500);
   }
 }
 
-export async function DELETE(request: NextRequest, context: { params: Params }) {
+export async function DELETE(request: NextRequest, context: { params: MaybePromise<Params> }) {
   try {
-    return await dispatchDelete(request, context.params);
+    return await dispatchDelete(request, await resolveRouteParams(context.params));
   } catch (error) {
     console.error('[portal-db-api][DELETE] error', error);
-    return jsonError('Unexpected server error', 500);
+    return jsonError(error instanceof Error ? error.message : 'Unexpected server error', 500);
   }
 }

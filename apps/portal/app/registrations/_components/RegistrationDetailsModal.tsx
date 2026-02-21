@@ -16,8 +16,7 @@ export function RegistrationDetailsModal({
 }) {
   if (!registration) return null;
   const collected = registration.collected ?? 0;
-  const finalPrice = registration.finalPriceJod ?? 0;
-  const paymentStatus = collected >= finalPrice ? 'Paid' : collected > 0 ? 'Partial' : 'Unpaid';
+  const paymentStatus = registration.isPaid ? 'Paid' : collected > 0 ? 'Partial' : 'Unpaid';
 
   return (
     <Modal open={open} onClose={onClose} title="Registration details" size="sm">

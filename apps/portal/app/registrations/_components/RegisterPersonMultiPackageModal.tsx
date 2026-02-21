@@ -172,11 +172,12 @@ export function RegisterPersonMultiPackageModal({
       const registrations = Array.from(selectedPackages).map((pkg) => {
         const c = packageConfigs[pkg];
         const base = Math.max(0, c?.basePriceJod?.trim() === '' ? 0 : parseInt(c?.basePriceJod ?? '0', 10) || 0);
+        const hasDefaultPrice = (defaultPricesByPackage?.[pkg] ?? pricing.find((x) => x.packageName === pkg)?.basePriceJod) != null;
         const discountType = (c?.discountType ?? 'NONE').toUpperCase();
         const discountVal = discountType === 'NONE' ? 0 : parseFloat(c?.discountValue ?? '0') || 0;
         return {
           packageName: pkg,
-          basePriceJod: base,
+          basePriceJod: hasDefaultPrice && base === 0 ? undefined : base,
           discountType,
           discountValue: discountType === 'NONE' ? null : discountVal,
           discountReason: discountType === 'NONE' ? undefined : (c?.discountReason ?? '').trim(),
@@ -185,7 +186,7 @@ export function RegisterPersonMultiPackageModal({
       });
       const res = await packageRegistrationsApi.bulkCreateForPerson({
         person: currentPerson,
-        periodStartsAt: startDate.trim() || undefined,
+        periodStartsAt: periodStartsAt.trim() || undefined,
         registrations,
       });
       onSuccess(res.created);
@@ -268,8 +269,8 @@ export function RegisterPersonMultiPackageModal({
             <Input
               label="Start date (optional)"
               type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              value={periodStartsAt}
+              onChange={(e) => setPeriodStartsAt(e.target.value)}
             />
             <p className="mt-0.5 text-xs text-ui-textMuted">When they start/started. Leave empty for today.</p>
           </div>

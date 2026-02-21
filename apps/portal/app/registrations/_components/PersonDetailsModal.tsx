@@ -39,8 +39,7 @@ export function PersonDetailsModal({
       <ul className="space-y-2 max-h-[50vh] overflow-y-auto rounded-lg border border-ui-border divide-y divide-ui-border">
         {registrations.map((r) => {
           const collected = r.collected ?? 0;
-          const finalPrice = r.finalPriceJod ?? 0;
-          const status = collected >= finalPrice ? 'Paid' : collected > 0 ? 'Partial' : 'Unpaid';
+          const status = r.isPaid ? 'Paid' : collected > 0 ? 'Partial' : 'Unpaid';
           return (
             <li key={r.id} className="p-3 flex flex-wrap items-center justify-between gap-2 bg-ui-softBg/30">
               <div>

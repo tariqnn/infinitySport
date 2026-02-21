@@ -78,6 +78,8 @@ export function RegisterInAnotherPackageModal({
       setError('Discount reason is required when applying a discount.');
       return;
     }
+    const basePricePayload = hasDefaultPrice && base === 0 ? undefined : base;
+
     setLoading(true);
     try {
       await packageRegistrationsApi.create({
@@ -86,10 +88,11 @@ export function RegisterInAnotherPackageModal({
         customerPhone: registration.customerPhone,
         customerEmail: registration.customerEmail ?? undefined,
         customerAge: registration.customerAge ?? undefined,
-        basePriceJod: base,
+        basePriceJod: basePricePayload,
         discountType,
         discountValue: discountType === 'NONE' ? null : discountVal,
         discountReason: discountType === 'NONE' ? undefined : discountReason.trim(),
+        periodStartsAt: startDate.trim() || undefined,
       });
       onSuccess();
       onClose();

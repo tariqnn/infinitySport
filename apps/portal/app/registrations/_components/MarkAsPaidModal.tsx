@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal, Input, Select, Button } from '../../_components/ui';
 import { packageRegistrationsApi, type PackageRegistrationRow } from '../../../lib/portalApi';
 
@@ -31,11 +31,23 @@ export function MarkAsPaidModal({
   const defaultAmount = registration?.finalPriceJod ?? 0;
   const amount = amountPaid.trim() ? Number(amountPaid) : defaultAmount;
 
+  useEffect(() => {
+    if (!open) return;
+    setAmountPaid(registration?.finalPriceJod != null ? String(registration.finalPriceJod) : '');
+    setPaymentMethod('CASH');
+    setPrivateNote('');
+    setError(null);
+  }, [open, registration?.id, registration?.finalPriceJod]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     if (!privateNote.trim()) {
       setError('Private note is required.');
+      return;
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError('Amount paid must be greater than 0.');
       return;
     }
     if (!registration) return;
@@ -73,7 +85,7 @@ export function MarkAsPaidModal({
           type="number"
           min={0}
           step="0.01"
-          value={amountPaid || (defaultAmount ? String(defaultAmount) : '')}
+          value={amountPaid}
           onChange={(e) => setAmountPaid(e.target.value)}
           placeholder={defaultAmount ? String(defaultAmount) : '0'}
         />

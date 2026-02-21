@@ -34,8 +34,19 @@ async function portalFetch<T>(endpoint: string, options?: RequestInit): Promise<
   }
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ message: 'Unknown server error' }));
-    throw new Error(`Request failed (${response.status}): ${errorData.message || response.statusText}`);
+    const rawError = await response.text().catch(() => '');
+    let message = response.statusText || 'Unknown server error';
+
+    if (rawError) {
+      try {
+        const parsed = JSON.parse(rawError) as { message?: string; error?: string };
+        message = parsed.message || parsed.error || message;
+      } catch {
+        message = rawError.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() || message;
+      }
+    }
+
+    throw new Error(`Request failed (${response.status}): ${message}`);
   }
 
   return response.json();

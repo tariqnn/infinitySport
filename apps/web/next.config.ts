@@ -1,6 +1,23 @@
 import type { NextConfig } from "next";
+import path from "path";
+
+interface WebpackConfigWithResolve {
+  resolve: { alias?: Record<string, string> };
+}
 
 const nextConfig: NextConfig = {
+  experimental: {
+    externalDir: true,
+  },
+  transpilePackages: ['@infinity/types', '@infinity/mock-api'],
+  webpack: (config: unknown) => {
+    const c = config as WebpackConfigWithResolve;
+    c.resolve.alias = {
+      ...c.resolve.alias,
+      '@infinity/types': path.resolve(__dirname, '../../packages/types/src'),
+    };
+    return config;
+  },
   images: {
     remotePatterns: [
       {

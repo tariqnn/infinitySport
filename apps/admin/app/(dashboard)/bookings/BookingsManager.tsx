@@ -2,19 +2,13 @@
 
 import { useState, useEffect, useActionState } from 'react';
 import { useActionToast } from '../../_components/useActionToast';
-import { deleteBookingAction, updateBookingAction, updateBookingPaymentAction, updateBookingStatusAction } from './actions';
-
-const getApiBaseUrl = () => {
-  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
-    return process.env.NEXT_PUBLIC_API_BASE_URL;
-  }
-  if (process.env.NODE_ENV === 'development') {
-    return 'http://localhost:4000';
-  }
-  return 'http://localhost:4000';
-};
-
-const API_BASE_URL = getApiBaseUrl();
+import {
+  deleteBookingAction,
+  listBookingsAction,
+  updateBookingAction,
+  updateBookingPaymentAction,
+  updateBookingStatusAction,
+} from './actions';
 
 interface Booking {
   id: string;
@@ -176,18 +170,11 @@ export function BookingsManager() {
       setLoading(true);
       setLoadError(null);
       const { start, end } = getRangeBounds(rangePreset, selectedDate, customStartDate, customEndDate);
-      const url = `${API_BASE_URL}/api/portal/bookings?startDate=${encodeURIComponent(start)}&endDate=${encodeURIComponent(end)}`;
-      const res = await fetch(url, { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        setBookings(Array.isArray(data) ? data : []);
-      } else {
-        setBookings([]);
-        setLoadError(`API returned ${res.status}`);
-      }
+      const data = await listBookingsAction({ startDate: start, endDate: end });
+      setBookings(Array.isArray(data) ? data : []);
     } catch {
       setBookings([]);
-      setLoadError('Could not reach the API. Ensure it is running.');
+      setLoadError('Could not load bookings from the database.');
     } finally {
       setLoading(false);
     }
@@ -340,7 +327,6 @@ export function BookingsManager() {
       ) : loadError ? (
         <div className="glass-card p-8 text-center">
           <p className="text-[var(--text-muted)]">{loadError}</p>
-          <p className="mt-2 text-sm text-[var(--text-muted)]">Start the API with: <code className="rounded bg-[var(--bg-card-muted)] px-1.5 py-0.5 text-[var(--text-primary)]">npm run dev:api</code></p>
           <button type="button" onClick={loadBookings} className="btn-primary mt-4">
             Retry
           </button>

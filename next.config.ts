@@ -15,13 +15,6 @@ const nextConfig: NextConfig = {
     };
     return config;
   },
-  async rewrites() {
-    if (process.env.NODE_ENV !== 'production' && process.env.API_RUNNING_LOCALLY === 'true') {
-      const apiPort = process.env.API_PORT || '4000';
-      return [{ source: '/api/:path*', destination: `http://localhost:${apiPort}/api/:path*` }];
-    }
-    return [];
-  },
   images: {
     remotePatterns: [
       {

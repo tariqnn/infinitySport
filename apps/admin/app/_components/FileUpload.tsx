@@ -22,15 +22,11 @@ export function FileUpload({
   const [preview, setPreview] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // Use deployed API URL by default, ignore localhost URLs
-  const getApiBaseUrl = () => {
-    const envUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-    if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
-      return envUrl;
-    }
-    return 'http://localhost:4000';
+  const getAppBaseUrl = () => {
+    const envUrl = process.env.NEXT_PUBLIC_APP_BASE_URL;
+    return envUrl ? envUrl.replace(/\/$/, '') : '';
   };
-  const API_BASE_URL = getApiBaseUrl();
+  const appBaseUrl = getAppBaseUrl();
 
   useEffect(() => {
     setMounted(true);
@@ -53,7 +49,7 @@ export function FileUpload({
                       type === 'video' ? '/api/upload/video' : 
                       '/api/upload/media';
 
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      const response = await fetch(`${appBaseUrl}${endpoint}`, {
         method: 'POST',
         body: formData,
       });
@@ -64,7 +60,7 @@ export function FileUpload({
       }
 
       const data = await response.json();
-      const fullUrl = `${API_BASE_URL}${data.url}`;
+      const fullUrl = data.url?.startsWith('http') ? data.url : `${appBaseUrl}${data.url}`;
       
       setPreview(fullUrl);
       onUploadComplete(fullUrl);

@@ -8,29 +8,6 @@ import type {
 } from '@infinity/types';
 import { cache } from 'react';
 
-// Default to deployed API, allow override via environment variable
-const getApiBaseUrl = () => {
-  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
-    return process.env.NEXT_PUBLIC_API_BASE_URL;
-  }
-  // If API is running on the same server, use relative URL (works with Next.js rewrites)
-  if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_API_SAME_DOMAIN === 'true') {
-    return ''; // Relative URL - will use Next.js rewrites
-  }
-  return 'http://localhost:4000';
-};
-
-const API_BASE_URL = getApiBaseUrl();
-
-// In production, never call localhost (API is not on the same box). Skip fetch and use fallback so the page never 503s.
-function isLandingApiReachable(): boolean {
-  if (process.env.NODE_ENV !== 'production') return true;
-  const url = (API_BASE_URL || '').trim();
-  if (!url) return false;
-  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(url)) return false;
-  return true;
-}
-
 export type ProgramResponse = {
   id: string;
   name: string;
@@ -77,69 +54,6 @@ export type AnnouncementResponse = {
   isPinned?: boolean;
 };
 
-// Fallback facilities when API returns none (used in landing + facilities page)
-const FALLBACK_FACILITIES: { id: string; name: string; description: string }[] = [
-  { id: 'iba-5x5', name: 'FIBA Approved Court 5x5', description: 'Full-size basketball court meeting FIBA standards for official 5x5 play.' },
-  { id: 'fiba-3x3', name: 'FIBA Approved 3x3 Court', description: 'FIBA-approved half-court for official 3x3 basketball.' },
-  { id: 'multipurpose-hall', name: 'Multipurpose Hall', description: 'Suitable for Yoga, Pilates, Ballet, Kickboxing, and more.' },
-  { id: 'padel-merry', name: 'Padel Court by Merry Sports', description: 'Professional padel court by Merry Sports.' },
-  { id: 'volleyball', name: 'Official Volleyball Court', description: 'Full-size official volleyball court.' },
-  { id: 'gymnastics', name: 'Official Gymnastics Training Facility', description: 'Dedicated gymnastics training facility meeting official standards.' },
-];
-
-type LandingApiResponse = {
-  hero?: {
-    title: string;
-    subtitle: string;
-    primaryCta: string;
-    primaryUrl: string;
-    secondaryCta?: string;
-    secondaryUrl?: string;
-    backgroundImageUrl?: string;
-    backgroundVideoUrl?: string;
-  };
-  programs?: ProgramResponse[];
-  offers?: OfferResponse[];
-  events?: EventResponse[];
-  announcements?: AnnouncementResponse[];
-  facilities?: FacilityResponse[];
-  footerSettings?: {
-    address: string;
-    phone: string;
-    email: string;
-    contactRecipientEmail?: string | null;
-    socialLinks?: unknown;
-  } | null;
-};
-
-async function jsonFetch<T>(endpoint: string): Promise<T> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
-  try {
-    const response = await fetch(endpoint, {
-      cache: 'no-store',
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-    return response.json() as Promise<T>;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-export async function fetchPrograms(): Promise<ProgramResponse[]> {
-  try {
-    return await jsonFetch<ProgramResponse[]>(`${API_BASE_URL}/api/public/programs`);
-  } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('Failed to fetch programs:', error);
-    }
-    return [];
-  }
-}
-
 export type PackageResponse = {
   id: string;
   sportType: string;
@@ -155,75 +69,156 @@ export type PackageResponse = {
   sortOrder: number;
 };
 
-export async function fetchPackages(): Promise<PackageResponse[]> {
+const FALLBACK_FACILITIES: { id: string; name: string; description: string }[] = [
+  { id: 'iba-5x5', name: 'FIBA Approved Court 5x5', description: 'Full-size basketball court meeting FIBA standards for official 5x5 play.' },
+  { id: 'fiba-3x3', name: 'FIBA Approved 3x3 Court', description: 'FIBA-approved half-court for official 3x3 basketball.' },
+  { id: 'multipurpose-hall', name: 'Multipurpose Hall', description: 'Suitable for Yoga, Pilates, Ballet, Kickboxing, and more.' },
+  { id: 'padel-merry', name: 'Padel Court by Merry Sports', description: 'Professional padel court by Merry Sports.' },
+  { id: 'volleyball', name: 'Official Volleyball Court', description: 'Full-size official volleyball court.' },
+  { id: 'gymnastics', name: 'Official Gymnastics Training Facility', description: 'Dedicated gymnastics training facility meeting official standards.' },
+];
+
+function canUseDb() {
+  return typeof window === 'undefined' && Boolean(process.env.DATABASE_URL?.trim());
+}
+
+async function getPrisma() {
+  const mod = await import('./db');
+  return mod.prisma;
+}
+
+export async function fetchPrograms(): Promise<ProgramResponse[]> {
+  if (!canUseDb()) return [];
   try {
-    return await jsonFetch<PackageResponse[]>(`${API_BASE_URL}/api/public/packages`);
-  } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('Failed to fetch packages:', error);
-    }
+    const prisma = await getPrisma();
+    const rows = await prisma.program.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] });
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      description: row.description ?? '',
+      slug: row.slug ?? undefined,
+      highlight: row.highlight,
+      level: row.level ?? undefined,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchPackages(): Promise<PackageResponse[]> {
+  if (!canUseDb()) return [];
+  try {
+    const prisma = await getPrisma();
+    const rows = await prisma.package.findMany({
+      where: { isActive: true },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      sportType: row.sportType,
+      name: row.name,
+      description: row.description,
+      descriptionBullets: Array.isArray(row.descriptionBullets) ? (row.descriptionBullets as string[]) : null,
+      sessionsCount: row.sessionsCount,
+      trackingType: row.trackingType,
+      pricingType: row.pricingType,
+      currentPriceJod: row.currentPriceJod,
+      timeSlots: row.timeSlots,
+      isActive: row.isActive,
+      sortOrder: row.sortOrder,
+    }));
+  } catch {
     return [];
   }
 }
 
 export async function fetchOffers(): Promise<OfferResponse[]> {
+  if (!canUseDb()) return [];
   try {
-    return await jsonFetch<OfferResponse[]>(`${API_BASE_URL}/api/public/offers`);
-  } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('Failed to fetch offers:', error);
-    }
+    const prisma = await getPrisma();
+    const rows = await prisma.offer.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] });
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      pricePerMonth: row.pricePerMonth,
+      description: row.description ?? '',
+      features: row.features ?? [],
+      badge: row.badge ?? undefined,
+      isFeatured: false,
+      isActive: true,
+      link: undefined,
+    }));
+  } catch {
     return [];
   }
 }
 
 export async function fetchEvents(): Promise<EventResponse[]> {
+  if (!canUseDb()) return [];
   try {
-    return await jsonFetch<EventResponse[]>(`${API_BASE_URL}/api/public/events`);
-  } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('Failed to fetch events:', error);
-    }
+    const prisma = await getPrisma();
+    const rows = await prisma.event.findMany({ orderBy: { date: 'asc' } });
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      date: row.date.toISOString(),
+      location: row.location ?? undefined,
+      description: row.description ?? undefined,
+      link: undefined,
+      highlight: row.highlight,
+    }));
+  } catch {
     return [];
   }
 }
 
-// Fetch facilities from API (admin-driven); fallback to static list only on error.
 export async function fetchFacilities(): Promise<FacilityResponse[]> {
+  if (!canUseDb()) {
+    return FALLBACK_FACILITIES.map((item) => ({
+      id: item.id,
+      name: item.name,
+      description: item.description,
+    }));
+  }
+
   try {
-    const list = await jsonFetch<Array<{ id: string; name: string; description?: string; imageUrl?: string }>>(
-      `${API_BASE_URL}/api/public/facilities`,
-    );
-    if (list?.length) {
-      return list.map((f): FacilityResponse => ({
-        id: f.id,
-        name: f.name,
-        description: f.description ?? '',
-        imageUrl: f.imageUrl,
-        specs: undefined,
+    const prisma = await getPrisma();
+    const rows = await prisma.facilityHighlight.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] });
+    if (rows.length === 0) {
+      return FALLBACK_FACILITIES.map((item) => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
       }));
     }
-  } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('Failed to fetch facilities:', error);
-    }
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      description: row.description ?? '',
+      imageUrl: row.imageUrl ?? undefined,
+      specs: undefined,
+    }));
+  } catch {
+    return FALLBACK_FACILITIES.map((item) => ({
+      id: item.id,
+      name: item.name,
+      description: item.description,
+    }));
   }
-  return FALLBACK_FACILITIES.map((f): FacilityResponse => ({
-    id: f.id,
-    name: f.name,
-    description: f.description,
-    imageUrl: undefined,
-    specs: undefined,
-  }));
 }
 
 export async function fetchAnnouncements(): Promise<AnnouncementResponse[]> {
+  if (!canUseDb()) return [];
   try {
-    return await jsonFetch<AnnouncementResponse[]>(`${API_BASE_URL}/api/public/announcements`);
-  } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('Failed to fetch announcements:', error);
-    }
+    const prisma = await getPrisma();
+    const rows = await prisma.announcement.findMany({ orderBy: [{ isPinned: 'desc' }, { publishedAt: 'desc' }] });
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      body: row.body,
+      isPinned: row.isPinned,
+    }));
+  } catch {
     return [];
   }
 }
@@ -245,10 +240,10 @@ export function getLandingFallback(): LandingContent {
     offers: [],
     events: [],
     announcements: [],
-    facilityHighlights: FALLBACK_FACILITIES.map((f): LandingFacilityHighlight => ({
-      id: f.id,
-      name: f.name,
-      description: f.description,
+    facilityHighlights: FALLBACK_FACILITIES.map((item): LandingFacilityHighlight => ({
+      id: item.id,
+      name: item.name,
+      description: item.description,
       mediaUrl: undefined,
       badge: undefined,
     })),
@@ -257,9 +252,7 @@ export function getLandingFallback(): LandingContent {
       phone: '07 9624 4059',
       email: 'infinitysportsacademyjo@gmail.com',
       contactRecipientEmail: 'infinitysportsacademyjo@gmail.com',
-      socialLinks: [
-        { id: 'instagram', label: 'Instagram', href: 'https://instagram.com/infinity.sports.academy' },
-      ],
+      socialLinks: [{ id: 'instagram', label: 'Instagram', href: 'https://instagram.com/infinity.sports.academy' }],
     },
     updatedAt: new Date().toISOString(),
     updatedBy: 'System',
@@ -267,142 +260,114 @@ export function getLandingFallback(): LandingContent {
 }
 
 async function _fetchLandingContent(): Promise<LandingContent> {
-  if (!isLandingApiReachable()) {
-    return getLandingFallback();
-  }
+  if (!canUseDb()) return getLandingFallback();
+
   try {
-    const data = await jsonFetch<LandingApiResponse>(`${API_BASE_URL}/api/public/landing`);
+    const prisma = await getPrisma();
+    const [hero, programs, offers, events, announcements, facilities, footerSettings] = await Promise.all([
+      prisma.heroSection.findFirst({ orderBy: { updatedAt: 'desc' } }),
+      prisma.program.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }),
+      prisma.offer.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }),
+      prisma.event.findMany({ orderBy: { date: 'asc' } }),
+      prisma.announcement.findMany({ orderBy: [{ isPinned: 'desc' }, { publishedAt: 'desc' }] }),
+      prisma.facilityHighlight.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }),
+      prisma.footerSettings.findFirst({ orderBy: { updatedAt: 'desc' } }),
+    ]);
 
-    const defaultHero: LandingContent['hero'] = {
-      title: 'Elevating Jordanian Athletes',
-      subtitle: 'Infinity Sports delivers elite training programs, professional coaching, and world-class facilities for teams and individuals across the region.',
-      primaryCtaLabel: 'Explore Programs',
-      primaryCtaLink: '/sports',
-      secondaryCtaLabel: 'Book a Tour',
-      secondaryCtaLink: '/contact',
-      backgroundImageUrl: undefined,
-      backgroundVideoUrl: undefined,
-    };
+    const fallback = getLandingFallback();
+    const rawSocialLinks = footerSettings?.socialLinks;
+    const socialLinks = Array.isArray(rawSocialLinks)
+      ? rawSocialLinks
+          .map((item: unknown) => {
+            if (!item || typeof item !== 'object') return null;
+            const record = item as Record<string, unknown>;
+            if (typeof record.label !== 'string' || typeof record.href !== 'string') return null;
+            return {
+              id: String(record.id || record.label).toLowerCase(),
+              label: record.label,
+              href: record.href,
+            };
+          })
+          .filter(Boolean) as Array<{ id: string; label: string; href: string }>
+      : fallback.footer.socialLinks;
 
-    const hero: LandingContent['hero'] = data.hero
-      ? {
-          title: data.hero.title,
-          subtitle: data.hero.subtitle,
-          primaryCtaLabel: data.hero.primaryCta,
-          primaryCtaLink: data.hero.primaryUrl,
-          secondaryCtaLabel: data.hero.secondaryCta || undefined,
-          secondaryCtaLink: data.hero.secondaryUrl || undefined,
-          backgroundImageUrl: data.hero.backgroundImageUrl || undefined,
-          backgroundVideoUrl: data.hero.backgroundVideoUrl || undefined,
-        }
-      : defaultHero;
-
-    const transformed: LandingContent = {
-      hero,
-      highlights: [], // Not in current schema, can be added later
-      programs: (data.programs || []).map((p): LandingProgram => ({
-        id: p.id,
-        title: p.name,
-        description: p.description ?? '',
-        sportType: p.level || 'multi',
-        badge: p.level || undefined,
-        link: `/sports#${p.slug}`,
+    return {
+      hero: hero
+        ? {
+            title: hero.title,
+            subtitle: hero.subtitle,
+            primaryCtaLabel: hero.primaryCta,
+            primaryCtaLink: hero.primaryUrl,
+            secondaryCtaLabel: hero.secondaryCta || undefined,
+            secondaryCtaLink: hero.secondaryUrl || undefined,
+            backgroundImageUrl: hero.backgroundImageUrl || undefined,
+            backgroundVideoUrl: hero.backgroundVideoUrl || undefined,
+          }
+        : fallback.hero,
+      highlights: [],
+      programs: programs.map((program): LandingProgram => ({
+        id: program.id,
+        title: program.name,
+        description: program.description ?? '',
+        sportType: program.level || 'multi',
+        badge: program.level || undefined,
+        link: `/sports#${program.slug}`,
         mediaUrl: undefined,
-        isFeatured: p.highlight || false,
+        isFeatured: program.highlight,
         isActive: true,
       })),
-      offers: (data.offers || []).map((o): LandingOffer => ({
-        id: o.id,
-        name: o.name,
-        price: o.pricePerMonth === 0 ? 'Custom' : `JD ${o.pricePerMonth}/mo`,
-        badge: o.badge || undefined,
-        description: o.description ?? '',
-        features: o.features ?? [],
-        link: o.link || '/offers',
-        isFeatured: Boolean(o.isFeatured),
-        isActive: o.isActive !== false,
+      offers: offers.map((offer): LandingOffer => ({
+        id: offer.id,
+        name: offer.name,
+        price: offer.pricePerMonth === 0 ? 'Custom' : `JD ${offer.pricePerMonth}/mo`,
+        badge: offer.badge || undefined,
+        description: offer.description ?? '',
+        features: offer.features ?? [],
+        link: '/offers',
+        isFeatured: false,
+        isActive: true,
       })),
-      events: (data.events || []).map((e): LandingEvent => ({
-        id: e.id,
-        title: e.title,
-        date: e.date,
-        location: e.location,
-        description: e.description || undefined,
+      events: events.map((event): LandingEvent => ({
+        id: event.id,
+        title: event.title,
+        date: event.date.toISOString(),
+        location: event.location,
+        description: event.description || undefined,
         link: '/events',
-        isActive: e.highlight !== false,
+        isActive: event.highlight !== false,
       })),
-      announcements: (data.announcements || []).map((a): LandingAnnouncement => ({
-        id: a.id,
-        title: a.title,
-        message: a.body,
-        isPinned: a.isPinned || false,
+      announcements: announcements.map((announcement): LandingAnnouncement => ({
+        id: announcement.id,
+        title: announcement.title,
+        message: announcement.body,
+        isPinned: announcement.isPinned,
         isActive: true,
         link: '/contact',
       })),
-      facilityHighlights: ((data.facilities || []).length > 0
-        ? (data.facilities || []).map((f): LandingFacilityHighlight => ({
-            id: f.id,
-            name: f.name,
-            description: f.description ?? '',
-            mediaUrl: f.imageUrl || undefined,
-            badge: undefined,
-          }))
-        : FALLBACK_FACILITIES.map((f): LandingFacilityHighlight => ({
-            id: f.id,
-            name: f.name,
-            description: f.description,
-            mediaUrl: undefined,
-            badge: undefined,
-          }))),
-      footer: (() => {
-        const fallback: LandingContent['footer'] = {
-          address: 'Shemisani, Princess Alia College',
-          phone: '07 9624 4059',
-          email: 'infinitysportsacademyjo@gmail.com',
-          contactRecipientEmail: 'infinitysportsacademyjo@gmail.com',
-          socialLinks: [
-            { id: 'instagram', label: 'Instagram', href: 'https://instagram.com/infinity.sports.academy' },
-          ],
-        };
-
-        if (!data.footerSettings) return fallback;
-
-        const rawLinks = data.footerSettings.socialLinks;
-        const socialLinks =
-          Array.isArray(rawLinks)
-            ? rawLinks
-                .map((link: unknown) => {
-                  const obj = typeof link === 'object' && link !== null ? (link as Record<string, unknown>) : null;
-                  const id = obj && typeof obj.id === 'string' ? obj.id : undefined;
-                  const label = obj && typeof obj.label === 'string' ? obj.label : undefined;
-                  const href = obj && typeof obj.href === 'string' ? obj.href : undefined;
-                  if (!label || !href) return null;
-                  return { id: id || label.toLowerCase(), label, href };
-                })
-                .filter((v): v is { id: string; label: string; href: string } => Boolean(v))
-            : fallback.socialLinks;
-
-        return {
-          address: data.footerSettings.address || fallback.address,
-          phone: data.footerSettings.phone || fallback.phone,
-          email: data.footerSettings.email || fallback.email,
-          contactRecipientEmail:
-            data.footerSettings.contactRecipientEmail || data.footerSettings.email || fallback.contactRecipientEmail,
-          socialLinks,
-        };
-      })(),
+      facilityHighlights:
+        facilities.length > 0
+          ? facilities.map((facility): LandingFacilityHighlight => ({
+              id: facility.id,
+              name: facility.name,
+              description: facility.description ?? '',
+              mediaUrl: facility.imageUrl || undefined,
+              badge: undefined,
+            }))
+          : fallback.facilityHighlights,
+      footer: {
+        address: footerSettings?.address || fallback.footer.address,
+        phone: footerSettings?.phone || fallback.footer.phone,
+        email: footerSettings?.email || fallback.footer.email,
+        contactRecipientEmail:
+          footerSettings?.contactRecipientEmail || footerSettings?.email || fallback.footer.contactRecipientEmail,
+        socialLinks,
+      },
       updatedAt: new Date().toISOString(),
       updatedBy: 'System',
     };
-    
-    return transformed;
-  } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('Failed to fetch landing content:', error);
-    }
+  } catch {
     return getLandingFallback();
   }
 }
 
-// Memoize per-request so Home + Footer don't trigger multiple slow API calls.
 export const fetchLandingContent = cache(_fetchLandingContent);

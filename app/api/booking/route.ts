@@ -2,14 +2,36 @@
 import { NextResponse } from 'next/server';
 import { isValidPhoneNumber } from '../../../lib/phoneValidation';
 
-// Default: local API only. Set API_BASE_URL / NEXT_PUBLIC_API_BASE_URL if API is elsewhere.
-const getApiBaseUrl = () => {
-  const envUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (envUrl) return envUrl.replace(/\/$/, '');
-  return `http://localhost:${process.env.API_PORT || '4000'}`;
+type CourtType = 'Basketball AC' | 'Basketball 3x3' | 'Padel' | 'Volleyball';
+
+const courtTypeForId = (courtId: string): CourtType | null => {
+  if (courtId === 'basketball-ac') return 'Basketball AC';
+  if (courtId === 'basketball-3x3') return 'Basketball 3x3';
+  if (courtId === 'padel') return 'Padel';
+  if (courtId === 'volleyball') return 'Volleyball';
+  return null;
 };
 
-const API_BASE_URL = getApiBaseUrl();
+const dayKey = (dateStr: string) => {
+  const [y, m, d] = dateStr.split('-').map((n) => Number(n));
+  const date = new Date(y, (m ?? 1) - 1, d ?? 1);
+  return date.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+};
+
+async function fetchBlockedMapFromDb(): Promise<Record<string, Partial<Record<CourtType, string[]>>>> {
+  const { prisma } = await import('../../../lib/db');
+  const rows = await prisma.blockedSlot.findMany({
+    where: { isBlocked: true },
+    select: { dayOfWeek: true, courtType: true, time: true },
+  });
+  const blocked: Record<string, Record<string, string[]>> = {};
+  for (const row of rows) {
+    if (!blocked[row.dayOfWeek]) blocked[row.dayOfWeek] = {};
+    if (!blocked[row.dayOfWeek][row.courtType]) blocked[row.dayOfWeek][row.courtType] = [];
+    blocked[row.dayOfWeek][row.courtType].push(row.time);
+  }
+  return blocked;
+}
 
 async function sendBookingWhatsAppMessage(data: {
   phone: string;
@@ -19,7 +41,7 @@ async function sendBookingWhatsAppMessage(data: {
 }) {
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
-  const from = process.env.TWILIO_WHATSAPP_FROM; // e.g. "whatsapp:+14155238886"
+  const from = process.env.TWILIO_WHATSAPP_FROM;
 
   if (!sid || !token || !from) return;
   if (!data.phone?.startsWith('+')) return;
@@ -41,7 +63,6 @@ async function sendBookingWhatsAppMessage(data: {
   });
 }
 
-// Simple email sending function (you can replace this with a real email service)
 async function sendBookingConfirmationEmail(data: {
   name: string;
   phone: string;
@@ -50,12 +71,6 @@ async function sendBookingConfirmationEmail(data: {
   date: string;
   time: string;
 }) {
-  // For now, we'll just log the email. In production, integrate with:
-  // - Resend (https://resend.com)
-  // - SendGrid (https://sendgrid.com)
-  // - Nodemailer with SMTP
-  // - AWS SES
-  
   const emailContent = {
     to: process.env.BOOKING_NOTIFICATION_EMAIL || 'hello@infinitysport.jo',
     subject: `New Court Booking - ${data.courtName}`,
@@ -77,18 +92,15 @@ Phone: ${data.phone}
 Court: ${data.courtName}
 Date: ${new Date(data.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
 Time: ${data.time}
-
-Please confirm this booking with the customer.
     `.trim(),
   };
 
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) {
-    console.log('📧 Booking email (not sent - RESEND_API_KEY missing):', emailContent);
-    return emailContent;
+    console.log('[booking] RESEND_API_KEY missing, email not sent');
+    return;
   }
 
-  // Send admin notification
   await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -104,7 +116,6 @@ Please confirm this booking with the customer.
     }),
   });
 
-  // Send customer confirmation if provided
   if (data.email) {
     await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -127,233 +138,143 @@ Please confirm this booking with the customer.
           </ul>
           <p>We will contact you to confirm.</p>
         `,
-        text: `Booking received\n\nCourt: ${data.courtName}\nDate: ${new Date(data.date).toLocaleDateString()}\nTime: ${data.time}\n\nWe will contact you to confirm.`,
       }),
     });
-  }
-
-  return emailContent;
-}
-
-const dayKey = (dateStr: string) => {
-  const [y, m, d] = dateStr.split('-').map((n) => Number(n));
-  const date = new Date(y, (m ?? 1) - 1, d ?? 1);
-  return date.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
-};
-
-type CourtType = 'Basketball AC' | 'Basketball 3x3' | 'Padel' | 'Volleyball';
-const courtTypeForId = (courtId: string): CourtType | null => {
-  if (courtId === 'basketball-ac') return 'Basketball AC';
-  if (courtId === 'basketball-3x3') return 'Basketball 3x3';
-  if (courtId === 'padel') return 'Padel';
-  if (courtId === 'volleyball') return 'Volleyball';
-  return null;
-};
-
-async function fetchBlockedMap(): Promise<Record<string, Partial<Record<CourtType, string[]>>>> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/portal/blocked-slots`, { cache: 'no-store' });
-    if (!res.ok) return {};
-    const rows: { dayOfWeek: string; courtType: string; time: string; isBlocked: boolean }[] = await res.json();
-    const blocked: Record<string, Record<string, string[]>> = {};
-    for (const r of rows) {
-      if (!r.isBlocked) continue;
-      if (!blocked[r.dayOfWeek]) blocked[r.dayOfWeek] = {};
-      if (!blocked[r.dayOfWeek][r.courtType]) blocked[r.dayOfWeek][r.courtType] = [];
-      blocked[r.dayOfWeek][r.courtType].push(r.time);
-    }
-    return blocked;
-  } catch {
-    return {};
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { courtId, courtName, date, time, name, phone, email } = body ?? {};
-
-    // Validate required fields
-    if (!courtId || !courtName || !date || !time || !name || !phone) {
+    if (!process.env.DATABASE_URL?.trim()) {
       return NextResponse.json(
-        { error: 'Missing required fields. Please fill in all fields.' },
-        { status: 400 }
+        { error: 'Booking is temporarily unavailable. Please try again later.' },
+        { status: 503 },
       );
     }
 
-    // Validate phone number (server-side validation)
+    const body = await request.json();
+    const { courtId, courtName, date, time, duration, name, phone, email } = body ?? {};
+
+    if (!courtId || !courtName || !date || !time || !name || !phone) {
+      return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
+    }
+
+    const durationHours = typeof duration === 'number' && duration > 0 ? Math.min(3, Math.max(0.5, duration)) : 1;
     const phoneValidation = isValidPhoneNumber(phone);
     if (!phoneValidation.valid) {
       return NextResponse.json(
-        { error: phoneValidation.error || 'Invalid phone number. Please enter a valid phone number.' },
-        { status: 400 }
+        { error: phoneValidation.error || 'Invalid phone number.' },
+        { status: 400 },
       );
     }
 
-    // Validate date is not in the past
     const selectedDate = new Date(date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (selectedDate < today) {
-      return NextResponse.json(
-        { error: 'Cannot book a date in the past.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Cannot book a date in the past.' }, { status: 400 });
     }
 
-    // Reject slots marked as blocked in admin (Booking Availability). Admin can set isBlocked=false to free them.
     const courtType = courtTypeForId(courtId);
     if (courtType) {
-      const blockedMap = await fetchBlockedMap();
+      const blockedMap = await fetchBlockedMapFromDb();
       const day = dayKey(date);
       const fullTimes = blockedMap[day]?.[courtType] ?? [];
-      if (fullTimes.includes(time)) {
+      const slotCount = Math.ceil(durationHours);
+
+      for (let i = 0; i < slotCount; i += 1) {
+        const [h, m] = time.split(':').map(Number);
+        const mins = (h || 0) * 60 + (m || 0) + i * 60;
+        const slotH = Math.floor(mins / 60) % 24;
+        const slotM = mins % 60;
+        const slotTime = `${String(slotH).padStart(2, '0')}:${String(slotM).padStart(2, '0')}`;
+        if (fullTimes.includes(slotTime)) {
+          return NextResponse.json(
+            { error: 'This time slot is fully booked. Please select another time.' },
+            { status: 409 },
+          );
+        }
+      }
+    }
+
+    const startTime = new Date(`${date}T${time}:00`);
+    const endTime = new Date(startTime);
+    endTime.setMinutes(endTime.getMinutes() + Math.round(durationHours * 60));
+
+    if (courtType) {
+      const { prisma } = await import('../../../lib/db');
+      const existing = await prisma.booking.findMany({
+        where: {
+          startTime: { lt: endTime },
+          endTime: { gt: startTime },
+          status: { not: 'CANCELLED' },
+          facilityArea: { in: [courtType, courtName] },
+        },
+        select: { id: true },
+      });
+      if (existing.length > 0) {
         return NextResponse.json(
-          { error: 'This time slot is fully booked. Please select another time.' },
-          { status: 409 }
+          { error: 'This time slot is already booked. Please select another time.' },
+          { status: 409 },
         );
       }
     }
 
-    // Check for existing bookings at this time and court (all companies – same venue)
-    try {
-      const startTime = new Date(`${date}T${time}:00`);
-      const endTime = new Date(startTime);
-      endTime.setHours(endTime.getHours() + 1);
-
-      const courtType = courtTypeForId(courtId);
-      const bookingsRes = await fetch(
-          `${API_BASE_URL}/api/portal/bookings?startDate=${startTime.toISOString()}&endDate=${endTime.toISOString()}`,
-          { cache: 'no-store' }
-        );
-        if (bookingsRes.ok && courtType) {
-          const existingBookings: Array<{
-            facilityArea: string | null;
-            startTime: string;
-            status: string;
-          }> = await bookingsRes.json();
-          const conflictingBooking = existingBookings.find(
-            (b) =>
-              b.status !== 'CANCELLED' &&
-              (b.facilityArea === courtType || b.facilityArea === courtName) &&
-              new Date(b.startTime).getTime() === startTime.getTime()
-          );
-          if (conflictingBooking) {
-            return NextResponse.json(
-              { error: 'This time slot is already booked. Please select another time.' },
-              { status: 409 }
-            );
-          }
-        }
-    } catch (checkError) {
-      console.error('Error checking existing bookings:', checkError);
-      // Continue with booking creation even if check fails
-    }
-
-    // Send confirmation email
-    try {
-      await sendBookingConfirmationEmail({
+    const endTimeStr = endTime.toTimeString().slice(0, 5);
+    await Promise.allSettled([
+      sendBookingConfirmationEmail({
         name,
         phone,
         email: typeof email === 'string' ? email : undefined,
         courtName,
         date,
-        time,
+        time: `${time} - ${endTimeStr} (${durationHours}h)`,
+      }),
+      sendBookingWhatsAppMessage({ phone, courtName, date, time: `${time} - ${endTimeStr}` }),
+    ]);
+
+    const { prisma } = await import('../../../lib/db');
+    let company = await prisma.company.findFirst({
+      where: { status: 'ACTIVE' },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    if (!company) {
+      company = await prisma.company.create({
+        data: {
+          name: 'Infinity Sport',
+          contactName: 'Infinity Sport',
+          contactEmail: 'infinitysportsacademyjo@gmail.com',
+          status: 'ACTIVE',
+        },
+        select: { id: true },
       });
-    } catch (emailError) {
-      console.error('Email sending error:', emailError);
-      // Don't fail the booking if email fails, but log it
     }
 
-    // Best-effort WhatsApp confirmation (requires Twilio WhatsApp credentials)
-    try {
-      await sendBookingWhatsAppMessage({ phone, courtName, date, time });
-    } catch (whatsAppError) {
-      console.error('WhatsApp sending error:', whatsAppError);
-    }
-
-    // Save booking to database
-    try {
-      const startTime = new Date(`${date}T${time}:00`);
-      const endTime = new Date(startTime);
-      endTime.setHours(endTime.getHours() + 1);
-
-      // Get or create company
-      const companiesRes = await fetch(`${API_BASE_URL}/api/portal/companies`, {
-        cache: 'no-store',
-      });
-      let companies: Array<{ id: string; name: string }> = [];
-      if (companiesRes.ok) {
-        companies = await companiesRes.json();
-      }
-
-      let companyId: string;
-      if (companies && companies.length > 0) {
-        companyId = companies[0].id;
-      } else {
-        // Create default company if none exists
-        const createCompanyRes = await fetch(`${API_BASE_URL}/api/portal/companies`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: 'Infinity Sporty',
-            contactName: 'Infinity Sporty',
-            contactEmail: 'infinitysportsacademyjo@gmail.com',
-            status: 'ACTIVE',
-          }),
-        });
-        if (createCompanyRes.ok) {
-          const newCompany = await createCompanyRes.json();
-          companyId = newCompany.id;
-        } else {
-          throw new Error('Failed to create company');
-        }
-      }
-
-      // Create booking (facilityArea = canonical courtType so it matches blocked/booked logic)
-      const courtType = courtTypeForId(courtId);
-      const bookingRes = await fetch(`${API_BASE_URL}/api/portal/bookings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          company: { connect: { id: companyId } },
-          facilityArea: courtType || courtName,
-          startTime: startTime.toISOString(),
-          endTime: endTime.toISOString(),
-          status: 'PENDING',
-          isPaid: false,
-          customerName: name,
-          customerPhone: phone,
-          customerEmail: typeof email === 'string' ? email : undefined,
-          notes: `Public booking from landing page`,
-        }),
-      });
-
-      if (!bookingRes.ok) {
-        const errorData = await bookingRes.json().catch(() => ({}));
-        console.error('Failed to create booking:', errorData);
-        throw new Error('Failed to save booking to database');
-      }
-    } catch (dbError) {
-      console.error('Database error:', dbError);
-      // Don't fail the booking if database save fails, but log it
-      // The email/WhatsApp notifications were already sent
-    }
+    await prisma.booking.create({
+      data: {
+        companyId: company.id,
+        facilityArea: courtType || courtName,
+        startTime,
+        endTime,
+        status: 'PENDING',
+        isPaid: false,
+        customerName: name,
+        customerPhone: phone,
+        customerEmail: typeof email === 'string' ? email : null,
+        notes: 'Public booking from landing page',
+      },
+    });
 
     return NextResponse.json({
       success: true,
-      message: 'Booking submitted successfully. You will receive a confirmation email shortly.',
+      message: 'Booking submitted successfully.',
     });
   } catch (error) {
     console.error('Booking submission error', error);
     return NextResponse.json(
       { error: 'Unable to process your booking. Please try again later.' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-
-
-
-
-

@@ -1,4 +1,4 @@
-# Infinity Sports - API + PostgreSQL (optional: use Neon instead and run only api)
+# Infinity Sports web app + optional local Postgres for development
 services:
   postgres:
     image: postgres:16-alpine
@@ -18,16 +18,16 @@ services:
       timeout: 5s
       retries: 5
 
-  api:
+  web:
     build: .
-    container_name: infinity-api
+    container_name: infinity-web
     restart: unless-stopped
     ports:
-      - "4000:4000"
+      - "3000:3000"
     environment:
       DATABASE_URL: postgresql://infinity:infinity@postgres:5432/infinity_sports
-      PORT: 4000
       NODE_ENV: production
+      PORT: 3000
     depends_on:
       postgres:
         condition: service_healthy

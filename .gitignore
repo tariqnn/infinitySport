@@ -47,7 +47,6 @@ next-env.d.ts
 prisma/migrations/
 
 # uploads
-apps/api/uploads/
 uploads/
 
 # Flutter mobile app (do not push to GitHub)

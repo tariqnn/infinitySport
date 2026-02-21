@@ -1,9 +1,9 @@
 import { getApiBaseUrl } from './getApiBaseUrl';
 
-const API_BASE_URL = getApiBaseUrl();
+const ROUTE_BASE_URL = getApiBaseUrl();
 
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}/api${endpoint}`, {
+  const response = await fetch(`${ROUTE_BASE_URL}/api${endpoint}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -206,4 +206,3 @@ export const apiClient = {
   updatePettyCashTransaction: (id: string, data: any) => request<any>(`/portal/petty-cash/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deletePettyCashTransaction: (id: string) => request<void>(`/portal/petty-cash/${id}`, { method: 'DELETE' }),
 };
-

@@ -40,14 +40,11 @@ export function HomeContent({ content }: HomeContentProps) {
       }
     : { href: "/contact", label: "Book a Tour" };
 
-  const facilityHighlight = content.facilityHighlights[0];
   const sportHighlights = content.programs.slice(0, 4);
   const upcomingEvents = content.events.filter((event) => event.isActive !== false).slice(0, 3);
-  const offerCards = content.offers;
   const valueProps = content.highlights;
   const announcements = content.announcements?.filter((announcement) => announcement.isActive !== false) ?? [];
   const footer = content.footer;
-  const featuredOffer = offerCards.find((offer) => offer.isFeatured) ?? offerCards[0];
 
   // Parallax effect for hero
   const [scrollY, setScrollY] = useState(0);

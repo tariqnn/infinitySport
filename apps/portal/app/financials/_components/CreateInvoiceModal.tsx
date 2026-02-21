@@ -46,7 +46,7 @@ const NOTE_TEMPLATES: Array<{ id: string; label: string; text: string }> = [
   }
 ];
 
-const API_BASE_URL = getApiBaseUrl();
+const ROUTE_BASE_URL = getApiBaseUrl();
 
 export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
@@ -307,7 +307,7 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
 
     const company = await getFirstCompany();
     if (!company) {
-      setError('Cannot connect to the API. Start it with: npm run dev:api (must run on http://localhost:4000).');
+      setError('Cannot connect to the database-backed route handler. Make sure the portal app is running and DATABASE_URL is set.');
       setLoading(false);
       return;
     }
@@ -400,7 +400,7 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
       }
 
       if (pdfPath) {
-        const base = pdfPath.startsWith('/api/') ? (typeof window !== 'undefined' ? window.location.origin : '') : API_BASE_URL;
+        const base = pdfPath.startsWith('/api/') ? (typeof window !== 'undefined' ? window.location.origin : '')  : ROUTE_BASE_URL;
         const pdfUrl = base + pdfPath;
         const res = await fetch(pdfUrl, { cache: 'no-store' });
         if (res.ok) {

@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { getApiBaseUrl } from '../../../lib/getApiBaseUrl';
 
 const COMPANY_NAME = 'Infinity Sporty';
-const API_BASE_URL = getApiBaseUrl();
+const ROUTE_BASE_URL = getApiBaseUrl();
 
 type ServiceType = 'basketball' | 'padel' | 'court-booking' | 'gym' | 'gymnastics';
 
@@ -46,7 +46,7 @@ export function CreateInvoiceFromSubscriptionModal({ open, onClose }: { open: bo
     const company = await getFirstCompany();
     
     if (!company || !company.id) {
-      setError('Company not found. The system tried to create "Infinity Sporty" but failed. Please check the API connection or create a company manually in the settings.');
+      setError('Company not found. The system tried to create "Infinity Sporty" but failed. Please check database connectivity or create a company manually in settings.');
       setLoading(false);
       return;
     }
@@ -108,7 +108,7 @@ export function CreateInvoiceFromSubscriptionModal({ open, onClose }: { open: bo
       }
 
       if (pdfPath) {
-        const base = pdfPath.startsWith('/api/') ? (typeof window !== 'undefined' ? window.location.origin : '') : API_BASE_URL;
+        const base = pdfPath.startsWith('/api/') ? (typeof window !== 'undefined' ? window.location.origin : '')  : ROUTE_BASE_URL;
         const pdfUrl = base + pdfPath;
         const res = await fetch(pdfUrl, { cache: 'no-store' });
         if (res.ok) {
@@ -233,3 +233,4 @@ export function CreateInvoiceFromSubscriptionModal({ open, onClose }: { open: bo
     </Modal>
   );
 }
+

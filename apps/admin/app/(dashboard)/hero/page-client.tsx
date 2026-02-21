@@ -55,7 +55,7 @@ export function HeroPageClient() {
         setContent({
           hero: {
             title: 'Error loading data',
-            subtitle: error instanceof Error ? error.message : 'Failed to connect to API',
+            subtitle: error instanceof Error ? error.message : 'Failed to connect to the data service',
             primaryCtaLabel: 'Retry',
             primaryCtaLink: '#',
           },
@@ -86,7 +86,7 @@ export function HeroPageClient() {
       <div className="p-6">
         <div className="text-center">
           <p className="text-lg font-semibold">Loading hero data...</p>
-          <p className="text-sm text-gray-500 mt-2">Connecting to API...</p>
+          <p className="text-sm text-gray-500 mt-2">Connecting to data service...</p>
         </div>
       </div>
     );
@@ -96,13 +96,11 @@ export function HeroPageClient() {
     return (
       <div className="p-6">
         <div className="rounded-lg border-2 border-red-200 bg-red-50 p-6">
-          <h3 className="text-lg font-semibold text-red-800 mb-2">⚠️ Cannot Connect to API</h3>
+          <h3 className="text-lg font-semibold text-red-800 mb-2">⚠️ Cannot Connect to Data Service</h3>
           <p className="text-red-700 mb-4">
-            Make sure the API server is running. Start it with:
+            Make sure the admin app is running and can access the database.
           </p>
-          <code className="block bg-white p-3 rounded border border-red-200 text-sm">
-            npm run dev:api
-          </code>
+          
           <p className="text-sm text-red-600 mt-4">
             Then refresh this page.
           </p>
@@ -150,4 +148,5 @@ export function HeroPageClient() {
     </>
   );
 }
+
 

@@ -1,24 +1,15 @@
-# Infinity Sports API - run from project root
-# Node >=20.19.0 required for SWC / @swc/helpers compatibility (e.g. Alpine/musl)
+# Infinity Sports web app (web/admin/portal all use Neon DB directly)
 FROM node:20.19-alpine
 
 WORKDIR /app
 
-# Copy whole project (monorepo needs all workspaces for npm install)
+# Copy whole monorepo (workspace install needs all package manifests)
 COPY . .
 
-# Install dependencies (from root - includes workspaces)
 RUN npm install
-
-# Generate Prisma client
 RUN npx prisma generate --schema=./prisma/schema.prisma
+RUN npm run build:web
 
-# Build the API
-RUN npm run build:api
+EXPOSE 3000
 
-EXPOSE 4000
-
-# Run migrations then start the API (docker-entrypoint.sh was copied with COPY . .)
-RUN chmod +x docker-entrypoint.sh
-ENTRYPOINT ["./docker-entrypoint.sh"]
-CMD ["node", "apps/api/dist/main"]
+CMD ["npm", "run", "start:web"]

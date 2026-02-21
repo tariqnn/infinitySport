@@ -1,27 +1,55 @@
 /// <reference lib="es2022" />
 import { NextResponse } from 'next/server';
+import type { Prisma } from '@prisma/client';
 
-const getApiBaseUrl = () => {
-  const envUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (envUrl) return envUrl.replace(/\/$/, '');
-  return `http://localhost:${process.env.API_PORT || '4000'}`;
-};
+function buildBlockedMap(
+  rows: Array<{ dayOfWeek: string; courtType: string; time: string; isBlocked: boolean }>,
+): Record<string, Record<string, string[]>> {
+  const blocked: Record<string, Record<string, string[]>> = {};
+  for (const row of rows) {
+    if (!row.isBlocked) continue;
+    const day = (row.dayOfWeek || '').toUpperCase();
+    if (!day) continue;
+    if (!blocked[day]) blocked[day] = {};
+    if (!blocked[day][row.courtType]) blocked[day][row.courtType] = [];
+    blocked[day][row.courtType].push(row.time);
+  }
+  return blocked;
+}
 
-// Returns { [day]: { [courtType]: time[] } } for slots where isBlocked=true (unavailable for booking).
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const res = await fetch(`${getApiBaseUrl()}/api/portal/blocked-slots`, { cache: 'no-store' });
-    if (!res.ok) return NextResponse.json({ blocked: {} });
-    const rows: { id: string; dayOfWeek: string; courtType: string; time: string; isBlocked: boolean }[] = await res.json();
-    const blocked: Record<string, Record<string, string[]>> = {};
-    for (const r of rows) {
-      if (!r.isBlocked) continue;
-      if (!blocked[r.dayOfWeek]) blocked[r.dayOfWeek] = {};
-      if (!blocked[r.dayOfWeek][r.courtType]) blocked[r.dayOfWeek][r.courtType] = [];
-      blocked[r.dayOfWeek][r.courtType].push(r.time);
+    if (!process.env.DATABASE_URL?.trim()) {
+      return NextResponse.json({ blocked: {} });
     }
-    return NextResponse.json({ blocked });
-  } catch {
+
+    const { searchParams } = new URL(request.url);
+    const date = searchParams.get('date');
+    const where: Prisma.BlockedSlotWhereInput = { isBlocked: true };
+
+    if (date) {
+      const d = new Date(date);
+      const start = new Date(d);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(d);
+      end.setHours(23, 59, 59, 999);
+      where.AND = [
+        { OR: [{ startDate: null }, { startDate: { lte: end } }] },
+        { OR: [{ endDate: null }, { endDate: { gte: start } }] },
+      ];
+    }
+
+    const { prisma } = await import('../../../../lib/db');
+    const rows = await prisma.blockedSlot.findMany({
+      where,
+      select: { dayOfWeek: true, courtType: true, time: true, isBlocked: true },
+    });
+
+    const res = NextResponse.json({ blocked: buildBlockedMap(rows) });
+    res.headers.set('Cache-Control', 'no-store');
+    return res;
+  } catch (error) {
+    console.error('[blocked-slots] error', error);
     return NextResponse.json({ blocked: {} });
   }
 }

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useActionState } from 'react';
 import { useActionToast } from '../../_components/useActionToast';
 import {
+  listBlockedSlotsAction,
   updateBlockedSlotAction,
   createClubBookingAction,
   updateClubBookingAction,
@@ -10,12 +11,6 @@ import {
   deleteBlockedSlotAction,
   deleteClubBookingByLabelAction,
 } from './actions';
-
-const getApiBaseUrl = () => {
-  if (process.env.NEXT_PUBLIC_API_BASE_URL) return process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (process.env.NODE_ENV === 'development') return 'http://localhost:4000';
-  return 'http://localhost:4000';
-};
 
 interface BlockedSlot {
   id: string;
@@ -105,37 +100,23 @@ export function BookingAvailabilityManager() {
     try {
       setLoading(true);
       setLoadError(null);
-      const url = `${getApiBaseUrl()}/api/portal/blocked-slots`;
-      const res = await fetch(url, { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : [];
-        setSlots(
-          list.map((s: Record<string, unknown>) => ({
-            id: String(s.id ?? ''),
-            dayOfWeek: String(s.dayOfWeek ?? ''),
-            courtType: String(s.courtType ?? ''),
-            time: String(s.time ?? ''),
-            isBlocked: Boolean(s.isBlocked !== false),
-            label: s.label != null ? String(s.label) : null,
-            startDate: s.startDate != null ? String(s.startDate) : null,
-            endDate: s.endDate != null ? String(s.endDate) : null,
-          }))
-        );
-      } else {
-        setSlots([]);
-        let msg = `API returned ${res.status}`;
-        try {
-          const err = await res.json();
-          if (err?.message) msg = err.message;
-        } catch {
-          /* ignore */
-        }
-        setLoadError(msg);
-      }
-    } catch (e) {
+      const data = await listBlockedSlotsAction();
+      const list = Array.isArray(data) ? data : [];
+      setSlots(
+        list.map((s: Record<string, unknown>) => ({
+          id: String(s.id ?? ''),
+          dayOfWeek: String(s.dayOfWeek ?? ''),
+          courtType: String(s.courtType ?? ''),
+          time: String(s.time ?? ''),
+          isBlocked: Boolean(s.isBlocked !== false),
+          label: s.label != null ? String(s.label) : null,
+          startDate: s.startDate != null ? String(s.startDate) : null,
+          endDate: s.endDate != null ? String(s.endDate) : null,
+        })),
+      );
+    } catch {
       setSlots([]);
-      setLoadError('Could not reach the API. Ensure it is running at ' + getApiBaseUrl());
+      setLoadError('Could not load blocked slots from the database.');
     } finally {
       setLoading(false);
     }
@@ -176,7 +157,6 @@ export function BookingAvailabilityManager() {
     return (
       <div className="glass-card p-8 text-center">
         <p className="text-[var(--text-muted)]">{loadError}</p>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">Start the API with: <code className="rounded bg-[var(--bg-card-muted)] px-1.5 py-0.5 text-[var(--text-primary)]">npm run dev:api</code></p>
         <button type="button" onClick={load} className="btn-primary mt-4">
           Retry
         </button>

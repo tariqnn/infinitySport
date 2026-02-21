@@ -1,5 +1,5 @@
 import { Card, CardBody, KPIStatCard, Badge } from './_components/ui';
-import { dashboardApi, bookingsApi, classesApi, inventoryApi, tasksApi, financeApi, packageRegistrationsApi } from '../lib/portalApi';
+import { bookingsApi, classesApi, inventoryApi, tasksApi, financeApi, packageRegistrationsApi } from '../lib/portalApi';
 import { getFirstCompany } from '../lib/portalApi';
 import { QuickActions } from './_components/QuickActions';
 import { 
@@ -10,13 +10,25 @@ import {
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 
+const DASHBOARD_TIMEZONE = process.env.PORTAL_TIMEZONE || 'Asia/Amman';
+
+function toDayKey(value: unknown): string | null {
+  const date = value instanceof Date ? value : new Date(String(value ?? ''));
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: DASHBOARD_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
 async function getDashboardData() {
   try {
     const company = await getFirstCompany();
     const companyId = company?.id;
 
-    const [stats, bookings, classes, inventory, tasks, invoices, registrations] = await Promise.all([
-      dashboardApi.stats(companyId),
+    const [bookingsResult, classesResult, inventoryResult, tasksResult, invoicesResult, registrationsResult] = await Promise.allSettled([
       bookingsApi.list(companyId),
       classesApi.list(companyId),
       inventoryApi.list(companyId),
@@ -24,6 +36,14 @@ async function getDashboardData() {
       financeApi.invoices.list(companyId),
       packageRegistrationsApi.list(),
     ]);
+
+    const bookings = bookingsResult.status === 'fulfilled' && Array.isArray(bookingsResult.value) ? bookingsResult.value : [];
+    const classes = classesResult.status === 'fulfilled' && Array.isArray(classesResult.value) ? classesResult.value : [];
+    const inventory = inventoryResult.status === 'fulfilled' && Array.isArray(inventoryResult.value) ? inventoryResult.value : [];
+    const tasks = tasksResult.status === 'fulfilled' && Array.isArray(tasksResult.value) ? tasksResult.value : [];
+    const invoices = invoicesResult.status === 'fulfilled' && Array.isArray(invoicesResult.value) ? invoicesResult.value : [];
+    const registrations =
+      registrationsResult.status === 'fulfilled' && Array.isArray(registrationsResult.value) ? registrationsResult.value : [];
 
     // Calculate upcoming bookings (next 7 days)
     const today = new Date();
@@ -63,16 +83,16 @@ async function getDashboardData() {
     const outstandingAmount = outstandingInvoices.reduce((sum: number, i: any) => sum + (i.amount ?? 0), 0);
 
     // Bookings today (same data as Bookings page)
+    const todayKey = toDayKey(new Date());
     const bookingsTodayList = Array.isArray(bookings) ? bookings.filter((b: any) => {
-      const bookingDate = new Date(b.startTime);
-      return bookingDate.toDateString() === today.toDateString();
+      if (!todayKey) return false;
+      return toDayKey(b.startTime) === todayKey;
     }) : [];
     const bookingsToday = bookingsTodayList.length;
     const bookingsTodayPending = bookingsTodayList.filter((b: any) => b.status === 'PENDING').length;
 
     return {
       companyId,
-      stats,
       upcomingBookings,
       upcomingClasses,
       lowInventory,
@@ -87,7 +107,6 @@ async function getDashboardData() {
     console.error('Failed to load dashboard data:', error);
     return {
       companyId: undefined,
-      stats: { totalMembers: 0, activeCoaches: 0, activeClasses: 0, activeSubscriptions: 0, pendingBookings: 0, pendingInvoices: 0, openTasks: 0, lowInventory: 0 },
       upcomingBookings: [],
       upcomingClasses: [],
       lowInventory: [],
@@ -103,7 +122,7 @@ async function getDashboardData() {
 
 export default async function DashboardPage() {
   const data = await getDashboardData();
-  const { companyId, stats, upcomingBookings, upcomingClasses, lowInventory, openTasks, outstandingAmount, outstandingInvoicesCount, activeMembersCount, bookingsToday, bookingsTodayPending } = data;
+  const { companyId, upcomingBookings, upcomingClasses, lowInventory, openTasks, outstandingAmount, outstandingInvoicesCount, activeMembersCount, bookingsToday, bookingsTodayPending } = data;
 
   return (
     <div className="space-y-6">
@@ -141,7 +160,7 @@ export default async function DashboardPage() {
         />
         <KPIStatCard
           label="Open Tasks"
-          value={stats.openTasks.toString()}
+          value={openTasks.length.toString()}
           caption="In progress"
           icon={<ClipboardDocumentCheckIcon className="h-5 w-5" />}
           iconTone="red"

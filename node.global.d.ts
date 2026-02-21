@@ -5,8 +5,6 @@
 declare namespace NodeJS {
   interface ProcessEnv {
     NODE_ENV?: "development" | "production" | "test";
-    API_RUNNING_LOCALLY?: string;
-    API_PORT?: string;
   }
 }
 

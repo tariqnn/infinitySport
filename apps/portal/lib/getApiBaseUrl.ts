@@ -1,14 +1,10 @@
-// Keep portal API base URL logic consistent with the rest of the monorepo (landing/admin).
-// - If NEXT_PUBLIC_API_BASE_URL is set, use it
-// - In development, default to http://localhost:4000 so Create Invoice and other API calls work without .env
-// - In production, default to the deployed API
+// Base URL for portal internal route calls.
+// - Browser: same-origin
+// - Server: can use PORTAL_INTERNAL_BASE_URL, otherwise default local portal dev port
 export function getApiBaseUrl() {
-  const envUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (typeof window !== 'undefined') return '';
+  const envUrl = process.env.PORTAL_INTERNAL_BASE_URL;
   if (envUrl) return envUrl.replace(/\/$/, '');
-
-  if (typeof process !== 'undefined' && process.env.NODE_ENV === 'development') {
-    return 'http://localhost:4000';
-  }
-  return 'http://localhost:4000';
+  return 'http://localhost:3002';
 }
 

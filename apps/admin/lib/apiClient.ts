@@ -1,23 +1,21 @@
-// Use deployed API URL in production; in development use local API unless overridden
+// Use same-origin route handlers by default. Optionally override via env.
 const getApiBaseUrl = () => {
-  const envUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (envUrl) return envUrl;
-  // In development, talk to local API so admin packages and other routes work
-  if (process.env.NODE_ENV === 'development') return 'http://localhost:4000';
-  return 'http://localhost:4000';
+  const envUrl = process.env.NEXT_PUBLIC_APP_BASE_URL;
+  if (envUrl) return envUrl.replace(/\/$/, '');
+  return '';
 };
 
-const API_BASE_URL = getApiBaseUrl();
+const ROUTE_BASE_URL = getApiBaseUrl();
 const REQUEST_TIMEOUT_MS = 12000;
 
 class ApiClient {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = API_BASE_URL;
-    // Log the API URL in development for debugging
+    this.baseUrl = ROUTE_BASE_URL;
+    // Log route base in development for debugging
     if (process.env.NODE_ENV === 'development') {
-      console.log('Admin API Client initialized with base URL:', this.baseUrl);
+      console.log('Admin route client initialized with base URL:', this.baseUrl || '(same-origin)');
     }
   }
 
@@ -59,7 +57,7 @@ class ApiClient {
       }
       if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
         throw new Error(
-          `Cannot connect to API at ${url}. Make sure the API server is running on ${this.baseUrl}`
+          `Cannot connect to route handler at ${url}. Make sure the admin app is running.`
         );
       }
       throw error;

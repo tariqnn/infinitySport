@@ -24,8 +24,7 @@ function toTimeStr(d: Date): string {
 
 /**
  * GET /api/booking/booked-slots?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
- * Returns { booked: { [dateStr]: { [courtType]: time[] } } } for existing (non‑cancelled) bookings.
- * Used by the landing booking form to grey out already-booked slots.
+ * Returns { booked: { [dateStr]: { [courtType]: time[] } } }. Uses DB when DATABASE_URL is set.
  */
 export async function GET(request: Request) {
   try {
@@ -37,10 +36,44 @@ export async function GET(request: Request) {
       d.setDate(d.getDate() + 30);
       endDate = toDateStr(d);
     }
-    // Include the day after so we cover 00:00 (midnight) slots on the last day
     const endNext = new Date(endDate);
     endNext.setDate(endNext.getDate() + 1);
     const endDateIso = toDateStr(endNext);
+
+    if (process.env.DATABASE_URL?.trim()) {
+      const { prisma } = await import('../../../../lib/db');
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDateIso);
+      end.setHours(23, 59, 59, 999);
+      const rows = await prisma.booking.findMany({
+        where: {
+          startTime: { lt: end },
+          endTime: { gt: start },
+          status: { not: 'CANCELLED' },
+          facilityArea: { in: [...COURT_TYPES] },
+        },
+        select: { facilityArea: true, startTime: true, endTime: true, status: true },
+      });
+      const booked: Record<string, Record<string, string[]>> = {};
+      for (const b of rows) {
+        if (b.status === 'CANCELLED') continue;
+        const ct = b.facilityArea && (COURT_TYPES as readonly string[]).includes(b.facilityArea) ? b.facilityArea : null;
+        if (!ct) continue;
+        const startT = new Date(b.startTime);
+        const endT = b.endTime ? new Date(b.endTime) : new Date(startT.getTime() + 60 * 60 * 1000);
+        let slot = new Date(startT);
+        while (slot.getTime() < endT.getTime()) {
+          const dateStr = toDateStr(slot);
+          const timeStr = toTimeStr(slot);
+          if (!booked[dateStr]) booked[dateStr] = {};
+          if (!booked[dateStr][ct]) booked[dateStr][ct] = [];
+          if (!booked[dateStr][ct].includes(timeStr)) booked[dateStr][ct].push(timeStr);
+          slot.setTime(slot.getTime() + 60 * 60 * 1000);
+        }
+      }
+      return NextResponse.json({ booked });
+    }
 
     const res = await fetch(
       `${getApiBaseUrl()}/api/portal/bookings?startDate=${startDate}&endDate=${endDateIso}`,
@@ -50,7 +83,6 @@ export async function GET(request: Request) {
 
     const rows: Array<{ facilityArea: string | null; startTime: string; endTime?: string; status: string }> = await res.json();
     const booked: Record<string, Record<string, string[]>> = {};
-
     for (const b of rows) {
       if (b.status === 'CANCELLED') continue;
       const ct = b.facilityArea && (COURT_TYPES as readonly string[]).includes(b.facilityArea) ? b.facilityArea : null;
@@ -67,7 +99,6 @@ export async function GET(request: Request) {
         slot.setTime(slot.getTime() + 60 * 60 * 1000);
       }
     }
-
     return NextResponse.json({ booked });
   } catch {
     return NextResponse.json({ booked: {} });

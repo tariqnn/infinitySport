@@ -106,16 +106,22 @@ export async function POST(request: Request) {
       customerAge: typeof customerAge === 'number' && customerAge > 0 ? customerAge : undefined,
     };
 
-    // 1) Prefer direct DB write when DATABASE_URL is set (works without the API).
-    const dbResult = await createRegistrationInDb(payload).catch((e) => {
-      console.warn('[package-registrations] DB create failed:', (e as Error)?.message);
-      return null;
-    });
-    if (dbResult) {
-      return NextResponse.json({ success: true, id: dbResult.id });
+    // 1) When DATABASE_URL is set, write directly to the DB (no API). Same DB as admin/portal – registrations show in both.
+    if (process.env.DATABASE_URL?.trim()) {
+      const dbResult = await createRegistrationInDb(payload).catch((e) => {
+        console.warn('[package-registrations] DB create failed:', (e as Error)?.message);
+        return null;
+      });
+      if (dbResult) {
+        return NextResponse.json({ success: true, id: dbResult.id });
+      }
+      return NextResponse.json(
+        { error: 'Unable to save registration. Please try again or contact us.' },
+        { status: 500 }
+      );
     }
 
-    // 2) Fallback: call the API (localhost or env override).
+    // 2) Fallback: call the API when DATABASE_URL is not set (e.g. API on another host).
     const baseUrl = getApiBaseUrl();
     const apiUrl = `${baseUrl}/api/portal/package-registrations`;
     const res = await fetchWithRetry(

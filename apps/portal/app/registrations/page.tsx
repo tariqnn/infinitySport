@@ -30,6 +30,7 @@ export default function RegistrationsPage() {
   const [customEndDate, setCustomEndDate] = useState<string>('');
   const [freezingId, setFreezingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [markingUnpaidId, setMarkingUnpaidId] = useState<string | null>(null);
   const [reregisteringId, setReregisteringId] = useState<string | null>(null);
   const [canceledDatesByPackage, setCanceledDatesByPackage] = useState<Record<string, Set<string>>>({});
 
@@ -281,6 +282,21 @@ export default function RegistrationsPage() {
     }
   }
 
+  async function handleMarkUnpaid(r: Registration) {
+    if (markingUnpaidId) return;
+    if (!confirm(`Mark ${r.customerName} as unpaid? All receipts for this registration will be voided. This cannot be undone.`)) return;
+    setMarkingUnpaidId(r.id);
+    try {
+      await packageRegistrationsApi.markUnpaid(r.id);
+      load();
+    } catch (e) {
+      console.error('Failed to mark as unpaid', e);
+      alert('Failed to mark as unpaid. Please try again.');
+    } finally {
+      setMarkingUnpaidId(null);
+    }
+  }
+
   function renderRemainingShort(row: Registration) {
     if (row.isFrozen) return <Badge variant="neutral">Frozen</Badge>;
     const end = getPeriodEnd(row);
@@ -426,6 +442,7 @@ export default function RegistrationsPage() {
                     return `${formatDateForExcel(date)} ${formatTimeForExcel(date)}`;
                   };
                   
+                  const periodStart = r.periodStartsAt ? new Date(r.periodStartsAt) : null;
                   const periodEnd = r.periodEndsAt ? new Date(r.periodEndsAt) : null;
                   const sessions = getSessionsRemaining(r as Registration);
                   const daysRemaining = getDaysRemaining(r as Registration);
@@ -463,6 +480,7 @@ export default function RegistrationsPage() {
                     collectedJod: String(collected),
                     paymentStatus,
                     isPaid: r.isPaid ? 'Yes' : 'No',
+                    periodStartsAt: periodStart ? formatDateForExcel(periodStart) : '',
                     periodEndsAt: periodEnd ? formatDateTimeForExcel(periodEnd) : '',
                     remainingType,
                     sessionsTotal: sessions ? String(sessions.total) : '',
@@ -488,6 +506,7 @@ export default function RegistrationsPage() {
                   'collectedJod',
                   'paymentStatus',
                   'isPaid',
+                  'periodStartsAt',
                   'periodEndsAt',
                   'remainingType',
                   'sessionsTotal',
@@ -523,13 +542,14 @@ export default function RegistrationsPage() {
             <table className="w-full border-collapse text-left table-fixed" style={{ tableLayout: 'fixed' }}>
               <thead className="sticky top-0 z-10 bg-ui-softBg border-b border-ui-border shadow-sm">
                 <tr>
-                  <th className="w-[17%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Package</th>
-                  <th className="w-[13%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Name</th>
-                  <th className="w-[15%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Contact</th>
-                  <th className="w-[5%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Age</th>
-                  <th className="w-[8%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Price</th>
-                  <th className="w-[11%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Payment</th>
-                  <th className="w-[11%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Remaining</th>
+                  <th className="w-[15%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Package</th>
+                  <th className="w-[12%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Name</th>
+                  <th className="w-[14%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Contact</th>
+                  <th className="w-[4%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Age</th>
+                  <th className="w-[7%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Price</th>
+                  <th className="w-[10%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Payment</th>
+                  <th className="w-[9%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Starts</th>
+                  <th className="w-[9%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Remaining</th>
                   <th className="w-[20%] min-w-0 sticky right-0 z-30 bg-ui-softBg border-l border-ui-border px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.06)]">Actions</th>
                 </tr>
               </thead>
@@ -567,6 +587,9 @@ export default function RegistrationsPage() {
                           {collected > 0 && <span className="text-xs text-ui-textMuted">{collected} JOD</span>}
                         </div>
                       </td>
+                      <td className="px-4 py-2 min-w-0 whitespace-nowrap text-sm text-ui-textPrimary">
+                        {row.periodStartsAt ? new Date(row.periodStartsAt).toLocaleDateString() : '—'}
+                      </td>
                       <td className="px-4 py-2 min-w-0">{renderRemainingShort(row)}</td>
                       <td className="sticky right-0 z-20 w-[20%] min-w-0 bg-background border-l border-ui-border px-4 py-2 overflow-visible">
                         <DropdownMenu.Root>
@@ -598,6 +621,15 @@ export default function RegistrationsPage() {
                                   onSelect={() => setViewReceiptsRegistration(row)}
                                 >
                                   View Receipt(s)
+                                </DropdownMenu.Item>
+                              )}
+                              {(paymentStatus === 'PAID' || paymentStatus === 'PARTIAL') && (
+                                <DropdownMenu.Item
+                                  className="cursor-pointer px-4 py-2 text-sm text-amber-700 outline-none hover:bg-amber-50 data-[highlighted]:bg-amber-50 disabled:opacity-50"
+                                  onSelect={() => handleMarkUnpaid(row)}
+                                  disabled={markingUnpaidId === row.id}
+                                >
+                                  Mark as Unpaid
                                 </DropdownMenu.Item>
                               )}
                               <DropdownMenu.Item

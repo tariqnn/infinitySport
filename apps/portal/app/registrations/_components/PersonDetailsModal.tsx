@@ -47,6 +47,9 @@ export function PersonDetailsModal({
                 <span className="font-medium text-ui-textPrimary">{r.packageName}</span>
                 <span className="ml-2 text-sm text-ui-textMuted">
                   {r.finalPriceJod ?? 0} JOD · {status}
+                  {r.periodStartsAt && (
+                    <span className="ml-2">· Starts {new Date(r.periodStartsAt).toLocaleDateString()}</span>
+                  )}
                 </span>
               </div>
               <div className="flex items-center gap-2">

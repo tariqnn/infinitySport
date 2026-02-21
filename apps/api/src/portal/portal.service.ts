@@ -1906,6 +1906,7 @@ export class PortalService {
         discountReason: r.discountReason ?? null,
         finalPriceJod: Number(r.finalPriceJod) ?? 0,
         collected,
+        periodStartsAt: r.periodStartsAt ?? null,
         periodEndsAt: r.periodEndsAt ?? null,
         isFrozen: r.isFrozen ?? false,
         frozenAt: r.frozenAt ?? null,
@@ -1940,6 +1941,7 @@ export class PortalService {
     discountType?: string;
     discountValue?: number | null;
     discountReason?: string | null;
+    periodStartsAt?: string | null; // ISO date when they will start (optional)
     createdBy?: string | null;
   }) {
     const pkg = (data.packageName || '').trim();
@@ -1957,7 +1959,10 @@ export class PortalService {
       throw new BadRequestException('Discount reason is required when applying a discount');
     const finalPriceJod = this.computeFinalPriceJod(basePriceJod, discountType, discountValue);
     const now = new Date();
-    const periodEndsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const periodStartsAt = data.periodStartsAt ? new Date(data.periodStartsAt) : null;
+    const periodEndsAt = periodStartsAt
+      ? new Date(periodStartsAt.getTime() + 30 * 24 * 60 * 60 * 1000)
+      : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     const { billingPeriodKey, priceLockedUntil } = this.billingPeriodFromDate(now);
     const discountApplied = discountType !== 'NONE';
 
@@ -2027,6 +2032,7 @@ export class PortalService {
         data: {
           billingPeriodKey,
           priceLockedUntil,
+          periodStartsAt: periodStartsAt ?? undefined,
           periodEndsAt,
           discountAppliedBy: discountApplied ? (data.createdBy ?? null) : null,
           discountAppliedAt: discountApplied ? now : null,
@@ -2056,6 +2062,7 @@ export class PortalService {
       discountValue: row.discountValue ?? null,
       discountReason: row.discountReason ?? null,
       finalPriceJod: row.finalPriceJod,
+      periodStartsAt: periodStartsAt ?? null,
       periodEndsAt,
       isFrozen: false,
       frozenAt: null,
@@ -2431,6 +2438,33 @@ export class PortalService {
     return { success: true };
   }
 
+  /** Mark registration as unpaid: set isPaid = false and void all active receipts (e.g. marked paid by mistake). */
+  async markRegistrationUnpaid(registrationId: string) {
+    const reg = await (this.prisma as any).packageRegistration.findUnique({
+      where: { id: registrationId },
+      include: { receipts: { where: { status: 'ACTIVE' } } },
+    });
+    if (!reg) throw new NotFoundException('Registration not found');
+    const reason = 'Marked as unpaid – correction';
+    for (const rec of reg.receipts || []) {
+      await (this.prisma as any).receipt.update({
+        where: { id: rec.id },
+        data: { status: 'VOIDED', voidedAt: new Date(), voidReason: reason },
+      });
+      await this.auditLog(null, 'RECEIPT_VOIDED', 'Receipt', rec.id, {
+        registrationId,
+        voidReason: reason,
+        markUnpaid: true,
+      });
+    }
+    await (this.prisma as any).packageRegistration.update({
+      where: { id: registrationId },
+      data: { isPaid: false },
+    });
+    await this.auditLog(null, 'MARK_UNPAID', 'Registration', registrationId, {});
+    return { success: true };
+  }
+
   async getRegistrationTotals(packageName?: string, startDate?: string, endDate?: string) {
     const where: any = {};
     if (packageName) where.packageName = packageName;
@@ -2512,6 +2546,7 @@ export class PortalService {
         discountType?: string;
         discountValue?: number | null;
         discountReason?: string | null;
+        periodStartsAt?: string | null;
       }>;
     },
   ) {
@@ -2554,6 +2589,10 @@ export class PortalService {
         const discountValue = discountType === 'NONE' ? null : (r.discountValue ?? 0);
         const finalPriceJod = this.computeFinalPriceJod(basePriceJod, discountType, discountValue);
         const discountApplied = discountType !== 'NONE';
+        const periodStartsAt = r.periodStartsAt ? new Date(r.periodStartsAt) : null;
+        const periodEndsAtItem = periodStartsAt
+          ? new Date(periodStartsAt.getTime() + 30 * 24 * 60 * 60 * 1000)
+          : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
         const row = await (this.prisma as any).packageRegistration.create({
           data: {
             packageName: pkg,
@@ -2570,7 +2609,8 @@ export class PortalService {
             finalPriceJod,
             billingPeriodKey,
             priceLockedUntil,
-            periodEndsAt,
+            periodStartsAt: periodStartsAt ?? undefined,
+            periodEndsAt: periodEndsAtItem,
           },
         });
         results.push({ success: true, id: row.id, row: i + 1 });
@@ -2602,6 +2642,7 @@ export class PortalService {
       discountType?: string;
       discountValue?: number | null;
       discountReason?: string | null;
+      periodStartsAt?: string | null;
     }>;
   }) {
     const person = data.person;
@@ -2651,6 +2692,10 @@ export class PortalService {
           throw new BadRequestException(`Discount reason required for package ${pkg}`);
         const finalPriceJod = this.computeFinalPriceJod(basePriceJod, discountType, discountValue);
         const discountApplied = discountType !== 'NONE';
+        const periodStartsAt = r.periodStartsAt ? new Date(r.periodStartsAt) : null;
+        const periodEndsAtItem = periodStartsAt
+          ? new Date(periodStartsAt.getTime() + 30 * 24 * 60 * 60 * 1000)
+          : periodEndsAt;
         const row = await tx.packageRegistration.create({
           data: {
             packageName: pkg,
@@ -2667,7 +2712,8 @@ export class PortalService {
             finalPriceJod,
             billingPeriodKey,
             priceLockedUntil,
-            periodEndsAt,
+            periodStartsAt: periodStartsAt ?? undefined,
+            periodEndsAt: periodEndsAtItem,
           },
         });
         out.push({

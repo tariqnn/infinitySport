@@ -44,6 +44,14 @@ export function RegistrationDetailsModal({
             {new Date(registration.createdAt).toLocaleString()}
           </p>
         </div>
+        {registration.periodStartsAt && (
+          <div>
+            <p className="text-ui-textMuted">Starts</p>
+            <p className="text-ui-textPrimary">
+              {new Date(registration.periodStartsAt).toLocaleDateString()}
+            </p>
+          </div>
+        )}
         <div>
           <p className="text-ui-textMuted">Payment</p>
           <p className="text-ui-textPrimary">

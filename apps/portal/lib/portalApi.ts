@@ -336,7 +336,7 @@ export const packageRegistrationsApi = {
     const query = params.toString() ? `?${params.toString()}` : '';
     return portalFetch<RegistrationTotals>(`/portal/package-registrations/totals${query}`);
   },
-  bulkCreate: (data: { startDate?: string | null; registrations: Array<{ packageName: string; customerName: string; customerPhone: string; customerEmail?: string | null; customerAge?: number | null; basePriceJod?: number }> }) =>
+  bulkCreate: (data: { startDate?: string | null; registrations: Array<{ packageName: string; customerName: string; customerPhone: string; customerEmail?: string | null; customerAge?: number | null; basePriceJod?: number; periodStartsAt?: string | null }> }) =>
     portalFetch<{ results: Array<{ success: boolean; id?: string; row?: number; error?: string }> }>('/portal/package-registrations/bulk', { method: 'POST', body: JSON.stringify(data) }),
   bulkCreateForPerson: (data: {
     person: { customerName: string; customerPhone: string; customerEmail?: string | null; customerAge?: number | null };
@@ -347,6 +347,7 @@ export const packageRegistrationsApi = {
       discountType?: string;
       discountValue?: number | null;
       discountReason?: string | null;
+      periodStartsAt?: string | null;
     }>;
   }) =>
     portalFetch<{ created: number; registrations: PackageRegistrationRow[] }>('/portal/package-registrations/bulk-for-person', { method: 'POST', body: JSON.stringify(data) }),
@@ -358,7 +359,7 @@ export const packageRegistrationsApi = {
   markPaid: (id: string, data: { amountPaid: number; paymentMethod: string; privateNote: string }) =>
     portalFetch<ReceiptRow>(`/portal/package-registrations/${id}/mark-paid`, { method: 'POST', body: JSON.stringify(data) }),
   markUnpaid: (id: string, voidReason?: string) =>
-    portalFetch<{ success: boolean; voidedCount: number }>(`/portal/package-registrations/${id}/mark-unpaid`, {
+    portalFetch<{ success: boolean; voidedCount?: number }>(`/portal/package-registrations/${id}/mark-unpaid`, {
       method: 'POST',
       body: JSON.stringify({ voidReason: voidReason ?? 'Marked as unpaid by staff' }),
     }),

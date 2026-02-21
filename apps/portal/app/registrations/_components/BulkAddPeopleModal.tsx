@@ -25,6 +25,7 @@ type Row = {
   customerPhone: string;
   customerEmail: string;
   customerAge: string;
+  periodStartsAt: string; // when they will start (YYYY-MM-DD)
 };
 
 function createEmptyRow(): Row {
@@ -35,6 +36,7 @@ function createEmptyRow(): Row {
     customerPhone: '',
     customerEmail: '',
     customerAge: '',
+    periodStartsAt: '',
   };
 }
 
@@ -63,6 +65,7 @@ function parsePaste(text: string): Row[] {
       customerPhone: parts[2] || '',
       customerEmail: parts[3] || '',
       customerAge: parts[4] || '',
+      periodStartsAt: parts[5] || '',
     };
   });
 }
@@ -169,6 +172,7 @@ export function BulkAddPeopleModal({
         customerEmail: (r.customerEmail || '').trim() || undefined,
         customerAge: (r.customerAge || '').trim() ? parseInt(r.customerAge, 10) : undefined,
         basePriceJod: basePriceJod != null ? basePriceJod : undefined,
+        periodStartsAt: (r.periodStartsAt || '').trim() || undefined,
       };
     });
 
@@ -273,6 +277,7 @@ export function BulkAddPeopleModal({
                       <th className="text-left font-semibold text-ui-textMuted px-3 py-2.5">Phone</th>
                       <th className="text-left font-semibold text-ui-textMuted px-3 py-2.5">Email</th>
                       <th className="text-left font-semibold text-ui-textMuted px-3 py-2.5 w-[80px]">Age</th>
+                      <th className="text-left font-semibold text-ui-textMuted px-3 py-2.5 w-[120px]">Starts</th>
                       <th className="w-10 px-2 py-2.5" aria-label="Actions" />
                     </tr>
                   </thead>
@@ -344,6 +349,14 @@ export function BulkAddPeopleModal({
                             />
                             {errors.age && <p className="text-xs text-red-600 mt-0.5">{errors.age}</p>}
                           </td>
+                          <td className="align-top px-3 py-2">
+                            <input
+                              type="date"
+                              value={row.periodStartsAt}
+                              onChange={(e) => updateRow(row.id, 'periodStartsAt', e.target.value)}
+                              className="w-full min-w-0 min-h-[36px] rounded-lg border border-ui-border bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primaryBlue/20"
+                            />
+                          </td>
                           <td className="align-middle px-2 py-2">
                             <button
                               type="button"
@@ -380,7 +393,7 @@ export function BulkAddPeopleModal({
                 setPasteText(e.target.value);
                 setPastePreview(null);
               }}
-              placeholder={`Paste rows from Excel/Sheets (tab or comma separated):\nPackage | Name | Phone | Email | Age`}
+              placeholder={`Paste rows from Excel/Sheets (tab or comma separated):\nPackage | Name | Phone | Email | Age | Start date`}
               rows={8}
               className="w-full rounded-xl border border-ui-border bg-white px-3 py-3 text-sm placeholder:text-ui-textMuted focus:outline-none focus:ring-2 focus:ring-brand-primaryBlue/20 resize-y min-h-[160px]"
             />
@@ -415,6 +428,7 @@ export function BulkAddPeopleModal({
                         <th className="text-left font-semibold text-ui-textMuted px-3 py-2">Phone</th>
                         <th className="text-left font-semibold text-ui-textMuted px-3 py-2">Email</th>
                         <th className="text-left font-semibold text-ui-textMuted px-3 py-2">Age</th>
+                        <th className="text-left font-semibold text-ui-textMuted px-3 py-2">Starts</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -432,6 +446,7 @@ export function BulkAddPeopleModal({
                           <td className="px-3 py-2 text-ui-textPrimary">{row.customerPhone || '—'}</td>
                           <td className="px-3 py-2 text-ui-textMuted">{row.customerEmail || '—'}</td>
                           <td className="px-3 py-2 text-ui-textMuted">{row.customerAge || '—'}</td>
+                          <td className="px-3 py-2 text-ui-textMuted">{row.periodStartsAt || '—'}</td>
                         </tr>
                       ))}
                     </tbody>

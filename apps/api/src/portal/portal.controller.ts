@@ -623,6 +623,7 @@ export class PortalController {
         discountType?: string;
         discountValue?: number | null;
         discountReason?: string | null;
+        periodStartsAt?: string | null;
       }>;
     },
   ) {
@@ -641,6 +642,7 @@ export class PortalController {
         discountType?: string;
         discountValue?: number | null;
         discountReason?: string | null;
+        periodStartsAt?: string | null;
       }>;
     },
   ) {

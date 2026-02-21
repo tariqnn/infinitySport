@@ -58,6 +58,7 @@ export function AddRegistrationModal({
   const [discountType, setDiscountType] = useState<'NONE' | 'PERCENT' | 'AMOUNT'>('NONE');
   const [discountValue, setDiscountValue] = useState<string>('');
   const [discountReason, setDiscountReason] = useState('');
+  const [periodStartsAt, setPeriodStartsAt] = useState(''); // when they will start (YYYY-MM-DD)
   const [pricing, setPricing] = useState<Array<{ packageName: string; basePriceJod: number | null }>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,7 +130,7 @@ export function AddRegistrationModal({
         discountType,
         discountValue: discountType === 'NONE' ? null : discountVal,
         discountReason: discountType === 'NONE' ? undefined : discountReason.trim(),
-        periodStartsAt: startDate.trim() ? startDate.trim() : undefined,
+        periodStartsAt: periodStartsAt.trim() || undefined,
       });
       onSuccess();
       onClose();
@@ -141,6 +142,7 @@ export function AddRegistrationModal({
       setDiscountType('NONE');
       setDiscountValue('');
       setDiscountReason('');
+      setPeriodStartsAt('');
     } catch (err: any) {
       setError(err?.message || 'Failed to add registration');
     } finally {
@@ -166,6 +168,13 @@ export function AddRegistrationModal({
         <Input label="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} required placeholder="Phone" />
         <Input label="Email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} placeholder="Email (optional)" />
         <Input label="Age" type="number" value={customerAge} onChange={(e) => setCustomerAge(e.target.value)} placeholder="Age (optional)" />
+        <Input
+          label="When they will start"
+          type="date"
+          value={periodStartsAt}
+          onChange={(e) => setPeriodStartsAt(e.target.value)}
+          placeholder="Optional start date"
+        />
 
         <Input
           label="Start date (optional)"

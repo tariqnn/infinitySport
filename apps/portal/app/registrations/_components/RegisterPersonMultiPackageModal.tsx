@@ -78,7 +78,7 @@ export function RegisterPersonMultiPackageModal({
   const [newAge, setNewAge] = useState('');
   const [selectedPackages, setSelectedPackages] = useState<Set<string>>(new Set());
   const [packageConfigs, setPackageConfigs] = useState<Record<string, PackageConfig>>({});
-  const [startDate, setStartDate] = useState('');
+  const [periodStartsAt, setPeriodStartsAt] = useState(''); // when they will start (optional)
   const [pricing, setPricing] = useState<Array<{ packageName: string; basePriceJod: number | null }>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -180,6 +180,7 @@ export function RegisterPersonMultiPackageModal({
           discountType,
           discountValue: discountType === 'NONE' ? null : discountVal,
           discountReason: discountType === 'NONE' ? undefined : (c?.discountReason ?? '').trim(),
+          periodStartsAt: periodStartsAt.trim() || undefined,
         };
       });
       const res = await packageRegistrationsApi.bulkCreateForPerson({
@@ -337,6 +338,15 @@ export function RegisterPersonMultiPackageModal({
                 </div>
               );
             })}
+          </div>
+          <div className="mt-4">
+            <Input
+              label="When they will start"
+              type="date"
+              value={periodStartsAt}
+              onChange={(e) => setPeriodStartsAt(e.target.value)}
+              placeholder="Optional start date for all"
+            />
           </div>
           <div className="mt-6 flex justify-between">
             <Button variant="secondary" onClick={() => setStep(2)}>Back</Button>

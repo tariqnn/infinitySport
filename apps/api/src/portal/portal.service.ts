@@ -1941,6 +1941,7 @@ export class PortalService {
     discountType?: string;
     discountValue?: number | null;
     discountReason?: string | null;
+    periodStartsAt?: string | null; // ISO date when they will start (optional)
     createdBy?: string | null;
     periodStartsAt?: string | null;
   }) {
@@ -1959,9 +1960,11 @@ export class PortalService {
       throw new BadRequestException('Discount reason is required when applying a discount');
     const finalPriceJod = this.computeFinalPriceJod(basePriceJod, discountType, discountValue);
     const now = new Date();
-    const periodStartsAt = data.periodStartsAt ? new Date(data.periodStartsAt) : now;
-    const periodEndsAt = new Date(periodStartsAt.getTime() + 30 * 24 * 60 * 60 * 1000);
-    const { billingPeriodKey, priceLockedUntil } = this.billingPeriodFromDate(periodStartsAt);
+    const periodStartsAt = data.periodStartsAt ? new Date(data.periodStartsAt) : null;
+    const periodEndsAt = periodStartsAt
+      ? new Date(periodStartsAt.getTime() + 30 * 24 * 60 * 60 * 1000)
+      : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const { billingPeriodKey, priceLockedUntil } = this.billingPeriodFromDate(now);
     const discountApplied = discountType !== 'NONE';
 
     // Production safety: some deployments may have an older DB schema (missing newer columns).
@@ -2030,7 +2033,7 @@ export class PortalService {
         data: {
           billingPeriodKey,
           priceLockedUntil,
-          periodStartsAt,
+          periodStartsAt: periodStartsAt ?? undefined,
           periodEndsAt,
           discountAppliedBy: discountApplied ? (data.createdBy ?? null) : null,
           discountAppliedAt: discountApplied ? now : null,
@@ -2060,7 +2063,7 @@ export class PortalService {
       discountValue: row.discountValue ?? null,
       discountReason: row.discountReason ?? null,
       finalPriceJod: row.finalPriceJod,
-      periodStartsAt,
+      periodStartsAt: periodStartsAt ?? null,
       periodEndsAt,
       isFrozen: false,
       frozenAt: null,
@@ -2538,6 +2541,7 @@ export class PortalService {
         discountType?: string;
         discountValue?: number | null;
         discountReason?: string | null;
+        periodStartsAt?: string | null;
       }>;
     },
   ) {
@@ -2581,6 +2585,10 @@ export class PortalService {
         const discountValue = discountType === 'NONE' ? null : (r.discountValue ?? 0);
         const finalPriceJod = this.computeFinalPriceJod(basePriceJod, discountType, discountValue);
         const discountApplied = discountType !== 'NONE';
+        const periodStartsAt = r.periodStartsAt ? new Date(r.periodStartsAt) : null;
+        const periodEndsAtItem = periodStartsAt
+          ? new Date(periodStartsAt.getTime() + 30 * 24 * 60 * 60 * 1000)
+          : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
         const row = await (this.prisma as any).packageRegistration.create({
           data: {
             packageName: pkg,
@@ -2597,8 +2605,8 @@ export class PortalService {
             finalPriceJod,
             billingPeriodKey,
             priceLockedUntil,
-            periodStartsAt,
-            periodEndsAt,
+            periodStartsAt: periodStartsAt ?? undefined,
+            periodEndsAt: periodEndsAtItem,
           },
         });
         results.push({ success: true, id: row.id, row: i + 1 });
@@ -2631,6 +2639,7 @@ export class PortalService {
       discountType?: string;
       discountValue?: number | null;
       discountReason?: string | null;
+      periodStartsAt?: string | null;
     }>;
   }) {
     const person = data.person;
@@ -2681,6 +2690,10 @@ export class PortalService {
           throw new BadRequestException(`Discount reason required for package ${pkg}`);
         const finalPriceJod = this.computeFinalPriceJod(basePriceJod, discountType, discountValue);
         const discountApplied = discountType !== 'NONE';
+        const periodStartsAt = r.periodStartsAt ? new Date(r.periodStartsAt) : null;
+        const periodEndsAtItem = periodStartsAt
+          ? new Date(periodStartsAt.getTime() + 30 * 24 * 60 * 60 * 1000)
+          : periodEndsAt;
         const row = await tx.packageRegistration.create({
           data: {
             packageName: pkg,
@@ -2697,8 +2710,8 @@ export class PortalService {
             finalPriceJod,
             billingPeriodKey,
             priceLockedUntil,
-            periodStartsAt,
-            periodEndsAt,
+            periodStartsAt: periodStartsAt ?? undefined,
+            periodEndsAt: periodEndsAtItem,
           },
         });
         out.push({

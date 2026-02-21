@@ -580,6 +580,7 @@ model PackageRegistration {
   finalPriceJod    Int       // snapshot: base - discount, clamped >= 0
   billingPeriodKey String?   // e.g. "YYYY-MM" for price lock scope
   priceLockedUntil DateTime? // optional end of billing period
+  periodStartsAt   DateTime? // when they will start (optional; used for periodEndsAt = periodStartsAt + 30d)
   periodEndsAt     DateTime?
   isFrozen         Boolean   @default(false)
   frozenAt         DateTime?

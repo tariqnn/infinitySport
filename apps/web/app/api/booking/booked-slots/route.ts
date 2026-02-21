@@ -1,6 +1,11 @@
 /// <reference lib="es2022" />
 import { NextResponse } from 'next/server';
 
+/**
+ * Landing booking: already-booked slots (red) are read DIRECTLY from the database.
+ * When DATABASE_URL is set we use only Prisma – no external API. Same DB as admin/portal.
+ */
+
 const getApiBaseUrl = () => {
   const envUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
   if (envUrl) return envUrl.replace(/\/$/, '');
@@ -79,6 +84,11 @@ export async function GET(request: Request) {
         console.error('[booked-slots] DB read failed:', err?.message ?? String(e));
         return NextResponse.json({ booked: {} });
       }
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[booked-slots] DATABASE_URL is required in production for direct DB.');
+      return NextResponse.json({ booked: {} });
     }
 
     const res = await fetch(

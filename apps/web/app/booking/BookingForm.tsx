@@ -149,7 +149,7 @@ export function BookingForm() {
     fetch(url)
       .then((r) => r.json())
       .then((d) => {
-        if (d?.blocked && typeof d.blocked === 'object') setBlocked(d.blocked);
+        if (d?.blocked && typeof d.blocked === 'object' && Object.keys(d.blocked).length > 0) setBlocked(d.blocked);
       })
       .catch(() => {});
   }, [selectedDate]);

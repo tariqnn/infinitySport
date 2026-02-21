@@ -2,7 +2,11 @@
 import { NextResponse } from 'next/server';
 import { isValidPhoneNumber } from '../../../lib/phoneValidation';
 
-// Default: local API only. Set API_BASE_URL / NEXT_PUBLIC_API_BASE_URL if API is elsewhere.
+/**
+ * Landing booking: when DATABASE_URL is set, bookings are saved DIRECTLY to the database
+ * (same DB as admin/portal). Blocked/conflict checks also use the DB. No external API.
+ */
+
 const getApiBaseUrl = () => {
   const envUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
   if (envUrl) return envUrl.replace(/\/$/, '');
@@ -193,6 +197,14 @@ async function fetchBlockedMap(): Promise<Record<string, Partial<Record<CourtTyp
 
 export async function POST(request: Request) {
   try {
+    if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL?.trim()) {
+      console.error('[booking] DATABASE_URL is required in production. Bookings go directly to the database.');
+      return NextResponse.json(
+        { error: 'Booking is temporarily unavailable. Please try again later or contact us.' },
+        { status: 503 }
+      );
+    }
+
     const body = await request.json();
     const { courtId, courtName, date, time, duration, name, phone, email } = body ?? {};
 
@@ -329,12 +341,11 @@ export async function POST(request: Request) {
       console.error('WhatsApp sending error:', whatsAppError);
     }
 
-    // Save booking to database (same DB as API). Reflects in admin and portal when they call the API.
+    // Save booking directly to database (same DB as admin/portal). No external API when DATABASE_URL is set.
     const courtTypeForBooking = courtTypeForId(courtId);
     if (process.env.DATABASE_URL?.trim()) {
       try {
         const { prisma } = await import('../../../lib/db');
-        // Use same company as portal (newest first) so landing-page bookings show in portal and admin
         let company = await prisma.company.findFirst({ where: { status: 'ACTIVE' }, orderBy: { createdAt: 'desc' }, select: { id: true } });
         if (!company) {
           company = await prisma.company.create({
@@ -416,6 +427,10 @@ export async function POST(request: Request) {
         }
       } catch (dbError) {
         console.error('Database error:', dbError);
+        return NextResponse.json(
+          { error: 'Failed to save booking. Please try again or contact us.' },
+          { status: 500 }
+        );
       }
     }
 

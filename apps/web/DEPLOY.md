@@ -1,9 +1,14 @@
 # Web app (landing) deployment
 
-## Bookings and registrations: direct DB vs API
+## Bookings: direct to database (no external API)
 
-1. **When `DATABASE_URL` is set** → writes directly to the database (same as admin/portal).
-2. **When `DATABASE_URL` is not set** → calls the external API (often fails in production if API URL is wrong).
+The landing booking form is **directly connected to the database**:
+
+- **Blocked slots (red/unavailable)** – read from the DB via `BlockedSlot` when `DATABASE_URL` is set.
+- **Already booked slots (red)** – read from the DB via `Booking` when `DATABASE_URL` is set.
+- **Submit booking** – saved directly to the DB via `Booking` when `DATABASE_URL` is set.
+
+There is **no external booking API** in between: the same Next.js app uses Prisma to read and write the same database as admin/portal. In **production**, `DATABASE_URL` is **required**; if it is missing, the app returns 503 and does not call any external API.
 
 ## If DATABASE_URL is set but it still doesn’t work in production
 

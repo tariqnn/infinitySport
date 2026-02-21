@@ -1,6 +1,11 @@
 /// <reference lib="es2022" />
 import { NextResponse } from 'next/server';
 
+/**
+ * Landing booking: blocked slots (red/unavailable) are read DIRECTLY from the database.
+ * When DATABASE_URL is set we use only Prisma – no external API. Same DB as admin/portal.
+ */
+
 const getApiBaseUrl = () => {
   const envUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
   if (envUrl) return envUrl.replace(/\/$/, '');
@@ -14,14 +19,16 @@ function buildBlockedMap(
   const blocked: Record<string, Record<string, string[]>> = {};
   for (const r of rows) {
     if (!r.isBlocked) continue;
-    if (!blocked[r.dayOfWeek]) blocked[r.dayOfWeek] = {};
-    if (!blocked[r.dayOfWeek][r.courtType]) blocked[r.dayOfWeek][r.courtType] = [];
-    blocked[r.dayOfWeek][r.courtType].push(r.time);
+    const day = (r.dayOfWeek || '').toUpperCase();
+    if (!day) continue;
+    if (!blocked[day]) blocked[day] = {};
+    if (!blocked[day][r.courtType]) blocked[day][r.courtType] = [];
+    blocked[day][r.courtType].push(r.time);
   }
   return blocked;
 }
 
-// Returns { blocked: { [day]: { [courtType]: time[] } } }. Uses DB when DATABASE_URL is set.
+/** GET: returns { blocked: { [day]: { [courtType]: time[] } } }. Direct from DB when DATABASE_URL is set. */
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -52,6 +59,11 @@ export async function GET(request: Request) {
         console.error('[blocked-slots] DB read failed:', err?.message ?? String(e));
         return NextResponse.json({ blocked: {} });
       }
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[blocked-slots] DATABASE_URL is required in production for direct DB.');
+      return NextResponse.json({ blocked: {} });
     }
 
     let url = `${getApiBaseUrl()}/api/portal/blocked-slots`;

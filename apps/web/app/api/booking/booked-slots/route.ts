@@ -1,5 +1,6 @@
 /// <reference lib="es2022" />
 import { NextResponse } from 'next/server';
+import { canAttemptDatabaseQuery, noteDatabaseFailure } from '../../../../lib/dbGuard';
 
 const COURT_TYPES = ['Basketball AC', 'Basketball 3x3', 'Padel', 'Volleyball'] as const;
 
@@ -19,6 +20,9 @@ function toTimeStr(d: Date): string {
 export async function GET(request: Request) {
   try {
     if (!process.env.DATABASE_URL?.trim()) {
+      return NextResponse.json({ booked: {} });
+    }
+    if (!(await canAttemptDatabaseQuery())) {
       return NextResponse.json({ booked: {} });
     }
 
@@ -74,6 +78,7 @@ export async function GET(request: Request) {
     res.headers.set('Cache-Control', 'no-store');
     return res;
   } catch (error) {
+    noteDatabaseFailure('booked-slots.GET', error);
     console.error('[booked-slots] error', error);
     return NextResponse.json({ booked: {} });
   }

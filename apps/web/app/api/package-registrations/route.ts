@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { isValidPhoneNumber } from "../../../lib/phoneValidation";
+import { canAttemptDatabaseQuery, noteDatabaseFailure } from "../../../lib/dbGuard";
 
 function ensureDatabaseUrl(): boolean {
   const explicitCandidates = [
@@ -162,6 +163,12 @@ export async function POST(request: Request) {
         { status: 503 },
       );
     }
+    if (!(await canAttemptDatabaseQuery())) {
+      return NextResponse.json(
+        { error: "Registration is unavailable. Please try again later." },
+        { status: 503 },
+      );
+    }
 
     const body = await request.json();
     const {
@@ -246,10 +253,16 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, id: row.id });
   } catch (error) {
+    noteDatabaseFailure("package-registrations.POST", error);
     console.error("[package-registrations] error", error);
+    const status =
+      (error as { code?: string }).code === "P1001" ||
+      (error as { code?: string }).code === "P1002"
+        ? 503
+        : 500;
     return NextResponse.json(
       { error: "Unable to save registration. Please try again or contact us." },
-      { status: 500 },
+      { status },
     );
   }
 }

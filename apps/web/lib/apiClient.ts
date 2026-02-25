@@ -7,6 +7,7 @@ import type {
   LandingProgram,
 } from '@infinity/types';
 import { cache } from 'react';
+import { canAttemptDatabaseQuery, noteDatabaseFailure } from './dbGuard';
 
 export type ProgramResponse = {
   id: string;
@@ -89,6 +90,7 @@ async function getPrisma() {
 
 export async function fetchPrograms(): Promise<ProgramResponse[]> {
   if (!canUseDb()) return [];
+  if (!(await canAttemptDatabaseQuery())) return [];
   try {
     const prisma = await getPrisma();
     const rows = await prisma.program.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] });
@@ -100,13 +102,15 @@ export async function fetchPrograms(): Promise<ProgramResponse[]> {
       highlight: row.highlight,
       level: row.level ?? undefined,
     }));
-  } catch {
+  } catch (error) {
+    noteDatabaseFailure('fetchPrograms', error);
     return [];
   }
 }
 
 export async function fetchPackages(): Promise<PackageResponse[]> {
   if (!canUseDb()) return [];
+  if (!(await canAttemptDatabaseQuery())) return [];
   try {
     const prisma = await getPrisma();
     const rows = await prisma.package.findMany({
@@ -127,13 +131,15 @@ export async function fetchPackages(): Promise<PackageResponse[]> {
       isActive: row.isActive,
       sortOrder: row.sortOrder,
     }));
-  } catch {
+  } catch (error) {
+    noteDatabaseFailure('fetchPackages', error);
     return [];
   }
 }
 
 export async function fetchOffers(): Promise<OfferResponse[]> {
   if (!canUseDb()) return [];
+  if (!(await canAttemptDatabaseQuery())) return [];
   try {
     const prisma = await getPrisma();
     const rows = await prisma.offer.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] });
@@ -148,13 +154,15 @@ export async function fetchOffers(): Promise<OfferResponse[]> {
       isActive: true,
       link: undefined,
     }));
-  } catch {
+  } catch (error) {
+    noteDatabaseFailure('fetchOffers', error);
     return [];
   }
 }
 
 export async function fetchEvents(): Promise<EventResponse[]> {
   if (!canUseDb()) return [];
+  if (!(await canAttemptDatabaseQuery())) return [];
   try {
     const prisma = await getPrisma();
     const rows = await prisma.event.findMany({ orderBy: { date: 'asc' } });
@@ -167,13 +175,21 @@ export async function fetchEvents(): Promise<EventResponse[]> {
       link: undefined,
       highlight: row.highlight,
     }));
-  } catch {
+  } catch (error) {
+    noteDatabaseFailure('fetchEvents', error);
     return [];
   }
 }
 
 export async function fetchFacilities(): Promise<FacilityResponse[]> {
   if (!canUseDb()) {
+    return FALLBACK_FACILITIES.map((item) => ({
+      id: item.id,
+      name: item.name,
+      description: item.description,
+    }));
+  }
+  if (!(await canAttemptDatabaseQuery())) {
     return FALLBACK_FACILITIES.map((item) => ({
       id: item.id,
       name: item.name,
@@ -198,7 +214,8 @@ export async function fetchFacilities(): Promise<FacilityResponse[]> {
       imageUrl: row.imageUrl ?? undefined,
       specs: undefined,
     }));
-  } catch {
+  } catch (error) {
+    noteDatabaseFailure('fetchFacilities', error);
     return FALLBACK_FACILITIES.map((item) => ({
       id: item.id,
       name: item.name,
@@ -209,6 +226,7 @@ export async function fetchFacilities(): Promise<FacilityResponse[]> {
 
 export async function fetchAnnouncements(): Promise<AnnouncementResponse[]> {
   if (!canUseDb()) return [];
+  if (!(await canAttemptDatabaseQuery())) return [];
   try {
     const prisma = await getPrisma();
     const rows = await prisma.announcement.findMany({ orderBy: [{ isPinned: 'desc' }, { publishedAt: 'desc' }] });
@@ -218,7 +236,8 @@ export async function fetchAnnouncements(): Promise<AnnouncementResponse[]> {
       body: row.body,
       isPinned: row.isPinned,
     }));
-  } catch {
+  } catch (error) {
+    noteDatabaseFailure('fetchAnnouncements', error);
     return [];
   }
 }
@@ -261,18 +280,17 @@ export function getLandingFallback(): LandingContent {
 
 async function _fetchLandingContent(): Promise<LandingContent> {
   if (!canUseDb()) return getLandingFallback();
+  if (!(await canAttemptDatabaseQuery())) return getLandingFallback();
 
   try {
     const prisma = await getPrisma();
-    const [hero, programs, offers, events, announcements, facilities, footerSettings] = await Promise.all([
-      prisma.heroSection.findFirst({ orderBy: { updatedAt: 'desc' } }),
-      prisma.program.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }),
-      prisma.offer.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }),
-      prisma.event.findMany({ orderBy: { date: 'asc' } }),
-      prisma.announcement.findMany({ orderBy: [{ isPinned: 'desc' }, { publishedAt: 'desc' }] }),
-      prisma.facilityHighlight.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }),
-      prisma.footerSettings.findFirst({ orderBy: { updatedAt: 'desc' } }),
-    ]);
+    const hero = await prisma.heroSection.findFirst({ orderBy: { updatedAt: 'desc' } });
+    const programs = await prisma.program.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] });
+    const offers = await prisma.offer.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] });
+    const events = await prisma.event.findMany({ orderBy: { date: 'asc' } });
+    const announcements = await prisma.announcement.findMany({ orderBy: [{ isPinned: 'desc' }, { publishedAt: 'desc' }] });
+    const facilities = await prisma.facilityHighlight.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] });
+    const footerSettings = await prisma.footerSettings.findFirst({ orderBy: { updatedAt: 'desc' } });
 
     const fallback = getLandingFallback();
     const rawSocialLinks = footerSettings?.socialLinks;
@@ -365,7 +383,8 @@ async function _fetchLandingContent(): Promise<LandingContent> {
       updatedAt: new Date().toISOString(),
       updatedBy: 'System',
     };
-  } catch {
+  } catch (error) {
+    noteDatabaseFailure('fetchLandingContent', error);
     return getLandingFallback();
   }
 }

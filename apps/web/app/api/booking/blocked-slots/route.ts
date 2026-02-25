@@ -1,6 +1,7 @@
 /// <reference lib="es2022" />
 import { NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
+import { canAttemptDatabaseQuery, noteDatabaseFailure } from '../../../../lib/dbGuard';
 
 function buildBlockedMap(
   rows: Array<{ dayOfWeek: string; courtType: string; time: string; isBlocked: boolean }>,
@@ -20,6 +21,9 @@ function buildBlockedMap(
 export async function GET(request: Request) {
   try {
     if (!process.env.DATABASE_URL?.trim()) {
+      return NextResponse.json({ blocked: {} });
+    }
+    if (!(await canAttemptDatabaseQuery())) {
       return NextResponse.json({ blocked: {} });
     }
 
@@ -49,6 +53,7 @@ export async function GET(request: Request) {
     res.headers.set('Cache-Control', 'no-store');
     return res;
   } catch (error) {
+    noteDatabaseFailure('blocked-slots.GET', error);
     console.error('[blocked-slots] error', error);
     return NextResponse.json({ blocked: {} });
   }

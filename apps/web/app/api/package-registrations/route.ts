@@ -2,7 +2,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { isValidPhoneNumber } from "../../../lib/phoneValidation";
-import { canAttemptDatabaseQuery, noteDatabaseFailure } from "../../../lib/dbGuard";
+import {
+  canAttemptDatabaseQuery,
+  isDatabaseUnavailableError,
+  noteDatabaseFailure,
+} from "../../../lib/dbGuard";
 
 function ensureDatabaseUrl(): boolean {
   const explicitCandidates = [
@@ -76,6 +80,7 @@ async function getBasePriceJod(packageName: string): Promise<number> {
       select: { currentPriceJod: true },
     })
     .catch((error: unknown) => {
+      noteDatabaseFailure("package-registrations.getBasePrice.package", error);
       console.warn("[package-registrations] package lookup skipped", error);
       return null;
     });
@@ -87,6 +92,7 @@ async function getBasePriceJod(packageName: string): Promise<number> {
       select: { basePriceJod: true },
     })
     .catch((error: unknown) => {
+      noteDatabaseFailure("package-registrations.getBasePrice.pricing", error);
       console.warn("[package-registrations] pricing lookup skipped", error);
       return null;
     });
@@ -143,6 +149,7 @@ async function ensureMemberAccount(params: {
         throw error;
       });
   } catch (error) {
+    noteDatabaseFailure("package-registrations.ensureMember", error);
     // User creation must never block registration submission.
     console.warn("[package-registrations] member account sync skipped", error);
   }
@@ -221,6 +228,12 @@ export async function POST(request: Request) {
 
     const cleanPackage = packageName.trim();
     const basePriceJod = await getBasePriceJod(cleanPackage);
+    if (!(await canAttemptDatabaseQuery())) {
+      return NextResponse.json(
+        { error: "Registration is temporarily unavailable. Please try again later." },
+        { status: 503 },
+      );
+    }
 
     const { prisma } = await import("../../../lib/db");
     const row = await prisma.packageRegistration.create({
@@ -255,11 +268,7 @@ export async function POST(request: Request) {
   } catch (error) {
     noteDatabaseFailure("package-registrations.POST", error);
     console.error("[package-registrations] error", error);
-    const status =
-      (error as { code?: string }).code === "P1001" ||
-      (error as { code?: string }).code === "P1002"
-        ? 503
-        : 500;
+    const status = isDatabaseUnavailableError(error) ? 503 : 500;
     return NextResponse.json(
       { error: "Unable to save registration. Please try again or contact us." },
       { status },

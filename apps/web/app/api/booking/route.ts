@@ -3,7 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { NextResponse } from 'next/server';
 import { isValidPhoneNumber } from '../../../lib/phoneValidation';
-import { canAttemptDatabaseQuery, noteDatabaseFailure } from '../../../lib/dbGuard';
+import {
+  canAttemptDatabaseQuery,
+  isDatabaseUnavailableError,
+  noteDatabaseFailure,
+} from '../../../lib/dbGuard';
 
 type CourtType = 'Basketball AC' | 'Basketball 3x3' | 'Padel' | 'Volleyball';
 
@@ -299,6 +303,12 @@ export async function POST(request: Request) {
       }),
       sendBookingWhatsAppMessage({ phone, courtName, date, time: `${time} - ${endTimeStr}` }),
     ]);
+    if (!(await canAttemptDatabaseQuery())) {
+      return NextResponse.json(
+        { error: 'Booking is temporarily unavailable. Please try again later.' },
+        { status: 503 },
+      );
+    }
 
     const { prisma } = await import('../../../lib/db');
     let company = await prisma.company.findFirst({
@@ -340,7 +350,7 @@ export async function POST(request: Request) {
   } catch (error) {
     noteDatabaseFailure('booking.POST', error);
     console.error('Booking submission error', error);
-    const status = ((error as { code?: string }).code === 'P1001' || (error as { code?: string }).code === 'P1002') ? 503 : 500;
+    const status = isDatabaseUnavailableError(error) ? 503 : 500;
     return NextResponse.json(
       { error: 'Unable to process your booking. Please try again later.' },
       { status },

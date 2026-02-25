@@ -6,6 +6,7 @@ type GuardState = {
 const globalGuard = globalThis as unknown as { __webDbGuard?: GuardState };
 
 const COOLDOWN_MS = 45_000;
+const PANIC_COOLDOWN_MS = 10 * 60_000;
 
 function state(): GuardState {
   if (!globalGuard.__webDbGuard) {
@@ -17,11 +18,17 @@ function state(): GuardState {
   return globalGuard.__webDbGuard;
 }
 
-function isLikelyTransientDbError(error: unknown): boolean {
+function errorMeta(error: unknown): { code?: string; name?: string; message: string } {
+  if (!error || typeof error !== 'object') return { message: '' };
+  const record = error as { code?: string; name?: string; message?: string };
+  return { code: record.code, name: record.name, message: record.message || '' };
+}
+
+export function isDatabaseUnavailableError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
 
-  const record = error as { code?: string; name?: string; message?: string };
-  const message = (record.message || '').toLowerCase();
+  const record = errorMeta(error);
+  const message = record.message.toLowerCase();
 
   return (
     record.code === 'P1001' ||
@@ -30,19 +37,24 @@ function isLikelyTransientDbError(error: unknown): boolean {
     message.includes('timer has gone away') ||
     message.includes('can\'t reach database server') ||
     message.includes('database server') ||
-    message.includes('prisma query engine has a panic')
+    message.includes('prisma query engine has a panic') ||
+    message.includes('prismaclientrustpanicerror')
   );
 }
 
 export function noteDatabaseFailure(context: string, error: unknown): void {
-  if (!isLikelyTransientDbError(error)) return;
+  if (!isDatabaseUnavailableError(error)) return;
 
   const s = state();
-  const reason = `${context}: ${(error as { code?: string; name?: string; message?: string })?.code || (error as { name?: string })?.name || 'db-error'}`;
-  s.unavailableUntil = Date.now() + COOLDOWN_MS;
+  const meta = errorMeta(error);
+  const message = meta.message.toLowerCase();
+  const isPanic = meta.name === 'PrismaClientRustPanicError' || message.includes('timer has gone away');
+  const cooldownMs = isPanic ? PANIC_COOLDOWN_MS : COOLDOWN_MS;
+  const reason = `${context}: ${meta.code || meta.name || 'db-error'}`;
+  s.unavailableUntil = Date.now() + cooldownMs;
   s.lastReason = reason;
 
-  console.warn(`[db-guard] cooling down DB access for ${COOLDOWN_MS}ms (${reason})`);
+  console.warn(`[db-guard] cooling down DB access for ${cooldownMs}ms (${reason})`);
 }
 
 export async function canAttemptDatabaseQuery(): Promise<boolean> {

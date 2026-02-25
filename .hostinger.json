@@ -2,8 +2,8 @@
   "framework": "nextjs",
   "rootDirectory": "./",
   "buildCommand": "npm install && npm run build:hostinger:web-only",
-  "startCommand": "npm run start:hostinger:web-only",
-  "outputDirectory": "apps/web/.next",
+  "startCommand": "node server.js",
+  "outputDirectory": "apps/web/.next/standalone",
   "installCommand": "npm install",
   "nodeVersion": "20",
   "packageManager": "npm"

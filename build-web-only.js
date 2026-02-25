@@ -1,50 +1,80 @@
-// Build script for web-only deployment on Hostinger
-// This ensures all steps run correctly and shows clear errors
+// Build script for web-only Hostinger deployment.
+// Produces a standalone Next runtime that includes a root-level server.js.
 
-const { execSync } = require('child_process');
-const path = require('path');
-const fs = require('fs');
+const { execSync } = require("child_process");
+const path = require("path");
+const fs = require("fs");
 
-console.log('Starting build process for web app...');
-console.log(`Working directory: ${process.cwd()}`);
+function copyIfExists(from, to) {
+  if (!fs.existsSync(from)) return;
+  fs.mkdirSync(path.dirname(to), { recursive: true });
+  fs.cpSync(from, to, { recursive: true });
+  console.log(`[copy] ${from} -> ${to}`);
+}
+
+const rootDir = process.cwd();
+const webDir = path.join(rootDir, "apps", "web");
+const webNextDir = path.join(webDir, ".next");
+const standaloneDir = path.join(webNextDir, "standalone");
+const webStaticDir = path.join(webNextDir, "static");
+const standaloneStaticDir = path.join(standaloneDir, ".next", "static");
+const webPublicDir = path.join(webDir, "public");
+const standalonePublicDir = path.join(standaloneDir, "public");
+
+console.log("[hostinger-build] Starting web build");
+console.log(`[hostinger-build] cwd: ${rootDir}`);
 
 try {
-  // Step 1: Generate Prisma Client
-  console.log('\nStep 1: Generating Prisma Client...');
-  execSync('npm run prisma:generate', {
-    stdio: 'inherit',
-    cwd: process.cwd(),
+  console.log("[hostinger-build] 1/4 Generate Prisma client");
+  execSync("npm run prisma:generate", {
+    stdio: "inherit",
+    cwd: rootDir,
   });
-  console.log('Prisma Client generated');
 
-  // Step 2: Build Next.js app
-  console.log('\nStep 2: Building Next.js app...');
-  execSync('npm run build:web', {
-    stdio: 'inherit',
-    cwd: process.cwd(),
+  console.log("[hostinger-build] 2/4 Build Next.js web app");
+  execSync("npm run build:web", {
+    stdio: "inherit",
+    cwd: rootDir,
   });
-  console.log('Next.js app built');
 
-  // Step 3: Verify app build output
-  const buildDir = path.join(process.cwd(), 'apps/web/.next');
-  if (!fs.existsSync(buildDir)) {
-    throw new Error(`Build output not found at: ${buildDir}`);
+  if (!fs.existsSync(standaloneDir)) {
+    throw new Error(
+      `Standalone build not found: ${standaloneDir}. Make sure output='standalone' is enabled.`,
+    );
   }
-  console.log(`Build verified at: ${buildDir}`);
 
-  // Step 4: Mirror build output to root for platforms expecting .next at repo root
-  console.log('\nStep 4: Syncing build output to root .next...');
-  execSync('node sync-web-next-output.js', {
-    stdio: 'inherit',
-    cwd: process.cwd(),
+  console.log("[hostinger-build] 3/4 Prepare standalone runtime assets");
+  copyIfExists(webStaticDir, standaloneStaticDir);
+  copyIfExists(webPublicDir, standalonePublicDir);
+
+  // Prisma engines/client can be missed in some host traces; copy explicitly to be safe.
+  const prismaRuntimeDir = path.join(rootDir, "node_modules", ".prisma");
+  const prismaClientDir = path.join(rootDir, "node_modules", "@prisma");
+  copyIfExists(
+    prismaRuntimeDir,
+    path.join(standaloneDir, "node_modules", ".prisma"),
+  );
+  copyIfExists(
+    prismaClientDir,
+    path.join(standaloneDir, "node_modules", "@prisma"),
+  );
+
+  console.log("[hostinger-build] 4/4 Sync root .next for local compatibility");
+  execSync("node sync-web-next-output.js", {
+    stdio: "inherit",
+    cwd: rootDir,
   });
-  console.log('Root .next synced');
 
-  console.log('\nBuild completed successfully!');
+  console.log("[hostinger-build] Done");
+  console.log(
+    `[hostinger-build] Deploy output directory should be: ${path.join("apps", "web", ".next", "standalone")}`,
+  );
 } catch (error) {
-  console.error('\nBuild failed!');
-  console.error(error.message);
-  if (error.stdout) console.error('STDOUT:', error.stdout.toString());
-  if (error.stderr) console.error('STDERR:', error.stderr.toString());
+  console.error("[hostinger-build] Failed");
+  console.error(error && error.message ? error.message : error);
+  if (error && error.stdout)
+    console.error("STDOUT:", error.stdout.toString());
+  if (error && error.stderr)
+    console.error("STDERR:", error.stderr.toString());
   process.exit(1);
 }

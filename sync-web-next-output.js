@@ -14,6 +14,7 @@ const webNextDir = path.join(webDir, ".next");
 const rootNextDir = path.join(rootDir, ".next");
 const rootStandaloneDir = path.join(rootNextDir, "standalone");
 const hostingerOutputDir = path.join(rootDir, "hostinger-output");
+const runtimeEnvFile = path.join(hostingerOutputDir, "runtime-env.json");
 
 if (!fs.existsSync(webNextDir)) {
   console.error(`[sync-web-next-output] Missing source build dir: ${webNextDir}`);
@@ -51,6 +52,22 @@ copyIfExists(path.join(webDir, "public"), path.join(hostingerOutputDir, "public"
 copyIfExists(path.join(rootDir, "node_modules", ".prisma"), path.join(hostingerOutputDir, "node_modules", ".prisma"));
 copyIfExists(path.join(rootDir, "node_modules", "@prisma"), path.join(hostingerOutputDir, "node_modules", "@prisma"));
 
+const buildDbUrl =
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_PRISMA_URL ||
+  process.env.POSTGRES_URL ||
+  process.env.PRISMA_DATABASE_URL ||
+  process.env.NEON_DATABASE_URL ||
+  "";
+if (buildDbUrl && buildDbUrl.trim()) {
+  fs.writeFileSync(
+    runtimeEnvFile,
+    JSON.stringify({ DATABASE_URL: buildDbUrl.trim() }, null, 2),
+    "utf8",
+  );
+  console.log(`[sync-web-next-output] Wrote runtime env file: ${runtimeEnvFile}`);
+}
+
 console.log(`[sync-web-next-output] Prepared deploy dir: ${hostingerOutputDir}`);
 
 // Hostinger lsnode in this account expects /public_html/server.js.
@@ -61,6 +78,24 @@ if (path.basename(publicHtmlDir) === "public_html") {
   const bootstrapSource =
     "const fs=require('fs');\n" +
     "const path=require('path');\n" +
+    "const envCandidates=[\n" +
+    "path.join(__dirname,'hostinger-output','runtime-env.json'),\n" +
+    "path.join(__dirname,'.builds','source','repository','hostinger-output','runtime-env.json'),\n" +
+    "path.join(__dirname,'..','nodejs','hostinger-output','runtime-env.json')\n" +
+    "];\n" +
+    "if(!process.env.DATABASE_URL){\n" +
+    "for(const p of envCandidates){\n" +
+    "try{\n" +
+    "if(!fs.existsSync(p)) continue;\n" +
+    "const parsed=JSON.parse(fs.readFileSync(p,'utf8'));\n" +
+    "if(parsed && typeof parsed.DATABASE_URL==='string' && parsed.DATABASE_URL.trim()){\n" +
+    "process.env.DATABASE_URL=parsed.DATABASE_URL.trim();\n" +
+    "console.log('[hostinger bootstrap] DATABASE_URL loaded from '+p);\n" +
+    "break;\n" +
+    "}\n" +
+    "}catch(err){console.error('[hostinger bootstrap] Failed reading env file '+p,err);}\n" +
+    "}\n" +
+    "}\n" +
     "const candidates=[\n" +
     "path.join(__dirname,'hostinger-output','server.js'),\n" +
     "path.join(__dirname,'.builds','source','repository','hostinger-output','server.js'),\n" +

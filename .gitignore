@@ -44,10 +44,14 @@ yarn-error.log*
 next-env.d.ts
 
 # prisma
-prisma/migrations/
+# keep migrations in git for production deploys
+# prisma/migrations/
 
 # uploads
 uploads/
+
+# hostinger build artifact
+hostinger-output/
 
 # Flutter mobile app (do not push to GitHub)
 mobile-app/

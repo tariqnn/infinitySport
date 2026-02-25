@@ -1,0 +1,15 @@
+-- Add enterprise invoice fields for client-ready PDF invoices
+ALTER TABLE "Invoice"
+  ADD COLUMN IF NOT EXISTS "companyName" TEXT,
+  ADD COLUMN IF NOT EXISTS "companyAddress" TEXT,
+  ADD COLUMN IF NOT EXISTS "logoPath" TEXT,
+  ADD COLUMN IF NOT EXISTS "clientName" TEXT,
+  ADD COLUMN IF NOT EXISTS "clientEmail" TEXT,
+  ADD COLUMN IF NOT EXISTS "clientAddress" TEXT,
+  ADD COLUMN IF NOT EXISTS "lineItems" JSONB,
+  ADD COLUMN IF NOT EXISTS "subtotal" INTEGER,
+  ADD COLUMN IF NOT EXISTS "tax" INTEGER,
+  ADD COLUMN IF NOT EXISTS "discount" INTEGER,
+  ADD COLUMN IF NOT EXISTS "notes" TEXT,
+  ADD COLUMN IF NOT EXISTS "pdfPath" TEXT;
+

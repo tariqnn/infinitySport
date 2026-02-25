@@ -52,3 +52,21 @@ copyIfExists(path.join(rootDir, "node_modules", ".prisma"), path.join(hostingerO
 copyIfExists(path.join(rootDir, "node_modules", "@prisma"), path.join(hostingerOutputDir, "node_modules", "@prisma"));
 
 console.log(`[sync-web-next-output] Prepared deploy dir: ${hostingerOutputDir}`);
+
+// Hostinger lsnode in this account expects /public_html/server.js.
+// When build runs under /public_html/.builds/source/repository, write a bootstrap file there.
+const publicHtmlDir = path.resolve(rootDir, "..", "..", "..");
+if (path.basename(publicHtmlDir) === "public_html") {
+  const hostingerBootstrap = path.join(publicHtmlDir, "server.js");
+  const bootstrapSource =
+    "const path=require('path');\n" +
+    "const target=path.join(__dirname,'.builds','source','repository','hostinger-output','server.js');\n" +
+    "process.chdir(path.dirname(target));\n" +
+    "require(target);\n";
+  try {
+    fs.writeFileSync(hostingerBootstrap, bootstrapSource, "utf8");
+    console.log(`[sync-web-next-output] Wrote host bootstrap: ${hostingerBootstrap}`);
+  } catch (error) {
+    console.warn(`[sync-web-next-output] Failed writing host bootstrap: ${error}`);
+  }
+}

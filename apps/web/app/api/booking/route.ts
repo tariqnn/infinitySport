@@ -1,4 +1,6 @@
 /// <reference lib="es2022" />
+import fs from 'node:fs';
+import path from 'node:path';
 import { NextResponse } from 'next/server';
 import { isValidPhoneNumber } from '../../../lib/phoneValidation';
 
@@ -29,6 +31,27 @@ function ensureDatabaseUrl(): boolean {
       `[booking] DATABASE_URL inferred from env key: ${inferred[0]}`,
     );
     return true;
+  }
+
+  const envFileCandidates = [
+    path.join(process.cwd(), 'runtime-env.json'),
+    path.join(process.cwd(), 'hostinger-output', 'runtime-env.json'),
+    path.join(process.cwd(), '.builds', 'source', 'repository', 'hostinger-output', 'runtime-env.json'),
+  ];
+  for (const envFile of envFileCandidates) {
+    try {
+      if (!fs.existsSync(envFile)) continue;
+      const parsed = JSON.parse(fs.readFileSync(envFile, 'utf8')) as {
+        DATABASE_URL?: string;
+      };
+      if (typeof parsed.DATABASE_URL === 'string' && parsed.DATABASE_URL.trim()) {
+        process.env.DATABASE_URL = parsed.DATABASE_URL.trim();
+        console.warn(`[booking] DATABASE_URL loaded from file: ${envFile}`);
+        return true;
+      }
+    } catch (error) {
+      console.warn(`[booking] failed reading runtime env file: ${envFile}`, error);
+    }
   }
 
   return false;

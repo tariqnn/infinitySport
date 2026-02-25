@@ -5,18 +5,33 @@ import { isValidPhoneNumber } from '../../../lib/phoneValidation';
 type CourtType = 'Basketball AC' | 'Basketball 3x3' | 'Padel' | 'Volleyball';
 
 function ensureDatabaseUrl(): boolean {
-  const candidates = [
+  const explicitCandidates = [
     process.env.DATABASE_URL,
     process.env.POSTGRES_PRISMA_URL,
     process.env.POSTGRES_URL,
     process.env.PRISMA_DATABASE_URL,
     process.env.NEON_DATABASE_URL,
   ];
-  const resolved = candidates.find(
+  const resolved = explicitCandidates.find(
     (value): value is string => typeof value === 'string' && !!value.trim(),
   );
   if (resolved && !process.env.DATABASE_URL) process.env.DATABASE_URL = resolved;
-  return Boolean(resolved);
+  if (resolved) return true;
+
+  const inferred = Object.entries(process.env).find(([key, value]) => {
+    if (typeof value !== 'string' || !value.trim()) return false;
+    if (!/^postgres(ql)?:\/\//i.test(value.trim())) return false;
+    return /(DATABASE|POSTGRES|PRISMA|NEON|DB|URL)/i.test(key);
+  });
+  if (inferred) {
+    process.env.DATABASE_URL = (inferred[1] as string).trim();
+    console.warn(
+      `[booking] DATABASE_URL inferred from env key: ${inferred[0]}`,
+    );
+    return true;
+  }
+
+  return false;
 }
 
 const courtTypeForId = (courtId: string): CourtType | null => {
@@ -161,6 +176,13 @@ Time: ${data.time}
 export async function POST(request: Request) {
   try {
     if (!ensureDatabaseUrl()) {
+      const dbLikeKeys = Object.keys(process.env)
+        .filter((key) => /(DATABASE|POSTGRES|PRISMA|NEON|DB|URL)/i.test(key))
+        .sort();
+      console.error(
+        '[booking] missing DATABASE_URL at runtime; available env keys:',
+        dbLikeKeys,
+      );
       return NextResponse.json(
         { error: 'Booking is temporarily unavailable. Please try again later.' },
         { status: 503 },

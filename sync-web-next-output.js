@@ -59,8 +59,21 @@ const publicHtmlDir = path.resolve(rootDir, "..", "..", "..");
 if (path.basename(publicHtmlDir) === "public_html") {
   const hostingerBootstrap = path.join(publicHtmlDir, "server.js");
   const bootstrapSource =
+    "const fs=require('fs');\n" +
     "const path=require('path');\n" +
-    "const target=path.join(__dirname,'.builds','source','repository','hostinger-output','server.js');\n" +
+    "const candidates=[\n" +
+    "path.join(__dirname,'hostinger-output','server.js'),\n" +
+    "path.join(__dirname,'.builds','source','repository','hostinger-output','server.js'),\n" +
+    "path.join(__dirname,'..','nodejs','hostinger-output','server.js'),\n" +
+    "path.join(__dirname,'..','nodejs','server.js'),\n" +
+    "path.join(__dirname,'.builds','source','repository','server.js')\n" +
+    "];\n" +
+    "const target=candidates.find((p)=>fs.existsSync(p));\n" +
+    "if(!target){\n" +
+    "console.error('[hostinger bootstrap] No startup target found. Checked:');\n" +
+    "for(const p of candidates) console.error(' - '+p);\n" +
+    "process.exit(1);\n" +
+    "}\n" +
     "process.chdir(path.dirname(target));\n" +
     "require(target);\n";
   try {

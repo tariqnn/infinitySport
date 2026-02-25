@@ -4,6 +4,21 @@ import { isValidPhoneNumber } from '../../../lib/phoneValidation';
 
 type CourtType = 'Basketball AC' | 'Basketball 3x3' | 'Padel' | 'Volleyball';
 
+function ensureDatabaseUrl(): boolean {
+  const candidates = [
+    process.env.DATABASE_URL,
+    process.env.POSTGRES_PRISMA_URL,
+    process.env.POSTGRES_URL,
+    process.env.PRISMA_DATABASE_URL,
+    process.env.NEON_DATABASE_URL,
+  ];
+  const resolved = candidates.find(
+    (value): value is string => typeof value === 'string' && !!value.trim(),
+  );
+  if (resolved && !process.env.DATABASE_URL) process.env.DATABASE_URL = resolved;
+  return Boolean(resolved);
+}
+
 const courtTypeForId = (courtId: string): CourtType | null => {
   if (courtId === 'basketball-ac') return 'Basketball AC';
   if (courtId === 'basketball-3x3') return 'Basketball 3x3';
@@ -145,7 +160,7 @@ Time: ${data.time}
 
 export async function POST(request: Request) {
   try {
-    if (!process.env.DATABASE_URL?.trim()) {
+    if (!ensureDatabaseUrl()) {
       return NextResponse.json(
         { error: 'Booking is temporarily unavailable. Please try again later.' },
         { status: 503 },

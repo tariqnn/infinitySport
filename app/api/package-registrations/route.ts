@@ -1,6 +1,21 @@
 import { NextResponse } from "next/server";
 import { isValidPhoneNumber } from "../../../lib/phoneValidation";
 
+function ensureDatabaseUrl(): boolean {
+  const candidates = [
+    process.env.DATABASE_URL,
+    process.env.POSTGRES_PRISMA_URL,
+    process.env.POSTGRES_URL,
+    process.env.PRISMA_DATABASE_URL,
+    process.env.NEON_DATABASE_URL,
+  ];
+  const resolved = candidates.find(
+    (value): value is string => typeof value === "string" && !!value.trim(),
+  );
+  if (resolved && !process.env.DATABASE_URL) process.env.DATABASE_URL = resolved;
+  return Boolean(resolved);
+}
+
 async function getBasePriceJod(packageName: string): Promise<number> {
   const { prisma } = await import("../../../lib/db");
 
@@ -84,7 +99,7 @@ async function ensureMemberAccount(params: {
 
 export async function POST(request: Request) {
   try {
-    if (!process.env.DATABASE_URL?.trim()) {
+    if (!ensureDatabaseUrl()) {
       return NextResponse.json(
         { error: "Registration is unavailable. Please try again later." },
         { status: 503 },

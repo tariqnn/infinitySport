@@ -20,6 +20,7 @@ const webStaticDir = path.join(webNextDir, "static");
 const standaloneStaticDir = path.join(standaloneDir, ".next", "static");
 const webPublicDir = path.join(webDir, "public");
 const standalonePublicDir = path.join(standaloneDir, "public");
+const webNextServerEntrypoint = path.join(webNextDir, "server.js");
 
 console.log("[hostinger-build] Starting web build");
 console.log(`[hostinger-build] cwd: ${rootDir}`);
@@ -58,6 +59,15 @@ try {
     prismaClientDir,
     path.join(standaloneDir, "node_modules", "@prisma"),
   );
+
+  // Fallback entrypoint for hosts that incorrectly use apps/web/.next as output dir.
+  // This file lets lsnode require /public_html/server.js and delegate to standalone.
+  fs.writeFileSync(
+    webNextServerEntrypoint,
+    "process.chdir(__dirname); require('./standalone/server.js');\n",
+    "utf8",
+  );
+  console.log(`[hostinger-build] Wrote fallback entrypoint: ${webNextServerEntrypoint}`);
 
   console.log("[hostinger-build] 4/4 Sync root .next for local compatibility");
   execSync("node sync-web-next-output.js", {

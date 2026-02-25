@@ -27,13 +27,19 @@ console.log("[hostinger-build] Starting web build");
 console.log(`[hostinger-build] cwd: ${rootDir}`);
 
 try {
-  console.log("[hostinger-build] 1/4 Generate Prisma client");
+  console.log("[hostinger-build] 1/5 Apply DB migrations (if DATABASE_URL is set)");
+  execSync("node prisma-migrate-if-env.js", {
+    stdio: "inherit",
+    cwd: rootDir,
+  });
+
+  console.log("[hostinger-build] 2/5 Generate Prisma client");
   execSync("npm run prisma:generate", {
     stdio: "inherit",
     cwd: rootDir,
   });
 
-  console.log("[hostinger-build] 2/4 Build Next.js web app");
+  console.log("[hostinger-build] 3/5 Build Next.js web app");
   execSync("npm run build:web", {
     stdio: "inherit",
     cwd: rootDir,
@@ -45,7 +51,7 @@ try {
     );
   }
 
-  console.log("[hostinger-build] 3/4 Prepare standalone runtime assets");
+  console.log("[hostinger-build] 4/5 Prepare standalone runtime assets");
   copyIfExists(webStaticDir, standaloneStaticDir);
   copyIfExists(webPublicDir, standalonePublicDir);
 
@@ -70,7 +76,7 @@ try {
   );
   console.log(`[hostinger-build] Wrote fallback entrypoint: ${webNextServerEntrypoint}`);
 
-  console.log("[hostinger-build] 4/4 Sync root .next for local compatibility");
+  console.log("[hostinger-build] 5/5 Sync root .next for local compatibility");
   execSync("node sync-web-next-output.js", {
     stdio: "inherit",
     cwd: rootDir,

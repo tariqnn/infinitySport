@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "postinstall": "(npm run prisma:generate || echo 'Prisma generate skipped (prisma not available)') && npm install @swc/helpers@0.5.18 --ignore-scripts",
-    "build": "npm run build:web",
+    "build": "node prisma-migrate-if-env.js && npm run build:web",
     "postbuild": "node sync-web-next-output.js",
     "start": "npm run start:web",
     "start:combined": "node start-combined.js",
@@ -27,6 +27,7 @@
     "lint:portal": "npm --workspace apps/portal run lint",
     "format": "npm --workspace apps/web run lint -- --fix && npm --workspace apps/admin run lint -- --fix && npm --workspace apps/portal run lint -- --fix",
     "prisma:generate": "npx prisma generate --schema=./prisma/schema.prisma",
+    "prisma:migrate:deploy": "npx prisma migrate deploy --schema=./prisma/schema.prisma",
     "prisma:migrate": "npx prisma migrate dev --schema=./prisma/schema.prisma",
     "prisma:seed": "cd prisma && ts-node --project tsconfig.json seed.ts",
     "prisma:seed-blocked-slots": "cd prisma && ts-node --project tsconfig.json seed-blocked-slots.ts",

@@ -68,14 +68,29 @@ if (path.basename(publicHtmlDir) === "public_html") {
     "path.join(__dirname,'..','nodejs','server.js'),\n" +
     "path.join(__dirname,'.builds','source','repository','server.js')\n" +
     "];\n" +
-    "const target=candidates.find((p)=>fs.existsSync(p));\n" +
-    "if(!target){\n" +
+    "const existing=candidates.filter((p)=>fs.existsSync(p));\n" +
+    "if(existing.length===0){\n" +
     "console.error('[hostinger bootstrap] No startup target found. Checked:');\n" +
     "for(const p of candidates) console.error(' - '+p);\n" +
     "process.exit(1);\n" +
     "}\n" +
+    "let lastErr=null;\n" +
+    "for(const target of existing){\n" +
+    "try{\n" +
     "process.chdir(path.dirname(target));\n" +
-    "require(target);\n";
+    "require(target);\n" +
+    "lastErr=null;\n" +
+    "break;\n" +
+    "}catch(err){\n" +
+    "lastErr=err;\n" +
+    "console.error('[hostinger bootstrap] Failed target: '+target);\n" +
+    "console.error(err);\n" +
+    "}\n" +
+    "}\n" +
+    "if(lastErr){\n" +
+    "console.error('[hostinger bootstrap] All startup targets failed.');\n" +
+    "process.exit(1);\n" +
+    "}\n";
   try {
     fs.writeFileSync(hostingerBootstrap, bootstrapSource, "utf8");
     console.log(`[sync-web-next-output] Wrote host bootstrap: ${hostingerBootstrap}`);

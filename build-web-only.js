@@ -21,6 +21,7 @@ const standaloneStaticDir = path.join(standaloneDir, ".next", "static");
 const webPublicDir = path.join(webDir, "public");
 const standalonePublicDir = path.join(standaloneDir, "public");
 const webNextServerEntrypoint = path.join(webNextDir, "server.js");
+const hostingerOutputDir = path.join(rootDir, "hostinger-output");
 
 console.log("[hostinger-build] Starting web build");
 console.log(`[hostinger-build] cwd: ${rootDir}`);
@@ -75,9 +76,16 @@ try {
     cwd: rootDir,
   });
 
+  // Create a non-hidden deploy directory for platforms that ignore dot-folders like ".next".
+  if (fs.existsSync(hostingerOutputDir)) {
+    fs.rmSync(hostingerOutputDir, { recursive: true, force: true });
+  }
+  fs.cpSync(standaloneDir, hostingerOutputDir, { recursive: true });
+  console.log(`[hostinger-build] Created deploy output: ${hostingerOutputDir}`);
+
   console.log("[hostinger-build] Done");
   console.log(
-    `[hostinger-build] Deploy output directory should be: ${path.join("apps", "web", ".next", "standalone")}`,
+    `[hostinger-build] Deploy output directory should be: ${path.join("hostinger-output")}`,
   );
 } catch (error) {
   console.error("[hostinger-build] Failed");

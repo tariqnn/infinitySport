@@ -3,7 +3,7 @@
   "rootDirectory": "./",
   "buildCommand": "npm install && npm run build:hostinger:web-only",
   "startCommand": "node server.js",
-  "outputDirectory": "apps/web/.next/standalone",
+  "outputDirectory": "hostinger-output",
   "installCommand": "npm install",
   "nodeVersion": "20",
   "packageManager": "npm"

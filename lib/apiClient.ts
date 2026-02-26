@@ -91,7 +91,32 @@ const FALLBACK_FACILITIES: { id: string; name: string; description: string }[] =
 ];
 
 function canUseDb() {
-  return typeof window === 'undefined' && Boolean(process.env.DATABASE_URL?.trim());
+  if (typeof window !== 'undefined') return false;
+
+  const candidates = [
+    process.env.DATABASE_URL,
+    process.env.POSTGRES_PRISMA_URL,
+    process.env.POSTGRES_URL,
+    process.env.PRISMA_DATABASE_URL,
+    process.env.NEON_DATABASE_URL,
+  ];
+  const explicit = candidates.find((value): value is string => typeof value === 'string' && !!value.trim());
+  if (explicit && !process.env.DATABASE_URL) {
+    process.env.DATABASE_URL = explicit.trim();
+  }
+
+  if (!process.env.DATABASE_URL?.trim()) {
+    const inferred = Object.entries(process.env).find(([key, value]) => {
+      if (typeof value !== 'string' || !value.trim()) return false;
+      if (!/^postgres(ql)?:\/\//i.test(value.trim())) return false;
+      return /(DATABASE|POSTGRES|PRISMA|NEON|DB|URL)/i.test(key);
+    });
+    if (inferred) {
+      process.env.DATABASE_URL = (inferred[1] as string).trim();
+    }
+  }
+
+  return Boolean(process.env.DATABASE_URL?.trim());
 }
 
 async function getPrisma() {

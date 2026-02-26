@@ -4,6 +4,8 @@ import { fetchPackages } from '../../lib/apiClient';
 export const metadata = {
   title: 'Sports & Facilities',
 };
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 type PackageItem = Awaited<ReturnType<typeof fetchPackages>>[number];
 
@@ -156,4 +158,3 @@ export default async function SportsPage() {
     </div>
   );
 }
-

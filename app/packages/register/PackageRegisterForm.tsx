@@ -22,19 +22,6 @@ const PHONE_COUNTRIES: Array<{ value: string; label: string }> = [
   { value: '+1', label: 'USA/Canada (+1)' },
 ];
 
-const FALLBACK_PACKAGE_OPTIONS = [
-  'Basketball - Little Kobes U10',
-  'Basketball - Ballers & Hoopers U12–U14',
-  'Basketball - Warriors',
-  'Basketball - Private 1v1 Sessions',
-  'Basketball - Small Groups',
-  'Gymnastics Package A',
-  'Gymnastics Package B',
-  'Gymnastics Package C',
-  'Gymnastics Package D',
-  'Volleyball',
-];
-
 function safeDecode(s: string | null): string {
   if (!s) return '';
   try {
@@ -66,7 +53,7 @@ export function PackageRegisterForm() {
   }, []);
 
   const options = useMemo(() => {
-    const list = packagesFromApi.length > 0 ? packagesFromApi.map((p) => p.name) : [...FALLBACK_PACKAGE_OPTIONS];
+    const list = packagesFromApi.map((p) => p.name);
     if (decodedPackage && !list.includes(decodedPackage)) list.unshift(decodedPackage);
     return list;
   }, [packagesFromApi, decodedPackage]);
@@ -142,6 +129,7 @@ export function PackageRegisterForm() {
           className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-gray-900 focus:border-brand-green-primary focus:outline-none focus:ring-1 focus:ring-brand-green-primary"
           required
         >
+          {options.length === 0 ? <option value="">No programs available</option> : null}
           {options.map((o) => (
             <option key={o} value={o}>{o}</option>
           ))}
@@ -223,3 +211,4 @@ export function PackageRegisterForm() {
     </form>
   );
 }
+

@@ -43,7 +43,6 @@ function getPublicUploadTargets(kind: UploadKind): string[] {
   return [
     path.join(repoRoot, 'apps', 'admin', 'public', 'uploads', kind),
     path.join(repoRoot, 'apps', 'web', 'public', 'uploads', kind),
-    path.join(repoRoot, 'public', 'uploads', kind),
   ];
 }
 
@@ -115,4 +114,3 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ message }, { status: 500 });
   }
 }
-

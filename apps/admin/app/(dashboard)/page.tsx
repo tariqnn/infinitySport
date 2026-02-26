@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { getLandingContent } from '@infinity/mock-api';
-import { ArrowUpRight, CalendarClock, CalendarRange, Gift, Layers3, Megaphone, Users } from 'lucide-react';
+import { ArrowUpRight, CalendarClock, CalendarRange, FileText, Gift, Layers3, Megaphone, Users } from 'lucide-react';
 import { PageHero } from '../_components/PageHero';
 import { StatCard } from '../_components/StatCard';
 import { prisma } from '../../lib/db';
@@ -28,19 +28,22 @@ export default async function DashboardPage() {
   }
 
   const stats = [
+    { label: 'Programs live', value: String(content.programs.filter((p) => p.isActive !== false).length), delta: `${content.programs.length} total`, accent: 'blue' as const },
     { label: 'Coaches live', value: String(coachesLive), delta: `${coachesTotal} total`, accent: 'blue' as const },
     { label: 'Offers & plans', value: String(content.offers.filter((o) => o.isActive !== false).length), delta: 'on landing page', accent: 'teal' as const },
     { label: 'Upcoming events', value: String(content.events.filter((e) => e.isActive !== false).length), delta: 'next 90 days', accent: 'green' as const },
-    { label: 'Live announcements', value: String(content.announcements.filter((a) => a.isActive !== false).length), delta: `${content.announcements.length} total`, accent: 'blue' as const },
+    { label: 'Live announcements', value: String(content.announcements.filter((a) => a.isActive !== false).length), delta: `${content.announcements.length} total`, accent: 'teal' as const },
   ];
 
   const activeModules =
+    content.programs.filter((p) => p.isActive !== false).length +
     coachesLive +
     content.offers.filter((o) => o.isActive !== false).length +
     content.events.filter((e) => e.isActive !== false).length +
     content.announcements.filter((a) => a.isActive !== false).length;
 
   const totalModules =
+    content.programs.length +
     coachesTotal +
     content.offers.length +
     content.events.length +
@@ -52,6 +55,12 @@ export default async function DashboardPage() {
       description: 'Refresh the headline, CTA, and background media.',
       href: '/hero',
       icon: Layers3,
+    },
+    {
+      title: 'Programs',
+      description: 'Edit landing page sport programs and ordering.',
+      href: '/programs',
+      icon: FileText,
     },
     {
       title: 'Coaches',
@@ -195,25 +204,25 @@ export default async function DashboardPage() {
         }
       />
 
-      {/* Quick links: Coaches & Events */}
+      {/* Quick links: Programs & Events */}
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="glass-card space-y-4 p-6">
           <div className="flex items-center justify-between">
-            <h3 className="font-display text-lg font-semibold text-[var(--text-primary)]">Coaches</h3>
-            <Link href="/coaches" className="text-xs font-semibold text-[var(--primary)] hover:underline">
+            <h3 className="font-display text-lg font-semibold text-[var(--text-primary)]">Programs</h3>
+            <Link href="/programs" className="text-xs font-semibold text-[var(--primary)] hover:underline">
               Manage
             </Link>
           </div>
           <ul className="space-y-2">
-            {coachesPreview.map((coach) => (
-              <li key={coach.id} className="rounded-2xl border border-[var(--border-muted)] bg-[var(--bg-card-muted)] px-4 py-3 text-sm">
-                <p className="font-medium text-[var(--text-primary)]">{coach.name}</p>
-                <p className="text-xs text-[var(--text-muted)]">{coach.sport}</p>
+            {content.programs.slice(0, 4).map((program) => (
+              <li key={program.id} className="rounded-2xl border border-[var(--border-muted)] bg-[var(--bg-card-muted)] px-4 py-3 text-sm">
+                <p className="font-medium text-[var(--text-primary)]">{program.title}</p>
+                <p className="text-xs text-[var(--text-muted)]">{program.sportType}</p>
               </li>
             ))}
-            {coachesPreview.length === 0 ? (
+            {content.programs.length === 0 ? (
               <li className="rounded-2xl border border-dashed border-[var(--border-muted)] bg-[var(--bg-card-muted)] px-4 py-3 text-sm text-[var(--text-muted)]">
-                No coaches yet. Add your first profile.
+                No programs yet. Add your first program card.
               </li>
             ) : null}
           </ul>

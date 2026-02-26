@@ -91,12 +91,46 @@ export default async function SportsPage() {
         <p className="text-sm uppercase tracking-[0.3em] text-brand-green-dark">Programs</p>
         <h1 className="mt-4 text-5xl font-bold text-brand-black">Sports & disciplines</h1>
         <p className="mt-4 text-lg text-gray-600">
-          Packages below are managed from Admin and reflected here automatically.
+          Programs and packages below are managed from Admin and reflected here automatically.
         </p>
       </div>
 
+      {programsData.length > 0 ? (
+        <section className="mx-auto mt-16 max-w-7xl px-6 lg:px-8">
+          <div className="mb-8 text-center">
+            <h2 className="text-3xl font-bold text-brand-black">Programs (Admin: Programs)</h2>
+            <p className="mt-2 text-sm text-gray-600">{programsData.length} program card(s)</p>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {programsData.map((program) => (
+              <article
+                key={program.id}
+                className="rounded-card border border-brand-lightBlue/20 bg-white p-6 shadow-card transition duration-500 hover:-translate-y-2 hover:border-brand-green-primary/50 hover:shadow-card-hover"
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-blue-primary">{program.level || 'Multi sport'}</p>
+                <h3 className="mt-2 text-2xl font-bold text-brand-black">{program.name}</h3>
+                {program.description ? <p className="mt-3 text-sm text-gray-600">{program.description}</p> : null}
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : (
+        <div className="mx-auto mt-16 max-w-2xl px-6 text-center">
+          <div className="rounded-card border border-brand-lightBlue/20 bg-white p-12 shadow-card">
+            <h3 className="text-2xl font-bold text-brand-black">No programs yet</h3>
+            <p className="mt-3 text-gray-600">Create programs from Admin - Programs to show them here.</p>
+          </div>
+        </div>
+      )}
+
       {orderedSports.length > 0 ? (
-        <div className="mx-auto mt-16 max-w-7xl space-y-16 px-6 lg:px-8">
+        <div className="mx-auto mt-20 max-w-7xl space-y-16 px-6 lg:px-8">
+          <div className="text-center">
+            <h2 className="text-3xl font-bold text-brand-black">Packages (Admin: Packages)</h2>
+            <p className="mt-2 text-sm text-gray-600">
+              {packagesData.length} package(s) available
+            </p>
+          </div>
           {orderedSports.map((sport) => {
             const sportPackages = groups.get(sport) || [];
             return (

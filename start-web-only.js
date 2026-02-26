@@ -8,6 +8,14 @@ const fs = require('fs');
 const webDir = path.join(process.cwd(), 'apps/web');
 const buildDir = path.join(webDir, '.next');
 
+function mergeNodeOptions(existing) {
+  const flags = ['--single-threaded', '--single-threaded-gc', '--v8-pool-size=1'];
+  const current = (existing || '').trim();
+  const all = new Set(current ? current.split(/\s+/) : []);
+  for (const flag of flags) all.add(flag);
+  return Array.from(all).join(' ').trim();
+}
+
 console.log('🌐 Starting Next.js Web App...');
 console.log(`📁 Working directory: ${process.cwd()}`);
 console.log(`📁 Web directory: ${webDir}`);
@@ -31,6 +39,8 @@ const webProcess = spawn('npm', ['run', 'start'], {
     ...process.env,
     NODE_ENV: 'production',
     PORT: process.env.PORT || 3000,
+    UV_THREADPOOL_SIZE: process.env.UV_THREADPOOL_SIZE || '1',
+    NODE_OPTIONS: mergeNodeOptions(process.env.NODE_OPTIONS),
   },
   stdio: 'inherit',
   shell: true,

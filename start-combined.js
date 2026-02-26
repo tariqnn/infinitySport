@@ -3,6 +3,14 @@ const { spawn } = require('child_process');
 
 const WEB_PORT = process.env.PORT || 3000;
 
+function mergeNodeOptions(existing) {
+  const flags = ['--single-threaded', '--single-threaded-gc', '--v8-pool-size=1'];
+  const current = (existing || '').trim();
+  const all = new Set(current ? current.split(/\s+/) : []);
+  for (const flag of flags) all.add(flag);
+  return Array.from(all).join(' ').trim();
+}
+
 console.log('Starting Infinity Sports web app...');
 console.log(`Web port: ${WEB_PORT}`);
 
@@ -12,6 +20,8 @@ const webProcess = spawn('npm', ['run', 'start:web'], {
     ...process.env,
     PORT: String(WEB_PORT),
     NODE_ENV: 'production',
+    UV_THREADPOOL_SIZE: process.env.UV_THREADPOOL_SIZE || '1',
+    NODE_OPTIONS: mergeNodeOptions(process.env.NODE_OPTIONS),
   },
   stdio: 'inherit',
   shell: true,

@@ -3,30 +3,27 @@
 @tailwind utilities;
 
 :root {
-  --bg-shell: #eef3ff;
-  --bg-shell-strong: #e3ebff;
+  --bg-shell: #f4f7fb;
+  --bg-shell-strong: #eef2f8;
   --bg-card: #ffffff;
-  --bg-card-muted: #f6f8fc;
-  --bg-card-strong: #edf2fb;
-  --border-muted: rgba(8, 21, 41, 0.1);
-  --border-input: rgba(8, 21, 41, 0.18);
-  --text-primary: #0b1324;
-  --text-muted: #475569;
-  --text-dark: #05080f;
-  --primary: #0f4ba0;
-  --primary-hover: #0b3b7f;
-  --primary-light: rgba(15, 75, 160, 0.12);
+  --bg-card-muted: #f8fafc;
+  --bg-card-strong: #eff3f9;
+  --border-muted: #e1e7f0;
+  --border-input: #d5deea;
+  --text-primary: #0f172a;
+  --text-muted: #64748b;
+  --text-dark: #020617;
+  --primary: #1e63ff;
+  --primary-hover: #184fd1;
+  --primary-light: rgba(30, 99, 255, 0.12);
   --accent-blue: #2f6bff;
   --accent-green: #22c55e;
   --accent-teal: #14b8a6;
   --accent-amber: #f59e0b;
-  --gradient-primary: linear-gradient(135deg, #0f4ba0 0%, #1a7fc1 55%, #14b8a6 100%);
-  --gradient-hero: radial-gradient(900px circle at 10% -10%, rgba(15, 75, 160, 0.2), transparent 45%),
-    radial-gradient(800px circle at 92% 0%, rgba(20, 184, 166, 0.16), transparent 40%),
-    radial-gradient(700px circle at 45% 115%, rgba(47, 107, 255, 0.16), transparent 45%),
-    linear-gradient(135deg, #f8fafc 0%, #edf3ff 60%, #eef4ff 100%);
-  --shadow-soft: 0 8px 24px rgba(11, 18, 36, 0.08);
-  --shadow-strong: 0 16px 40px rgba(11, 18, 36, 0.14);
+  --gradient-primary: linear-gradient(135deg, #0b1f4f 0%, #0e2a68 100%);
+  --gradient-hero: linear-gradient(180deg, #f4f7fb 0%, #f4f7fb 100%);
+  --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-strong: 0 10px 24px rgba(15, 23, 42, 0.08);
 }
 
 @layer base {
@@ -38,47 +35,18 @@
     font-family: var(--font-sans), system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     background-color: var(--bg-shell);
     background-image: var(--gradient-hero);
-    background-attachment: fixed;
     color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
-    position: relative;
-  }
-
-  body::before,
-  body::after {
-    content: '';
-    position: fixed;
-    z-index: -1;
-    border-radius: 9999px;
-    pointer-events: none;
-    filter: blur(44px);
-    opacity: 0.45;
-  }
-
-  body::before {
-    width: 18rem;
-    height: 18rem;
-    top: -5rem;
-    right: -5rem;
-    background: rgba(15, 75, 160, 0.4);
-  }
-
-  body::after {
-    width: 14rem;
-    height: 14rem;
-    bottom: -4rem;
-    left: -4rem;
-    background: rgba(20, 184, 166, 0.34);
   }
 
   ::selection {
-    background: rgba(0, 61, 165, 0.2);
+    background: rgba(30, 99, 255, 0.22);
     color: var(--text-dark);
   }
 
   :focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(15, 75, 160, 0.2);
+    box-shadow: 0 0 0 3px rgba(30, 99, 255, 0.18);
   }
 }
 
@@ -89,8 +57,7 @@
 
   .glass-card {
     @apply rounded-2xl border bg-[var(--bg-card)];
-    background-color: rgba(255, 255, 255, 0.92);
-    backdrop-filter: blur(12px);
+    background-color: rgba(255, 255, 255, 0.96);
     border-color: var(--border-muted);
     color: var(--text-primary);
     box-shadow: var(--shadow-soft);
@@ -104,7 +71,7 @@
   .glass-card input,
   .glass-card textarea,
   .glass-card select {
-    @apply rounded-2xl border px-3 py-2.5 text-sm transition-colors;
+    @apply rounded-lg border px-3 py-2.5 text-sm transition-colors;
     background-color: var(--bg-card);
     border-color: var(--border-input);
     color: var(--text-primary);
@@ -124,24 +91,24 @@
 
   .btn-primary {
     background: var(--gradient-primary);
-    @apply rounded-2xl px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-[0.98];
+    @apply rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-[0.98];
     box-shadow: var(--shadow-soft);
   }
 
   .btn-secondary {
-    @apply rounded-2xl border px-4 py-2.5 text-sm font-semibold text-[var(--text-primary)] transition-all active:scale-[0.98];
+    @apply rounded-lg border px-4 py-2.5 text-sm font-semibold text-[var(--text-primary)] transition-all active:scale-[0.98];
     background-color: rgba(255, 255, 255, 0.85);
     border-color: var(--border-muted);
   }
 
   .glow-button {
     background: var(--gradient-primary);
-    @apply rounded-2xl px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-[0.98];
+    @apply rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-[0.98];
     box-shadow: var(--shadow-soft);
   }
 
   .surface-input {
-    @apply w-full rounded-2xl border px-4 py-2 text-sm transition-colors;
+    @apply w-full rounded-lg border px-4 py-2 text-sm transition-colors;
     background-color: rgba(255, 255, 255, 0.9);
     border-color: var(--border-muted);
     color: var(--text-primary);
@@ -177,7 +144,7 @@
 
   .glass-card:hover {
     box-shadow: var(--shadow-strong);
-    border-color: rgba(15, 75, 160, 0.2);
+    border-color: rgba(30, 99, 255, 0.22);
     transform: translateY(-1px);
   }
 

@@ -49,7 +49,7 @@ export function PortalTopbar({
           </button>
           <p className="hidden text-xs font-semibold uppercase tracking-[0.08em] text-ui-textMuted sm:block">
             Workspace:
-            <span className="ml-1 font-bold text-ui-textPrimary">London HQ</span>
+            <span className="ml-1 font-bold text-ui-textPrimary">InfinitySports</span>
           </p>
         </div>
       </div>

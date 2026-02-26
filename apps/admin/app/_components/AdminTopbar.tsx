@@ -17,7 +17,7 @@ export function AdminTopbar() {
   const pageTitle = formatPageTitle(pathname);
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-[var(--border-muted)] bg-white/85 px-6 backdrop-blur-xl">
+    <header className="sticky top-0 z-30 flex h-[72px] items-center justify-between gap-4 border-b border-[var(--border-muted)] bg-white px-4 sm:px-6">
       <div className="flex min-w-0 flex-1 items-center gap-4">
         <div className="min-w-0">
           <h1 className="truncate font-display text-xl font-bold text-[var(--text-primary)]">
@@ -32,16 +32,16 @@ export function AdminTopbar() {
           <input
             type="search"
             placeholder="Search programs, events, content..."
-            className="surface-input pl-9 pr-14"
+            className="h-10 w-full rounded-full border border-[var(--border-muted)] bg-[var(--bg-card-muted)] pl-9 pr-14 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--primary)]/30"
             aria-label="Search admin content"
           />
-          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-lg border border-[var(--border-muted)] bg-white/80 px-2 py-1 text-[10px] font-semibold text-[var(--text-muted)]">
+          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-md border border-[var(--border-muted)] bg-white px-2 py-1 text-[10px] font-semibold text-[var(--text-muted)]">
             Ctrl K
           </span>
         </div>
       </div>
       <div className="flex flex-shrink-0 items-center gap-2">
-        <div className="hidden items-center gap-2 rounded-full border border-[var(--border-muted)] bg-white/80 px-3 py-1 text-xs font-semibold text-[var(--text-muted)] md:flex">
+        <div className="hidden items-center gap-2 rounded-lg border border-[var(--border-muted)] bg-white px-3 py-1 text-xs font-semibold text-[var(--text-muted)] md:flex">
           <span className="h-2 w-2 rounded-full bg-[var(--accent-green)]" />
           Live
         </div>

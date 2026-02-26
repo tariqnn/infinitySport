@@ -9,26 +9,33 @@ export default async function DashboardPage() {
   const content = await getLandingContent();
   let coachesLive = 0;
   let coachesTotal = 0;
-  let coachesPreview: Array<{ id: string; name: string; sport: string }> = [];
+  let programsLive = 0;
+  let programsTotal = 0;
+  let programsPreview: Array<{ id: string; name: string; sportType: string }> = [];
   try {
-    const [liveCount, totalCount, preview] = await Promise.all([
+    const [liveCount, totalCount, packageLiveCount, packageTotalCount, packagePreview] = await Promise.all([
       prisma.landingCoach.count({ where: { isActive: true } }),
       prisma.landingCoach.count(),
-      prisma.landingCoach.findMany({
-        orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+      prisma.package.count({ where: { isActive: true } }),
+      prisma.package.count(),
+      prisma.package.findMany({
+        where: { isActive: true },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
         take: 4,
-        select: { id: true, name: true, sport: true },
+        select: { id: true, name: true, sportType: true },
       }),
     ]);
     coachesLive = liveCount;
     coachesTotal = totalCount;
-    coachesPreview = preview;
+    programsLive = packageLiveCount;
+    programsTotal = packageTotalCount;
+    programsPreview = packagePreview;
   } catch (error) {
-    console.error('[admin] failed to load coach dashboard data:', error);
+    console.error('[admin] failed to load dashboard data:', error);
   }
 
   const stats = [
-    { label: 'Programs live', value: String(content.programs.filter((p) => p.isActive !== false).length), delta: `${content.programs.length} total`, accent: 'blue' as const },
+    { label: 'Programs live', value: String(programsLive), delta: `${programsTotal} total`, accent: 'blue' as const },
     { label: 'Coaches live', value: String(coachesLive), delta: `${coachesTotal} total`, accent: 'blue' as const },
     { label: 'Offers & plans', value: String(content.offers.filter((o) => o.isActive !== false).length), delta: 'on landing page', accent: 'teal' as const },
     { label: 'Upcoming events', value: String(content.events.filter((e) => e.isActive !== false).length), delta: 'next 90 days', accent: 'green' as const },
@@ -36,14 +43,14 @@ export default async function DashboardPage() {
   ];
 
   const activeModules =
-    content.programs.filter((p) => p.isActive !== false).length +
+    programsLive +
     coachesLive +
     content.offers.filter((o) => o.isActive !== false).length +
     content.events.filter((e) => e.isActive !== false).length +
     content.announcements.filter((a) => a.isActive !== false).length;
 
   const totalModules =
-    content.programs.length +
+    programsTotal +
     coachesTotal +
     content.offers.length +
     content.events.length +
@@ -58,8 +65,8 @@ export default async function DashboardPage() {
     },
     {
       title: 'Programs',
-      description: 'Edit landing page sport programs and ordering.',
-      href: '/programs',
+      description: 'Manage sellable programs shown on landing.',
+      href: '/packages',
       icon: FileText,
     },
     {
@@ -209,20 +216,20 @@ export default async function DashboardPage() {
         <div className="glass-card space-y-4 p-6">
           <div className="flex items-center justify-between">
             <h3 className="font-display text-lg font-semibold text-[var(--text-primary)]">Programs</h3>
-            <Link href="/programs" className="text-xs font-semibold text-[var(--primary)] hover:underline">
+            <Link href="/packages" className="text-xs font-semibold text-[var(--primary)] hover:underline">
               Manage
             </Link>
           </div>
           <ul className="space-y-2">
-            {content.programs.slice(0, 4).map((program) => (
+            {programsPreview.map((program) => (
               <li key={program.id} className="rounded-2xl border border-[var(--border-muted)] bg-[var(--bg-card-muted)] px-4 py-3 text-sm">
-                <p className="font-medium text-[var(--text-primary)]">{program.title}</p>
+                <p className="font-medium text-[var(--text-primary)]">{program.name}</p>
                 <p className="text-xs text-[var(--text-muted)]">{program.sportType}</p>
               </li>
             ))}
-            {content.programs.length === 0 ? (
+            {programsPreview.length === 0 ? (
               <li className="rounded-2xl border border-dashed border-[var(--border-muted)] bg-[var(--bg-card-muted)] px-4 py-3 text-sm text-[var(--text-muted)]">
-                No programs yet. Add your first program card.
+                No programs yet. Add your first program in Admin.
               </li>
             ) : null}
           </ul>

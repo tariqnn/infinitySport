@@ -64,8 +64,8 @@ export function PackagesManager() {
         const list = await apiClient.getPackages();
         setPackages(Array.isArray(list) ? list : []);
       } catch (e) {
-        console.error('Failed to load packages', e);
-        setCreateState({ status: 'error', message: 'Failed to load packages. Is the API running?' });
+        console.error('Failed to load programs', e);
+        setCreateState({ status: 'error', message: 'Failed to load programs. Is the API running?' });
       } finally {
         setLoading(false);
       }
@@ -97,10 +97,10 @@ export function PackagesManager() {
     try {
       if (isEdit && editing) {
         await apiClient.updatePackage(editing.id, payload);
-        stateSetter({ status: 'success', message: 'Package updated.' });
+        stateSetter({ status: 'success', message: 'Program updated.' });
       } else {
         await apiClient.createPackage(payload);
-        stateSetter({ status: 'success', message: 'Package created.' });
+        stateSetter({ status: 'success', message: 'Program created.' });
       }
       const list = await apiClient.getPackages();
       setPackages(Array.isArray(list) ? list : []);
@@ -110,7 +110,7 @@ export function PackagesManager() {
     } catch (err) {
       stateSetter({
         status: 'error',
-        message: err instanceof Error ? err.message : 'Failed to save package',
+        message: err instanceof Error ? err.message : 'Failed to save program',
       });
     } finally {
       setPending(false);
@@ -118,12 +118,12 @@ export function PackagesManager() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this package? Registrations using this package name may be affected.')) return;
+    if (!confirm('Delete this program? Registrations using this program name may be affected.')) return;
     setPending(true);
     setDeleteState({ status: 'idle' });
     try {
       await apiClient.deletePackage(id);
-      setDeleteState({ status: 'success', message: 'Package deleted.' });
+      setDeleteState({ status: 'success', message: 'Program deleted.' });
       const list = await apiClient.getPackages();
       setPackages(Array.isArray(list) ? list : []);
       setEditing(null);
@@ -159,7 +159,7 @@ export function PackagesManager() {
   if (loading) {
     return (
       <div className="p-6 text-center">
-        <p className="text-lg font-semibold text-slate-600">Loading packages...</p>
+        <p className="text-lg font-semibold text-slate-600">Loading programs...</p>
       </div>
     );
   }
@@ -171,9 +171,9 @@ export function PackagesManager() {
       <div className="glass-card space-y-4 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-slate-500">{editing ? 'Update' : 'Create'} package</p>
+            <p className="text-xs uppercase tracking-[0.4em] text-slate-500">{editing ? 'Update' : 'Create'} program</p>
             <h3 className="font-display text-2xl font-semibold text-slate-900">
-              {editing ? editing.name : 'Add package'}
+              {editing ? editing.name : 'Add program'}
             </h3>
           </div>
           {editing && (
@@ -244,12 +244,12 @@ export function PackagesManager() {
               {(editing ? editState : createState).message}
             </p>
           )}
-          <SubmitButton label={editing ? 'Save package' : 'Create package'} pending={pending} />
+          <SubmitButton label={editing ? 'Save program' : 'Create program'} pending={pending} />
         </form>
       </div>
 
       <div className="space-y-3">
-        <h3 className="font-display text-xl font-semibold text-slate-900">Packages ({packages.length})</h3>
+        <h3 className="font-display text-xl font-semibold text-slate-900">Programs ({packages.length})</h3>
         <div className="space-y-2">
           {packages.map((pkg, idx) => (
             <div key={pkg.id} className="glass-card flex flex-wrap items-center justify-between gap-3 p-4">

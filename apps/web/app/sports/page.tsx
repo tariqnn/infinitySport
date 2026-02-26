@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { fetchPrograms, fetchPackages } from '../../lib/apiClient';
+import { fetchPackages } from '../../lib/apiClient';
 
 export const metadata = {
   title: 'Sports & Facilities',
@@ -21,7 +21,7 @@ function displaySport(value: string): string {
   return value || 'Other';
 }
 
-function cleanPackageTitle(name: string, sportType: string): string {
+function cleanProgramTitle(name: string, sportType: string): string {
   const sport = displaySport(sportType);
   const withDash = `${sport} - `;
   if (name.startsWith(withDash)) return name.slice(withDash.length).trim();
@@ -29,25 +29,25 @@ function cleanPackageTitle(name: string, sportType: string): string {
   return name;
 }
 
-function getPriceLabel(pkg: PackageItem): string {
-  if (pkg.pricingType === 'MANUAL' || pkg.currentPriceJod == null) return 'Contact for pricing';
-  return `${pkg.currentPriceJod} JOD`;
+function getPriceLabel(program: PackageItem): string {
+  if (program.pricingType === 'MANUAL' || program.currentPriceJod == null) return 'Contact for pricing';
+  return `${program.currentPriceJod} JOD`;
 }
 
-function getBullets(pkg: PackageItem): string[] {
-  if (Array.isArray(pkg.descriptionBullets) && pkg.descriptionBullets.length > 0) {
-    return pkg.descriptionBullets.filter((item) => typeof item === 'string' && item.trim().length > 0);
+function getBullets(program: PackageItem): string[] {
+  if (Array.isArray(program.descriptionBullets) && program.descriptionBullets.length > 0) {
+    return program.descriptionBullets.filter((item) => typeof item === 'string' && item.trim().length > 0);
   }
-  if (pkg.description && pkg.description.trim().length > 0) {
-    return [pkg.description.trim()];
+  if (program.description && program.description.trim().length > 0) {
+    return [program.description.trim()];
   }
   return [];
 }
 
-function getTimeSlots(pkg: PackageItem): string[] {
-  if (!pkg.timeSlots) return [];
-  if (Array.isArray(pkg.timeSlots)) {
-    return pkg.timeSlots
+function getTimeSlots(program: PackageItem): string[] {
+  if (!program.timeSlots) return [];
+  if (Array.isArray(program.timeSlots)) {
+    return program.timeSlots
       .map((entry) => {
         if (typeof entry === 'string') return entry.trim();
         if (entry && typeof entry === 'object' && 'label' in entry && typeof (entry as { label?: unknown }).label === 'string') {
@@ -61,22 +61,13 @@ function getTimeSlots(pkg: PackageItem): string[] {
 }
 
 export default async function SportsPage() {
-  const [programsData, packagesData] = await Promise.all([fetchPrograms(), fetchPackages()]);
-
-  const featuredSports = programsData
-    .filter((program) => program.highlight)
-    .map((program) => ({
-      id: program.id,
-      name: program.name,
-      description: program.description || '',
-      slug: program.slug || program.name.toLowerCase().replace(/\s+/g, '-'),
-    }));
+  const programsData = await fetchPackages();
 
   const groups = new Map<string, PackageItem[]>();
-  for (const pkg of packagesData) {
-    const key = normalizeSport(pkg.sportType);
+  for (const program of programsData) {
+    const key = normalizeSport(program.sportType);
     const list = groups.get(key) || [];
-    list.push(pkg);
+    list.push(program);
     groups.set(key, list);
   }
 
@@ -90,70 +81,34 @@ export default async function SportsPage() {
       <div className="mx-auto max-w-4xl px-6 text-center lg:px-0">
         <p className="text-sm uppercase tracking-[0.3em] text-brand-green-dark">Programs</p>
         <h1 className="mt-4 text-5xl font-bold text-brand-black">Sports & disciplines</h1>
-        <p className="mt-4 text-lg text-gray-600">
-          Programs and packages below are managed from Admin and reflected here automatically.
-        </p>
+        <p className="mt-4 text-lg text-gray-600">Programs are managed from Admin and reflected here automatically.</p>
       </div>
 
-      {programsData.length > 0 ? (
-        <section className="mx-auto mt-16 max-w-7xl px-6 lg:px-8">
-          <div className="mb-8 text-center">
-            <h2 className="text-3xl font-bold text-brand-black">Programs (Admin: Programs)</h2>
-            <p className="mt-2 text-sm text-gray-600">{programsData.length} program card(s)</p>
-          </div>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {programsData.map((program) => (
-              <article
-                key={program.id}
-                className="rounded-card border border-brand-lightBlue/20 bg-white p-6 shadow-card transition duration-500 hover:-translate-y-2 hover:border-brand-green-primary/50 hover:shadow-card-hover"
-              >
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-blue-primary">{program.level || 'Multi sport'}</p>
-                <h3 className="mt-2 text-2xl font-bold text-brand-black">{program.name}</h3>
-                {program.description ? <p className="mt-3 text-sm text-gray-600">{program.description}</p> : null}
-              </article>
-            ))}
-          </div>
-        </section>
-      ) : (
-        <div className="mx-auto mt-16 max-w-2xl px-6 text-center">
-          <div className="rounded-card border border-brand-lightBlue/20 bg-white p-12 shadow-card">
-            <h3 className="text-2xl font-bold text-brand-black">No programs yet</h3>
-            <p className="mt-3 text-gray-600">Create programs from Admin - Programs to show them here.</p>
-          </div>
-        </div>
-      )}
-
       {orderedSports.length > 0 ? (
-        <div className="mx-auto mt-20 max-w-7xl space-y-16 px-6 lg:px-8">
-          <div className="text-center">
-            <h2 className="text-3xl font-bold text-brand-black">Packages (Admin: Packages)</h2>
-            <p className="mt-2 text-sm text-gray-600">
-              {packagesData.length} package(s) available
-            </p>
-          </div>
+        <div className="mx-auto mt-16 max-w-7xl space-y-16 px-6 lg:px-8">
           {orderedSports.map((sport) => {
-            const sportPackages = groups.get(sport) || [];
+            const sportPrograms = groups.get(sport) || [];
             return (
               <section key={sport} id={sport.toLowerCase()} className="scroll-mt-24">
                 <div className="mb-8 text-center">
                   <h2 className="text-3xl font-bold text-brand-black">{displaySport(sport)}</h2>
-                  <p className="mt-2 text-sm text-gray-600">{sportPackages.length} package(s)</p>
+                  <p className="mt-2 text-sm text-gray-600">{sportPrograms.length} program(s)</p>
                 </div>
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {sportPackages.map((pkg) => {
-                    const bullets = getBullets(pkg);
-                    const slots = getTimeSlots(pkg);
+                  {sportPrograms.map((program) => {
+                    const bullets = getBullets(program);
+                    const slots = getTimeSlots(program);
                     return (
                       <article
-                        key={pkg.id}
+                        key={program.id}
                         className="rounded-card border border-brand-lightBlue/20 bg-white p-6 shadow-card transition duration-500 hover:-translate-y-2 hover:border-brand-green-primary/50 hover:shadow-card-hover"
                       >
-                        <h3 className="text-2xl font-bold text-brand-black">{cleanPackageTitle(pkg.name, pkg.sportType)}</h3>
-                        {pkg.description ? <p className="mt-3 text-sm text-gray-600">{pkg.description}</p> : null}
+                        <h3 className="text-2xl font-bold text-brand-black">{cleanProgramTitle(program.name, program.sportType)}</h3>
+                        {program.description ? <p className="mt-3 text-sm text-gray-600">{program.description}</p> : null}
                         {bullets.length > 0 ? (
                           <ul className="mt-4 space-y-2 text-sm text-gray-600">
                             {bullets.slice(0, 4).map((bullet, idx) => (
-                              <li key={`${pkg.id}-bullet-${idx}`} className="flex items-start gap-2">
+                              <li key={`${program.id}-bullet-${idx}`} className="flex items-start gap-2">
                                 <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-brand-green-primary" />
                                 <span>{bullet}</span>
                               </li>
@@ -163,20 +118,20 @@ export default async function SportsPage() {
                         {slots.length > 0 ? (
                           <div className="mt-4 rounded-xl bg-brand-lightBlue/10 p-3 text-xs font-semibold text-brand-blue-primary">
                             {slots.map((slot, idx) => (
-                              <p key={`${pkg.id}-slot-${idx}`}>{slot}</p>
+                              <p key={`${program.id}-slot-${idx}`}>{slot}</p>
                             ))}
                           </div>
                         ) : null}
                         <div className="mt-5 flex items-center justify-between gap-3">
                           <div>
                             <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Price</p>
-                            <p className="text-lg font-bold text-brand-black">{getPriceLabel(pkg)}</p>
-                            {pkg.sessionsCount > 0 ? (
-                              <p className="text-xs text-gray-500">{pkg.sessionsCount} sessions</p>
+                            <p className="text-lg font-bold text-brand-black">{getPriceLabel(program)}</p>
+                            {program.sessionsCount > 0 ? (
+                              <p className="text-xs text-gray-500">{program.sessionsCount} sessions</p>
                             ) : null}
                           </div>
                           <Link
-                            href={`/packages/register?package=${encodeURIComponent(pkg.name)}`}
+                            href={`/packages/register?package=${encodeURIComponent(program.name)}`}
                             className="rounded-full bg-[#003DA5] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#003DA5]/90"
                           >
                             Register
@@ -193,31 +148,12 @@ export default async function SportsPage() {
       ) : (
         <div className="mx-auto mt-16 max-w-2xl px-6 text-center">
           <div className="rounded-card border border-brand-lightBlue/20 bg-white p-12 shadow-card">
-            <h3 className="text-2xl font-bold text-brand-black">No active packages yet</h3>
-            <p className="mt-3 text-gray-600">Create and activate packages from Admin to show them on this page.</p>
+            <h3 className="text-2xl font-bold text-brand-black">No programs yet</h3>
+            <p className="mt-3 text-gray-600">Create and activate programs from Admin to show them on this page.</p>
           </div>
         </div>
       )}
-
-      {featuredSports.length > 0 ? (
-        <div className="mx-auto mt-24 max-w-7xl px-6 lg:px-8">
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {featuredSports.map((sport) => (
-              <div
-                key={sport.id}
-                className="flex flex-col rounded-card border border-brand-lightBlue/20 bg-white p-6 shadow-card transition duration-500 hover:-translate-y-2 hover:border-brand-green-primary/50 hover:shadow-card-hover"
-              >
-                <div className="mb-4 h-48 rounded-xl bg-gradient-to-br from-brand-lightBlue/20 to-brand-green-primary/20" />
-                <h3 className="text-2xl font-bold text-brand-black">{sport.name}</h3>
-                {sport.description ? <p className="mt-3 text-sm text-gray-600">{sport.description}</p> : null}
-                <Link href={`/sports#${sport.slug}`} className="mt-6 text-sm font-semibold text-brand-blue-primary transition hover:text-brand-green-primary">
-                  Learn more
-                </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
+

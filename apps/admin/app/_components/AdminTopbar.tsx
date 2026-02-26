@@ -31,7 +31,7 @@ export function AdminTopbar() {
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
           <input
             type="search"
-            placeholder="Search programs, packages, events..."
+            placeholder="Search programs, events, content..."
             className="surface-input pl-9 pr-14"
             aria-label="Search admin content"
           />

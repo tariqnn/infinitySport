@@ -300,7 +300,10 @@ async function _fetchLandingContent(): Promise<LandingContent> {
     const prisma = await getPrisma();
     const [hero, programs, offers, events, announcements, facilities, footerSettings] = await Promise.all([
       prisma.heroSection.findFirst({ orderBy: { updatedAt: 'desc' } }),
-      prisma.program.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }),
+      prisma.package.findMany({
+        where: { isActive: true },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      }),
       prisma.offer.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }),
       prisma.event.findMany({ orderBy: { date: 'asc' } }),
       prisma.announcement.findMany({ orderBy: [{ isPinned: 'desc' }, { publishedAt: 'desc' }] }),
@@ -342,13 +345,13 @@ async function _fetchLandingContent(): Promise<LandingContent> {
       programs: programs.map((program): LandingProgram => ({
         id: program.id,
         title: program.name,
-        description: program.description ?? '',
-        sportType: program.level || 'multi',
-        badge: program.level || undefined,
-        link: `/sports#${program.slug}`,
+        description: program.description?.trim() || 'Program details available on the sports page.',
+        sportType: program.sportType || 'multi',
+        badge: program.sportType || undefined,
+        link: `/sports#${(program.sportType || 'other').toLowerCase().replace(/\s+/g, '-')}`,
         mediaUrl: undefined,
-        isFeatured: program.highlight,
-        isActive: true,
+        isFeatured: false,
+        isActive: program.isActive,
       })),
       offers: offers.map((offer): LandingOffer => ({
         id: offer.id,

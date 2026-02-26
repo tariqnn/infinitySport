@@ -3,6 +3,24 @@ import { NextResponse } from 'next/server';
 import { canAttemptDatabaseQuery, noteDatabaseFailure } from '../../../../lib/dbGuard';
 
 const COURT_TYPES = ['Basketball AC', 'Basketball 3x3', 'Padel', 'Volleyball'] as const;
+type BookedPayload = { booked: Record<string, Record<string, string[]>> };
+type CacheEntry = { expiresAt: number; payload: BookedPayload };
+
+const CACHE_TTL_MS = 10_000;
+const globalCache = globalThis as unknown as { __bookedSlotsCache?: Map<string, CacheEntry> };
+
+function getCache(): Map<string, CacheEntry> {
+  if (!globalCache.__bookedSlotsCache) {
+    globalCache.__bookedSlotsCache = new Map<string, CacheEntry>();
+  }
+  return globalCache.__bookedSlotsCache;
+}
+
+function withCacheHeaders(response: NextResponse, cacheHit: boolean) {
+  response.headers.set('Cache-Control', 'public, max-age=5, s-maxage=5, stale-while-revalidate=15');
+  response.headers.set('X-Cache', cacheHit ? 'HIT' : 'MISS');
+  return response;
+}
 
 function toDateStr(d: Date): string {
   const y = d.getFullYear();
@@ -18,21 +36,31 @@ function toTimeStr(d: Date): string {
 }
 
 export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const startDate = searchParams.get('startDate') || new Date().toISOString().slice(0, 10);
+  let endDate = searchParams.get('endDate');
+  if (!endDate) {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + 30);
+    endDate = toDateStr(d);
+  }
+
+  const key = `${startDate}:${endDate}`;
+  const cache = getCache();
+  const cached = cache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return withCacheHeaders(NextResponse.json(cached.payload), true);
+  }
+
   try {
     if (!process.env.DATABASE_URL?.trim()) {
-      return NextResponse.json({ booked: {} });
+      const payload: BookedPayload = { booked: {} };
+      return withCacheHeaders(NextResponse.json(payload), false);
     }
     if (!(await canAttemptDatabaseQuery())) {
-      return NextResponse.json({ booked: {} });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const startDate = searchParams.get('startDate') || new Date().toISOString().slice(0, 10);
-    let endDate = searchParams.get('endDate');
-    if (!endDate) {
-      const d = new Date(startDate);
-      d.setDate(d.getDate() + 30);
-      endDate = toDateStr(d);
+      if (cached) return withCacheHeaders(NextResponse.json(cached.payload), true);
+      const payload: BookedPayload = { booked: {} };
+      return withCacheHeaders(NextResponse.json(payload), false);
     }
 
     const endNext = new Date(endDate);
@@ -74,12 +102,14 @@ export async function GET(request: Request) {
       }
     }
 
-    const res = NextResponse.json({ booked });
-    res.headers.set('Cache-Control', 'no-store');
-    return res;
+    const payload: BookedPayload = { booked };
+    cache.set(key, { payload, expiresAt: Date.now() + CACHE_TTL_MS });
+    return withCacheHeaders(NextResponse.json(payload), false);
   } catch (error) {
     noteDatabaseFailure('booked-slots.GET', error);
     console.error('[booked-slots] error', error);
-    return NextResponse.json({ booked: {} });
+    if (cached) return withCacheHeaders(NextResponse.json(cached.payload), true);
+    const payload: BookedPayload = { booked: {} };
+    return withCacheHeaders(NextResponse.json(payload), false);
   }
 }

@@ -145,21 +145,23 @@ export function BookingForm() {
   const phone = `${phoneCountry}${phoneDigits}`;
 
   useEffect(() => {
+    if (!selectedDate || !selectedCourt) return;
+
     const url = selectedDate ? `/api/booking/blocked-slots?date=${encodeURIComponent(selectedDate)}` : '/api/booking/blocked-slots';
-    fetch(url)
+    const controller = new AbortController();
+
+    fetch(url, { signal: controller.signal })
       .then((r) => r.json())
       .then((d) => {
         if (d?.blocked && typeof d.blocked === 'object' && Object.keys(d.blocked).length > 0) setBlocked(d.blocked);
       })
       .catch(() => {});
-  }, [selectedDate]);
 
-  const fetchBooked = () => {
-    const today = new Date().toISOString().split('T')[0];
-    const max = new Date();
-    max.setDate(max.getDate() + 30);
-    const end = max.toISOString().split('T')[0];
-    fetch(`/api/booking/booked-slots?startDate=${today}&endDate=${end}`)
+    return () => controller.abort();
+  }, [selectedDate, selectedCourt]);
+
+  const fetchBookedForDate = (date: string, signal?: AbortSignal) => {
+    fetch(`/api/booking/booked-slots?startDate=${date}&endDate=${date}`, { signal })
       .then((r) => r.json())
       .then((d) => {
         if (d?.booked && typeof d.booked === 'object') setBooked(d.booked);
@@ -168,8 +170,13 @@ export function BookingForm() {
   };
 
   useEffect(() => {
-    fetchBooked();
-  }, []);
+    if (!selectedDate || !selectedCourt) return;
+
+    const controller = new AbortController();
+    fetchBookedForDate(selectedDate, controller.signal);
+
+    return () => controller.abort();
+  }, [selectedDate, selectedCourt]);
 
   const COURTS: Array<{ id: string; name: string; type: CourtType }> = [
     { id: 'basketball-ac', name: tr(language, 'booking_court_basketball'), type: 'Basketball AC' },
@@ -294,7 +301,7 @@ export function BookingForm() {
           ? tr(language, 'booking_success_email')
           : tr(language, 'booking_success_no_email')
       );
-      fetchBooked();
+      fetchBookedForDate(selectedDate);
       // Reset form
       setSelectedCourt('');
       setSelectedDate('');

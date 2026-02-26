@@ -3,6 +3,25 @@ import { NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
 import { canAttemptDatabaseQuery, noteDatabaseFailure } from '../../../../lib/dbGuard';
 
+type BlockedPayload = { blocked: Record<string, Record<string, string[]>> };
+type CacheEntry = { expiresAt: number; payload: BlockedPayload };
+
+const CACHE_TTL_MS = 15_000;
+const globalCache = globalThis as unknown as { __blockedSlotsCache?: Map<string, CacheEntry> };
+
+function getCache(): Map<string, CacheEntry> {
+  if (!globalCache.__blockedSlotsCache) {
+    globalCache.__blockedSlotsCache = new Map<string, CacheEntry>();
+  }
+  return globalCache.__blockedSlotsCache;
+}
+
+function withCacheHeaders(response: NextResponse, cacheHit: boolean) {
+  response.headers.set('Cache-Control', 'public, max-age=10, s-maxage=10, stale-while-revalidate=20');
+  response.headers.set('X-Cache', cacheHit ? 'HIT' : 'MISS');
+  return response;
+}
+
 function buildBlockedMap(
   rows: Array<{ dayOfWeek: string; courtType: string; time: string; isBlocked: boolean }>,
 ): Record<string, Record<string, string[]>> {
@@ -19,16 +38,27 @@ function buildBlockedMap(
 }
 
 export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const date = searchParams.get('date');
+  const key = `date:${date || 'all'}`;
+  const cache = getCache();
+  const cached = cache.get(key);
+
+  if (cached && cached.expiresAt > Date.now()) {
+    return withCacheHeaders(NextResponse.json(cached.payload), true);
+  }
+
   try {
     if (!process.env.DATABASE_URL?.trim()) {
-      return NextResponse.json({ blocked: {} });
+      const payload: BlockedPayload = { blocked: {} };
+      return withCacheHeaders(NextResponse.json(payload), false);
     }
     if (!(await canAttemptDatabaseQuery())) {
-      return NextResponse.json({ blocked: {} });
+      if (cached) return withCacheHeaders(NextResponse.json(cached.payload), true);
+      const payload: BlockedPayload = { blocked: {} };
+      return withCacheHeaders(NextResponse.json(payload), false);
     }
 
-    const { searchParams } = new URL(request.url);
-    const date = searchParams.get('date');
     const where: Prisma.BlockedSlotWhereInput = { isBlocked: true };
 
     if (date) {
@@ -49,12 +79,14 @@ export async function GET(request: Request) {
       select: { dayOfWeek: true, courtType: true, time: true, isBlocked: true },
     });
 
-    const res = NextResponse.json({ blocked: buildBlockedMap(rows) });
-    res.headers.set('Cache-Control', 'no-store');
-    return res;
+    const payload: BlockedPayload = { blocked: buildBlockedMap(rows) };
+    cache.set(key, { payload, expiresAt: Date.now() + CACHE_TTL_MS });
+    return withCacheHeaders(NextResponse.json(payload), false);
   } catch (error) {
     noteDatabaseFailure('blocked-slots.GET', error);
     console.error('[blocked-slots] error', error);
-    return NextResponse.json({ blocked: {} });
+    if (cached) return withCacheHeaders(NextResponse.json(cached.payload), true);
+    const payload: BlockedPayload = { blocked: {} };
+    return withCacheHeaders(NextResponse.json(payload), false);
   }
 }

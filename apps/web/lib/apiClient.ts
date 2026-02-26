@@ -91,6 +91,87 @@ const FALLBACK_FACILITIES: { id: string; name: string; description: string }[] =
   { id: 'gymnastics', name: 'Official Gymnastics Training Facility', description: 'Dedicated gymnastics training facility meeting official standards.' },
 ];
 
+const FALLBACK_PACKAGES: PackageResponse[] = [
+  {
+    id: 'fallback-basketball',
+    sportType: 'basketball',
+    name: 'Basketball Academy',
+    description: 'Skill development, gameplay IQ, and strength progression for youth athletes.',
+    descriptionBullets: ['Fundamentals', 'Conditioning', 'Match play'],
+    sessionsCount: 12,
+    trackingType: 'MONTHLY',
+    pricingType: 'SUBSCRIPTION',
+    currentPriceJod: null,
+    timeSlots: null,
+    isActive: true,
+    sortOrder: 1,
+  },
+  {
+    id: 'fallback-gymnastics',
+    sportType: 'gymnastics',
+    name: 'Gymnastics Program',
+    description: 'Balance, flexibility, and discipline training designed for all levels.',
+    descriptionBullets: ['Beginner to advanced', 'Technique focus', 'Safe progression'],
+    sessionsCount: 12,
+    trackingType: 'MONTHLY',
+    pricingType: 'SUBSCRIPTION',
+    currentPriceJod: null,
+    timeSlots: null,
+    isActive: true,
+    sortOrder: 2,
+  },
+  {
+    id: 'fallback-volleyball',
+    sportType: 'volleyball',
+    name: 'Volleyball Program',
+    description: 'Competitive volleyball sessions including passing, serving, and team systems.',
+    descriptionBullets: ['Tactical drills', 'Team training', 'Competitive preparation'],
+    sessionsCount: 12,
+    trackingType: 'MONTHLY',
+    pricingType: 'SUBSCRIPTION',
+    currentPriceJod: null,
+    timeSlots: null,
+    isActive: true,
+    sortOrder: 3,
+  },
+];
+
+const FALLBACK_COACHES: CoachResponse[] = [
+  {
+    id: 'fallback-coach-ammar',
+    name: 'Ammar Salman',
+    sport: 'Basketball',
+    description: 'Head coach focused on fundamentals, game awareness, and athlete growth.',
+    quote: 'Discipline and consistency build champions.',
+    achievements: ['Youth development specialist', 'Team systems coach'],
+    imageUrl: '/ammar-salman.jpg',
+    isActive: true,
+    order: 1,
+  },
+  {
+    id: 'fallback-coach-raghad',
+    name: 'Raghad Haimour',
+    sport: 'Gymnastics',
+    description: 'Gymnastics coach delivering structured progressions in a safe training environment.',
+    quote: 'Progress starts with perfect fundamentals.',
+    achievements: ['Progressive training plans', 'Beginner to advanced support'],
+    imageUrl: '/raghad-haimour.jpeg',
+    isActive: true,
+    order: 2,
+  },
+  {
+    id: 'fallback-coach-rahaf',
+    name: 'Rahaf Haimour',
+    sport: 'Volleyball',
+    description: 'Volleyball coach emphasizing teamwork, technique, and match readiness.',
+    quote: 'Strong teams are built in practice.',
+    achievements: ['Team coordination training', 'Competitive drill design'],
+    imageUrl: '/rahaf-haimour.jpeg',
+    isActive: true,
+    order: 3,
+  },
+];
+
 function canUseDb() {
   if (typeof window !== 'undefined') return false;
 
@@ -146,14 +227,15 @@ export async function fetchPrograms(): Promise<ProgramResponse[]> {
 }
 
 export async function fetchPackages(): Promise<PackageResponse[]> {
-  if (!canUseDb()) return [];
-  if (!(await canAttemptDatabaseQuery())) return [];
+  if (!canUseDb()) return FALLBACK_PACKAGES;
+  if (!(await canAttemptDatabaseQuery())) return FALLBACK_PACKAGES;
   try {
     const prisma = await getPrisma();
     const rows = await prisma.package.findMany({
       where: { isActive: true },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     });
+    if (!rows.length) return FALLBACK_PACKAGES;
     return rows.map((row) => ({
       id: row.id,
       sportType: row.sportType,
@@ -170,7 +252,7 @@ export async function fetchPackages(): Promise<PackageResponse[]> {
     }));
   } catch (error) {
     noteDatabaseFailure('fetchPackages', error);
-    return [];
+    return FALLBACK_PACKAGES;
   }
 }
 
@@ -220,11 +302,12 @@ export async function fetchEvents(): Promise<EventResponse[]> {
 }
 
 export async function fetchCoaches(): Promise<CoachResponse[]> {
-  if (!canUseDb()) return [];
-  if (!(await canAttemptDatabaseQuery())) return [];
+  if (!canUseDb()) return FALLBACK_COACHES;
+  if (!(await canAttemptDatabaseQuery())) return FALLBACK_COACHES;
   try {
     const prisma = await getPrisma();
     const rows = await prisma.landingCoach.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] });
+    if (!rows.length) return FALLBACK_COACHES;
     return rows.map((row) => ({
       id: row.id,
       name: row.name,
@@ -238,7 +321,7 @@ export async function fetchCoaches(): Promise<CoachResponse[]> {
     }));
   } catch (error) {
     noteDatabaseFailure('fetchCoaches', error);
-    return [];
+    return FALLBACK_COACHES;
   }
 }
 
@@ -304,6 +387,18 @@ export async function fetchAnnouncements(): Promise<AnnouncementResponse[]> {
 }
 
 export function getLandingFallback(): LandingContent {
+  const fallbackPrograms: LandingProgram[] = FALLBACK_PACKAGES.map((program) => ({
+    id: program.id,
+    title: program.name,
+    description: program.description?.trim() || 'Program details available on the sports page.',
+    sportType: program.sportType || 'multi',
+    badge: program.sportType || undefined,
+    link: `/sports#${(program.sportType || 'other').toLowerCase().replace(/\s+/g, '-')}`,
+    mediaUrl: undefined,
+    isFeatured: false,
+    isActive: true,
+  }));
+
   return {
     hero: {
       title: 'Elevating Jordanian Athletes',
@@ -316,7 +411,7 @@ export function getLandingFallback(): LandingContent {
       backgroundVideoUrl: undefined,
     },
     highlights: [],
-    programs: [],
+    programs: fallbackPrograms,
     offers: [],
     events: [],
     announcements: [],

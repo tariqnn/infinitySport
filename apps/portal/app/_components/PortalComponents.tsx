@@ -1,11 +1,11 @@
-import { ReactNode } from 'react';
-import clsx from 'clsx';
+import { ReactNode } from "react";
+import clsx from "clsx";
 
 type StatCardProps = {
   label: string;
   value: string;
   delta?: string;
-  deltaTone?: 'up' | 'down' | 'neutral';
+  deltaTone?: "up" | "down" | "neutral";
   description?: string;
   icon?: ReactNode;
 };
@@ -14,7 +14,7 @@ export function SectionHeader({
   eyebrow,
   title,
   description,
-  actions
+  actions,
 }: {
   eyebrow?: string;
   title: string;
@@ -24,40 +24,36 @@ export function SectionHeader({
   return (
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        {eyebrow ? (
-          <p className="text-xs uppercase tracking-[0.35em] text-[#5c6475]">{eyebrow}</p>
-        ) : null}
-        <h2 className="text-2xl font-black text-[#0f1a2b]">{title}</h2>
-        {description ? <p className="text-sm text-[#5c6475]">{description}</p> : null}
+        {eyebrow ? <p className="text-xs uppercase tracking-[0.16em] text-ui-textMuted">{eyebrow}</p> : null}
+        <h2 className="text-2xl font-bold text-ui-textPrimary">{title}</h2>
+        {description ? <p className="text-sm text-ui-textMuted">{description}</p> : null}
       </div>
-      {actions ? <div className="flex gap-3">{actions}</div> : null}
+      {actions ? <div className="flex gap-2">{actions}</div> : null}
     </div>
   );
 }
 
-export function StatCard({ label, value, delta, deltaTone = 'neutral', description, icon }: StatCardProps) {
+export function StatCard({ label, value, delta, deltaTone = "neutral", description, icon }: StatCardProps) {
   return (
-    <div className="relative overflow-hidden rounded-[24px] border border-[#e3e8f2] bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.08)] transition hover:-translate-y-1 hover:shadow-[0_22px_55px_rgba(15,23,42,0.16)]">
+    <div className="rounded-2xl border border-ui-border bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[#5c6475]">{label}</p>
-        {icon ? <div className="text-[#1426ff]">{icon}</div> : null}
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-ui-textMuted">{label}</p>
+        {icon ? <div className="text-[#2558e8]">{icon}</div> : null}
       </div>
-      <div className="mt-3 flex items-center gap-3">
-        <p className="text-3xl font-black text-[#0f1a2b]">{value}</p>
-        {delta ? (
-          <span
-            className={clsx(
-              'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold',
-              deltaTone === 'up' && 'bg-[#e8fff0] text-[#1c934e]',
-              deltaTone === 'down' && 'bg-[#ffe8e8] text-[#d14343]',
-              deltaTone === 'neutral' && 'bg-[#f0f5ff] text-[#1426ff]'
-            )}
-          >
-            {delta}
-          </span>
-        ) : null}
-      </div>
-      {description ? <p className="mt-2 text-xs text-[#5c6475]">{description}</p> : null}
+      <p className="mt-2 text-3xl font-bold text-ui-textPrimary">{value}</p>
+      {delta ? (
+        <p
+          className={clsx(
+            "mt-1 text-xs font-medium",
+            deltaTone === "up" && "text-[#10b981]",
+            deltaTone === "down" && "text-[#ef4444]",
+            deltaTone === "neutral" && "text-ui-textMuted"
+          )}
+        >
+          {delta}
+        </p>
+      ) : null}
+      {description ? <p className="mt-2 text-xs text-ui-textMuted">{description}</p> : null}
     </div>
   );
 }
@@ -67,38 +63,30 @@ export function QuickAction({
   title,
   description,
   onClick,
-  variant = 'row',
+  variant = "row",
 }: {
   icon: ReactNode;
   title: string;
   description: string;
   onClick?: () => void;
-  variant?: 'row' | 'centered';
+  variant?: "row" | "centered";
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={clsx(
-        'rounded-2xl border border-ui-border bg-white p-5 text-left shadow-portal-card transition',
-        'hover:-translate-y-0.5 hover:shadow-portal-card-hover focus:outline-none focus:ring-2 focus:ring-brand-primaryBlue/20 focus:ring-offset-2',
-        variant === 'row' && 'flex items-start gap-3',
-        variant === 'centered' && 'flex flex-col items-center justify-center text-center'
+        "rounded-2xl border border-ui-border bg-white p-4 text-left transition hover:bg-[#f8fafc]",
+        variant === "row" && "flex items-start gap-3",
+        variant === "centered" && "flex flex-col items-center justify-center text-center"
       )}
     >
-      <div
-        className={clsx(
-          'flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f0f5ff] text-brand-primaryBlue',
-          variant === 'row' ? 'mt-0' : 'mb-3'
-        )}
-      >
+      <div className={clsx("flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef4ff] text-brand-primaryBlue", variant === "centered" && "mb-2")}>
         {icon}
       </div>
-      <div className={clsx(variant === 'row' ? '' : '')}>
+      <div>
         <p className="text-sm font-semibold text-ui-textPrimary">{title}</p>
-        <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-ui-textMuted">
-          {description}
-        </p>
+        <p className="mt-1 text-xs text-ui-textMuted">{description}</p>
       </div>
     </button>
   );
@@ -108,7 +96,7 @@ export function DataCard({
   title,
   subtitle,
   children,
-  actions
+  actions,
 }: {
   title: string;
   subtitle?: string;
@@ -116,32 +104,37 @@ export function DataCard({
   actions?: ReactNode;
 }) {
   return (
-    <div className="rounded-[24px] border border-[#e3e8f2] bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.08)]">
+    <div className="rounded-2xl border border-ui-border bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.35em] text-[#5c6475]">{subtitle}</p>
-          <h3 className="text-xl font-black text-[#0f1a2b]">{title}</h3>
+          {subtitle ? <p className="text-xs uppercase tracking-[0.12em] text-ui-textMuted">{subtitle}</p> : null}
+          <h3 className="text-xl font-semibold text-ui-textPrimary">{title}</h3>
         </div>
         {actions}
       </div>
-      <div className="mt-5">{children}</div>
+      <div className="mt-4">{children}</div>
     </div>
   );
 }
 
-export function StatusBadge({ tone = 'default', children }: { tone?: 'default' | 'green' | 'blue' | 'amber'; children: ReactNode }) {
+export function StatusBadge({
+  tone = "default",
+  children,
+}: {
+  tone?: "default" | "green" | "blue" | "amber";
+  children: ReactNode;
+}) {
   return (
     <span
       className={clsx(
-        'pill',
-        tone === 'default' && 'bg-[#f0f5ff] text-[#1426ff]',
-        tone === 'green' && 'bg-[#e8fff0] text-[#1c934e]',
-        tone === 'blue' && 'bg-[#f0f5ff] text-[#1426ff]',
-        tone === 'amber' && 'bg-[#fff8e6] text-[#b97700]'
+        "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold",
+        tone === "default" && "border-[#d8e0ec] bg-[#f8fafc] text-ui-textMuted",
+        tone === "green" && "border-[#bde8ce] bg-[#ecfff3] text-[#17834a]",
+        tone === "blue" && "border-[#c7d7ff] bg-[#f0f5ff] text-[#1e40af]",
+        tone === "amber" && "border-[#ffdba8] bg-[#fff8ea] text-[#a16207]"
       )}
     >
       {children}
     </span>
   );
 }
-

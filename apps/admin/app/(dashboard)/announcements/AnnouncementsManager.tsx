@@ -81,12 +81,13 @@ export function AnnouncementsManager() {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>, isEdit: boolean) {
     e.preventDefault();
+    const form = e.currentTarget;
     setPending(true);
     const stateSetter = isEdit ? setEditState : setCreateState;
     stateSetter({ status: 'idle' });
 
     try {
-      const formData = new FormData(e.currentTarget);
+      const formData = new FormData(form);
       const startDate = formData.get('startDate')?.toString();
       const publishedAt = startDate ? new Date(startDate) : new Date();
 
@@ -122,7 +123,7 @@ export function AnnouncementsManager() {
         setAnnouncements(transformed);
         setEditing(null);
         setImageUrl('');
-        e.currentTarget.reset();
+        form.reset();
         router.refresh();
     } catch (error) {
       console.error('Failed to save announcement:', error);

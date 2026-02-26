@@ -1,5 +1,11 @@
-import { InputHTMLAttributes, LabelHTMLAttributes } from 'react';
-import clsx from 'clsx';
+import {
+  InputHTMLAttributes,
+  SelectHTMLAttributes,
+  TextareaHTMLAttributes,
+  ReactNode,
+  useId,
+} from "react";
+import clsx from "clsx";
 
 export function Input({
   label,
@@ -12,33 +18,28 @@ export function Input({
   error?: string;
   hint?: string;
 }) {
-  const id = props.id || `input-${Math.random().toString(36).substr(2, 9)}`;
+  const generatedId = useId();
+  const id = props.id || generatedId;
 
   return (
     <div className="w-full">
-      {label && (
-        <label
-          htmlFor={id}
-          className="block text-sm font-medium text-ui-textPrimary mb-1.5"
-        >
+      {label ? (
+        <label htmlFor={id} className="control-label">
           {label}
-          {props.required && <span className="text-ui-danger ml-1">*</span>}
+          {props.required ? <span className="ml-1 text-ui-danger">*</span> : null}
         </label>
-      )}
+      ) : null}
       <input
         id={id}
         className={clsx(
-          'w-full rounded-xl border px-3 py-2.5 text-sm shadow-sm transition-colors',
-          'focus:outline-none focus:ring-2 focus:ring-brand-primaryBlue/20 focus:border-brand-primaryBlue',
-          error
-            ? 'border-ui-danger bg-red-50'
-            : 'border-ui-border bg-white text-ui-textPrimary',
+          "control-field",
+          error ? "border-ui-danger bg-red-50" : "border-ui-border bg-white text-ui-textPrimary",
           className
         )}
         {...props}
       />
-      {error && <p className="mt-1.5 text-sm text-ui-danger">{error}</p>}
-      {hint && !error && <p className="mt-1.5 text-sm text-ui-textMuted">{hint}</p>}
+      {error ? <p className="mt-1.5 text-sm text-ui-danger">{error}</p> : null}
+      {hint && !error ? <p className="mt-1.5 text-sm text-ui-textMuted">{hint}</p> : null}
     </div>
   );
 }
@@ -49,38 +50,33 @@ export function Textarea({
   hint,
   className,
   ...props
-}: React.TextareaHTMLAttributes<HTMLTextAreaElement> & {
+}: TextareaHTMLAttributes<HTMLTextAreaElement> & {
   label?: string;
   error?: string;
   hint?: string;
 }) {
-  const id = props.id || `textarea-${Math.random().toString(36).substr(2, 9)}`;
+  const generatedId = useId();
+  const id = props.id || generatedId;
 
   return (
     <div className="w-full">
-      {label && (
-        <label
-          htmlFor={id}
-          className="block text-sm font-medium text-ui-textPrimary mb-1.5"
-        >
+      {label ? (
+        <label htmlFor={id} className="control-label">
           {label}
-          {props.required && <span className="text-ui-danger ml-1">*</span>}
+          {props.required ? <span className="ml-1 text-ui-danger">*</span> : null}
         </label>
-      )}
+      ) : null}
       <textarea
         id={id}
         className={clsx(
-          'w-full rounded-xl border px-3 py-2.5 text-sm shadow-sm transition-colors resize-none',
-          'focus:outline-none focus:ring-2 focus:ring-brand-primaryBlue/20 focus:border-brand-primaryBlue',
-          error
-            ? 'border-ui-danger bg-red-50'
-            : 'border-ui-border bg-white text-ui-textPrimary',
+          "control-field min-h-24 resize-none py-2",
+          error ? "border-ui-danger bg-red-50" : "border-ui-border bg-white text-ui-textPrimary",
           className
         )}
         {...props}
       />
-      {error && <p className="mt-1.5 text-sm text-ui-danger">{error}</p>}
-      {hint && !error && <p className="mt-1.5 text-sm text-ui-textMuted">{hint}</p>}
+      {error ? <p className="mt-1.5 text-sm text-ui-danger">{error}</p> : null}
+      {hint && !error ? <p className="mt-1.5 text-sm text-ui-textMuted">{hint}</p> : null}
     </div>
   );
 }
@@ -93,34 +89,29 @@ export function Select({
   options,
   children,
   ...props
-}: React.SelectHTMLAttributes<HTMLSelectElement> & {
+}: SelectHTMLAttributes<HTMLSelectElement> & {
   label?: string;
   error?: string;
   hint?: string;
   options?: { value: string; label: string }[];
-  children?: React.ReactNode;
+  children?: ReactNode;
 }) {
-  const id = props.id || `select-${Math.random().toString(36).substr(2, 9)}`;
+  const generatedId = useId();
+  const id = props.id || generatedId;
 
   return (
     <div className="w-full">
-      {label && (
-        <label
-          htmlFor={id}
-          className="block text-sm font-medium text-ui-textPrimary mb-1.5"
-        >
+      {label ? (
+        <label htmlFor={id} className="control-label">
           {label}
-          {props.required && <span className="text-ui-danger ml-1">*</span>}
+          {props.required ? <span className="ml-1 text-ui-danger">*</span> : null}
         </label>
-      )}
+      ) : null}
       <select
         id={id}
         className={clsx(
-          'w-full rounded-xl border px-3 py-2.5 text-sm shadow-sm transition-colors',
-          'focus:outline-none focus:ring-2 focus:ring-brand-primaryBlue/20 focus:border-brand-primaryBlue',
-          error
-            ? 'border-ui-danger bg-red-50'
-            : 'border-ui-border bg-white text-ui-textPrimary',
+          "control-field",
+          error ? "border-ui-danger bg-red-50" : "border-ui-border bg-white text-ui-textPrimary",
           className
         )}
         {...props}
@@ -133,9 +124,8 @@ export function Select({
             ))
           : children}
       </select>
-      {error && <p className="mt-1.5 text-sm text-ui-danger">{error}</p>}
-      {hint && !error && <p className="mt-1.5 text-sm text-ui-textMuted">{hint}</p>}
+      {error ? <p className="mt-1.5 text-sm text-ui-danger">{error}</p> : null}
+      {hint && !error ? <p className="mt-1.5 text-sm text-ui-textMuted">{hint}</p> : null}
     </div>
   );
 }
-

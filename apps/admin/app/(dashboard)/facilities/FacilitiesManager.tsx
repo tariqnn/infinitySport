@@ -77,12 +77,13 @@ export function FacilitiesManager() {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>, isEdit: boolean) {
     e.preventDefault();
+    const form = e.currentTarget;
     setPending(true);
     const stateSetter = isEdit ? setEditState : setCreateState;
     stateSetter({ status: 'idle' });
 
     try {
-      const formData = new FormData(e.currentTarget);
+      const formData = new FormData(form);
 
       const payload = {
         name: formData.get('name')?.toString() || '',
@@ -110,7 +111,7 @@ export function FacilitiesManager() {
       setFacilities(transformed);
       setEditing(null);
       setImageUrl('');
-      e.currentTarget.reset();
+      form.reset();
       router.refresh();
     } catch (error) {
       console.error('Failed to save facility:', error);

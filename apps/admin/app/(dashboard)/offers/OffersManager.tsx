@@ -85,12 +85,13 @@ export function OffersManager() {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>, isEdit: boolean) {
     e.preventDefault();
+    const form = e.currentTarget;
     setPending(true);
     const stateSetter = isEdit ? setEditState : setCreateState;
     stateSetter({ status: 'idle' });
 
     try {
-      const formData = new FormData(e.currentTarget);
+      const formData = new FormData(form);
       const priceStr = formData.get('price')?.toString() || '0';
       const pricePerMonth = parsePrice(priceStr);
       const features = formData.get('features')?.toString() || '';
@@ -131,7 +132,7 @@ export function OffersManager() {
       }));
       setOffers(transformed);
       setEditing(null);
-      e.currentTarget.reset();
+      form.reset();
       router.refresh();
     } catch (error) {
       console.error('Failed to save offer:', error);

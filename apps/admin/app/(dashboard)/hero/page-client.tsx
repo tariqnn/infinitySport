@@ -25,7 +25,7 @@ export function HeroPageClient() {
             secondaryCtaLabel: hero.secondaryCta || undefined,
             secondaryCtaLink: hero.secondaryUrl || undefined,
             backgroundImageUrl: hero.backgroundImageUrl || undefined,
-            backgroundVideoUrl: undefined,
+            backgroundVideoUrl: hero.backgroundVideoUrl || undefined,
           } : {
             title: '',
             subtitle: '',

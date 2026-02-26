@@ -5,82 +5,51 @@ import Link from "next/link";
 import {
   ChartBarIcon,
   UsersIcon,
+  UserGroupIcon,
   CalendarIcon,
   CreditCardIcon,
-  ClipboardDocumentCheckIcon,
+  BanknotesIcon,
   Cog6ToothIcon,
+  ClipboardDocumentListIcon,
   MapIcon,
   InboxStackIcon,
-  UserGroupIcon,
-  ClipboardDocumentListIcon
+  DocumentTextIcon,
+  ClipboardDocumentCheckIcon,
 } from "@heroicons/react/24/outline";
 import clsx from "clsx";
 
-const NAV = {
-  core: [
-    { label: "Dashboard", href: "/", icon: ChartBarIcon },
-    { label: "Members", href: "/members", icon: UsersIcon },
-    { label: "Coaches", href: "/coaches", icon: UserGroupIcon },
-    { label: "Bookings", href: "/bookings", icon: CalendarIcon },
-  ],
-  resources: [
-    { label: "Financials", href: "/financials", icon: CreditCardIcon },
-    { label: "Settings", href: "/settings", icon: Cog6ToothIcon },
-  ],
-  operations: [
-    { label: "Classes", href: "/classes", icon: MapIcon },
-    { label: "Registrations", href: "/registrations", icon: ClipboardDocumentListIcon },
-    { label: "Inventory", href: "/inventory", icon: InboxStackIcon },
-    { label: "Staff Tools", href: "/staff", icon: ClipboardDocumentCheckIcon },
-  ],
-} as const;
-
-function NavSection({
-  title,
-  items,
-  pathname,
-  onNavigate,
-}: {
-  title?: string;
-  items: Array<{ label: string; href: string; icon: any }>;
-  pathname: string;
-  onNavigate?: () => void;
-}) {
-  return (
-    <div className="space-y-1">
-      {title ? (
-        <div className="px-4 pt-5 text-[11px] font-bold uppercase tracking-[0.22em] text-ui-textMuted">
-          {title}
-        </div>
-      ) : null}
-      {items.map((item) => {
-        const Icon = item.icon;
-        const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={() => onNavigate?.()}
-            className={clsx(
-              "group flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-semibold transition-all duration-200",
-              active
-                ? "bg-gradient-to-r from-[#5b4bff] to-brand-primaryBlue text-white shadow-[0_10px_24px_rgba(29,72,255,0.22)]"
-                : "text-ui-textMuted hover:bg-ui-softBg hover:text-ui-textPrimary"
-            )}
-          >
-            <Icon
-              className={clsx(
-                "h-5 w-5",
-                active ? "text-white" : "text-ui-textMuted group-hover:text-brand-primaryBlue"
-              )}
-            />
-            <span className="truncate">{item.label}</span>
-          </Link>
-        );
-      })}
-    </div>
-  );
-}
+const NAV_SECTIONS = [
+  {
+    label: "Core",
+    items: [
+      { label: "Dashboard", href: "/", icon: ChartBarIcon },
+      { label: "Members", href: "/members", icon: UsersIcon },
+      { label: "Coaches", href: "/coaches", icon: UserGroupIcon },
+      { label: "Bookings", href: "/bookings", icon: CalendarIcon },
+      { label: "Registrations", href: "/registrations", icon: ClipboardDocumentListIcon },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { label: "Classes", href: "/classes", icon: MapIcon },
+      { label: "Inventory", href: "/inventory", icon: InboxStackIcon },
+      { label: "News", href: "/news", icon: ClipboardDocumentCheckIcon },
+      { label: "Docs", href: "/docs", icon: DocumentTextIcon },
+    ],
+  },
+  {
+    label: "Finance",
+    items: [
+      { label: "Financials", href: "/financials", icon: CreditCardIcon },
+      { label: "Salaries", href: "/salaries", icon: BanknotesIcon },
+    ],
+  },
+  {
+    label: "System",
+    items: [{ label: "Settings", href: "/settings", icon: Cog6ToothIcon }],
+  },
+] as const;
 
 export function PortalSidebar({
   variant = "desktop",
@@ -95,40 +64,57 @@ export function PortalSidebar({
   return (
     <aside
       className={clsx(
-        "w-[264px] flex-col border-r border-ui-border bg-white",
+        "w-[250px] shrink-0 flex-col border-r border-[#13274f] bg-[#050b1f] text-slate-100",
         isDesktop ? "hidden md:flex" : "flex"
       )}
     >
-      {/* Desktop brand header (mobile header lives in `PortalShell`) */}
-      {isDesktop ? (
-        <div className="flex items-center gap-3 border-b border-ui-border px-5 py-5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-primaryBlue to-[#5b4bff] text-white shadow-[0_12px_25px_rgba(29,72,255,0.25)]">
-            <span className="text-lg font-extrabold">∞</span>
-          </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-ui-textPrimary">Infinity Sport</p>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-ui-textMuted">
-              Management
-            </p>
-          </div>
+      <div className="flex h-[72px] items-center gap-3 border-b border-[#13274f] px-5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#1e63ff] text-sm font-extrabold text-white">
+          oo
         </div>
-      ) : null}
+        <p className="text-xl font-bold text-white">InfinitySport</p>
+      </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-4 px-3 py-4">
-        <NavSection items={NAV.core as any} pathname={pathname} onNavigate={onNavigate} />
-        <NavSection title="Resources" items={NAV.resources as any} pathname={pathname} onNavigate={onNavigate} />
-        <NavSection title="Operations" items={NAV.operations as any} pathname={pathname} onNavigate={onNavigate} />
+      <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-5">
+        {NAV_SECTIONS.map((section) => (
+          <div key={section.label} className="space-y-1">
+            <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+              {section.label}
+            </p>
+            {section.items.map((item) => {
+              const Icon = item.icon;
+              const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => onNavigate?.()}
+                  className={clsx(
+                    "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition",
+                    active
+                      ? "bg-[#1e63ff] text-white shadow-[0_8px_18px_rgba(30,99,255,0.35)]"
+                      : "text-slate-200 hover:bg-white/8 hover:text-white"
+                  )}
+                >
+                  <Icon className={clsx("h-4 w-4", active ? "text-white" : "text-slate-300 group-hover:text-white")} />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
-      {/* Footer CTA */}
-      <div className="border-t border-ui-border p-4">
-        <div className="rounded-2xl border border-ui-border bg-ui-softBg p-4">
-          <p className="text-sm font-semibold text-ui-textPrimary">Need help?</p>
-          <p className="mt-1 text-xs text-ui-textMuted">Check documentation or contact support.</p>
-          <button className="mt-3 w-full rounded-xl bg-white px-3 py-2 text-xs font-semibold text-ui-textPrimary shadow-sm transition hover:bg-ui-softBg">
-            Get support
-          </button>
+      <div className="border-t border-[#13274f] p-3">
+        <div className="flex items-center gap-3 rounded-xl bg-[#081432] px-3 py-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#2a426f] text-xs font-semibold text-white">
+            AP
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-white">Alexander Pierce</p>
+            <p className="text-xs text-slate-300">Administrator</p>
+          </div>
         </div>
       </div>
     </aside>

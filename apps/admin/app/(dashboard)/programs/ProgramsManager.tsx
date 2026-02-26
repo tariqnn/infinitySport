@@ -81,12 +81,13 @@ export function ProgramsManager() {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>, isEdit: boolean) {
     e.preventDefault();
+    const form = e.currentTarget;
     setPending(true);
     const stateSetter = isEdit ? setEditState : setCreateState;
     stateSetter({ status: 'idle' });
 
     try {
-      const formData = new FormData(e.currentTarget);
+      const formData = new FormData(form);
       const title = formData.get('title')?.toString() || '';
       const slug = title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
@@ -123,7 +124,7 @@ export function ProgramsManager() {
       setPrograms(transformed);
       setEditing(null);
       setMediaUrl('');
-      e.currentTarget.reset();
+      form.reset();
       router.refresh();
     } catch (error) {
       console.error('Failed to save program:', error);

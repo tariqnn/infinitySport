@@ -12,7 +12,7 @@ export interface ModalProps {
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 }
 
 export function Modal({ title, description, open, onClose, children, footer, size = 'md' }: ModalProps) {
@@ -32,6 +32,7 @@ export function Modal({ title, description, open, onClose, children, footer, siz
     md: 'w-full max-w-lg',
     lg: 'w-full max-w-2xl',
     xl: 'w-full max-w-4xl',
+    '2xl': 'w-full max-w-6xl',
   };
 
   return (
@@ -46,7 +47,7 @@ export function Modal({ title, description, open, onClose, children, footer, siz
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+          <div className="fixed inset-0 bg-[#060a15]/55 backdrop-blur-[4px]" onClick={onClose} />
         </Transition.Child>
 
         <div className="fixed inset-0 z-[10000] overflow-y-auto">
@@ -62,26 +63,26 @@ export function Modal({ title, description, open, onClose, children, footer, siz
             >
               <Dialog.Panel
                 className={clsx(
-                  'relative z-[10001] transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-2xl transition-all',
+                  'relative z-[10001] transform overflow-hidden rounded-[26px] border border-ui-border bg-white/95 p-6 text-left align-middle shadow-[0_24px_60px_rgba(7,16,35,0.34)] transition-all backdrop-blur',
                   sizeClasses[size]
                 )}
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="flex items-start justify-between gap-6 mb-6">
+                <div className="mb-6 flex items-start justify-between gap-6">
                   <div>
-                    {title && <Dialog.Title className="text-xl font-semibold text-textPrimary">{title}</Dialog.Title>}
-                    {description && <Dialog.Description className="mt-2 text-sm text-textMuted">{description}</Dialog.Description>}
+                    {title && <Dialog.Title className="text-xl font-semibold text-ui-textPrimary">{title}</Dialog.Title>}
+                    {description && <Dialog.Description className="mt-2 text-sm text-ui-textMuted">{description}</Dialog.Description>}
                   </div>
                   <button
                     aria-label="Close modal"
-                    className="rounded-full p-2 text-textMuted transition hover:bg-softBackground hover:text-textPrimary"
+                    className="rounded-full border border-ui-border p-2 text-ui-textMuted transition hover:bg-ui-softBg hover:text-ui-textPrimary"
                     onClick={onClose}
                   >
                     <XMarkIcon className="h-5 w-5" />
                   </button>
                 </div>
                 <div className="max-h-[calc(100vh-200px)] overflow-y-auto">{children}</div>
-                {footer && <div className="mt-6 flex justify-end gap-3 border-t border-borderColor pt-4">{footer}</div>}
+                {footer && <div className="mt-6 flex justify-end gap-3 border-t border-ui-border pt-4">{footer}</div>}
               </Dialog.Panel>
             </Transition.Child>
           </div>
@@ -90,4 +91,3 @@ export function Modal({ title, description, open, onClose, children, footer, siz
     </Transition>
   );
 }
-

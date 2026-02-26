@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Use separate dir to avoid OneDrive/lock issues (like admin); ensures chunks like registrations/page.js are written
-  distDir: ".next-portal",
+  // Use a dedicated dir and rotate from old `.next-portal` when it gets locked/corrupted on Windows/OneDrive.
+  distDir: ".next-portal-v2",
   transpilePackages: ["@infinity/ui", "@infinity/types", "@infinity/mock-api"],
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },

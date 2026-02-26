@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode } from "react";
 
 export function PageHeader({
   title,
@@ -10,13 +10,12 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-ui-textPrimary">{title}</h1>
-        {subtitle && <p className="mt-2 text-sm text-ui-textMuted">{subtitle}</p>}
+        <h1 className="text-[36px] font-bold leading-tight text-ui-textPrimary">{title}</h1>
+        {subtitle ? <p className="mt-1 text-sm text-ui-textMuted">{subtitle}</p> : null}
       </div>
-      {actions && <div className="flex flex-wrap gap-3">{actions}</div>}
+      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>
   );
 }
-

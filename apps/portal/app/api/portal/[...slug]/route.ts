@@ -1932,6 +1932,14 @@ async function dispatchGet(request: NextRequest, params: Params) {
     return NextResponse.json(rows);
   }
 
+  // Landing coaches shared with Admin (/api/admin/coaches)
+  if (resource === "landing-coaches" && !id) {
+    const rows = await prisma.landingCoach.findMany({
+      orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+    });
+    return NextResponse.json(rows);
+  }
+
   if (resource === "dashboard" && id === "stats") {
     return getDashboardStats(request);
   }

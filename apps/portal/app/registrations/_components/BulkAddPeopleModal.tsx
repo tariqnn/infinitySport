@@ -204,7 +204,7 @@ export function BulkAddPeopleModal({
       onClose={onClose}
       title="Add Multiple People"
       description="Add people manually or paste from a spreadsheet."
-      size="xl"
+      size="2xl"
       footer={
         <div className="flex w-full items-center justify-between gap-4">
           <div className="text-sm text-ui-textMuted">
@@ -267,22 +267,32 @@ export function BulkAddPeopleModal({
         {tab === 'manual' && (
           <>
             <div className="overflow-hidden rounded-xl border border-ui-border">
-              <div className="max-h-[min(50vh,400px)] overflow-auto">
-                <table className="w-full border-collapse text-sm">
+              <div className="max-h-[min(50vh,420px)] overflow-auto">
+                <table className="min-w-[1120px] w-full border-collapse text-sm">
+                  <colgroup>
+                    <col style={{ width: 260 }} />
+                    <col style={{ width: 90 }} />
+                    <col style={{ width: 170 }} />
+                    <col style={{ width: 170 }} />
+                    <col style={{ width: 210 }} />
+                    <col style={{ width: 90 }} />
+                    <col style={{ width: 160 }} />
+                    <col style={{ width: 44 }} />
+                  </colgroup>
                   <thead className="sticky top-0 z-10 bg-ui-softBg border-b border-ui-border">
                     <tr>
-                      <th className="text-left font-semibold text-ui-textMuted px-3 py-2.5 w-[240px]">Package</th>
+                      <th className="text-left font-semibold text-ui-textMuted px-3 py-2.5 w-[260px]">Package</th>
                       <th className="text-left font-semibold text-ui-textMuted px-3 py-2.5 w-[90px]">Price</th>
-                      <th className="text-left font-semibold text-ui-textMuted px-3 py-2.5">Name</th>
-                      <th className="text-left font-semibold text-ui-textMuted px-3 py-2.5">Phone</th>
-                      <th className="text-left font-semibold text-ui-textMuted px-3 py-2.5">Email</th>
-                      <th className="text-left font-semibold text-ui-textMuted px-3 py-2.5 w-[80px]">Age</th>
-                      <th className="text-left font-semibold text-ui-textMuted px-3 py-2.5 w-[120px]">Starts</th>
+                      <th className="text-left font-semibold text-ui-textMuted px-3 py-2.5 w-[170px]">Name</th>
+                      <th className="text-left font-semibold text-ui-textMuted px-3 py-2.5 w-[170px]">Phone</th>
+                      <th className="text-left font-semibold text-ui-textMuted px-3 py-2.5 w-[210px]">Email</th>
+                      <th className="text-left font-semibold text-ui-textMuted px-3 py-2.5 w-[90px]">Age</th>
+                      <th className="text-left font-semibold text-ui-textMuted px-3 py-2.5 w-[160px]">Starts</th>
                       <th className="w-10 px-2 py-2.5" aria-label="Actions" />
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((row, i) => {
+                    {rows.map((row) => {
                       const errors = getRowErrors(row);
                       return (
                         <tr key={row.id} className="border-b border-ui-border/60 hover:bg-ui-softBg/30">
@@ -290,7 +300,7 @@ export function BulkAddPeopleModal({
                             <select
                               value={row.packageName}
                               onChange={(e) => updateRow(row.id, 'packageName', e.target.value)}
-                              className="w-full max-w-[240px] min-h-[36px] rounded-lg border border-ui-border bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primaryBlue/20"
+                              className="w-full min-h-[36px] rounded-lg border border-ui-border bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primaryBlue/20"
                             >
                               <option value="">Select package</option>
                               {packageList.map((p) => (
@@ -418,8 +428,17 @@ export function BulkAddPeopleModal({
             )}
             {pastePreview && pastePreview.length > 0 && (
               <div className="rounded-xl border border-ui-border overflow-hidden">
-                <div className="max-h-[200px] overflow-auto">
-                  <table className="w-full border-collapse text-sm">
+                <div className="max-h-[220px] overflow-auto">
+                  <table className="min-w-[980px] w-full border-collapse text-sm">
+                    <colgroup>
+                      <col style={{ width: 260 }} />
+                      <col style={{ width: 90 }} />
+                      <col style={{ width: 170 }} />
+                      <col style={{ width: 170 }} />
+                      <col style={{ width: 210 }} />
+                      <col style={{ width: 90 }} />
+                      <col style={{ width: 160 }} />
+                    </colgroup>
                     <thead className="sticky top-0 bg-ui-softBg border-b border-ui-border">
                       <tr>
                         <th className="text-left font-semibold text-ui-textMuted px-3 py-2">Package</th>

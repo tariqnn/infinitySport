@@ -3,12 +3,12 @@
 @tailwind utilities;
 
 :root {
-  --bg-shell: #eef2f7;
-  --bg-shell-strong: #e3e9f2;
+  --bg-shell: #eef3ff;
+  --bg-shell-strong: #e3ebff;
   --bg-card: #ffffff;
   --bg-card-muted: #f6f8fc;
   --bg-card-strong: #edf2fb;
-  --border-muted: rgba(8, 21, 41, 0.12);
+  --border-muted: rgba(8, 21, 41, 0.1);
   --border-input: rgba(8, 21, 41, 0.18);
   --text-primary: #0b1324;
   --text-muted: #475569;
@@ -21,9 +21,10 @@
   --accent-teal: #14b8a6;
   --accent-amber: #f59e0b;
   --gradient-primary: linear-gradient(135deg, #0f4ba0 0%, #1a7fc1 55%, #14b8a6 100%);
-  --gradient-hero: radial-gradient(900px circle at 10% -10%, rgba(15, 75, 160, 0.18), transparent 45%),
-    radial-gradient(800px circle at 90% 0%, rgba(20, 184, 166, 0.16), transparent 40%),
-    linear-gradient(135deg, #f8fafc 0%, #eef3f8 60%, #f2f6ff 100%);
+  --gradient-hero: radial-gradient(900px circle at 10% -10%, rgba(15, 75, 160, 0.2), transparent 45%),
+    radial-gradient(800px circle at 92% 0%, rgba(20, 184, 166, 0.16), transparent 40%),
+    radial-gradient(700px circle at 45% 115%, rgba(47, 107, 255, 0.16), transparent 45%),
+    linear-gradient(135deg, #f8fafc 0%, #edf3ff 60%, #eef4ff 100%);
   --shadow-soft: 0 8px 24px rgba(11, 18, 36, 0.08);
   --shadow-strong: 0 16px 40px rgba(11, 18, 36, 0.14);
 }
@@ -40,11 +41,44 @@
     background-attachment: fixed;
     color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
+    position: relative;
+  }
+
+  body::before,
+  body::after {
+    content: '';
+    position: fixed;
+    z-index: -1;
+    border-radius: 9999px;
+    pointer-events: none;
+    filter: blur(44px);
+    opacity: 0.45;
+  }
+
+  body::before {
+    width: 18rem;
+    height: 18rem;
+    top: -5rem;
+    right: -5rem;
+    background: rgba(15, 75, 160, 0.4);
+  }
+
+  body::after {
+    width: 14rem;
+    height: 14rem;
+    bottom: -4rem;
+    left: -4rem;
+    background: rgba(20, 184, 166, 0.34);
   }
 
   ::selection {
     background: rgba(0, 61, 165, 0.2);
     color: var(--text-dark);
+  }
+
+  :focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(15, 75, 160, 0.2);
   }
 }
 

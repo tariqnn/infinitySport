@@ -5,8 +5,17 @@ type GuardState = {
 
 const globalGuard = globalThis as unknown as { __webDbGuard?: GuardState };
 
-const COOLDOWN_MS = 45_000;
-const PANIC_COOLDOWN_MS = 10 * 60_000;
+function readMsFromEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+  return parsed;
+}
+
+// Keep normal outages short and panic cooldown practical so production can self-recover quickly.
+const COOLDOWN_MS = readMsFromEnv('DB_GUARD_COOLDOWN_MS', 45_000);
+const PANIC_COOLDOWN_MS = readMsFromEnv('DB_GUARD_PANIC_COOLDOWN_MS', 90_000);
 
 function state(): GuardState {
   if (!globalGuard.__webDbGuard) {

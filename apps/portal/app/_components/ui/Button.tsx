@@ -1,12 +1,12 @@
-import { ButtonHTMLAttributes, ReactNode } from 'react';
-import clsx from 'clsx';
+import { ButtonHTMLAttributes, ReactNode } from "react";
+import clsx from "clsx";
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'destructive';
-type ButtonSize = 'sm' | 'md' | 'lg';
+type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive";
+type ButtonSize = "sm" | "md" | "lg";
 
 export function Button({
-  variant = 'primary',
-  size = 'md',
+  variant = "primary",
+  size = "md",
   children,
   className,
   isLoading,
@@ -24,22 +24,18 @@ export function Button({
   return (
     <button
       className={clsx(
-        'inline-flex items-center justify-center gap-2 font-semibold transition-all duration-200',
-        'focus:outline-none focus:ring-2 focus:ring-brand-primaryBlue/25 focus:ring-offset-2',
-        'disabled:opacity-50 disabled:cursor-not-allowed',
-        // Variants
-        variant === 'primary' &&
-          'bg-brand-gradient text-white shadow-brand-glow hover:shadow-lg active:translate-y-px',
-        variant === 'secondary' &&
-          'border-2 border-brand-primaryBlue text-brand-primaryBlue hover:bg-brand-primaryBlue/5 active:translate-y-px',
-        variant === 'ghost' &&
-          'text-ui-textPrimary hover:bg-ui-softBg active:translate-y-px',
-        variant === 'destructive' &&
-          'bg-ui-danger text-white hover:bg-ui-danger/90 active:translate-y-px',
-        // Sizes
-        size === 'sm' && 'rounded-portal-button px-3 py-1.5 text-sm',
-        size === 'md' && 'rounded-portal-button px-4 py-2 text-sm',
-        size === 'lg' && 'rounded-portal-button px-6 py-3 text-base',
+        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-semibold transition",
+        "focus:outline-none focus:ring-2 focus:ring-brand-primaryBlue/25",
+        "disabled:cursor-not-allowed disabled:opacity-55",
+        variant === "primary" &&
+          "border border-[#0a1d45] bg-[#0b1f4f] text-white shadow-[0_6px_16px_rgba(11,31,79,0.25)] hover:bg-[#0f275f]",
+        variant === "secondary" &&
+          "border border-ui-border bg-white text-ui-textPrimary shadow-sm hover:bg-[#f8fafc]",
+        variant === "ghost" && "bg-transparent text-ui-textPrimary hover:bg-ui-softBg",
+        variant === "destructive" && "border border-[#dc2626] bg-[#dc2626] text-white hover:bg-[#b91c1c]",
+        size === "sm" && "px-3 py-1.5 text-xs",
+        size === "md" && "px-4 py-2.5 text-sm",
+        size === "lg" && "px-6 py-3 text-base",
         className
       )}
       disabled={isLoading || props.disabled}
@@ -47,20 +43,8 @@ export function Button({
     >
       {isLoading ? (
         <>
-          <svg
-            className="h-4 w-4 animate-spin"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
+          <svg className="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path
               className="opacity-75"
               fill="currentColor"
@@ -79,4 +63,3 @@ export function Button({
     </button>
   );
 }
-

@@ -79,6 +79,10 @@ export const coachesApi = {
   delete: (id: string) => portalDbFetch<void>(`/portal/coaches/${id}`, { method: 'DELETE' }),
 };
 
+export const landingCoachesApi = {
+  list: () => portalDbFetch<unknown[]>('/portal/landing-coaches'),
+};
+
 export const bookingsApi = {
   list: (companyId?: string, startDate?: string, endDate?: string) => {
     const params = new URLSearchParams();

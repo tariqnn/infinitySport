@@ -1,13 +1,20 @@
 import Link from 'next/link';
 import { getLandingContent } from '@infinity/mock-api';
 import { PageHero } from '../../_components/PageHero';
+import { prisma } from '../../../lib/db';
 
 export default async function LandingContentMapPage() {
   const content = await getLandingContent();
+  let coachesCount = 0;
+  try {
+    coachesCount = await prisma.landingCoach.count();
+  } catch (error) {
+    console.error('[admin] failed to load coaches count for content map:', error);
+  }
 
   const sections = [
     { title: 'Hero', description: content.hero.title, href: '/hero' },
-    { title: 'Programs', description: `${content.programs.length} cards`, href: '/programs' },
+    { title: 'Coaches', description: `${coachesCount} profiles`, href: '/coaches' },
     { title: 'Offers', description: `${content.offers.length} plans`, href: '/offers' },
     { title: 'Events', description: `${content.events.length} scheduled`, href: '/events' },
     { title: 'Announcements', description: `${content.announcements.length} banners`, href: '/announcements' },
@@ -27,7 +34,7 @@ export default async function LandingContentMapPage() {
           <Link key={section.title} href={section.href} className="glass-card block p-6 transition hover:shadow-card-hover">
             <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">{section.title}</p>
             <p className="mt-2 font-display text-xl font-semibold text-[var(--text-primary)]">{section.description}</p>
-            <p className="mt-3 text-sm font-semibold text-[var(--primary)]">Open {section.title.toLowerCase()} -></p>
+            <p className="mt-3 text-sm font-semibold text-[var(--primary)]">Open {section.title.toLowerCase()}</p>
           </Link>
         ))}
       </div>

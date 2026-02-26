@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { fetchEvents, type EventResponse } from '../../lib/apiClient';
 import { useLanguage } from '../_components/LanguageProvider';
 import { tr } from '../../lib/translations';
@@ -24,12 +23,15 @@ export default function EventsPage() {
     date: event.date,
     location: event.location || 'Infinity Campus',
     description: event.description || '',
+    imageUrl: event.imageUrl || '/events.jpeg',
     link: event.link || '/events',
     highlight: event.highlight || false,
   }));
   
   const upcoming = events.filter((event) => new Date(event.date) >= new Date());
   const past = events.filter((event) => new Date(event.date) < new Date());
+  const topEvent = upcoming[0] || events[0];
+  const heroEventImage = topEvent?.imageUrl || '/events.jpeg';
 
   return (
     <div className="bg-white py-24">
@@ -38,21 +40,18 @@ export default function EventsPage() {
         <div className="mb-6 text-center">
           <p className="text-sm uppercase tracking-[0.3em] text-brand-green-dark">{tr(language, 'events_kicker')}</p>
           <h1 className="mt-3 text-4xl font-black text-brand-black sm:text-5xl lg:text-6xl">
-            {tr(language, 'events_title')}
+            {topEvent?.title || tr(language, 'events_title')}
           </h1>
           <p className="mx-auto mt-3 max-w-2xl text-base text-gray-600 sm:text-lg">
-            {tr(language, 'events_subtitle')}
+            {topEvent?.description || tr(language, 'events_subtitle')}
           </p>
+          {topEvent?.location ? (
+            <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold text-brand-blue-primary">{topEvent.location}</p>
+          ) : null}
         </div>
         <div className="relative h-64 sm:h-80 md:h-96 lg:h-[500px] w-full rounded-2xl overflow-hidden border-2 border-brand-lightBlue/20 shadow-[0_8px_32px_rgba(0,0,0,0.08)]">
-          <Image
-            src="/events.jpeg"
-            alt="Upcoming Events"
-            fill
-            className="object-cover"
-            priority
-            sizes="(max-width: 768px) 100vw, (max-width: 1024px) 100vw, 1280px"
-          />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={heroEventImage} alt="Upcoming Events" className="h-full w-full object-cover" />
         </div>
       </div>
 
@@ -71,12 +70,11 @@ export default function EventsPage() {
                 className="group flex flex-col rounded-2xl border-2 border-brand-lightBlue/20 bg-white overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-2 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)]"
               >
                 <div className="relative h-48 w-full">
-                  <Image
-                    src="/events.jpeg"
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={event.imageUrl}
                     alt={event.title}
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                   <div className="absolute top-4 left-4">
                     <span className="rounded-full bg-[#003DA5] px-3 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-white shadow-lg">
@@ -154,12 +152,11 @@ export default function EventsPage() {
                 className="group flex flex-col rounded-2xl border-2 border-brand-lightBlue/20 bg-white overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-2 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)]"
               >
                 <div className="relative h-40 w-full">
-                  <Image
-                    src="/events.jpeg"
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={event.imageUrl}
                     alt={event.title}
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-105 opacity-75"
-                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    className="h-full w-full object-cover opacity-75 transition-transform duration-500 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                 </div>
@@ -192,4 +189,3 @@ export default function EventsPage() {
     </div>
   );
 }
-

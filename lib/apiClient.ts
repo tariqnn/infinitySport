@@ -6,7 +6,6 @@ import type {
   LandingOffer,
   LandingProgram,
 } from '@infinity/types';
-import { cache } from 'react';
 
 export type ProgramResponse = {
   id: string;
@@ -35,8 +34,21 @@ export type EventResponse = {
   date: string;
   location?: string;
   description?: string;
+  imageUrl?: string;
   link?: string;
   highlight?: boolean;
+};
+
+export type CoachResponse = {
+  id: string;
+  name: string;
+  sport: string;
+  description: string;
+  quote?: string;
+  achievements: string[];
+  imageUrl: string;
+  isActive: boolean;
+  order: number;
 };
 
 export type FacilityResponse = {
@@ -164,8 +176,30 @@ export async function fetchEvents(): Promise<EventResponse[]> {
       date: row.date.toISOString(),
       location: row.location ?? undefined,
       description: row.description ?? undefined,
+      imageUrl: row.imageUrl ?? undefined,
       link: undefined,
       highlight: row.highlight,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchCoaches(): Promise<CoachResponse[]> {
+  if (!canUseDb()) return [];
+  try {
+    const prisma = await getPrisma();
+    const rows = await prisma.landingCoach.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] });
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      sport: row.sport,
+      description: row.description,
+      quote: row.quote ?? undefined,
+      achievements: row.achievements ?? [],
+      imageUrl: row.imageUrl,
+      isActive: row.isActive,
+      order: row.order,
     }));
   } catch {
     return [];
@@ -333,6 +367,7 @@ async function _fetchLandingContent(): Promise<LandingContent> {
         date: event.date.toISOString(),
         location: event.location,
         description: event.description || undefined,
+        imageUrl: event.imageUrl || undefined,
         link: '/events',
         isActive: event.highlight !== false,
       })),
@@ -370,4 +405,6 @@ async function _fetchLandingContent(): Promise<LandingContent> {
   }
 }
 
-export const fetchLandingContent = cache(_fetchLandingContent);
+export async function fetchLandingContent(): Promise<LandingContent> {
+  return _fetchLandingContent();
+}

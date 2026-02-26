@@ -42,6 +42,7 @@ export function HomeContent({ content }: HomeContentProps) {
 
   const sportHighlights = content.programs.slice(0, 4);
   const upcomingEvents = content.events.filter((event) => event.isActive !== false).slice(0, 3);
+  const featuredEventImage = upcomingEvents[0]?.imageUrl || '/events.jpeg';
   const valueProps = content.highlights;
   const announcements = content.announcements?.filter((announcement) => announcement.isActive !== false) ?? [];
   const footer = content.footer;
@@ -537,13 +538,11 @@ export function HomeContent({ content }: HomeContentProps) {
             <div className="mt-8 sm:mt-12 lg:mt-16">
               <div className="group relative overflow-hidden rounded-2xl border-2 border-brand-lightBlue/20 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-2 hover:border-brand-green-primary/60 hover:shadow-[0_16px_48px_rgba(20,26,255,0.2)]">
                 <div className="relative h-64 sm:h-80 md:h-96 lg:h-[500px] w-full">
-                  <Image
-                    src="/events.jpeg"
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={featuredEventImage}
                     alt="Upcoming Event"
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 100vw, 1280px"
-                    priority
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                 </div>
               </div>

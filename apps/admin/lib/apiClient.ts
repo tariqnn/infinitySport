@@ -107,6 +107,35 @@ class ApiClient {
     });
   }
 
+  // Coaches
+  async getCoaches() {
+    return this.request('/api/admin/coaches');
+  }
+
+  async getCoach(id: string) {
+    return this.request(`/api/admin/coaches/${id}`);
+  }
+
+  async createCoach(data: any) {
+    return this.request('/api/admin/coaches', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCoach(id: string, data: any) {
+    return this.request(`/api/admin/coaches/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteCoach(id: string) {
+    return this.request(`/api/admin/coaches/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Offers
   async getOffers() {
     return this.request('/api/admin/offers');

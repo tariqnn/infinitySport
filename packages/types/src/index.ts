@@ -203,6 +203,7 @@ export type LandingOffer = z.infer<typeof landingOfferSchema>;
 export const landingEventSchema = eventItemSchema.extend({
   link: z.string().optional(),
   isActive: z.boolean().optional(),
+  imageUrl: z.string().optional(),
 });
 export type LandingEvent = z.infer<typeof landingEventSchema>;
 

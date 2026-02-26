@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getClientApiBase } from '../../../lib/clientApi';
+import { fetchPackages } from '../../../lib/apiClient';
 
 const PHONE_COUNTRIES: Array<{ value: string; label: string }> = [
   { value: '+962', label: 'Jordan (+962)' },
@@ -21,7 +22,7 @@ const PHONE_COUNTRIES: Array<{ value: string; label: string }> = [
   { value: '+1', label: 'USA/Canada (+1)' },
 ];
 
-const PACKAGE_OPTIONS = [
+const FALLBACK_PACKAGE_OPTIONS = [
   'Basketball - Little Kobes U10',
   'Basketball - Ballers & Hoopers U12–U14',
   'Basketball - Warriors',
@@ -46,6 +47,7 @@ function safeDecode(s: string | null): string {
 export function PackageRegisterForm() {
   const searchParams = useSearchParams();
   const decodedPackage = safeDecode(searchParams.get('package'));
+  const [packagesFromApi, setPackagesFromApi] = useState<Array<{ name: string }>>([]);
 
   const [name, setName] = useState('');
   const [phoneCountry, setPhoneCountry] = useState('+962');
@@ -59,13 +61,17 @@ export function PackageRegisterForm() {
   const phoneDigits = phoneLocal.replace(/[^\d]/g, '');
   const phone = `${phoneCountry}${phoneDigits}`;
 
+  useEffect(() => {
+    fetchPackages().then((list) => setPackagesFromApi(list.map((p) => ({ name: p.name })))).catch(() => setPackagesFromApi([]));
+  }, []);
+
   const options = useMemo(() => {
-    const list = [...PACKAGE_OPTIONS];
+    const list = packagesFromApi.length > 0 ? packagesFromApi.map((p) => p.name) : [...FALLBACK_PACKAGE_OPTIONS];
     if (decodedPackage && !list.includes(decodedPackage)) list.unshift(decodedPackage);
     return list;
-  }, [decodedPackage]);
+  }, [packagesFromApi, decodedPackage]);
 
-  const defaultPackage = decodedPackage || PACKAGE_OPTIONS[0] || '';
+  const defaultPackage = decodedPackage || options[0] || '';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

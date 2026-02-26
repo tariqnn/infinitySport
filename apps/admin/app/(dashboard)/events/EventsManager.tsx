@@ -5,6 +5,7 @@ import type { LandingEvent } from '@infinity/types';
 import { useActionToast } from '../../_components/useActionToast';
 import { apiClient } from '../../../lib/apiClient';
 import { useRouter } from 'next/navigation';
+import { FileUpload } from '../../_components/FileUpload';
 
 interface EventState {
   status: 'idle' | 'success' | 'error';
@@ -12,6 +13,13 @@ interface EventState {
 }
 
 const initialState: EventState = { status: 'idle' };
+const appBaseUrl = (process.env.NEXT_PUBLIC_APP_BASE_URL || '').replace(/\/$/, '');
+
+function resolveMediaUrl(url?: string): string {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return appBaseUrl ? `${appBaseUrl}${url}` : url;
+}
 
 function SubmitButton({ label, pending }: { label: string; pending: boolean }) {
   return (
@@ -33,6 +41,8 @@ export function EventsManager() {
   const [editState, setEditState] = useState<EventState>(initialState);
   const [deleteState, setDeleteState] = useState<EventState>(initialState);
   const [pending, setPending] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string>('');
+  const [formKey, setFormKey] = useState(0);
   const router = useRouter();
 
   useActionToast(createState);
@@ -50,6 +60,7 @@ export function EventsManager() {
           date: e.date,
           location: e.location,
           description: e.description || undefined,
+          imageUrl: e.imageUrl || undefined,
           link: '/events',
           isActive: e.highlight !== false,
         }));
@@ -67,8 +78,23 @@ export function EventsManager() {
     loadEvents();
   }, []);
 
+  useEffect(() => {
+    if (editing) {
+      setImageUrl(editing.imageUrl || '');
+    } else {
+      setImageUrl('');
+      setFormKey((value) => value + 1);
+    }
+  }, [editing]);
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>, isEdit: boolean) {
     e.preventDefault();
+    if (!imageUrl) {
+      const stateSetter = isEdit ? setEditState : setCreateState;
+      stateSetter({ status: 'error', message: 'Event image is required.' });
+      return;
+    }
+
     setPending(true);
     const stateSetter = isEdit ? setEditState : setCreateState;
     stateSetter({ status: 'idle' });
@@ -83,6 +109,7 @@ export function EventsManager() {
         description: formData.get('description')?.toString() || undefined,
         date: date,
         location: formData.get('location')?.toString() || 'Infinity Campus',
+        imageUrl,
         highlight: formData.get('isActive')?.toString() !== 'hidden',
       };
 
@@ -102,12 +129,15 @@ export function EventsManager() {
         date: e.date,
         location: e.location,
         description: e.description || undefined,
+        imageUrl: e.imageUrl || undefined,
         link: '/events',
         isActive: e.highlight !== false,
       }));
       setEvents(transformed);
       setEditing(null);
-      e.currentTarget.reset();
+      if (!isEdit) {
+        setFormKey((value) => value + 1);
+      }
       router.refresh();
     } catch (error) {
       console.error('Failed to save event:', error);
@@ -138,6 +168,7 @@ export function EventsManager() {
         date: e.date,
         location: e.location,
         description: e.description || undefined,
+        imageUrl: e.imageUrl || undefined,
         link: '/events',
         isActive: e.highlight !== false,
       }));
@@ -167,7 +198,11 @@ export function EventsManager() {
   const current = editing ?? undefined;
 
   const renderForm = (isEditing: boolean) => (
-    <form onSubmit={(e) => handleSubmit(e, isEditing)} className="space-y-4">
+        <form
+          key={isEditing && editing ? editing.id : `create-${formKey}`}
+          onSubmit={(e) => handleSubmit(e, isEditing)}
+          className="space-y-4"
+        >
       <div className="grid gap-4 md:grid-cols-2">
         <label className="text-sm font-semibold text-slate-600">
           Title
@@ -196,6 +231,12 @@ export function EventsManager() {
         Description
         <textarea name="description" defaultValue={current?.description} rows={3} className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2" />
       </label>
+      <FileUpload
+        label="Event image"
+        type="image"
+        currentUrl={resolveMediaUrl(imageUrl)}
+        onUploadComplete={(url) => setImageUrl(url)}
+      />
       <label className="text-sm font-semibold text-slate-600">
         Visibility
         <select name="isActive" defaultValue={current?.isActive === false ? 'hidden' : 'visible'} className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2">
@@ -223,7 +264,10 @@ export function EventsManager() {
             </h3>
           </div>
           {editing ? (
-            <button type="button" onClick={() => setEditing(null)} className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600">
+            <button type="button" onClick={() => {
+              setEditing(null);
+              setImageUrl('');
+            }} className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600">
               Cancel edit
             </button>
           ) : null}
@@ -241,6 +285,12 @@ export function EventsManager() {
         <div className="divide-y divide-slate-100">
           {events.map((event) => (
             <div key={event.id} className="flex flex-wrap items-center gap-4 px-6 py-4">
+              {event.imageUrl ? (
+                <div className="h-14 w-14 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={resolveMediaUrl(event.imageUrl)} alt={event.title} className="h-full w-full object-cover" />
+                </div>
+              ) : null}
               <div className="flex-1">
                 <p className="font-semibold text-slate-900">{event.title}</p>
                 <p className="text-xs text-slate-500">

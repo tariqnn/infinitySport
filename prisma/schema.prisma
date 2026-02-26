@@ -37,6 +37,23 @@ model Program {
   updatedAt   DateTime  @updatedAt
 }
 
+model LandingCoach {
+  id           String   @id @default(cuid())
+  name         String
+  sport        String
+  description  String
+  quote        String?
+  achievements String[] @default([])
+  imageUrl     String
+  order        Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([order])
+  @@index([isActive])
+}
+
 model Offer {
   id            String         @id @default(cuid())
   name          String
@@ -56,6 +73,7 @@ model Event {
   description String?
   date        DateTime
   location    String
+  imageUrl    String?
   highlight   Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

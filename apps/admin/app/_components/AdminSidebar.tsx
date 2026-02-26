@@ -13,7 +13,7 @@ import {
   Settings,
   Calendar,
   CalendarClock,
-  FileText,
+  Users,
   Package,
 } from 'lucide-react';
 import clsx from 'clsx';
@@ -28,7 +28,7 @@ const navGroups = [
     items: [
       { href: '/landing-content', label: 'Landing Content', icon: LayoutDashboard },
       { href: '/hero', label: 'Hero', icon: Layers3 },
-      { href: '/programs', label: 'Programs', icon: FileText },
+      { href: '/coaches', label: 'Coaches', icon: Users },
       { href: '/packages', label: 'Packages', icon: Package },
       { href: '/offers', label: 'Offers', icon: Gift },
       { href: '/events', label: 'Events', icon: CalendarRange },

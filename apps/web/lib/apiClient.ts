@@ -298,18 +298,41 @@ function mapRemoteCoachRows(rows: unknown[]): CoachResponse[] {
   const out: CoachResponse[] = [];
   for (const row of rows) {
     const r = row as Record<string, unknown>;
-    if (typeof r.id !== 'string' || typeof r.name !== 'string') continue;
+    if (typeof r.id !== 'string') continue;
+    const name =
+      typeof r.name === 'string'
+        ? r.name
+        : [r.firstName, r.lastName].filter((v): v is string => typeof v === 'string' && !!v.trim()).join(' ').trim();
+    if (!name) continue;
+    const sport =
+      typeof r.sport === 'string'
+        ? r.sport
+        : typeof r.specialty === 'string'
+          ? r.specialty
+          : 'Multi-Sport';
+    const description =
+      typeof r.description === 'string'
+        ? r.description
+        : typeof r.bio === 'string'
+          ? r.bio
+          : '';
+    const isActive =
+      typeof r.isActive === 'boolean'
+        ? r.isActive
+        : typeof r.status === 'string'
+          ? r.status.toUpperCase() === 'ACTIVE'
+          : true;
     out.push({
       id: r.id,
-      name: r.name,
-      sport: typeof r.sport === 'string' ? r.sport : 'Multi-Sport',
-      description: typeof r.description === 'string' ? r.description : '',
+      name,
+      sport,
+      description,
       quote: typeof r.quote === 'string' ? r.quote : undefined,
       achievements: Array.isArray(r.achievements)
         ? r.achievements.filter((v): v is string => typeof v === 'string')
         : [],
       imageUrl: typeof r.imageUrl === 'string' ? r.imageUrl : '',
-      isActive: r.isActive !== false,
+      isActive,
       order: typeof r.order === 'number' ? r.order : 0,
     });
   }
@@ -344,8 +367,10 @@ export async function fetchPackages(): Promise<PackageResponse[]> {
   const remoteRows = await fetchRemoteJson('/api/portal/packages');
   if (remoteRows) {
     const mappedRemote = mapRemotePackageRows(remoteRows);
-    writeCache('packages', mappedRemote);
-    return mappedRemote;
+    if (mappedRemote.length > 0) {
+      writeCache('packages', mappedRemote);
+      return mappedRemote;
+    }
   }
   if (!canUseDb()) return stale || FALLBACK_PACKAGES;
   if (!(await canAttemptDatabaseQuery())) return stale || FALLBACK_PACKAGES;
@@ -377,7 +402,7 @@ export async function fetchPackages(): Promise<PackageResponse[]> {
     return mapped;
   } catch (error) {
     noteDatabaseFailure('fetchPackages', error);
-    return stale || [];
+    return stale || FALLBACK_PACKAGES;
   }
 }
 
@@ -431,11 +456,21 @@ export async function fetchCoaches(): Promise<CoachResponse[]> {
   if (fresh) return fresh;
 
   const stale = getStaleCache<CoachResponse[]>('coaches');
-  const remoteRows = await fetchRemoteJson('/api/portal/landing-coaches');
-  if (remoteRows) {
-    const mappedRemote = mapRemoteCoachRows(remoteRows);
-    writeCache('coaches', mappedRemote);
-    return mappedRemote;
+  const landingCoachRows = await fetchRemoteJson('/api/portal/landing-coaches');
+  if (landingCoachRows) {
+    const mappedRemote = mapRemoteCoachRows(landingCoachRows);
+    if (mappedRemote.length > 0) {
+      writeCache('coaches', mappedRemote);
+      return mappedRemote;
+    }
+  }
+  const portalCoachRows = await fetchRemoteJson('/api/portal/coaches');
+  if (portalCoachRows) {
+    const mappedRemote = mapRemoteCoachRows(portalCoachRows);
+    if (mappedRemote.length > 0) {
+      writeCache('coaches', mappedRemote);
+      return mappedRemote;
+    }
   }
   if (!canUseDb()) return stale || FALLBACK_COACHES;
   if (!(await canAttemptDatabaseQuery())) return stale || FALLBACK_COACHES;
@@ -461,7 +496,7 @@ export async function fetchCoaches(): Promise<CoachResponse[]> {
     return mapped;
   } catch (error) {
     noteDatabaseFailure('fetchCoaches', error);
-    return stale || [];
+    return stale || FALLBACK_COACHES;
   }
 }
 

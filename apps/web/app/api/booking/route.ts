@@ -281,7 +281,7 @@ export async function POST(request: Request) {
         `,
         [endTime, startTime, [courtType, courtName]],
       );
-      if (overlap.rowCount > 0) {
+      if ((overlap.rowCount ?? 0) > 0) {
         return NextResponse.json(
           { error: 'This time slot is already booked. Please select another time.' },
           { status: 409 },

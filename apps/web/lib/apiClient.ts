@@ -6,6 +6,7 @@ import type {
   LandingOffer,
   LandingProgram,
 } from '@infinity/types';
+import { getPgPool } from './pg';
 import { canAttemptDatabaseQuery, noteDatabaseFailure } from './dbGuard';
 
 export type ProgramResponse = {
@@ -503,13 +504,42 @@ export async function fetchPackages(): Promise<PackageResponse[]> {
 
   const stale = getStaleCache<PackageResponse[]>('packages');
   if (!canUseDb()) return stale || FALLBACK_PACKAGES;
-  if (!(await canAttemptDatabaseQuery())) return stale || FALLBACK_PACKAGES;
   try {
-    const prisma = await getPrisma();
-    const rows = await prisma.package.findMany({
-      where: { isActive: true },
-      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-    });
+    const pool = getPgPool();
+    const result = await pool.query<{
+      id: string;
+      sportType: string;
+      name: string;
+      description: string | null;
+      descriptionBullets: unknown;
+      sessionsCount: number;
+      trackingType: string;
+      pricingType: string;
+      currentPriceJod: number | null;
+      timeSlots: unknown;
+      isActive: boolean;
+      sortOrder: number;
+    }>(
+      `
+      SELECT
+        "id",
+        "sportType",
+        "name",
+        "description",
+        "descriptionBullets",
+        "sessionsCount",
+        "trackingType",
+        "pricingType",
+        "currentPriceJod",
+        "timeSlots",
+        "isActive",
+        "sortOrder"
+      FROM "Package"
+      WHERE "isActive" = true
+      ORDER BY "sortOrder" ASC, "name" ASC
+      `,
+    );
+    const rows = result.rows;
     if (!rows.length) {
       writeCache('packages', FALLBACK_PACKAGES);
       return FALLBACK_PACKAGES;
@@ -587,13 +617,36 @@ export async function fetchCoaches(): Promise<CoachResponse[]> {
 
   const stale = getStaleCache<CoachResponse[]>('coaches');
   if (!canUseDb()) return stale || FALLBACK_COACHES;
-  if (!(await canAttemptDatabaseQuery())) return stale || FALLBACK_COACHES;
   try {
-    const prisma = await getPrisma();
-    const landingRows = await prisma.landingCoach.findMany({
-      where: { isActive: true },
-      orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
-    });
+    const pool = getPgPool();
+    const landingResult = await pool.query<{
+      id: string;
+      name: string;
+      sport: string;
+      description: string;
+      quote: string | null;
+      achievements: unknown;
+      imageUrl: string;
+      isActive: boolean;
+      order: number;
+    }>(
+      `
+      SELECT
+        "id",
+        "name",
+        "sport",
+        "description",
+        "quote",
+        "achievements",
+        "imageUrl",
+        "isActive",
+        "order"
+      FROM "LandingCoach"
+      WHERE "isActive" = true
+      ORDER BY "order" ASC, "createdAt" ASC
+      `,
+    );
+    const landingRows = landingResult.rows;
     if (landingRows.length) {
       const mapped = landingRows.map((row) => ({
         id: row.id,
@@ -601,7 +654,7 @@ export async function fetchCoaches(): Promise<CoachResponse[]> {
         sport: row.sport,
         description: row.description,
         quote: row.quote ?? undefined,
-        achievements: row.achievements ?? [],
+        achievements: Array.isArray(row.achievements) ? (row.achievements as string[]) : [],
         imageUrl: row.imageUrl,
         isActive: row.isActive,
         order: row.order,
@@ -611,10 +664,22 @@ export async function fetchCoaches(): Promise<CoachResponse[]> {
     }
 
     // Secondary source: portal coaches table (firstName/lastName) when landingCoach is empty.
-    const portalRows = await prisma.coach.findMany({
-      where: { status: 'ACTIVE' },
-      orderBy: [{ createdAt: 'asc' }],
-    });
+    const portalResult = await pool.query<{
+      id: string;
+      firstName: string;
+      lastName: string;
+      specialty: string | null;
+      bio: string | null;
+      status: string;
+    }>(
+      `
+      SELECT "id", "firstName", "lastName", "specialty", "bio", "status"
+      FROM "Coach"
+      WHERE "status" = 'ACTIVE'
+      ORDER BY "createdAt" ASC
+      `,
+    );
+    const portalRows = portalResult.rows;
     if (portalRows.length) {
       const mappedFromPortal = portalRows.map((row, index) => ({
         id: row.id,

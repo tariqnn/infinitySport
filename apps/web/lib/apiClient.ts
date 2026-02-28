@@ -1,9 +1,6 @@
 import type {
-  LandingAnnouncement,
   LandingContent,
-  LandingEvent,
   LandingFacilityHighlight,
-  LandingOffer,
   LandingProgram,
 } from '@infinity/types';
 import { canAttemptDatabaseQuery, noteDatabaseFailure } from './dbGuard';
@@ -416,6 +413,20 @@ function readMsFromEnv(name: string, fallback: number): number {
 const WEB_CACHE_TTL_MS = readMsFromEnv('WEB_API_CACHE_TTL_MS', 0);
 const WEB_STALE_TTL_MS = readMsFromEnv('WEB_API_STALE_TTL_MS', 15 * 60_000);
 
+function shouldUseSsl(connectionString: string): boolean {
+  try {
+    const parsed = new URL(connectionString);
+    const host = parsed.hostname.toLowerCase();
+    const sslMode = (parsed.searchParams.get('sslmode') || '').toLowerCase();
+    if (sslMode === 'disable') return false;
+    if (sslMode === 'require' || sslMode === 'verify-ca' || sslMode === 'verify-full') return true;
+    if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.local')) return false;
+    return true;
+  } catch {
+    return /sslmode=require|ssl=true/i.test(connectionString);
+  }
+}
+
 function cacheStore(): CacheStore {
   if (!globalCache.__webApiCache) {
     globalCache.__webApiCache = { fresh: {}, stale: {} };
@@ -530,8 +541,8 @@ function getServerPgPool() {
     max: Number.parseInt(process.env.PG_POOL_MAX || '1', 10) || 1,
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 10_000,
-    ssl: /sslmode=require|ssl=true/i.test(connectionString)
-      ? { rejectUnauthorized: false }
+    ssl: shouldUseSsl(connectionString)
+      ? { rejectUnauthorized: process.env.PG_SSL_REJECT_UNAUTHORIZED === 'true' }
       : undefined,
   }) as {
     query: <T = unknown>(text: string, values?: unknown[]) => Promise<{ rows: T[] }>;
@@ -881,114 +892,33 @@ async function _fetchLandingContent(): Promise<LandingContent> {
 
   const stale = getStaleCache<LandingContent>('landingContent');
   if (!canUseDb()) return stale || getLandingFallback();
-  if (!(await canAttemptDatabaseQuery())) return stale || getLandingFallback();
 
   try {
-    const prisma = await getPrisma();
-    const hero = await prisma.heroSection.findFirst({ orderBy: { updatedAt: 'desc' } });
     const programs = await fetchPackages();
-    const offers = await prisma.offer.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] });
-    const events = await prisma.event.findMany({ orderBy: { date: 'asc' } });
-    const announcements = await prisma.announcement.findMany({ orderBy: [{ isPinned: 'desc' }, { publishedAt: 'desc' }] });
-    const facilities = await prisma.facilityHighlight.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] });
-    const footerSettings = await prisma.footerSettings.findFirst({ orderBy: { updatedAt: 'desc' } });
-
     const fallback = getLandingFallback();
-    const rawSocialLinks = footerSettings?.socialLinks;
-    const socialLinks = Array.isArray(rawSocialLinks)
-      ? rawSocialLinks
-          .map((item: unknown) => {
-            if (!item || typeof item !== 'object') return null;
-            const record = item as Record<string, unknown>;
-            if (typeof record.label !== 'string' || typeof record.href !== 'string') return null;
-            return {
-              id: String(record.id || record.label).toLowerCase(),
-              label: record.label,
-              href: record.href,
-            };
-          })
-          .filter(Boolean) as Array<{ id: string; label: string; href: string }>
-      : fallback.footer.socialLinks;
 
     const result: LandingContent = {
-      hero: hero
-        ? {
-            title: hero.title,
-            subtitle: hero.subtitle,
-            primaryCtaLabel: hero.primaryCta,
-            primaryCtaLink: hero.primaryUrl,
-            secondaryCtaLabel: hero.secondaryCta || undefined,
-            secondaryCtaLink: hero.secondaryUrl || undefined,
-            backgroundImageUrl: hero.backgroundImageUrl || undefined,
-            backgroundVideoUrl: hero.backgroundVideoUrl || undefined,
-          }
-        : fallback.hero,
-      highlights: [],
-      programs: programs.map((program): LandingProgram => ({
-        id: program.id,
-        title: program.name,
-        description: program.description?.trim() || 'Program details available on the sports page.',
-        sportType: program.sportType || 'multi',
-        badge: program.sportType || undefined,
-        link: `/sports#${(program.sportType || 'other').toLowerCase().replace(/\s+/g, '-')}`,
-        mediaUrl: undefined,
-        isFeatured: false,
-        isActive: program.isActive,
-      })),
-      offers: offers.map((offer): LandingOffer => ({
-        id: offer.id,
-        name: offer.name,
-        price: offer.pricePerMonth === 0 ? 'Custom' : `JD ${offer.pricePerMonth}/mo`,
-        badge: offer.badge || undefined,
-        description: offer.description ?? '',
-        features: offer.features ?? [],
-        link: '/offers',
-        isFeatured: false,
-        isActive: true,
-      })),
-      events: events.map((event): LandingEvent => ({
-        id: event.id,
-        title: event.title,
-        date: event.date.toISOString(),
-        location: event.location,
-        description: event.description || undefined,
-        imageUrl: event.imageUrl || undefined,
-        link: '/events',
-        isActive: event.highlight !== false,
-      })),
-      announcements: announcements.map((announcement): LandingAnnouncement => ({
-        id: announcement.id,
-        title: announcement.title,
-        message: announcement.body,
-        isPinned: announcement.isPinned,
-        isActive: true,
-        link: '/contact',
-      })),
-      facilityHighlights:
-        facilities.length > 0
-          ? facilities.map((facility): LandingFacilityHighlight => ({
-              id: facility.id,
-              name: facility.name,
-              description: facility.description ?? '',
-              mediaUrl: facility.imageUrl || undefined,
-              badge: undefined,
+      ...fallback,
+      programs:
+        programs.length > 0
+          ? programs.map((program): LandingProgram => ({
+              id: program.id,
+              title: program.name,
+              description: program.description?.trim() || 'Program details available on the sports page.',
+              sportType: program.sportType || 'multi',
+              badge: program.sportType || undefined,
+              link: `/sports#${(program.sportType || 'other').toLowerCase().replace(/\s+/g, '-')}`,
+              mediaUrl: undefined,
+              isFeatured: false,
+              isActive: program.isActive,
             }))
-          : fallback.facilityHighlights,
-      footer: {
-        address: footerSettings?.address || fallback.footer.address,
-        phone: footerSettings?.phone || fallback.footer.phone,
-        email: footerSettings?.email || fallback.footer.email,
-        contactRecipientEmail:
-          footerSettings?.contactRecipientEmail || footerSettings?.email || fallback.footer.contactRecipientEmail,
-        socialLinks,
-      },
+          : fallback.programs,
       updatedAt: new Date().toISOString(),
       updatedBy: 'System',
     };
     writeCache('landingContent', result);
     return result;
   } catch (error) {
-    noteDatabaseFailure('fetchLandingContent', error);
     if (stale) return stale;
     const fallback = getLandingFallback();
     const livePrograms = await fetchPackages();

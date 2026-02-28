@@ -3,7 +3,17 @@ import { Pool } from 'pg';
 const globalPg = globalThis as unknown as { __webPgPool?: Pool };
 
 function shouldUseSsl(connectionString: string): boolean {
-  return /sslmode=require|ssl=true/i.test(connectionString);
+  try {
+    const parsed = new URL(connectionString);
+    const host = parsed.hostname.toLowerCase();
+    const sslMode = (parsed.searchParams.get('sslmode') || '').toLowerCase();
+    if (sslMode === 'disable') return false;
+    if (sslMode === 'require' || sslMode === 'verify-ca' || sslMode === 'verify-full') return true;
+    if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.local')) return false;
+    return true;
+  } catch {
+    return /sslmode=require|ssl=true/i.test(connectionString);
+  }
 }
 
 export function getPgPool(): Pool {
@@ -19,7 +29,9 @@ export function getPgPool(): Pool {
     max: Number.parseInt(process.env.PG_POOL_MAX || '1', 10) || 1,
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 10_000,
-    ssl: shouldUseSsl(connectionString) ? { rejectUnauthorized: false } : undefined,
+    ssl: shouldUseSsl(connectionString)
+      ? { rejectUnauthorized: process.env.PG_SSL_REJECT_UNAUTHORIZED === 'true' }
+      : undefined,
   });
 
   globalPg.__webPgPool = pool;

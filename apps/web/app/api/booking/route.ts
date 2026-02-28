@@ -1,10 +1,11 @@
 /// <reference lib="es2022" />
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { NextResponse } from 'next/server';
+import { getPgPool } from '../../../lib/pg';
 import { isValidPhoneNumber } from '../../../lib/phoneValidation';
 import {
-  canAttemptDatabaseQuery,
   isDatabaseUnavailableError,
   noteDatabaseFailure,
 } from '../../../lib/dbGuard';
@@ -77,11 +78,11 @@ const dayKey = (dateStr: string) => {
 };
 
 async function fetchBlockedMapFromDb(): Promise<Record<string, Partial<Record<CourtType, string[]>>>> {
-  const { prisma } = await import('../../../lib/db');
-  const rows = await prisma.blockedSlot.findMany({
-    where: { isBlocked: true },
-    select: { dayOfWeek: true, courtType: true, time: true },
-  });
+  const pool = getPgPool();
+  const result = await pool.query<{ dayOfWeek: string; courtType: string; time: string }>(
+    'SELECT "dayOfWeek", "courtType", "time" FROM "BlockedSlot" WHERE "isBlocked" = true',
+  );
+  const rows = result.rows;
   const blocked: Record<string, Record<string, string[]>> = {};
   for (const row of rows) {
     if (!blocked[row.dayOfWeek]) blocked[row.dayOfWeek] = {};
@@ -216,12 +217,6 @@ export async function POST(request: Request) {
         { status: 503 },
       );
     }
-    if (!(await canAttemptDatabaseQuery())) {
-      return NextResponse.json(
-        { error: 'Booking is temporarily unavailable. Please try again later.' },
-        { status: 503 },
-      );
-    }
 
     const body = await request.json();
     const { courtId, courtName, date, time, duration, name, phone, email } = body ?? {};
@@ -271,19 +266,22 @@ export async function POST(request: Request) {
     const startTime = new Date(`${date}T${time}:00`);
     const endTime = new Date(startTime);
     endTime.setMinutes(endTime.getMinutes() + Math.round(durationHours * 60));
+    const pool = getPgPool();
 
     if (courtType) {
-      const { prisma } = await import('../../../lib/db');
-      const existing = await prisma.booking.findMany({
-        where: {
-          startTime: { lt: endTime },
-          endTime: { gt: startTime },
-          status: { not: 'CANCELLED' },
-          facilityArea: { in: [courtType, courtName] },
-        },
-        select: { id: true },
-      });
-      if (existing.length > 0) {
+      const overlap = await pool.query<{ id: string }>(
+        `
+        SELECT "id"
+        FROM "Booking"
+        WHERE "startTime" < $1
+          AND "endTime" > $2
+          AND "status" <> 'CANCELLED'
+          AND "facilityArea" = ANY($3::text[])
+        LIMIT 1
+        `,
+        [endTime, startTime, [courtType, courtName]],
+      );
+      if (overlap.rowCount > 0) {
         return NextResponse.json(
           { error: 'This time slot is already booked. Please select another time.' },
           { status: 409 },
@@ -303,45 +301,69 @@ export async function POST(request: Request) {
       }),
       sendBookingWhatsAppMessage({ phone, courtName, date, time: `${time} - ${endTimeStr}` }),
     ]);
-    if (!(await canAttemptDatabaseQuery())) {
-      return NextResponse.json(
-        { error: 'Booking is temporarily unavailable. Please try again later.' },
-        { status: 503 },
+    const companyResult = await pool.query<{ id: string }>(
+      `
+      SELECT "id"
+      FROM "Company"
+      WHERE "status" = 'ACTIVE'
+      ORDER BY "createdAt" DESC
+      LIMIT 1
+      `,
+    );
+    let companyId = companyResult.rows[0]?.id;
+
+    if (!companyId) {
+      const insertedCompany = await pool.query<{ id: string }>(
+        `
+        INSERT INTO "Company" ("id", "name", "contactName", "contactEmail", "status", "createdAt", "updatedAt")
+        VALUES ($1, $2, $3, $4, 'ACTIVE', NOW(), NOW())
+        RETURNING "id"
+        `,
+        [
+          randomUUID(),
+          'Infinity Sport',
+          'Infinity Sport',
+          'infinitysportsacademyjo@gmail.com',
+        ],
       );
+      companyId = insertedCompany.rows[0]?.id;
     }
 
-    const { prisma } = await import('../../../lib/db');
-    let company = await prisma.company.findFirst({
-      where: { status: 'ACTIVE' },
-      orderBy: { createdAt: 'desc' },
-      select: { id: true },
-    });
-    if (!company) {
-      company = await prisma.company.create({
-        data: {
-          name: 'Infinity Sport',
-          contactName: 'Infinity Sport',
-          contactEmail: 'infinitysportsacademyjo@gmail.com',
-          status: 'ACTIVE',
-        },
-        select: { id: true },
-      });
+    if (!companyId) {
+      throw new Error('Failed to resolve company for booking');
     }
 
-    await prisma.booking.create({
-      data: {
-        companyId: company.id,
-        facilityArea: courtType || courtName,
+    await pool.query(
+      `
+      INSERT INTO "Booking" (
+        "id",
+        "companyId",
+        "facilityArea",
+        "startTime",
+        "endTime",
+        "status",
+        "isPaid",
+        "customerName",
+        "customerPhone",
+        "customerEmail",
+        "notes",
+        "createdAt",
+        "updatedAt"
+      )
+      VALUES ($1, $2, $3, $4, $5, 'PENDING', false, $6, $7, $8, $9, NOW(), NOW())
+      `,
+      [
+        randomUUID(),
+        companyId,
+        courtType || courtName,
         startTime,
         endTime,
-        status: 'PENDING',
-        isPaid: false,
-        customerName: name,
-        customerPhone: phone,
-        customerEmail: typeof email === 'string' ? email : null,
-        notes: 'Public booking from landing page',
-      },
-    });
+        name,
+        phone,
+        typeof email === 'string' ? email : null,
+        'Public booking from landing page',
+      ],
+    );
 
     return NextResponse.json({
       success: true,

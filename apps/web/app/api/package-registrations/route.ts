@@ -1,12 +1,10 @@
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { NextResponse } from "next/server";
+import { getPgPool } from "../../../lib/pg";
 import { isValidPhoneNumber } from "../../../lib/phoneValidation";
-import {
-  canAttemptDatabaseQuery,
-  isDatabaseUnavailableError,
-  noteDatabaseFailure,
-} from "../../../lib/dbGuard";
+import { isDatabaseUnavailableError, noteDatabaseFailure } from "../../../lib/dbGuard";
 
 function ensureDatabaseUrl(): boolean {
   const explicitCandidates = [
@@ -72,30 +70,32 @@ function ensureDatabaseUrl(): boolean {
 }
 
 async function getBasePriceJod(packageName: string): Promise<number> {
-  const { prisma } = await import("../../../lib/db");
+  const pool = getPgPool();
 
-  const pkg = await prisma.package
-    .findUnique({
-      where: { name: packageName },
-      select: { currentPriceJod: true },
-    })
+  const packageResult = await pool
+    .query<{ currentPriceJod: number | null }>(
+      'SELECT "currentPriceJod" FROM "Package" WHERE "name" = $1 LIMIT 1',
+      [packageName],
+    )
     .catch((error: unknown) => {
       noteDatabaseFailure("package-registrations.getBasePrice.package", error);
       console.warn("[package-registrations] package lookup skipped", error);
       return null;
     });
+  const pkg = packageResult?.rows?.[0];
   if (pkg?.currentPriceJod != null) return Math.max(0, pkg.currentPriceJod);
 
-  const pricing = await prisma.packagePricing
-    .findUnique({
-      where: { packageName },
-      select: { basePriceJod: true },
-    })
+  const pricingResult = await pool
+    .query<{ basePriceJod: number | null }>(
+      'SELECT "basePriceJod" FROM "PackagePricing" WHERE "packageName" = $1 LIMIT 1',
+      [packageName],
+    )
     .catch((error: unknown) => {
       noteDatabaseFailure("package-registrations.getBasePrice.pricing", error);
       console.warn("[package-registrations] pricing lookup skipped", error);
       return null;
     });
+  const pricing = pricingResult?.rows?.[0];
   return Math.max(0, pricing?.basePriceJod ?? 0);
 }
 
@@ -106,48 +106,27 @@ async function ensureMemberAccount(params: {
 }) {
   const email = (params.customerEmail || "").trim().toLowerCase();
   if (!email) return;
-  const { prisma } = await import("../../../lib/db");
+  const pool = getPgPool();
 
   try {
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      await prisma.user.update({
-        where: { id: existing.id },
-        data: {
-          isActive: true,
-          ...(existing.name
-            ? {}
-            : { name: params.customerName.trim() || null }),
-          ...(existing.phone
-            ? {}
-            : { phone: params.customerPhone.trim() || null }),
-        },
-      });
-      return;
-    }
-
-    await prisma.user
-      .create({
-        data: {
-          email,
-          name: params.customerName.trim() || null,
-          phone: params.customerPhone.trim() || null,
-          role: "MEMBER",
-          isActive: true,
-        },
-      })
-      .catch((error: unknown) => {
-        // Ignore unique races to keep registration flow resilient.
-        if (
-          typeof error === "object" &&
-          error &&
-          "code" in error &&
-          (error as { code?: string }).code === "P2002"
-        ) {
-          return;
-        }
-        throw error;
-      });
+    await pool.query(
+      `
+      INSERT INTO "User" ("id", "email", "name", "phone", "role", "isActive", "createdAt", "updatedAt")
+      VALUES ($1, $2, $3, $4, 'MEMBER', true, NOW(), NOW())
+      ON CONFLICT ("email")
+      DO UPDATE SET
+        "isActive" = true,
+        "name" = COALESCE("User"."name", EXCLUDED."name"),
+        "phone" = COALESCE("User"."phone", EXCLUDED."phone"),
+        "updatedAt" = NOW()
+      `,
+      [
+        randomUUID(),
+        email,
+        params.customerName.trim() || null,
+        params.customerPhone.trim() || null,
+      ],
+    );
   } catch (error) {
     noteDatabaseFailure("package-registrations.ensureMember", error);
     // User creation must never block registration submission.
@@ -165,12 +144,6 @@ export async function POST(request: Request) {
         "[package-registrations] missing DATABASE_URL at runtime; available env keys:",
         dbLikeKeys,
       );
-      return NextResponse.json(
-        { error: "Registration is unavailable. Please try again later." },
-        { status: 503 },
-      );
-    }
-    if (!(await canAttemptDatabaseQuery())) {
       return NextResponse.json(
         { error: "Registration is unavailable. Please try again later." },
         { status: 503 },
@@ -227,36 +200,48 @@ export async function POST(request: Request) {
     }
 
     const cleanPackage = packageName.trim();
+    const pool = getPgPool();
     const basePriceJod = await getBasePriceJod(cleanPackage);
-    if (!(await canAttemptDatabaseQuery())) {
-      return NextResponse.json(
-        { error: "Registration is temporarily unavailable. Please try again later." },
-        { status: 503 },
-      );
-    }
+    const registrationId = randomUUID();
 
-    const { prisma } = await import("../../../lib/db");
-    const row = await prisma.packageRegistration.create({
-      data: {
-        packageName: cleanPackage,
-        customerName: customerName.trim(),
-        customerPhone: customerPhone.trim(),
-        customerEmail:
-          typeof customerEmail === "string" && customerEmail.trim()
-            ? customerEmail.trim()
-            : null,
-        customerAge:
-          typeof customerAge === "number" && customerAge > 0
-            ? customerAge
-            : null,
+    await pool.query(
+      `
+      INSERT INTO "PackageRegistration" (
+        "id",
+        "packageName",
+        "customerName",
+        "customerPhone",
+        "customerEmail",
+        "customerAge",
+        "isPaid",
+        "basePriceJod",
+        "discountType",
+        "discountValue",
+        "discountReason",
+        "finalPriceJod",
+        "sessionsBonus",
+        "status",
+        "isFrozen",
+        "createdAt",
+        "updatedAt"
+      )
+      VALUES (
+        $1, $2, $3, $4, $5, $6, false, $7, 'NONE', NULL, NULL, $8, 0, 'ACTIVE', false, NOW(), NOW()
+      )
+      `,
+      [
+        registrationId,
+        cleanPackage,
+        customerName.trim(),
+        customerPhone.trim(),
+        typeof customerEmail === "string" && customerEmail.trim()
+          ? customerEmail.trim()
+          : null,
+        typeof customerAge === "number" && customerAge > 0 ? customerAge : null,
         basePriceJod,
-        discountType: "NONE",
-        discountValue: null,
-        discountReason: null,
-        finalPriceJod: basePriceJod,
-      },
-      select: { id: true },
-    });
+        basePriceJod,
+      ],
+    );
 
     await ensureMemberAccount({
       customerEmail: typeof customerEmail === "string" ? customerEmail : null,
@@ -264,7 +249,7 @@ export async function POST(request: Request) {
       customerPhone: customerPhone.trim(),
     });
 
-    return NextResponse.json({ success: true, id: row.id });
+    return NextResponse.json({ success: true, id: registrationId });
   } catch (error) {
     noteDatabaseFailure("package-registrations.POST", error);
     console.error("[package-registrations] error", error);

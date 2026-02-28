@@ -1436,6 +1436,11 @@ async function bulkCreateForPerson(request: NextRequest) {
 
 async function updatePackageRegistration(id: string, request: NextRequest) {
   const body = (await request.json()) as {
+    packageName?: string;
+    customerName?: string;
+    customerPhone?: string;
+    customerEmail?: string | null;
+    customerAge?: number | null;
     isPaid?: boolean;
     isFrozen?: boolean;
     basePriceJod?: number;
@@ -1453,7 +1458,57 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
   if (!existing) return jsonError("Package registration not found", 404);
 
   const updateData: any = {};
+  if (body.packageName !== undefined) {
+    const packageName = String(body.packageName || "").trim();
+    if (!packageName) return jsonError("Package is required");
+    updateData.packageName = packageName;
+  }
+  if (body.customerName !== undefined) {
+    const customerName = String(body.customerName || "").trim();
+    if (!customerName) return jsonError("Customer name is required");
+    updateData.customerName = customerName;
+  }
+  if (body.customerPhone !== undefined) {
+    const customerPhone = String(body.customerPhone || "").trim();
+    if (!customerPhone) return jsonError("Customer phone is required");
+    updateData.customerPhone = customerPhone;
+  }
+  if (body.customerEmail !== undefined) {
+    updateData.customerEmail = String(body.customerEmail || "").trim() || null;
+  }
+  if (body.customerAge !== undefined) {
+    if (body.customerAge == null) {
+      updateData.customerAge = null;
+    } else {
+      const parsedAge = Number(body.customerAge);
+      if (!Number.isFinite(parsedAge) || parsedAge < 0) {
+        return jsonError("Customer age must be a positive number");
+      }
+      updateData.customerAge = Math.round(parsedAge);
+    }
+  }
   if (body.isPaid !== undefined) updateData.isPaid = Boolean(body.isPaid);
+
+  const nextPackageName = (updateData.packageName ??
+    existing.packageName) as string;
+  const nextCustomerPhone = (updateData.customerPhone ??
+    existing.customerPhone) as string;
+  if (
+    nextPackageName !== existing.packageName ||
+    nextCustomerPhone !== existing.customerPhone
+  ) {
+    const duplicate = await prisma.packageRegistration.findFirst({
+      where: {
+        id: { not: id },
+        packageName: nextPackageName,
+        customerPhone: nextCustomerPhone,
+      },
+      select: { id: true },
+    });
+    if (duplicate) {
+      return jsonError("Duplicate registration (same package + phone)", 409);
+    }
+  }
 
   if (
     body.basePriceJod !== undefined ||
@@ -1461,18 +1516,30 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
     body.discountValue !== undefined ||
     body.discountReason !== undefined
   ) {
-    const basePriceJod = clampNonNegative(
-      Number(body.basePriceJod ?? existing.basePriceJod),
+    const basePriceJod = Math.round(
+      clampNonNegative(Number(body.basePriceJod ?? existing.basePriceJod)),
     );
     const discountType = (
       body.discountType ??
       existing.discountType ??
       "NONE"
     ).toUpperCase();
+    if (!["NONE", "PERCENT", "AMOUNT"].includes(discountType)) {
+      return jsonError("Invalid discount type");
+    }
     const discountValue =
       discountType === "NONE"
         ? null
-        : Number(body.discountValue ?? existing.discountValue ?? 0);
+        : Math.round(Number(body.discountValue ?? existing.discountValue ?? 0));
+    if (
+      discountType !== "NONE" &&
+      (discountValue == null ||
+        (discountType === "PERCENT" &&
+          (discountValue < 0 || discountValue > 100)) ||
+        (discountType === "AMOUNT" && discountValue < 0))
+    ) {
+      return jsonError("Invalid discount");
+    }
 
     if (
       discountType !== "NONE" &&
@@ -1500,14 +1567,33 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
     }
   }
 
-  if (body.periodStartsAt !== undefined)
-    updateData.periodStartsAt = body.periodStartsAt
-      ? new Date(body.periodStartsAt)
-      : null;
-  if (body.periodEndsAt !== undefined)
-    updateData.periodEndsAt = body.periodEndsAt
-      ? new Date(body.periodEndsAt)
-      : null;
+  if (body.periodStartsAt !== undefined) {
+    if (body.periodStartsAt) {
+      const periodStartsAt = new Date(body.periodStartsAt);
+      if (Number.isNaN(periodStartsAt.getTime())) {
+        return jsonError("Invalid period start date");
+      }
+      updateData.periodStartsAt = periodStartsAt;
+      if (body.periodEndsAt === undefined) {
+        updateData.periodEndsAt = new Date(
+          periodStartsAt.getTime() + 30 * 24 * 60 * 60 * 1000,
+        );
+      }
+    } else {
+      updateData.periodStartsAt = null;
+    }
+  }
+  if (body.periodEndsAt !== undefined) {
+    if (body.periodEndsAt) {
+      const periodEndsAt = new Date(body.periodEndsAt);
+      if (Number.isNaN(periodEndsAt.getTime())) {
+        return jsonError("Invalid period end date");
+      }
+      updateData.periodEndsAt = periodEndsAt;
+    } else {
+      updateData.periodEndsAt = null;
+    }
+  }
 
   if (body.isFrozen !== undefined) {
     updateData.isFrozen = Boolean(body.isFrozen);
@@ -1530,6 +1616,12 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
     where: { id },
     data: updateData,
     include: { receipts: { where: ACTIVE_RECEIPT_WHERE } },
+  });
+
+  await findOrCreateUserFromRegistration({
+    customerEmail: row.customerEmail ?? null,
+    customerName: row.customerName,
+    customerPhone: row.customerPhone,
   });
 
   return NextResponse.json(mapRegistrationRow(row));

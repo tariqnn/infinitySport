@@ -18,6 +18,7 @@ import { RegisterInAnotherPackageModal } from './_components/RegisterInAnotherPa
 import { RegisterExistingPersonModal } from './_components/RegisterExistingPersonModal';
 import { RegisterPersonMultiPackageModal } from './_components/RegisterPersonMultiPackageModal';
 import { PersonDetailsModal } from './_components/PersonDetailsModal';
+import { EditRegistrationModal } from './_components/EditRegistrationModal';
 
 type Registration = PackageRegistrationRow;
 
@@ -41,6 +42,7 @@ export default function RegistrationsPage() {
   const [cancelSessionDayOpen, setCancelSessionDayOpen] = useState(false);
   const [addRegistrationOpen, setAddRegistrationOpen] = useState(false);
   const [detailsModalRow, setDetailsModalRow] = useState<Registration | null>(null);
+  const [editRegistrationRow, setEditRegistrationRow] = useState<Registration | null>(null);
   const [registerInAnotherPackageRow, setRegisterInAnotherPackageRow] = useState<Registration | null>(null);
   const [registerExistingPersonOpen, setRegisterExistingPersonOpen] = useState(false);
   const [addRegistrationInitialPerson, setAddRegistrationInitialPerson] = useState<InitialPerson | null>(null);
@@ -677,6 +679,12 @@ export default function RegistrationsPage() {
                                 View details
                               </DropdownMenu.Item>
                               <DropdownMenu.Item
+                                className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
+                                onSelect={() => setEditRegistrationRow(row)}
+                              >
+                                Edit registration
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item
                                 className="cursor-pointer px-4 py-2 text-sm text-red-600 outline-none hover:bg-red-50 data-[highlighted]:bg-red-50 disabled:opacity-50"
                                 onSelect={() => handleDelete(row)}
                                 disabled={deletingId === row.id}
@@ -774,6 +782,17 @@ export default function RegistrationsPage() {
         onViewReceipts={(row) => {
           setDetailsModalRow(null);
           setViewReceiptsRegistration(row);
+        }}
+      />
+
+      <EditRegistrationModal
+        open={!!editRegistrationRow}
+        onClose={() => setEditRegistrationRow(null)}
+        registration={editRegistrationRow}
+        packageOptions={packageOpts}
+        onSuccess={() => {
+          setEditRegistrationRow(null);
+          load();
         }}
       />
 

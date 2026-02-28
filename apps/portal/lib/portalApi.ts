@@ -369,7 +369,21 @@ export const packageRegistrationsApi = {
     }>;
   }) =>
     portalDbFetch<{ created: number; registrations: PackageRegistrationRow[] }>('/portal/package-registrations/bulk-for-person', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: { isPaid?: boolean; isFrozen?: boolean }) =>
+  update: (id: string, data: {
+    packageName?: string;
+    customerName?: string;
+    customerPhone?: string;
+    customerEmail?: string | null;
+    customerAge?: number | null;
+    isPaid?: boolean;
+    isFrozen?: boolean;
+    basePriceJod?: number;
+    discountType?: string;
+    discountValue?: number | null;
+    discountReason?: string | null;
+    periodStartsAt?: string | null;
+    periodEndsAt?: string | null;
+  }) =>
     portalDbFetch<PackageRegistrationRow>(`/portal/package-registrations/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) => portalDbFetch<void>(`/portal/package-registrations/${id}`, { method: 'DELETE' }),
   reregister: (id: string) =>

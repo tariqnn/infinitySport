@@ -30,7 +30,7 @@ export default async function Home() {
       content = contentResult.value;
     }
 
-    if (content.programs.length === 0 && packagesResult.status === 'fulfilled' && packagesResult.value.length > 0) {
+    if (packagesResult.status === 'fulfilled' && packagesResult.value.length > 0) {
       content = {
         ...content,
         programs: mapPackagesToPrograms(packagesResult.value),

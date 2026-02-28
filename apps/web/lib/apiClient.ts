@@ -447,6 +447,34 @@ function writeCache<T>(key: CacheKey, value: T): void {
 function canUseDb() {
   if (typeof window !== 'undefined') return false;
 
+  // Shared-host deployments sometimes expose DB URL via runtime-env.json only.
+  if (!process.env.DATABASE_URL?.trim()) {
+    try {
+      const req = (0, eval)('require') as (id: string) => unknown;
+      const fs = req('fs') as {
+        existsSync: (path: string) => boolean;
+        readFileSync: (path: string, encoding: string) => string;
+      };
+      const path = req('path') as { join: (...parts: string[]) => string };
+      const cwd = process.cwd();
+      const candidates = [
+        path.join(cwd, 'runtime-env.json'),
+        path.join(cwd, 'hostinger-output', 'runtime-env.json'),
+        path.join(cwd, '.builds', 'source', 'repository', 'hostinger-output', 'runtime-env.json'),
+      ];
+      for (const file of candidates) {
+        if (!fs.existsSync(file)) continue;
+        const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as { DATABASE_URL?: string };
+        if (typeof parsed.DATABASE_URL === 'string' && parsed.DATABASE_URL.trim()) {
+          process.env.DATABASE_URL = parsed.DATABASE_URL.trim();
+          break;
+        }
+      }
+    } catch {
+      // Ignore and continue with env-only resolution.
+    }
+  }
+
   const candidates = [
     process.env.DATABASE_URL,
     process.env.POSTGRES_PRISMA_URL,

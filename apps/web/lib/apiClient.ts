@@ -479,11 +479,37 @@ async function getPrisma() {
 }
 
 function getServerPgPool() {
-  const req = (0, eval)('require') as (id: string) => { getPgPool: () => unknown };
-  const mod = req('./pg');
-  return mod.getPgPool() as {
+  if (typeof window !== 'undefined') {
+    throw new Error('getServerPgPool must run on the server');
+  }
+
+  const globalPg = globalThis as unknown as {
+    __webApiPgPool?: {
+      query: <T = unknown>(text: string, values?: unknown[]) => Promise<{ rows: T[] }>;
+    };
+  };
+  if (globalPg.__webApiPgPool) return globalPg.__webApiPgPool;
+
+  const connectionString = process.env.DATABASE_URL?.trim();
+  if (!connectionString) {
+    throw new Error('DATABASE_URL is missing');
+  }
+
+  const req = (0, eval)('require') as (id: string) => { Pool: new (config: object) => unknown };
+  const { Pool } = req('pg');
+  const pool = new Pool({
+    connectionString,
+    max: Number.parseInt(process.env.PG_POOL_MAX || '1', 10) || 1,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 10_000,
+    ssl: /sslmode=require|ssl=true/i.test(connectionString)
+      ? { rejectUnauthorized: false }
+      : undefined,
+  }) as {
     query: <T = unknown>(text: string, values?: unknown[]) => Promise<{ rows: T[] }>;
   };
+  globalPg.__webApiPgPool = pool;
+  return pool;
 }
 
 export async function fetchPrograms(): Promise<ProgramResponse[]> {

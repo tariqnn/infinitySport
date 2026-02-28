@@ -172,6 +172,53 @@ const FALLBACK_COACHES: CoachResponse[] = [
   },
 ];
 
+type CacheKey = 'packages' | 'coaches' | 'landingContent';
+type CacheStore = {
+  fresh: Partial<Record<CacheKey, { value: unknown; expiresAt: number }>>;
+  stale: Partial<Record<CacheKey, { value: unknown; expiresAt: number }>>;
+};
+
+const globalCache = globalThis as unknown as { __webApiCache?: CacheStore };
+
+function readMsFromEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+  return parsed;
+}
+
+const WEB_CACHE_TTL_MS = readMsFromEnv('WEB_API_CACHE_TTL_MS', 60_000);
+const WEB_STALE_TTL_MS = readMsFromEnv('WEB_API_STALE_TTL_MS', 15 * 60_000);
+
+function cacheStore(): CacheStore {
+  if (!globalCache.__webApiCache) {
+    globalCache.__webApiCache = { fresh: {}, stale: {} };
+  }
+  return globalCache.__webApiCache;
+}
+
+function getFreshCache<T>(key: CacheKey): T | null {
+  const entry = cacheStore().fresh[key];
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) return null;
+  return entry.value as T;
+}
+
+function getStaleCache<T>(key: CacheKey): T | null {
+  const entry = cacheStore().stale[key];
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) return null;
+  return entry.value as T;
+}
+
+function writeCache<T>(key: CacheKey, value: T): void {
+  const now = Date.now();
+  const store = cacheStore();
+  store.fresh[key] = { value, expiresAt: now + WEB_CACHE_TTL_MS };
+  store.stale[key] = { value, expiresAt: now + WEB_STALE_TTL_MS };
+}
+
 function canUseDb() {
   if (typeof window !== 'undefined') return false;
 
@@ -227,16 +274,23 @@ export async function fetchPrograms(): Promise<ProgramResponse[]> {
 }
 
 export async function fetchPackages(): Promise<PackageResponse[]> {
-  if (!canUseDb()) return FALLBACK_PACKAGES;
-  if (!(await canAttemptDatabaseQuery())) return FALLBACK_PACKAGES;
+  const fresh = getFreshCache<PackageResponse[]>('packages');
+  if (fresh) return fresh;
+
+  const stale = getStaleCache<PackageResponse[]>('packages');
+  if (!canUseDb()) return stale || FALLBACK_PACKAGES;
+  if (!(await canAttemptDatabaseQuery())) return stale || FALLBACK_PACKAGES;
   try {
     const prisma = await getPrisma();
     const rows = await prisma.package.findMany({
       where: { isActive: true },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     });
-    if (!rows.length) return FALLBACK_PACKAGES;
-    return rows.map((row) => ({
+    if (!rows.length) {
+      writeCache('packages', FALLBACK_PACKAGES);
+      return FALLBACK_PACKAGES;
+    }
+    const mapped = rows.map((row) => ({
       id: row.id,
       sportType: row.sportType,
       name: row.name,
@@ -250,9 +304,11 @@ export async function fetchPackages(): Promise<PackageResponse[]> {
       isActive: row.isActive,
       sortOrder: row.sortOrder,
     }));
+    writeCache('packages', mapped);
+    return mapped;
   } catch (error) {
     noteDatabaseFailure('fetchPackages', error);
-    return FALLBACK_PACKAGES;
+    return stale || FALLBACK_PACKAGES;
   }
 }
 
@@ -302,13 +358,20 @@ export async function fetchEvents(): Promise<EventResponse[]> {
 }
 
 export async function fetchCoaches(): Promise<CoachResponse[]> {
-  if (!canUseDb()) return FALLBACK_COACHES;
-  if (!(await canAttemptDatabaseQuery())) return FALLBACK_COACHES;
+  const fresh = getFreshCache<CoachResponse[]>('coaches');
+  if (fresh) return fresh;
+
+  const stale = getStaleCache<CoachResponse[]>('coaches');
+  if (!canUseDb()) return stale || FALLBACK_COACHES;
+  if (!(await canAttemptDatabaseQuery())) return stale || FALLBACK_COACHES;
   try {
     const prisma = await getPrisma();
     const rows = await prisma.landingCoach.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] });
-    if (!rows.length) return FALLBACK_COACHES;
-    return rows.map((row) => ({
+    if (!rows.length) {
+      writeCache('coaches', FALLBACK_COACHES);
+      return FALLBACK_COACHES;
+    }
+    const mapped = rows.map((row) => ({
       id: row.id,
       name: row.name,
       sport: row.sport,
@@ -319,9 +382,11 @@ export async function fetchCoaches(): Promise<CoachResponse[]> {
       isActive: row.isActive,
       order: row.order,
     }));
+    writeCache('coaches', mapped);
+    return mapped;
   } catch (error) {
     noteDatabaseFailure('fetchCoaches', error);
-    return FALLBACK_COACHES;
+    return stale || FALLBACK_COACHES;
   }
 }
 
@@ -435,8 +500,12 @@ export function getLandingFallback(): LandingContent {
 }
 
 async function _fetchLandingContent(): Promise<LandingContent> {
-  if (!canUseDb()) return getLandingFallback();
-  if (!(await canAttemptDatabaseQuery())) return getLandingFallback();
+  const fresh = getFreshCache<LandingContent>('landingContent');
+  if (fresh) return fresh;
+
+  const stale = getStaleCache<LandingContent>('landingContent');
+  if (!canUseDb()) return stale || getLandingFallback();
+  if (!(await canAttemptDatabaseQuery())) return stale || getLandingFallback();
 
   try {
     const prisma = await getPrisma();
@@ -468,7 +537,7 @@ async function _fetchLandingContent(): Promise<LandingContent> {
           .filter(Boolean) as Array<{ id: string; label: string; href: string }>
       : fallback.footer.socialLinks;
 
-    return {
+    const result: LandingContent = {
       hero: hero
         ? {
             title: hero.title,
@@ -543,9 +612,11 @@ async function _fetchLandingContent(): Promise<LandingContent> {
       updatedAt: new Date().toISOString(),
       updatedBy: 'System',
     };
+    writeCache('landingContent', result);
+    return result;
   } catch (error) {
     noteDatabaseFailure('fetchLandingContent', error);
-    return getLandingFallback();
+    return stale || getLandingFallback();
   }
 }
 

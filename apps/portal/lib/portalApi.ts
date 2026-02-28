@@ -12,13 +12,12 @@ function getCompanyId(): string | undefined {
 
 async function portalFetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const companyId = getCompanyId();
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...options?.headers,
-  };
-
+  const headers = new Headers(options?.headers || undefined);
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
   if (companyId) {
-    headers['x-company-id'] = companyId;
+    headers.set('x-company-id', companyId);
   }
 
   const url = `${ROUTE_BASE_URL}/api${endpoint}`;
@@ -83,6 +82,155 @@ export const landingCoachesApi = {
   list: () => portalDbFetch<unknown[]>('/portal/landing-coaches'),
 };
 
+export type BookingSource = 'WEBSITE' | 'APP' | 'ADMIN';
+export type BookingPaymentMethod = 'CASH' | 'CARD' | 'ONLINE' | 'TRANSFER' | 'OTHER';
+export type BookingPaymentStatus = 'PAID' | 'REFUNDED';
+export type BookingFinancialStatus = 'UNPAID' | 'PARTIAL' | 'PAID' | 'REFUNDED';
+
+export type BookingOverviewFilters = {
+  companyId?: string;
+  view?: 'day' | 'week' | 'month' | 'custom';
+  startDate?: string;
+  endDate?: string;
+  court?: string;
+  label?: string;
+  bookingStatus?: 'ALL' | 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW';
+  paymentStatus?: 'ALL' | BookingFinancialStatus;
+  paymentMethod?: 'ALL' | Exclude<BookingPaymentMethod, 'OTHER'>;
+  source?: 'ALL' | BookingSource;
+  search?: string;
+};
+
+export type BookingOverviewRow = {
+  id: string;
+  companyId: string;
+  startTime: string;
+  endTime: string;
+  facilityArea: string | null;
+  status: string;
+  customerName: string | null;
+  customerPhone: string | null;
+  customerEmail: string | null;
+  notes: string | null;
+  source: BookingSource;
+  member: { id: string; firstName: string; lastName: string } | null;
+  class: { id: string; name: string } | null;
+  coach: { id: string; firstName: string; lastName: string } | null;
+  financials: {
+    totalHours: number;
+    totalAmount: number;
+    paidAmount: number;
+    refundAmount: number;
+    netPaid: number;
+    remainingAmount: number;
+    paymentStatus: BookingFinancialStatus;
+    latestPaymentMethod: BookingPaymentMethod | null;
+  };
+};
+
+export type BookingCalendarEvent = {
+  id: string;
+  type: 'BOOKING' | 'RECURRING_BLOCK' | 'MAINTENANCE' | 'EXCEPTION';
+  bookingId?: string;
+  blockId?: string;
+  title: string;
+  court: string | null;
+  startTime: string;
+  endTime: string;
+  status: string;
+  paymentStatus?: BookingFinancialStatus;
+  openTime?: string | null;
+  closeTime?: string | null;
+  color: 'blue' | 'green' | 'red' | 'gray' | 'orange';
+};
+
+export type BookingPaymentRow = {
+  id: string;
+  bookingId: string;
+  customerId: string | null;
+  amount: number;
+  method: BookingPaymentMethod;
+  status: BookingPaymentStatus;
+  transactionRef: string | null;
+  createdByAdminId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  bookingStartTime?: string | null;
+  court?: string | null;
+  customerName?: string | null;
+};
+
+export type BookingCourtRate = {
+  name: string;
+  hourlyRate: number;
+};
+
+export type BookingOverviewResponse = {
+  range: { start: string; end: string };
+  filters: Record<string, string | null>;
+  kpis: {
+    totalCollected: number;
+    totalPending: number;
+    totalRefunds: number;
+    totalRevenue: number;
+    bookingsCount: number;
+    totalHoursBooked: number;
+    utilizationPercent: number;
+    availableHours: number;
+  };
+  bookings: BookingOverviewRow[];
+  calendarEvents: BookingCalendarEvent[];
+  paymentReport: {
+    byMethod: Record<string, { paid: number; refunded: number; net: number }>;
+    rows: BookingPaymentRow[];
+  };
+  courts: BookingCourtRate[];
+  labels: string[];
+};
+
+export type BookingPaymentsResponse = {
+  booking: {
+    id: string;
+    customerName: string;
+    customerPhone: string | null;
+    customerEmail: string | null;
+    startTime: string;
+    endTime: string;
+    facilityArea: string | null;
+    status: string;
+  };
+  payments: BookingPaymentRow[];
+  financials: BookingOverviewRow['financials'];
+};
+
+export type BookingCustomerProfileResponse = {
+  customer: {
+    key: string;
+    name: string | null;
+    phone: string | null;
+    email: string | null;
+  };
+  totals: {
+    totalBookings: number;
+    totalPaid: number;
+    totalUnpaid: number;
+    totalRefunds: number;
+  };
+  bookings: Array<{
+    id: string;
+    startTime: string;
+    endTime: string;
+    facilityArea: string | null;
+    status: string;
+    customerName: string;
+    customerPhone: string | null;
+    customerEmail: string | null;
+    source: BookingSource;
+    financials: BookingOverviewRow['financials'];
+  }>;
+  paymentHistory: BookingPaymentRow[];
+};
+
 export const bookingsApi = {
   list: (companyId?: string, startDate?: string, endDate?: string) => {
     const params = new URLSearchParams();
@@ -96,6 +244,70 @@ export const bookingsApi = {
   create: (data: unknown) => portalDbFetch<unknown>('/portal/bookings', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: unknown) => portalDbFetch<unknown>(`/portal/bookings/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) => portalDbFetch<void>(`/portal/bookings/${id}`, { method: 'DELETE' }),
+  getOverview: (filters: BookingOverviewFilters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.companyId) params.append('companyId', filters.companyId);
+    if (filters.view) params.append('view', filters.view);
+    if (filters.startDate) params.append('startDate', filters.startDate);
+    if (filters.endDate) params.append('endDate', filters.endDate);
+    if (filters.court) params.append('court', filters.court);
+    if (filters.label) params.append('label', filters.label);
+    if (filters.bookingStatus) params.append('bookingStatus', filters.bookingStatus);
+    if (filters.paymentStatus) params.append('paymentStatus', filters.paymentStatus);
+    if (filters.paymentMethod) params.append('paymentMethod', filters.paymentMethod);
+    if (filters.source) params.append('source', filters.source);
+    if (filters.search) params.append('search', filters.search);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return portalDbFetch<BookingOverviewResponse>(`/portal/bookings/overview${query}`);
+  },
+  getCourtRates: () => portalDbFetch<BookingCourtRate[]>('/portal/bookings/court-rates'),
+  updateCourtRates: (data: { rates: BookingCourtRate[]; createdByAdminId?: string | null }) =>
+    portalDbFetch<BookingCourtRate[]>('/portal/bookings/court-rates', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  getPayments: (bookingId: string) => portalDbFetch<BookingPaymentsResponse>(`/portal/bookings/${bookingId}/payments`),
+  addPayment: (
+    bookingId: string,
+    data: {
+      amount: number;
+      method: BookingPaymentMethod;
+      status?: BookingPaymentStatus;
+      transactionRef?: string | null;
+      customerId?: string | null;
+      createdByAdminId?: string | null;
+      note?: string | null;
+    }
+  ) => portalDbFetch<{ success: boolean; bookingId: string; financials: BookingOverviewRow['financials']; payments: BookingPaymentRow[] }>(
+    `/portal/bookings/${bookingId}/payments`,
+    { method: 'POST', body: JSON.stringify(data) }
+  ),
+  getCustomerProfile: (customerKey: string) =>
+    portalDbFetch<BookingCustomerProfileResponse>(`/portal/bookings/customers/${encodeURIComponent(customerKey)}/profile`),
+  updateRecurringBlock: (
+    blockId: string,
+    data: {
+      dayOfWeek?: string;
+      courtType?: string;
+      time?: string;
+      isBlocked?: boolean;
+      label?: string | null;
+      startDate?: string | null;
+      endDate?: string | null;
+    }
+  ) => portalDbFetch<unknown>(`/portal/bookings/recurring-blocks/${blockId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  duplicateRecurringBlock: (
+    blockId: string,
+    data?: {
+      dayOfWeek?: string;
+      courtType?: string;
+      time?: string;
+      label?: string | null;
+      startDate?: string | null;
+      endDate?: string | null;
+      isBlocked?: boolean;
+    }
+  ) => portalDbFetch<unknown>(`/portal/bookings/recurring-blocks/${blockId}/duplicate`, { method: 'POST', body: JSON.stringify(data || {}) }),
 };
 
 export const classesApi = {
@@ -479,15 +691,17 @@ export const packageSessionCanceledApi = {
 
 // Helper to get first company (for initial setup)
 // Creates "Infinity Sporty" company in DB if none exists
-export async function getFirstCompany() {
+type CompanyLite = { id: string; name?: string };
+
+export async function getFirstCompany(): Promise<CompanyLite | null> {
   try {
-    const companies = await portalDbFetch<unknown[]>('/portal/companies');
+    const companies = await portalDbFetch<CompanyLite[]>('/portal/companies');
     if (companies && companies.length > 0) {
       return companies[0];
     }
     // Create default company if none exists
     try {
-      const created = await portalDbFetch<unknown>('/portal/companies', {
+      const created = await portalDbFetch<CompanyLite>('/portal/companies', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -499,7 +713,7 @@ export async function getFirstCompany() {
           status: 'ACTIVE',
         }),
       });
-      if (created && typeof created === 'object' && created !== null && 'id' in created) {
+      if (created && created.id) {
         return created;
       }
       throw new Error('Company creation returned invalid data');
@@ -514,7 +728,7 @@ export async function getFirstCompany() {
     }
     console.error('Failed to fetch companies:', err);
     try {
-      const created = await portalDbFetch<unknown>('/portal/companies', {
+      const created = await portalDbFetch<CompanyLite>('/portal/companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -524,7 +738,7 @@ export async function getFirstCompany() {
           status: 'ACTIVE',
         }),
       });
-      if (created && typeof created === 'object' && created !== null && 'id' in created) return created;
+      if (created && created.id) return created;
     } catch {}
     return null;
   }

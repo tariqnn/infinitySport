@@ -5,7 +5,7 @@ import { PageHeader, Card, CardHeader, CardBody, Badge, Select, Input, Button } 
 import { packageRegistrationsApi, packageSessionCanceledApi, packagesApi, type PackageRegistrationRow } from '../../lib/portalApi';
 import { ExportCsvButton } from '../_components/ActionButtons';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { TrashIcon, BanknotesIcon, DocumentTextIcon, PlusCircleIcon, EllipsisVerticalIcon, PauseCircleIcon, PlayCircleIcon, CalendarIcon } from '@heroicons/react/24/outline';
+import { TrashIcon, BanknotesIcon, DocumentTextIcon, PlusCircleIcon, EllipsisVerticalIcon, PauseCircleIcon, PlayCircleIcon, CalendarIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { MarkAsPaidModal } from './_components/MarkAsPaidModal';
 import { ViewReceiptsModal } from './_components/ViewReceiptsModal';
 import { BulkAddPeopleModal } from './_components/BulkAddPeopleModal';
@@ -348,6 +348,17 @@ export default function RegistrationsPage() {
       <PageHeader
         title="Package Registrations"
         subtitle="Registrations from Basketball, Gymnastics, and Volleyball packages"
+        actions={
+          <Button
+            variant="secondary"
+            onClick={load}
+            isLoading={loading}
+            disabled={loading}
+            leadingIcon={!loading ? <ArrowPathIcon className="h-4 w-4" /> : undefined}
+          >
+            Refresh
+          </Button>
+        }
       />
 
       <RegistrationTotalsPanel
@@ -683,6 +694,14 @@ export default function RegistrationsPage() {
                                 onSelect={() => setEditRegistrationRow(row)}
                               >
                                 Edit registration
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item
+                                className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
+                                onSelect={() => {
+                                  window.alert('Coming soon: Generate mobile app account will be available in a future update.');
+                                }}
+                              >
+                                Generate app account (Coming soon)
                               </DropdownMenu.Item>
                               <DropdownMenu.Item
                                 className="cursor-pointer px-4 py-2 text-sm text-red-600 outline-none hover:bg-red-50 data-[highlighted]:bg-red-50 disabled:opacity-50"

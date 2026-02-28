@@ -4,17 +4,13 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   ChartBarIcon,
-  UsersIcon,
   UserGroupIcon,
   CalendarIcon,
   CreditCardIcon,
   BanknotesIcon,
-  Cog6ToothIcon,
   ClipboardDocumentListIcon,
   MapIcon,
   InboxStackIcon,
-  DocumentTextIcon,
-  ClipboardDocumentCheckIcon,
 } from "@heroicons/react/24/outline";
 import clsx from "clsx";
 
@@ -23,7 +19,6 @@ const NAV_SECTIONS = [
     label: "Core",
     items: [
       { label: "Dashboard", href: "/", icon: ChartBarIcon },
-      { label: "Members", href: "/members", icon: UsersIcon },
       { label: "Coaches", href: "/coaches", icon: UserGroupIcon },
       { label: "Bookings", href: "/bookings", icon: CalendarIcon },
       { label: "Registrations", href: "/registrations", icon: ClipboardDocumentListIcon },
@@ -34,8 +29,6 @@ const NAV_SECTIONS = [
     items: [
       { label: "Classes", href: "/classes", icon: MapIcon },
       { label: "Inventory", href: "/inventory", icon: InboxStackIcon },
-      { label: "News", href: "/news", icon: ClipboardDocumentCheckIcon },
-      { label: "Docs", href: "/docs", icon: DocumentTextIcon },
     ],
   },
   {
@@ -44,10 +37,6 @@ const NAV_SECTIONS = [
       { label: "Financials", href: "/financials", icon: CreditCardIcon },
       { label: "Salaries", href: "/salaries", icon: BanknotesIcon },
     ],
-  },
-  {
-    label: "System",
-    items: [{ label: "Settings", href: "/settings", icon: Cog6ToothIcon }],
   },
 ] as const;
 

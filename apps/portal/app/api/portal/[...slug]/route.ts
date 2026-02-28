@@ -321,6 +321,609 @@ function mapRegistrationRow(row: any) {
   };
 }
 
+type BookingPaymentMethod = "CASH" | "CARD" | "ONLINE" | "TRANSFER" | "OTHER";
+type BookingPaymentStatus = "PAID" | "REFUNDED";
+
+type BookingPaymentRow = {
+  id: string;
+  bookingId: string;
+  customerId: string | null;
+  amount: number;
+  method: BookingPaymentMethod;
+  status: BookingPaymentStatus;
+  transactionRef: string | null;
+  createdByAdminId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type BookingFinancialSummary = {
+  totalHours: number;
+  totalAmount: number;
+  paidAmount: number;
+  refundAmount: number;
+  netPaid: number;
+  remainingAmount: number;
+  paymentStatus: "UNPAID" | "PARTIAL" | "PAID" | "REFUNDED";
+  latestPaymentMethod: BookingPaymentMethod | null;
+};
+
+type BookingOverviewItem = {
+  id: string;
+  companyId: string;
+  startTime: string;
+  endTime: string;
+  facilityArea: string | null;
+  status: string;
+  customerName: string | null;
+  customerPhone: string | null;
+  customerEmail: string | null;
+  notes: string | null;
+  source: "WEBSITE" | "APP" | "ADMIN";
+  member: { id: string; firstName: string; lastName: string } | null;
+  class: { id: string; name: string } | null;
+  coach: { id: string; firstName: string; lastName: string } | null;
+  financials: BookingFinancialSummary;
+};
+
+const DEFAULT_BOOKING_COURTS = [
+  "Basketball AC",
+  "Basketball 3x3",
+  "Padel",
+  "Volleyball",
+];
+
+const HOURLY_RATE_BY_COURT: Record<string, number> = {
+  "Basketball AC": 40,
+  "Basketball 3x3": 30,
+  Padel: 35,
+  Volleyball: 35,
+};
+
+type CourtRateMap = Record<string, number>;
+
+const BOOKING_SOURCE_PATTERN = /\[SOURCE:(WEBSITE|APP|ADMIN)\]/i;
+
+const bookingInfraState = globalThis as unknown as {
+  __portalBookingInfraReady?: boolean;
+  __portalBookingInfraVersion?: number;
+};
+const BOOKING_INFRA_VERSION = 2;
+
+function toIsoDate(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
+
+function toDayStart(value: Date): Date {
+  const d = new Date(value);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function toDayEnd(value: Date): Date {
+  const d = new Date(value);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+function parseClockToMinutes(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const parts = value.split(":");
+  if (parts.length < 2) return null;
+  const h = Number(parts[0]);
+  const m = Number(parts[1]);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+  return h * 60 + m;
+}
+
+function dayOfWeekUpper(date: Date): string {
+  return date.toLocaleDateString("en-US", { weekday: "long" }).toUpperCase();
+}
+
+function hoursBetween(start: Date, end: Date): number {
+  const ms = end.getTime() - start.getTime();
+  if (ms <= 0) return 0;
+  return Math.round((ms / (1000 * 60 * 60)) * 100) / 100;
+}
+
+function getCourtRate(court: string | null | undefined, rates?: CourtRateMap): number {
+  if (!court) return 30;
+  if (rates && Number.isFinite(rates[court])) return Number(rates[court]);
+  return HOURLY_RATE_BY_COURT[court] ?? 30;
+}
+
+async function listStoredCourtRates(): Promise<Array<{ courtType: string; hourlyRate: number }>> {
+  await ensureBookingInfrastructure();
+  const rows = (await prisma.$queryRawUnsafe(
+    `
+      SELECT "courtType", "hourlyRate"
+      FROM "CourtRate"
+      ORDER BY "courtType" ASC
+    `,
+  )) as Array<{ courtType: string; hourlyRate: number }>;
+  return rows
+    .map((row) => ({
+      courtType: String(row.courtType || "").trim(),
+      hourlyRate: Number(row.hourlyRate || 0),
+    }))
+    .filter((row) => !!row.courtType && Number.isFinite(row.hourlyRate) && row.hourlyRate > 0);
+}
+
+async function getEffectiveCourtRates(): Promise<CourtRateMap> {
+  const defaults: CourtRateMap = { ...HOURLY_RATE_BY_COURT };
+  const stored = await listStoredCourtRates();
+  for (const row of stored) {
+    defaults[row.courtType] = row.hourlyRate;
+  }
+  return defaults;
+}
+
+function inferBookingSource(notes: string | null | undefined): "WEBSITE" | "APP" | "ADMIN" {
+  const text = String(notes || "");
+  const tagged = text.match(BOOKING_SOURCE_PATTERN)?.[1];
+  if (tagged === "WEBSITE" || tagged === "APP" || tagged === "ADMIN") return tagged;
+  const lowered = text.toLowerCase();
+  if (lowered.includes("public booking")) return "WEBSITE";
+  if (lowered.includes("mobile app")) return "APP";
+  return "ADMIN";
+}
+
+function normalizePaymentMethod(value: unknown): BookingPaymentMethod {
+  const candidate = String(value || "").trim().toUpperCase();
+  if (candidate === "CASH") return "CASH";
+  if (candidate === "CARD") return "CARD";
+  if (candidate === "ONLINE") return "ONLINE";
+  if (candidate === "TRANSFER") return "TRANSFER";
+  return "OTHER";
+}
+
+function normalizePaymentStatus(value: unknown): BookingPaymentStatus {
+  return String(value || "").trim().toUpperCase() === "REFUNDED"
+    ? "REFUNDED"
+    : "PAID";
+}
+
+function withSourceTag(notes: string | null | undefined, source: "WEBSITE" | "APP" | "ADMIN"): string {
+  const text = String(notes || "").trim();
+  if (!text) return `[SOURCE:${source}]`;
+  if (BOOKING_SOURCE_PATTERN.test(text)) {
+    return text.replace(BOOKING_SOURCE_PATTERN, `[SOURCE:${source}]`);
+  }
+  return `[SOURCE:${source}] ${text}`;
+}
+
+function normalizeSource(value: unknown): "WEBSITE" | "APP" | "ADMIN" | null {
+  const candidate = String(value || "").trim().toUpperCase();
+  if (candidate === "WEBSITE") return "WEBSITE";
+  if (candidate === "APP") return "APP";
+  if (candidate === "ADMIN") return "ADMIN";
+  return null;
+}
+
+function normalizeDayOfWeek(value: unknown): string | null {
+  const candidate = String(value || "")
+    .trim()
+    .toUpperCase();
+  const valid = new Set([
+    "SUNDAY",
+    "MONDAY",
+    "TUESDAY",
+    "WEDNESDAY",
+    "THURSDAY",
+    "FRIDAY",
+    "SATURDAY",
+  ]);
+  return valid.has(candidate) ? candidate : null;
+}
+
+function computeBookingFinancials(
+  booking: {
+    startTime: Date;
+    endTime: Date;
+    facilityArea: string | null;
+  },
+  payments: BookingPaymentRow[],
+  courtRates?: CourtRateMap,
+): BookingFinancialSummary {
+  const totalHours = hoursBetween(new Date(booking.startTime), new Date(booking.endTime));
+  const totalAmount = Math.max(0, Math.round(totalHours * getCourtRate(booking.facilityArea, courtRates)));
+  const paidAmount = payments
+    .filter((row) => row.status === "PAID")
+    .reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const refundAmount = payments
+    .filter((row) => row.status === "REFUNDED")
+    .reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const netPaid = paidAmount - refundAmount;
+  const remainingAmount = Math.max(0, totalAmount - netPaid);
+  const latestPaymentMethod = payments.length
+    ? payments
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        )[0]?.method ?? null
+    : null;
+
+  let paymentStatus: BookingFinancialSummary["paymentStatus"] = "UNPAID";
+  if (netPaid <= 0 && refundAmount > 0) paymentStatus = "REFUNDED";
+  else if (netPaid <= 0) paymentStatus = "UNPAID";
+  else if (totalAmount > 0 && netPaid >= totalAmount) paymentStatus = "PAID";
+  else paymentStatus = "PARTIAL";
+
+  return {
+    totalHours,
+    totalAmount,
+    paidAmount,
+    refundAmount,
+    netPaid,
+    remainingAmount,
+    paymentStatus,
+    latestPaymentMethod,
+  };
+}
+
+async function ensureBookingInfrastructure() {
+  if (
+    bookingInfraState.__portalBookingInfraReady &&
+    (bookingInfraState.__portalBookingInfraVersion || 0) >= BOOKING_INFRA_VERSION
+  ) {
+    return;
+  }
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "BookingPayment" (
+      "id" TEXT PRIMARY KEY,
+      "bookingId" TEXT NOT NULL REFERENCES "Booking"("id") ON DELETE CASCADE,
+      "customerId" TEXT NULL,
+      "amount" INTEGER NOT NULL CHECK ("amount" >= 0),
+      "method" TEXT NOT NULL,
+      "status" TEXT NOT NULL DEFAULT 'PAID',
+      "transactionRef" TEXT NULL,
+      "createdByAdminId" TEXT NULL,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "BookingPayment_bookingId_idx"
+    ON "BookingPayment" ("bookingId");
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "BookingPayment_createdAt_idx"
+    ON "BookingPayment" ("createdAt");
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "BookingAuditLog" (
+      "id" TEXT PRIMARY KEY,
+      "bookingId" TEXT NULL,
+      "action" TEXT NOT NULL,
+      "payload" JSONB NULL,
+      "createdByAdminId" TEXT NULL,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "BookingAuditLog_bookingId_idx"
+    ON "BookingAuditLog" ("bookingId");
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "WorkingHours" (
+      "id" TEXT PRIMARY KEY,
+      "courtType" TEXT NOT NULL,
+      "dayOfWeek" INTEGER NOT NULL,
+      "openTime" TEXT NOT NULL DEFAULT '07:00',
+      "closeTime" TEXT NOT NULL DEFAULT '23:59',
+      "isClosed" BOOLEAN NOT NULL DEFAULT false,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE ("courtType", "dayOfWeek")
+    );
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "AvailabilityException" (
+      "id" TEXT PRIMARY KEY,
+      "courtType" TEXT NOT NULL,
+      "date" DATE NOT NULL,
+      "openTime" TEXT NULL,
+      "closeTime" TEXT NULL,
+      "isClosed" BOOLEAN NOT NULL DEFAULT false,
+      "reason" TEXT NULL,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "AvailabilityException_court_date_idx"
+    ON "AvailabilityException" ("courtType", "date");
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "CourtRate" (
+      "courtType" TEXT PRIMARY KEY,
+      "hourlyRate" INTEGER NOT NULL CHECK ("hourlyRate" > 0),
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  for (const [courtType, hourlyRate] of Object.entries(HOURLY_RATE_BY_COURT)) {
+    await prisma.$executeRawUnsafe(
+      `
+        INSERT INTO "CourtRate" ("courtType", "hourlyRate", "createdAt", "updatedAt")
+        VALUES ($1, $2, NOW(), NOW())
+        ON CONFLICT ("courtType") DO NOTHING
+      `,
+      courtType,
+      Math.max(1, Math.round(Number(hourlyRate || 0))),
+    );
+  }
+
+  bookingInfraState.__portalBookingInfraReady = true;
+  bookingInfraState.__portalBookingInfraVersion = BOOKING_INFRA_VERSION;
+}
+
+async function addBookingAuditLog(input: {
+  bookingId?: string | null;
+  action: string;
+  payload?: unknown;
+  createdByAdminId?: string | null;
+}) {
+  await ensureBookingInfrastructure();
+  await prisma.$executeRawUnsafe(
+    `
+      INSERT INTO "BookingAuditLog" ("id", "bookingId", "action", "payload", "createdByAdminId", "createdAt")
+      VALUES ($1, $2, $3, $4::jsonb, $5, NOW())
+    `,
+    crypto.randomUUID(),
+    input.bookingId ?? null,
+    input.action,
+    input.payload == null ? null : JSON.stringify(input.payload),
+    input.createdByAdminId ?? null,
+  );
+}
+
+async function listPaymentsForBookingIds(
+  bookingIds: string[],
+): Promise<BookingPaymentRow[]> {
+  if (!bookingIds.length) return [];
+  await ensureBookingInfrastructure();
+  const rows = (await prisma.$queryRawUnsafe(
+    `
+      SELECT
+        "id",
+        "bookingId",
+        "customerId",
+        "amount",
+        "method",
+        "status",
+        "transactionRef",
+        "createdByAdminId",
+        "createdAt",
+        "updatedAt"
+      FROM "BookingPayment"
+      WHERE "bookingId" = ANY($1::text[])
+      ORDER BY "createdAt" DESC
+    `,
+    bookingIds,
+  )) as Array<{
+    id: string;
+    bookingId: string;
+    customerId: string | null;
+    amount: number;
+    method: string;
+    status: string;
+    transactionRef: string | null;
+    createdByAdminId: string | null;
+    createdAt: Date | string;
+    updatedAt: Date | string;
+  }>;
+  return rows.map((row) => ({
+    id: row.id,
+    bookingId: row.bookingId,
+    customerId: row.customerId,
+    amount: Number(row.amount || 0),
+    method: normalizePaymentMethod(row.method),
+    status: normalizePaymentStatus(row.status),
+    transactionRef: row.transactionRef,
+    createdByAdminId: row.createdByAdminId,
+    createdAt: new Date(row.createdAt).toISOString(),
+    updatedAt: new Date(row.updatedAt).toISOString(),
+  }));
+}
+
+function hourlySlotStringsBetween(start: Date, end: Date): string[] {
+  const out: string[] = [];
+  const cursor = new Date(start);
+  while (cursor.getTime() < end.getTime()) {
+    const hh = String(cursor.getHours()).padStart(2, "0");
+    const mm = String(cursor.getMinutes()).padStart(2, "0");
+    out.push(`${hh}:${mm}`);
+    cursor.setHours(cursor.getHours() + 1, 0, 0, 0);
+  }
+  return out;
+}
+
+function isBlockedSlotActiveForRange(
+  slot: { startDate: Date | null; endDate: Date | null },
+  start: Date,
+  end: Date,
+): boolean {
+  if (slot.startDate && slot.startDate.getTime() > end.getTime()) return false;
+  if (slot.endDate && slot.endDate.getTime() < start.getTime()) return false;
+  return true;
+}
+
+async function validateBookingAvailability(input: {
+  bookingId?: string | null;
+  startTime: Date;
+  endTime: Date;
+  facilityArea: string | null | undefined;
+  adminOverride?: boolean;
+  createdByAdminId?: string | null;
+}): Promise<{ conflict: string | null; conflictMeta?: Record<string, unknown> }> {
+  const facilityArea = (input.facilityArea || "").trim();
+  if (!facilityArea) return { conflict: null };
+  const dayOfWeek = dayOfWeekUpper(input.startTime);
+  const slots = hourlySlotStringsBetween(input.startTime, input.endTime);
+
+  const blocked = await prisma.blockedSlot.findMany({
+    where: {
+      isBlocked: true,
+      dayOfWeek,
+      courtType: facilityArea,
+      time: { in: slots },
+    },
+    select: { id: true, time: true, label: true, startDate: true, endDate: true },
+  });
+  const activeBlocked = blocked.find((row) =>
+    isBlockedSlotActiveForRange(row, input.startTime, input.endTime),
+  );
+  if (activeBlocked && !input.adminOverride) {
+    return {
+      conflict: "Time conflicts with a recurring blocked slot",
+      conflictMeta: {
+        type: "RECURRING_BLOCK",
+        slotId: activeBlocked.id,
+        label: activeBlocked.label,
+        time: activeBlocked.time,
+      },
+    };
+  }
+
+  await ensureBookingInfrastructure();
+  const weekday = input.startTime.getDay();
+  const workingRows = (await prisma.$queryRawUnsafe(
+    `
+      SELECT "openTime", "closeTime", "isClosed"
+      FROM "WorkingHours"
+      WHERE "courtType" = $1 AND "dayOfWeek" = $2
+      LIMIT 1
+    `,
+    facilityArea,
+    weekday,
+  )) as Array<{ openTime: string; closeTime: string; isClosed: boolean }>;
+  const working = workingRows[0] ?? null;
+  if (working?.isClosed && !input.adminOverride) {
+    return {
+      conflict: "Court is closed in configured working hours",
+      conflictMeta: { type: "WORKING_HOURS_CLOSED" },
+    };
+  }
+  if (working && !working.isClosed) {
+    const open = parseClockToMinutes(working.openTime);
+    const close = parseClockToMinutes(working.closeTime);
+    const startM =
+      input.startTime.getHours() * 60 + input.startTime.getMinutes();
+    const endM = input.endTime.getHours() * 60 + input.endTime.getMinutes();
+    const closeAdjusted = close != null && open != null && close > open ? close : 24 * 60;
+    if (
+      open != null &&
+      closeAdjusted != null &&
+      !input.adminOverride &&
+      (startM < open || endM > closeAdjusted)
+    ) {
+      return {
+        conflict: "Time falls outside configured working hours",
+        conflictMeta: {
+          type: "WORKING_HOURS_RANGE",
+          openTime: working.openTime,
+          closeTime: working.closeTime,
+        },
+      };
+    }
+  }
+
+  const dateKey = toIsoDate(input.startTime);
+  const exceptionRows = (await prisma.$queryRawUnsafe(
+    `
+      SELECT "id", "openTime", "closeTime", "isClosed", "reason"
+      FROM "AvailabilityException"
+      WHERE "courtType" = $1 AND "date" = $2::date
+      LIMIT 1
+    `,
+    facilityArea,
+    dateKey,
+  )) as Array<{
+    id: string;
+    openTime: string | null;
+    closeTime: string | null;
+    isClosed: boolean;
+    reason: string | null;
+  }>;
+  const exception = exceptionRows[0] ?? null;
+  if (exception?.isClosed && !input.adminOverride) {
+    return {
+      conflict: "Court is closed due to an availability exception",
+      conflictMeta: {
+        type: "EXCEPTION_CLOSED",
+        reason: exception.reason,
+      },
+    };
+  }
+  if (exception && !exception.isClosed && exception.openTime && exception.closeTime) {
+    const open = parseClockToMinutes(exception.openTime);
+    const close = parseClockToMinutes(exception.closeTime);
+    const startM =
+      input.startTime.getHours() * 60 + input.startTime.getMinutes();
+    const endM = input.endTime.getHours() * 60 + input.endTime.getMinutes();
+    const closeAdjusted = close != null && open != null && close > open ? close : 24 * 60;
+    if (
+      open != null &&
+      closeAdjusted != null &&
+      !input.adminOverride &&
+      (startM < open || endM > closeAdjusted)
+    ) {
+      return {
+        conflict: "Time falls outside exception opening window",
+        conflictMeta: {
+          type: "EXCEPTION_WINDOW",
+          openTime: exception.openTime,
+          closeTime: exception.closeTime,
+          reason: exception.reason,
+        },
+      };
+    }
+  }
+
+  const overlap = await prisma.booking.findFirst({
+    where: {
+      id: input.bookingId ? { not: input.bookingId } : undefined,
+      facilityArea,
+      status: { not: "CANCELLED" as any },
+      startTime: { lt: input.endTime },
+      endTime: { gt: input.startTime },
+    },
+    select: { id: true, startTime: true, endTime: true },
+  });
+  if (overlap && !input.adminOverride) {
+    return {
+      conflict: "Time overlaps with an existing booking",
+      conflictMeta: {
+        type: "BOOKING_OVERLAP",
+        bookingId: overlap.id,
+      },
+    };
+  }
+
+  if ((activeBlocked || exception || overlap) && input.adminOverride) {
+    await addBookingAuditLog({
+      bookingId: input.bookingId ?? null,
+      action: "BOOKING_ADMIN_OVERRIDE",
+      payload: {
+        facilityArea,
+        startTime: input.startTime.toISOString(),
+        endTime: input.endTime.toISOString(),
+        blockedSlotId: activeBlocked?.id ?? null,
+        exceptionId: exception?.id ?? null,
+        overlapBookingId: overlap?.id ?? null,
+      },
+      createdByAdminId: input.createdByAdminId ?? null,
+    });
+  }
+
+  return { conflict: null };
+}
+
 type MemberRegistrationSummary = {
   id: string;
   studentName: string;
@@ -1887,6 +2490,794 @@ async function voidReceipt(id: string, request: NextRequest) {
   return NextResponse.json({ success: true });
 }
 
+function parseOverviewDateRange(request: NextRequest): { start: Date; end: Date } {
+  const view = (request.nextUrl.searchParams.get("view") || "week").toLowerCase();
+  const startDate = request.nextUrl.searchParams.get("startDate");
+  const endDate = request.nextUrl.searchParams.get("endDate");
+  if (startDate && endDate) {
+    const s = parseDate(startDate);
+    const e = parseDate(endDate);
+    if (s && e) return { start: toDayStart(s), end: toDayEnd(e) };
+  }
+
+  const now = new Date();
+  if (view === "day") return { start: toDayStart(now), end: toDayEnd(now) };
+  if (view === "month") {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return { start: toDayStart(start), end: toDayEnd(end) };
+  }
+  const day = now.getDay();
+  const diffToMonday = (day + 6) % 7;
+  const start = new Date(now);
+  start.setDate(now.getDate() - diffToMonday);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  return { start: toDayStart(start), end: toDayEnd(end) };
+}
+
+function bookingCustomerDisplayName(row: {
+  customerName?: string | null;
+  member?: { firstName: string; lastName: string } | null;
+}): string {
+  if (row.customerName && row.customerName.trim()) return row.customerName.trim();
+  if (row.member) return `${row.member.firstName} ${row.member.lastName}`.trim();
+  return "Unknown customer";
+}
+
+function bookingDateFitsRange(row: { startTime: Date; endTime: Date }, start: Date, end: Date): boolean {
+  return row.startTime.getTime() <= end.getTime() && row.endTime.getTime() >= start.getTime();
+}
+
+function compareByDateDesc(a: { createdAt: string }, b: { createdAt: string }): number {
+  return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+}
+
+async function getBookingCourtRates() {
+  const map = await getEffectiveCourtRates();
+  const rows = Object.entries(map)
+    .map(([name, hourlyRate]) => ({ name, hourlyRate }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return NextResponse.json(rows);
+}
+
+async function updateBookingCourtRates(request: NextRequest) {
+  const body = (await request.json().catch(() => ({}))) as {
+    rates?: Array<{ name?: string; hourlyRate?: number }>;
+    createdByAdminId?: string | null;
+  };
+  const rates = Array.isArray(body.rates) ? body.rates : [];
+  if (!rates.length) return jsonError("rates array is required");
+
+  await ensureBookingInfrastructure();
+  for (const item of rates) {
+    const courtName = String(item?.name || "").trim();
+    const hourlyRate = Math.round(Number(item?.hourlyRate || 0));
+    if (!courtName) return jsonError("Court name is required");
+    if (!Number.isFinite(hourlyRate) || hourlyRate <= 0) {
+      return jsonError(`Hourly rate must be greater than 0 for court: ${courtName}`);
+    }
+    await prisma.$executeRawUnsafe(
+      `
+        INSERT INTO "CourtRate" ("courtType", "hourlyRate", "createdAt", "updatedAt")
+        VALUES ($1, $2, NOW(), NOW())
+        ON CONFLICT ("courtType")
+        DO UPDATE SET "hourlyRate" = EXCLUDED."hourlyRate", "updatedAt" = NOW()
+      `,
+      courtName,
+      hourlyRate,
+    );
+  }
+
+  await addBookingAuditLog({
+    action: "COURT_RATES_UPDATED",
+    payload: {
+      rates: rates.map((row) => ({
+        name: String(row?.name || "").trim(),
+        hourlyRate: Math.round(Number(row?.hourlyRate || 0)),
+      })),
+    },
+    createdByAdminId:
+      typeof body.createdByAdminId === "string" ? body.createdByAdminId : null,
+  });
+
+  return getBookingCourtRates();
+}
+
+async function getBookingOverview(request: NextRequest) {
+  const courtRates = await getEffectiveCourtRates();
+  const { start, end } = parseOverviewDateRange(request);
+  const companyId = request.nextUrl.searchParams.get("companyId") || undefined;
+  const court = (request.nextUrl.searchParams.get("court") || "").trim();
+  const labelFilter = (request.nextUrl.searchParams.get("label") || "").trim();
+  const bookingStatus = (request.nextUrl.searchParams.get("bookingStatus") || "").trim().toUpperCase();
+  const paymentStatusFilter = (request.nextUrl.searchParams.get("paymentStatus") || "").trim().toUpperCase();
+  const paymentMethodFilter = normalizePaymentMethod(request.nextUrl.searchParams.get("paymentMethod") || undefined);
+  const sourceFilter = normalizeSource(request.nextUrl.searchParams.get("source") || undefined);
+  const search = (request.nextUrl.searchParams.get("search") || "").trim().toLowerCase();
+
+  const bookingWhere: any = {
+    startTime: { lte: end },
+    endTime: { gte: start },
+  };
+  if (companyId) bookingWhere.companyId = companyId;
+  if (court && court !== "ALL") bookingWhere.facilityArea = court;
+  if (bookingStatus && bookingStatus !== "ALL") {
+    if (bookingStatus === "NO_SHOW") bookingWhere.status = "CANCELLED";
+    else bookingWhere.status = bookingStatus;
+  }
+
+  const bookings = await prisma.booking.findMany({
+    where: bookingWhere,
+    include: {
+      member: { select: { id: true, firstName: true, lastName: true } },
+      class: { select: { id: true, name: true } },
+      coach: { select: { id: true, firstName: true, lastName: true } },
+      company: { select: { id: true, name: true } },
+    },
+    orderBy: { startTime: "asc" },
+  });
+
+  const payments = await listPaymentsForBookingIds(bookings.map((row) => row.id));
+  const paymentsByBooking = new Map<string, BookingPaymentRow[]>();
+  for (const payment of payments) {
+    const list = paymentsByBooking.get(payment.bookingId) || [];
+    list.push(payment);
+    paymentsByBooking.set(payment.bookingId, list);
+  }
+
+  let rows: BookingOverviewItem[] = bookings.map((row) => {
+    const financials = computeBookingFinancials(
+      { startTime: row.startTime, endTime: row.endTime, facilityArea: row.facilityArea },
+      paymentsByBooking.get(row.id) || [],
+      courtRates,
+    );
+    return {
+      id: row.id,
+      companyId: row.companyId,
+      startTime: row.startTime.toISOString(),
+      endTime: row.endTime.toISOString(),
+      facilityArea: row.facilityArea ?? null,
+      status: String(row.status || "PENDING"),
+      customerName: row.customerName ?? null,
+      customerPhone: row.customerPhone ?? null,
+      customerEmail: row.customerEmail ?? null,
+      notes: row.notes ?? null,
+      source: inferBookingSource(row.notes),
+      member: row.member
+        ? {
+            id: row.member.id,
+            firstName: row.member.firstName,
+            lastName: row.member.lastName,
+          }
+        : null,
+      class: row.class ? { id: row.class.id, name: row.class.name } : null,
+      coach: row.coach
+        ? {
+            id: row.coach.id,
+            firstName: row.coach.firstName,
+            lastName: row.coach.lastName,
+          }
+        : null,
+      financials,
+    };
+  });
+
+  if (bookingStatus === "NO_SHOW") {
+    rows = rows.filter((row) =>
+      String(row.notes || "").toUpperCase().includes("[NO_SHOW]"),
+    );
+  }
+
+  if (paymentStatusFilter && paymentStatusFilter !== "ALL") {
+    rows = rows.filter((row) => row.financials.paymentStatus === paymentStatusFilter);
+  }
+  if (paymentMethodFilter && paymentMethodFilter !== "OTHER" && request.nextUrl.searchParams.get("paymentMethod")) {
+    rows = rows.filter((row) => row.financials.latestPaymentMethod === paymentMethodFilter);
+  }
+  if (sourceFilter) {
+    rows = rows.filter((row) => row.source === sourceFilter);
+  }
+  if (search) {
+    rows = rows.filter((row) => {
+      const bookingId = row.id.toLowerCase();
+      const name = bookingCustomerDisplayName(row).toLowerCase();
+      const phone = String(row.customerPhone || "").toLowerCase();
+      return bookingId.includes(search) || name.includes(search) || phone.includes(search);
+    });
+  }
+
+  const rowIds = new Set(rows.map((row) => row.id));
+  const filteredPayments = payments.filter((row) => rowIds.has(row.bookingId));
+
+  const blockedSlots = await prisma.blockedSlot.findMany({
+    where: {
+      ...(court && court !== "ALL" ? { courtType: court } : {}),
+      ...(labelFilter && labelFilter !== "ALL"
+        ? { label: { contains: labelFilter, mode: "insensitive" } }
+        : {}),
+    },
+    orderBy: [{ dayOfWeek: "asc" }, { time: "asc" }],
+  });
+
+  await ensureBookingInfrastructure();
+  const exceptionRows = (await prisma.$queryRawUnsafe(
+    `
+      SELECT "id", "courtType", "date", "openTime", "closeTime", "isClosed", "reason"
+      FROM "AvailabilityException"
+      WHERE "date" BETWEEN $1::date AND $2::date
+      ${court && court !== "ALL" ? `AND "courtType" = $3` : ""}
+      ORDER BY "date" ASC
+    `,
+    ...(court && court !== "ALL"
+      ? [toIsoDate(start), toIsoDate(end), court]
+      : [toIsoDate(start), toIsoDate(end)]),
+  )) as Array<{
+    id: string;
+    courtType: string;
+    date: Date | string;
+    openTime: string | null;
+    closeTime: string | null;
+    isClosed: boolean;
+    reason: string | null;
+  }>;
+
+  const calendarEvents: Array<Record<string, unknown>> = [];
+  for (const row of rows) {
+    const payStatus = row.financials.paymentStatus;
+    calendarEvents.push({
+      id: `booking-${row.id}`,
+      type: "BOOKING",
+      bookingId: row.id,
+      title: bookingCustomerDisplayName(row),
+      court: row.facilityArea,
+      startTime: row.startTime,
+      endTime: row.endTime,
+      status: row.status,
+      paymentStatus: payStatus,
+      color:
+        row.status === "CANCELLED"
+          ? "red"
+          : payStatus === "PAID"
+            ? "green"
+            : "blue",
+    });
+  }
+
+  const dayMap = new Map<string, number>([
+    ["SUNDAY", 0],
+    ["MONDAY", 1],
+    ["TUESDAY", 2],
+    ["WEDNESDAY", 3],
+    ["THURSDAY", 4],
+    ["FRIDAY", 5],
+    ["SATURDAY", 6],
+  ]);
+  for (const block of blockedSlots) {
+    const targetDow = dayMap.get(String(block.dayOfWeek).toUpperCase());
+    if (targetDow == null) continue;
+    for (let d = new Date(start); d.getTime() <= end.getTime(); d.setDate(d.getDate() + 1)) {
+      if (d.getDay() !== targetDow) continue;
+      if (!isBlockedSlotActiveForRange(block, d, d)) continue;
+      const [h, m] = String(block.time || "00:00").split(":").map((x) => Number(x));
+      const eventStart = new Date(d);
+      eventStart.setHours(Number.isFinite(h) ? h : 0, Number.isFinite(m) ? m : 0, 0, 0);
+      const eventEnd = new Date(eventStart);
+      eventEnd.setHours(eventStart.getHours() + 1, 0, 0, 0);
+      const looksMaintenance =
+        String(block.label || "").toLowerCase().includes("maintenance") ||
+        String(block.label || "").toLowerCase().includes("exception");
+      calendarEvents.push({
+        id: `block-${block.id}-${eventStart.toISOString()}`,
+        type: looksMaintenance ? "MAINTENANCE" : "RECURRING_BLOCK",
+        blockId: block.id,
+        title: block.label || "Recurring block",
+        court: block.courtType,
+        startTime: eventStart.toISOString(),
+        endTime: eventEnd.toISOString(),
+        status: block.isBlocked ? "BLOCKED" : "FREE",
+        color: looksMaintenance ? "orange" : "gray",
+      });
+    }
+  }
+
+  for (const ex of exceptionRows) {
+    const dayDate = new Date(ex.date);
+    const eventStart = new Date(dayDate);
+    eventStart.setHours(0, 0, 0, 0);
+    const eventEnd = new Date(dayDate);
+    eventEnd.setHours(23, 59, 59, 999);
+    calendarEvents.push({
+      id: `exception-${ex.id}`,
+      type: "EXCEPTION",
+      title: ex.reason || (ex.isClosed ? "Court closed" : "Availability exception"),
+      court: ex.courtType,
+      startTime: eventStart.toISOString(),
+      endTime: eventEnd.toISOString(),
+      status: ex.isClosed ? "CLOSED" : "LIMITED",
+      openTime: ex.openTime,
+      closeTime: ex.closeTime,
+      color: "orange",
+    });
+  }
+
+  const workingRows = (await prisma.$queryRawUnsafe(
+    `
+      SELECT "courtType", "dayOfWeek", "openTime", "closeTime", "isClosed"
+      FROM "WorkingHours"
+    `,
+  )) as Array<{
+    courtType: string;
+    dayOfWeek: number;
+    openTime: string;
+    closeTime: string;
+    isClosed: boolean;
+  }>;
+  const workingMap = new Map<string, { openTime: string; closeTime: string; isClosed: boolean }>();
+  for (const row of workingRows) {
+    workingMap.set(`${row.courtType}::${row.dayOfWeek}`, {
+      openTime: row.openTime,
+      closeTime: row.closeTime,
+      isClosed: !!row.isClosed,
+    });
+  }
+  const exceptionMap = new Map<string, typeof exceptionRows[number]>();
+  for (const row of exceptionRows) {
+    const key = `${row.courtType}::${toIsoDate(new Date(row.date))}`;
+    exceptionMap.set(key, row);
+  }
+  const knownCourts = Array.from(
+    new Set([
+      ...DEFAULT_BOOKING_COURTS,
+      ...rows.map((row) => String(row.facilityArea || "").trim()).filter(Boolean),
+      ...blockedSlots.map((row) => String(row.courtType || "").trim()).filter(Boolean),
+      ...workingRows.map((row) => String(row.courtType || "").trim()).filter(Boolean),
+      ...exceptionRows.map((row) => String(row.courtType || "").trim()).filter(Boolean),
+      ...Object.keys(courtRates),
+    ]),
+  ).sort((a, b) => a.localeCompare(b));
+
+  const selectedCourts =
+    court && court !== "ALL"
+      ? [court]
+      : knownCourts;
+  let availableHours = 0;
+  for (let d = new Date(start); d.getTime() <= end.getTime(); d.setDate(d.getDate() + 1)) {
+    const dateKey = toIsoDate(d);
+    const dow = d.getDay();
+    for (const courtName of selectedCourts) {
+      const exception = exceptionMap.get(`${courtName}::${dateKey}`);
+      if (exception?.isClosed) continue;
+      let openTime = "07:00";
+      let closeTime = "23:59";
+      const working = workingMap.get(`${courtName}::${dow}`);
+      if (working?.isClosed) continue;
+      if (working) {
+        openTime = working.openTime || openTime;
+        closeTime = working.closeTime || closeTime;
+      }
+      if (exception && !exception.isClosed && exception.openTime && exception.closeTime) {
+        openTime = exception.openTime;
+        closeTime = exception.closeTime;
+      }
+      const open = parseClockToMinutes(openTime);
+      const close = parseClockToMinutes(closeTime);
+      if (open == null || close == null) continue;
+      const diff = (close > open ? close : 24 * 60) - open;
+      availableHours += diff > 0 ? diff / 60 : 0;
+    }
+  }
+  const bookedHours = rows
+    .filter((row) => row.status !== "CANCELLED")
+    .reduce((sum, row) => sum + row.financials.totalHours, 0);
+
+  const grossPaid = rows.reduce((sum, row) => sum + row.financials.paidAmount, 0);
+  const refundsTotal = rows.reduce((sum, row) => sum + row.financials.refundAmount, 0);
+  const collectedTotal = rows.reduce((sum, row) => sum + row.financials.netPaid, 0);
+  const pendingTotal = rows.reduce((sum, row) => sum + row.financials.remainingAmount, 0);
+  const utilization = availableHours > 0 ? (bookedHours / availableHours) * 100 : 0;
+
+  const paymentsByMethod = filteredPayments.reduce(
+    (acc, row) => {
+      const method = row.method;
+      if (!acc[method]) acc[method] = { paid: 0, refunded: 0, net: 0 };
+      if (row.status === "REFUNDED") {
+        acc[method].refunded += row.amount;
+        acc[method].net -= row.amount;
+      } else {
+        acc[method].paid += row.amount;
+        acc[method].net += row.amount;
+      }
+      return acc;
+    },
+    {} as Record<string, { paid: number; refunded: number; net: number }>,
+  );
+
+  const paymentRows = filteredPayments
+    .map((row) => {
+      const booking = rows.find((item) => item.id === row.bookingId);
+      return {
+        ...row,
+        bookingStartTime: booking?.startTime ?? null,
+        court: booking?.facilityArea ?? null,
+        customerName: booking ? bookingCustomerDisplayName(booking) : null,
+      };
+    })
+    .sort(compareByDateDesc);
+
+  return NextResponse.json({
+    range: { start: start.toISOString(), end: end.toISOString() },
+    filters: {
+      companyId: companyId ?? null,
+      court: court || "ALL",
+      bookingStatus: bookingStatus || "ALL",
+      paymentStatus: paymentStatusFilter || "ALL",
+      source: sourceFilter || "ALL",
+      search: search || "",
+    },
+    kpis: {
+      totalCollected: collectedTotal,
+      totalPending: pendingTotal,
+      totalRefunds: refundsTotal,
+      totalRevenue: grossPaid - refundsTotal,
+      bookingsCount: rows.length,
+      totalHoursBooked: bookedHours,
+      utilizationPercent: Math.max(0, Math.min(100, Number(utilization.toFixed(2)))),
+      availableHours: Number(availableHours.toFixed(2)),
+    },
+    bookings: rows,
+    calendarEvents,
+    paymentReport: {
+      byMethod: paymentsByMethod,
+      rows: paymentRows,
+    },
+    courts: knownCourts.map((name) => ({
+      name,
+      hourlyRate: getCourtRate(name, courtRates),
+    })),
+    labels: Array.from(
+      new Set(blockedSlots.map((row) => String(row.label || "").trim()).filter(Boolean)),
+    ),
+  });
+}
+
+async function getBookingPayments(bookingId: string) {
+  const courtRates = await getEffectiveCourtRates();
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: { member: { select: { id: true, firstName: true, lastName: true } } },
+  });
+  if (!booking) return jsonError("Booking not found", 404);
+  const payments = await listPaymentsForBookingIds([bookingId]);
+  const financials = computeBookingFinancials(
+    { startTime: booking.startTime, endTime: booking.endTime, facilityArea: booking.facilityArea },
+    payments,
+    courtRates,
+  );
+  return NextResponse.json({
+    booking: {
+      id: booking.id,
+      customerName: bookingCustomerDisplayName(booking),
+      customerPhone: booking.customerPhone ?? null,
+      customerEmail: booking.customerEmail ?? null,
+      startTime: booking.startTime.toISOString(),
+      endTime: booking.endTime.toISOString(),
+      facilityArea: booking.facilityArea ?? null,
+      status: booking.status,
+    },
+    payments: payments.sort(compareByDateDesc),
+    financials,
+  });
+}
+
+async function addBookingPayment(bookingId: string, request: NextRequest) {
+  const courtRates = await getEffectiveCourtRates();
+  const body = (await request.json().catch(() => ({}))) as {
+    amount?: number;
+    method?: string;
+    status?: string;
+    transactionRef?: string | null;
+    customerId?: string | null;
+    createdByAdminId?: string | null;
+    note?: string | null;
+  };
+  const amount = Math.round(Number(body.amount || 0));
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return jsonError("amount must be greater than 0");
+  }
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    select: {
+      id: true,
+      startTime: true,
+      endTime: true,
+      facilityArea: true,
+      isPaid: true,
+    },
+  });
+  if (!booking) return jsonError("Booking not found", 404);
+
+  const method = normalizePaymentMethod(body.method);
+  const status = normalizePaymentStatus(body.status);
+  await ensureBookingInfrastructure();
+  await prisma.$executeRawUnsafe(
+    `
+      INSERT INTO "BookingPayment"
+      ("id", "bookingId", "customerId", "amount", "method", "status", "transactionRef", "createdByAdminId", "createdAt", "updatedAt")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+    `,
+    crypto.randomUUID(),
+    bookingId,
+    body.customerId ?? null,
+    amount,
+    method,
+    status,
+    body.transactionRef ?? null,
+    body.createdByAdminId ?? null,
+  );
+
+  const payments = await listPaymentsForBookingIds([bookingId]);
+  const financials = computeBookingFinancials(
+    { startTime: booking.startTime, endTime: booking.endTime, facilityArea: booking.facilityArea },
+    payments,
+    courtRates,
+  );
+
+  await prisma.booking.update({
+    where: { id: bookingId },
+    data: { isPaid: financials.paymentStatus === "PAID" },
+  });
+
+  await addBookingAuditLog({
+    bookingId,
+    action: status === "REFUNDED" ? "BOOKING_PAYMENT_REFUNDED" : "BOOKING_PAYMENT_ADDED",
+    payload: {
+      amount,
+      method,
+      status,
+      transactionRef: body.transactionRef ?? null,
+      note: body.note ?? null,
+      remainingAmount: financials.remainingAmount,
+    },
+    createdByAdminId: body.createdByAdminId ?? null,
+  });
+
+  return NextResponse.json({
+    success: true,
+    bookingId,
+    financials,
+    payments: payments.sort(compareByDateDesc),
+  });
+}
+
+function parseCustomerKey(value: string): { field: "phone" | "email" | "memberId"; val: string } {
+  const decoded = decodeURIComponent(value || "").trim();
+  if (decoded.startsWith("email:")) return { field: "email", val: decoded.slice(6).trim() };
+  if (decoded.startsWith("member:")) return { field: "memberId", val: decoded.slice(7).trim() };
+  if (decoded.startsWith("phone:")) return { field: "phone", val: decoded.slice(6).trim() };
+  if (decoded.includes("@")) return { field: "email", val: decoded };
+  return { field: "phone", val: decoded };
+}
+
+async function getBookingCustomerProfile(customerKey: string) {
+  const courtRates = await getEffectiveCourtRates();
+  const parsed = parseCustomerKey(customerKey);
+  if (!parsed.val) return jsonError("Customer key is required");
+
+  const where: any = {};
+  if (parsed.field === "phone") where.customerPhone = parsed.val;
+  if (parsed.field === "email") where.customerEmail = parsed.val.toLowerCase();
+  if (parsed.field === "memberId") where.memberId = parsed.val;
+
+  const bookings = await prisma.booking.findMany({
+    where,
+    include: {
+      member: { select: { id: true, firstName: true, lastName: true } },
+      class: { select: { id: true, name: true } },
+      coach: { select: { id: true, firstName: true, lastName: true } },
+    },
+    orderBy: { startTime: "desc" },
+  });
+  const payments = await listPaymentsForBookingIds(bookings.map((row) => row.id));
+  const paymentsByBooking = new Map<string, BookingPaymentRow[]>();
+  for (const payment of payments) {
+    const list = paymentsByBooking.get(payment.bookingId) || [];
+    list.push(payment);
+    paymentsByBooking.set(payment.bookingId, list);
+  }
+
+  const bookingRows = bookings.map((row) => {
+    const financials = computeBookingFinancials(
+      { startTime: row.startTime, endTime: row.endTime, facilityArea: row.facilityArea },
+      paymentsByBooking.get(row.id) || [],
+      courtRates,
+    );
+    return {
+      id: row.id,
+      startTime: row.startTime.toISOString(),
+      endTime: row.endTime.toISOString(),
+      facilityArea: row.facilityArea ?? null,
+      status: row.status,
+      customerName: bookingCustomerDisplayName(row),
+      customerPhone: row.customerPhone ?? null,
+      customerEmail: row.customerEmail ?? null,
+      source: inferBookingSource(row.notes),
+      financials,
+    };
+  });
+
+  const lifetimePaid = bookingRows.reduce((sum, row) => sum + row.financials.netPaid, 0);
+  const lifetimeUnpaid = bookingRows.reduce((sum, row) => sum + row.financials.remainingAmount, 0);
+  const lifetimeRefunds = bookingRows.reduce((sum, row) => sum + row.financials.refundAmount, 0);
+
+  const paymentHistory = payments
+    .map((row) => {
+      const booking = bookingRows.find((item) => item.id === row.bookingId);
+      return {
+        ...row,
+        bookingStartTime: booking?.startTime ?? null,
+        court: booking?.facilityArea ?? null,
+      };
+    })
+    .sort(compareByDateDesc);
+
+  return NextResponse.json({
+    customer: {
+      key: customerKey,
+      name: bookingRows[0]?.customerName ?? null,
+      phone: bookingRows[0]?.customerPhone ?? null,
+      email: bookingRows[0]?.customerEmail ?? null,
+    },
+    totals: {
+      totalBookings: bookingRows.length,
+      totalPaid: lifetimePaid,
+      totalUnpaid: lifetimeUnpaid,
+      totalRefunds: lifetimeRefunds,
+    },
+    bookings: bookingRows,
+    paymentHistory,
+  });
+}
+
+async function updateRecurringBlock(blockId: string, request: NextRequest) {
+  const body = (await request.json().catch(() => ({}))) as {
+    dayOfWeek?: string;
+    courtType?: string;
+    time?: string;
+    isBlocked?: boolean;
+    label?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+  };
+
+  const existing = await prisma.blockedSlot.findUnique({ where: { id: blockId } });
+  if (!existing) return jsonError("Recurring block not found", 404);
+
+  const nextDay = body.dayOfWeek !== undefined ? normalizeDayOfWeek(body.dayOfWeek) : existing.dayOfWeek;
+  if (!nextDay) return jsonError("dayOfWeek must be a valid weekday");
+
+  const nextCourt =
+    body.courtType !== undefined
+      ? String(body.courtType || "").trim()
+      : existing.courtType;
+  if (!nextCourt) return jsonError("courtType is required");
+
+  const nextTime =
+    body.time !== undefined ? String(body.time || "").trim() : existing.time;
+  if (!/^\d{2}:\d{2}$/.test(nextTime)) {
+    return jsonError("time must be HH:MM");
+  }
+
+  const startDate =
+    body.startDate === undefined
+      ? existing.startDate
+      : body.startDate
+        ? parseDate(body.startDate)
+        : null;
+  const endDate =
+    body.endDate === undefined
+      ? existing.endDate
+      : body.endDate
+        ? parseDate(body.endDate)
+        : null;
+
+  if ((body.startDate && !startDate) || (body.endDate && !endDate)) {
+    return jsonError("Invalid startDate or endDate");
+  }
+  if (startDate && endDate && endDate.getTime() < startDate.getTime()) {
+    return jsonError("endDate must be on or after startDate");
+  }
+
+  try {
+    const row = await prisma.blockedSlot.update({
+      where: { id: blockId },
+      data: {
+        dayOfWeek: nextDay,
+        courtType: nextCourt,
+        time: nextTime,
+        isBlocked:
+          body.isBlocked === undefined ? existing.isBlocked : Boolean(body.isBlocked),
+        label:
+          body.label === undefined
+            ? existing.label
+            : String(body.label || "").trim() || null,
+        startDate,
+        endDate,
+      },
+    });
+    return NextResponse.json(row);
+  } catch (error: any) {
+    if (error?.code === "P2002") {
+      return jsonError("A recurring block already exists for this day/court/time", 409);
+    }
+    return jsonError("Failed to update recurring block", 500);
+  }
+}
+
+function addOneHourClock(time: string): string {
+  const [hRaw, mRaw] = time.split(":");
+  const h = Number(hRaw);
+  const m = Number(mRaw);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return "08:00";
+  const nextHour = (h + 1) % 24;
+  return `${String(nextHour).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+async function duplicateRecurringBlock(blockId: string, request: NextRequest) {
+  const source = await prisma.blockedSlot.findUnique({ where: { id: blockId } });
+  if (!source) return jsonError("Recurring block not found", 404);
+
+  const body = (await request.json().catch(() => ({}))) as {
+    dayOfWeek?: string;
+    courtType?: string;
+    time?: string;
+    isBlocked?: boolean;
+    label?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+  };
+
+  const dayOfWeek = normalizeDayOfWeek(body.dayOfWeek ?? source.dayOfWeek);
+  if (!dayOfWeek) return jsonError("dayOfWeek must be a valid weekday");
+  const courtType = String(body.courtType ?? source.courtType).trim();
+  if (!courtType) return jsonError("courtType is required");
+  const time = String(body.time ?? addOneHourClock(source.time)).trim();
+  if (!/^\d{2}:\d{2}$/.test(time)) return jsonError("time must be HH:MM");
+
+  const startDate = body.startDate ? parseDate(body.startDate) : source.startDate;
+  const endDate = body.endDate ? parseDate(body.endDate) : source.endDate;
+  if ((body.startDate && !startDate) || (body.endDate && !endDate)) {
+    return jsonError("Invalid startDate or endDate");
+  }
+  if (startDate && endDate && endDate.getTime() < startDate.getTime()) {
+    return jsonError("endDate must be on or after startDate");
+  }
+
+  try {
+    const row = await prisma.blockedSlot.create({
+      data: {
+        dayOfWeek,
+        courtType,
+        time,
+        isBlocked: body.isBlocked === undefined ? source.isBlocked : Boolean(body.isBlocked),
+        label:
+          body.label === undefined
+            ? source.label
+            : String(body.label || "").trim() || null,
+        startDate,
+        endDate,
+      },
+    });
+    return NextResponse.json(row);
+  } catch (error: any) {
+    if (error?.code === "P2002") {
+      return jsonError("A recurring block already exists for this day/court/time", 409);
+    }
+    return jsonError("Failed to duplicate recurring block", 500);
+  }
+}
+
 async function dispatchGet(request: NextRequest, params: Params) {
   const [resource, id, action, extra] = params.slug;
 
@@ -1919,6 +3310,22 @@ async function dispatchGet(request: NextRequest, params: Params) {
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json(rows);
+  }
+
+  if (resource === "bookings" && id === "overview") {
+    return getBookingOverview(request);
+  }
+
+  if (resource === "bookings" && id === "court-rates" && !action) {
+    return getBookingCourtRates();
+  }
+
+  if (resource === "bookings" && id === "customers" && action && extra === "profile") {
+    return getBookingCustomerProfile(action);
+  }
+
+  if (resource === "bookings" && id && action === "payments") {
+    return getBookingPayments(id);
   }
 
   if (resource === "bookings" && !id) {
@@ -2121,7 +3528,7 @@ async function dispatchGet(request: NextRequest, params: Params) {
 }
 
 async function dispatchPost(request: NextRequest, params: Params) {
-  const [resource, id, action] = params.slug;
+  const [resource, id, action, extra] = params.slug;
 
   if (resource === "member-auth" && id === "sign-in" && !action) {
     return memberSignIn(request);
@@ -2162,6 +3569,19 @@ async function dispatchPost(request: NextRequest, params: Params) {
     return NextResponse.json(company);
   }
 
+  if (resource === "bookings" && id && action === "payments") {
+    return addBookingPayment(id, request);
+  }
+
+  if (
+    resource === "bookings" &&
+    id === "recurring-blocks" &&
+    action &&
+    extra === "duplicate"
+  ) {
+    return duplicateRecurringBlock(action, request);
+  }
+
   if (resource === "bookings" && !id) {
     const body = (await request.json()) as Record<string, unknown>;
 
@@ -2173,20 +3593,60 @@ async function dispatchPost(request: NextRequest, params: Params) {
     const endTime = parseDate(String(body.endTime || ""));
     if (!startTime || !endTime)
       return jsonError("Valid startTime and endTime are required");
+    if (endTime.getTime() <= startTime.getTime()) {
+      return jsonError("endTime must be later than startTime");
+    }
+
+    const requestedSource = normalizeSource(body.source);
+    const source =
+      requestedSource ||
+      inferBookingSource((body.notes as string | undefined) || undefined);
+    const isNoShow = String(body.status || "")
+      .trim()
+      .toUpperCase() === "NO_SHOW";
+    const adminOverride = Boolean(body.adminOverride);
+    const createdByAdminId =
+      typeof body.createdByAdminId === "string" ? body.createdByAdminId : null;
+    const statusValue = isNoShow
+      ? "CANCELLED"
+      : ((typeof body.status === "string" ? body.status : "PENDING") as string);
+    const notesText = withSourceTag(
+      (body.notes as string | undefined) || null,
+      source,
+    );
+    const notesWithNoShow =
+      isNoShow && !notesText.toLowerCase().includes("[no_show]")
+        ? `${notesText} [NO_SHOW]`
+        : notesText;
+
+    const availability = await validateBookingAvailability({
+      startTime,
+      endTime,
+      facilityArea: (body.facilityArea as string | undefined) || null,
+      adminOverride,
+      createdByAdminId,
+    });
+    if (availability.conflict) {
+      return NextResponse.json(
+        {
+          message: availability.conflict,
+          conflict: availability.conflictMeta ?? null,
+        },
+        { status: 409 },
+      );
+    }
 
     const data: any = {
       companyId,
       startTime,
       endTime,
       facilityArea: (body.facilityArea as string | undefined) || null,
-      status: (typeof body.status === "string"
-        ? body.status
-        : "PENDING") as any,
+      status: statusValue as any,
       isPaid: Boolean(body.isPaid ?? false),
       customerName: (body.customerName as string | undefined) ?? null,
       customerPhone: (body.customerPhone as string | undefined) ?? null,
       customerEmail: (body.customerEmail as string | undefined) ?? null,
-      notes: (body.notes as string | undefined) ?? null,
+      notes: notesWithNoShow,
     };
 
     const classId =
@@ -2208,6 +3668,19 @@ async function dispatchPost(request: NextRequest, params: Params) {
         coach: true,
         member: true,
       },
+    });
+
+    await addBookingAuditLog({
+      bookingId: row.id,
+      action: "BOOKING_CREATED",
+      payload: {
+        source,
+        adminOverride,
+        startTime: row.startTime,
+        endTime: row.endTime,
+        facilityArea: row.facilityArea,
+      },
+      createdByAdminId,
     });
 
     return NextResponse.json(row);
@@ -2291,9 +3764,19 @@ async function dispatchPatch(request: NextRequest, params: Params) {
 
   if (!id) return jsonError("Missing ID");
 
+  if (resource === "bookings" && id === "court-rates" && !action) {
+    return updateBookingCourtRates(request);
+  }
+
+  if (resource === "bookings" && id === "recurring-blocks" && action) {
+    return updateRecurringBlock(action, request);
+  }
+
   if (resource === "bookings" && !action) {
     const body = (await request.json()) as Record<string, unknown>;
     const data: any = {};
+    const existing = await prisma.booking.findUnique({ where: { id } });
+    if (!existing) return jsonError("Booking not found", 404);
 
     if (body.startTime !== undefined) {
       const d = parseDate(String(body.startTime));
@@ -2309,7 +3792,10 @@ async function dispatchPatch(request: NextRequest, params: Params) {
 
     if (body.facilityArea !== undefined)
       data.facilityArea = (body.facilityArea as string | null) ?? null;
-    if (body.status !== undefined) data.status = body.status as any;
+    if (body.status !== undefined) {
+      const statusValue = String(body.status || "").trim().toUpperCase();
+      data.status = (statusValue === "NO_SHOW" ? "CANCELLED" : statusValue) as any;
+    }
     if (body.isPaid !== undefined) data.isPaid = Boolean(body.isPaid);
     if (body.notes !== undefined)
       data.notes = (body.notes as string | null) ?? null;
@@ -2319,6 +3805,15 @@ async function dispatchPatch(request: NextRequest, params: Params) {
       data.customerPhone = (body.customerPhone as string | null) ?? null;
     if (body.customerEmail !== undefined)
       data.customerEmail = (body.customerEmail as string | null) ?? null;
+    if (body.source !== undefined) {
+      const source = normalizeSource(body.source) || inferBookingSource(existing.notes);
+      const notesBase = (data.notes as string | null | undefined) ?? existing.notes ?? null;
+      data.notes = withSourceTag(notesBase, source);
+    }
+    if (String(body.status || "").trim().toUpperCase() === "NO_SHOW") {
+      const base = String(data.notes ?? existing.notes ?? "").trim();
+      data.notes = base.toLowerCase().includes("[no_show]") ? base : `${base} [NO_SHOW]`.trim();
+    }
 
     const classId =
       extractConnectId(body, "class") || extractConnectId(body, "classId");
@@ -2328,8 +3823,39 @@ async function dispatchPatch(request: NextRequest, params: Params) {
       extractConnectId(body, "member") || extractConnectId(body, "memberId");
 
     if (classId) data.class = { connect: { id: classId } };
+    else if (body.classId !== undefined || body.class !== undefined)
+      data.class = { disconnect: true };
     if (coachId) data.coach = { connect: { id: coachId } };
+    else if (body.coachId !== undefined || body.coach !== undefined)
+      data.coach = { disconnect: true };
     if (memberId) data.member = { connect: { id: memberId } };
+    else if (body.memberId !== undefined || body.member !== undefined)
+      data.member = { disconnect: true };
+
+    const nextStart = (data.startTime as Date | undefined) ?? existing.startTime;
+    const nextEnd = (data.endTime as Date | undefined) ?? existing.endTime;
+    if (nextEnd.getTime() <= nextStart.getTime()) {
+      return jsonError("endTime must be later than startTime");
+    }
+    const nextFacility =
+      (data.facilityArea as string | null | undefined) ?? existing.facilityArea;
+    const adminOverride = Boolean(body.adminOverride);
+    const createdByAdminId =
+      typeof body.createdByAdminId === "string" ? body.createdByAdminId : null;
+    const availability = await validateBookingAvailability({
+      bookingId: id,
+      startTime: nextStart,
+      endTime: nextEnd,
+      facilityArea: nextFacility,
+      adminOverride,
+      createdByAdminId,
+    });
+    if (availability.conflict) {
+      return NextResponse.json(
+        { message: availability.conflict, conflict: availability.conflictMeta ?? null },
+        { status: 409 },
+      );
+    }
 
     try {
       const row = await prisma.booking.update({
@@ -2341,6 +3867,15 @@ async function dispatchPatch(request: NextRequest, params: Params) {
           coach: true,
           member: true,
         },
+      });
+      await addBookingAuditLog({
+        bookingId: row.id,
+        action: "BOOKING_UPDATED",
+        payload: {
+          adminOverride,
+          changedFields: Object.keys(data),
+        },
+        createdByAdminId,
       });
       return NextResponse.json(row);
     } catch (error: any) {

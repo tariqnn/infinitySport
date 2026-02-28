@@ -1,7 +1,7 @@
 /// <reference lib="es2022" />
 import { NextResponse } from 'next/server';
-import type { Prisma } from '@prisma/client';
-import { canAttemptDatabaseQuery, noteDatabaseFailure } from '../../../../lib/dbGuard';
+import { getPgPool } from '../../../../lib/pg';
+import { noteDatabaseFailure } from '../../../../lib/dbGuard';
 
 type BlockedPayload = { blocked: Record<string, Record<string, string[]>> };
 type CacheEntry = { expiresAt: number; payload: BlockedPayload };
@@ -53,31 +53,46 @@ export async function GET(request: Request) {
       const payload: BlockedPayload = { blocked: {} };
       return withCacheHeaders(NextResponse.json(payload), false);
     }
-    if (!(await canAttemptDatabaseQuery())) {
-      if (cached) return withCacheHeaders(NextResponse.json(cached.payload), true);
-      const payload: BlockedPayload = { blocked: {} };
-      return withCacheHeaders(NextResponse.json(payload), false);
-    }
-
-    const where: Prisma.BlockedSlotWhereInput = { isBlocked: true };
-
+    const pool = getPgPool();
+    let rows: Array<{ dayOfWeek: string; courtType: string; time: string; isBlocked: boolean }> = [];
     if (date) {
       const d = new Date(date);
       const start = new Date(d);
       start.setHours(0, 0, 0, 0);
       const end = new Date(d);
       end.setHours(23, 59, 59, 999);
-      where.AND = [
-        { OR: [{ startDate: null }, { startDate: { lte: end } }] },
-        { OR: [{ endDate: null }, { endDate: { gte: start } }] },
-      ];
-    }
 
-    const { prisma } = await import('../../../../lib/db');
-    const rows = await prisma.blockedSlot.findMany({
-      where,
-      select: { dayOfWeek: true, courtType: true, time: true, isBlocked: true },
-    });
+      const result = await pool.query<{
+        dayOfWeek: string;
+        courtType: string;
+        time: string;
+        isBlocked: boolean;
+      }>(
+        `
+        SELECT "dayOfWeek", "courtType", "time", "isBlocked"
+        FROM "BlockedSlot"
+        WHERE "isBlocked" = true
+          AND ("startDate" IS NULL OR "startDate" <= $1)
+          AND ("endDate" IS NULL OR "endDate" >= $2)
+        `,
+        [end, start],
+      );
+      rows = result.rows;
+    } else {
+      const result = await pool.query<{
+        dayOfWeek: string;
+        courtType: string;
+        time: string;
+        isBlocked: boolean;
+      }>(
+        `
+        SELECT "dayOfWeek", "courtType", "time", "isBlocked"
+        FROM "BlockedSlot"
+        WHERE "isBlocked" = true
+        `,
+      );
+      rows = result.rows;
+    }
 
     const payload: BlockedPayload = { blocked: buildBlockedMap(rows) };
     cache.set(key, { payload, expiresAt: Date.now() + CACHE_TTL_MS });

@@ -1,6 +1,7 @@
 /// <reference lib="es2022" />
 import { NextResponse } from 'next/server';
-import { canAttemptDatabaseQuery, noteDatabaseFailure } from '../../../../lib/dbGuard';
+import { getPgPool } from '../../../../lib/pg';
+import { noteDatabaseFailure } from '../../../../lib/dbGuard';
 
 const COURT_TYPES = ['Basketball AC', 'Basketball 3x3', 'Padel', 'Volleyball'] as const;
 type BookedPayload = { booked: Record<string, Record<string, string[]>> };
@@ -57,30 +58,29 @@ export async function GET(request: Request) {
       const payload: BookedPayload = { booked: {} };
       return withCacheHeaders(NextResponse.json(payload), false);
     }
-    if (!(await canAttemptDatabaseQuery())) {
-      if (cached) return withCacheHeaders(NextResponse.json(cached.payload), true);
-      const payload: BookedPayload = { booked: {} };
-      return withCacheHeaders(NextResponse.json(payload), false);
-    }
-
-    const endNext = new Date(endDate);
-    endNext.setDate(endNext.getDate() + 1);
-
-    const { prisma } = await import('../../../../lib/db');
     const start = new Date(startDate);
     start.setHours(0, 0, 0, 0);
-    const end = new Date(toDateStr(endNext));
+    const end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
 
-    const rows = await prisma.booking.findMany({
-      where: {
-        startTime: { lt: end },
-        endTime: { gt: start },
-        status: { not: 'CANCELLED' },
-        facilityArea: { in: [...COURT_TYPES] },
-      },
-      select: { facilityArea: true, startTime: true, endTime: true, status: true },
-    });
+    const pool = getPgPool();
+    const result = await pool.query<{
+      facilityArea: string | null;
+      startTime: Date;
+      endTime: Date;
+      status: string;
+    }>(
+      `
+      SELECT "facilityArea", "startTime", "endTime", "status"
+      FROM "Booking"
+      WHERE "startTime" < $1
+        AND "endTime" > $2
+        AND "status" <> 'CANCELLED'
+        AND "facilityArea" = ANY($3::text[])
+      `,
+      [end, start, [...COURT_TYPES]],
+    );
+    const rows = result.rows;
 
     const booked: Record<string, Record<string, string[]>> = {};
     for (const row of rows) {

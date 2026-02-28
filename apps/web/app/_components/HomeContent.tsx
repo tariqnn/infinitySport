@@ -39,7 +39,7 @@ export function HomeContent({ content }: HomeContentProps) {
       }
     : { href: "/contact", label: "Book a Tour" };
 
-  const sportHighlights = content.programs.slice(0, 4);
+  const sportHighlights = content.programs;
   const upcomingEvents = content.events.filter((event) => event.isActive !== false).slice(0, 3);
   const featuredEventImage = upcomingEvents[0]?.imageUrl || '/events.jpeg';
   const valueProps = content.highlights;

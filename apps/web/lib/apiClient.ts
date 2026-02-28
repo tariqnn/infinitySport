@@ -412,7 +412,8 @@ function readMsFromEnv(name: string, fallback: number): number {
   return parsed;
 }
 
-const WEB_CACHE_TTL_MS = readMsFromEnv('WEB_API_CACHE_TTL_MS', 60_000);
+// Default to immediate freshness so Admin edits appear on Landing without delay.
+const WEB_CACHE_TTL_MS = readMsFromEnv('WEB_API_CACHE_TTL_MS', 0);
 const WEB_STALE_TTL_MS = readMsFromEnv('WEB_API_STALE_TTL_MS', 15 * 60_000);
 
 function cacheStore(): CacheStore {

@@ -190,6 +190,9 @@ function readMsFromEnv(name: string, fallback: number): number {
 
 const WEB_CACHE_TTL_MS = readMsFromEnv('WEB_API_CACHE_TTL_MS', 60_000);
 const WEB_STALE_TTL_MS = readMsFromEnv('WEB_API_STALE_TTL_MS', 15 * 60_000);
+const LANDING_DATA_API_BASE = (process.env.LANDING_DATA_API_BASE || process.env.NEXT_PUBLIC_LANDING_DATA_API_BASE || '')
+  .trim()
+  .replace(/\/+$/, '');
 
 function cacheStore(): CacheStore {
   if (!globalCache.__webApiCache) {
@@ -253,6 +256,66 @@ async function getPrisma() {
   return mod.prisma;
 }
 
+async function fetchRemoteJson(path: string): Promise<unknown[] | null> {
+  if (!LANDING_DATA_API_BASE || typeof window !== 'undefined') return null;
+  const url = `${LANDING_DATA_API_BASE}${path}`;
+  try {
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return Array.isArray(data) ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+function mapRemotePackageRows(rows: unknown[]): PackageResponse[] {
+  const out: PackageResponse[] = [];
+  for (const row of rows) {
+    const r = row as Record<string, unknown>;
+    if (typeof r.id !== 'string' || typeof r.name !== 'string') continue;
+    out.push({
+      id: r.id,
+      sportType: typeof r.sportType === 'string' ? r.sportType : 'multi',
+      name: r.name,
+      description: typeof r.description === 'string' ? r.description : null,
+      descriptionBullets: Array.isArray(r.descriptionBullets)
+        ? r.descriptionBullets.filter((v): v is string => typeof v === 'string')
+        : null,
+      sessionsCount: typeof r.sessionsCount === 'number' ? r.sessionsCount : 0,
+      trackingType: typeof r.trackingType === 'string' ? r.trackingType : 'SESSIONS',
+      pricingType: typeof r.pricingType === 'string' ? r.pricingType : 'MANUAL',
+      currentPriceJod: typeof r.currentPriceJod === 'number' ? r.currentPriceJod : null,
+      timeSlots: r.timeSlots ?? null,
+      isActive: r.isActive !== false,
+      sortOrder: typeof r.sortOrder === 'number' ? r.sortOrder : 0,
+    });
+  }
+  return out.sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+}
+
+function mapRemoteCoachRows(rows: unknown[]): CoachResponse[] {
+  const out: CoachResponse[] = [];
+  for (const row of rows) {
+    const r = row as Record<string, unknown>;
+    if (typeof r.id !== 'string' || typeof r.name !== 'string') continue;
+    out.push({
+      id: r.id,
+      name: r.name,
+      sport: typeof r.sport === 'string' ? r.sport : 'Multi-Sport',
+      description: typeof r.description === 'string' ? r.description : '',
+      quote: typeof r.quote === 'string' ? r.quote : undefined,
+      achievements: Array.isArray(r.achievements)
+        ? r.achievements.filter((v): v is string => typeof v === 'string')
+        : [],
+      imageUrl: typeof r.imageUrl === 'string' ? r.imageUrl : '',
+      isActive: r.isActive !== false,
+      order: typeof r.order === 'number' ? r.order : 0,
+    });
+  }
+  return out.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+}
+
 export async function fetchPrograms(): Promise<ProgramResponse[]> {
   if (!canUseDb()) return [];
   if (!(await canAttemptDatabaseQuery())) return [];
@@ -278,6 +341,12 @@ export async function fetchPackages(): Promise<PackageResponse[]> {
   if (fresh) return fresh;
 
   const stale = getStaleCache<PackageResponse[]>('packages');
+  const remoteRows = await fetchRemoteJson('/api/portal/packages');
+  if (remoteRows) {
+    const mappedRemote = mapRemotePackageRows(remoteRows);
+    writeCache('packages', mappedRemote);
+    return mappedRemote;
+  }
   if (!canUseDb()) return stale || FALLBACK_PACKAGES;
   if (!(await canAttemptDatabaseQuery())) return stale || FALLBACK_PACKAGES;
   try {
@@ -308,7 +377,7 @@ export async function fetchPackages(): Promise<PackageResponse[]> {
     return mapped;
   } catch (error) {
     noteDatabaseFailure('fetchPackages', error);
-    return stale || FALLBACK_PACKAGES;
+    return stale || [];
   }
 }
 
@@ -362,6 +431,12 @@ export async function fetchCoaches(): Promise<CoachResponse[]> {
   if (fresh) return fresh;
 
   const stale = getStaleCache<CoachResponse[]>('coaches');
+  const remoteRows = await fetchRemoteJson('/api/portal/landing-coaches');
+  if (remoteRows) {
+    const mappedRemote = mapRemoteCoachRows(remoteRows);
+    writeCache('coaches', mappedRemote);
+    return mappedRemote;
+  }
   if (!canUseDb()) return stale || FALLBACK_COACHES;
   if (!(await canAttemptDatabaseQuery())) return stale || FALLBACK_COACHES;
   try {
@@ -386,7 +461,7 @@ export async function fetchCoaches(): Promise<CoachResponse[]> {
     return mapped;
   } catch (error) {
     noteDatabaseFailure('fetchCoaches', error);
-    return stale || FALLBACK_COACHES;
+    return stale || [];
   }
 }
 
@@ -510,10 +585,7 @@ async function _fetchLandingContent(): Promise<LandingContent> {
   try {
     const prisma = await getPrisma();
     const hero = await prisma.heroSection.findFirst({ orderBy: { updatedAt: 'desc' } });
-    const programs = await prisma.package.findMany({
-      where: { isActive: true },
-      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-    });
+    const programs = await fetchPackages();
     const offers = await prisma.offer.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] });
     const events = await prisma.event.findMany({ orderBy: { date: 'asc' } });
     const announcements = await prisma.announcement.findMany({ orderBy: [{ isPinned: 'desc' }, { publishedAt: 'desc' }] });
@@ -616,7 +688,24 @@ async function _fetchLandingContent(): Promise<LandingContent> {
     return result;
   } catch (error) {
     noteDatabaseFailure('fetchLandingContent', error);
-    return stale || getLandingFallback();
+    if (stale) return stale;
+    const fallback = getLandingFallback();
+    const livePrograms = await fetchPackages();
+    if (!livePrograms.length) return fallback;
+    return {
+      ...fallback,
+      programs: livePrograms.map((program): LandingProgram => ({
+        id: program.id,
+        title: program.name,
+        description: program.description?.trim() || 'Program details available on the sports page.',
+        sportType: program.sportType || 'multi',
+        badge: program.sportType || undefined,
+        link: `/sports#${(program.sportType || 'other').toLowerCase().replace(/\s+/g, '-')}`,
+        mediaUrl: undefined,
+        isFeatured: false,
+        isActive: program.isActive,
+      })),
+    };
   }
 }
 

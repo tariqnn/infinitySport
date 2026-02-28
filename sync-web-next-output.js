@@ -78,6 +78,11 @@ if (path.basename(publicHtmlDir) === "public_html") {
   const bootstrapSource =
     "const fs=require('fs');\n" +
     "const path=require('path');\n" +
+    "process.env.TOKIO_WORKER_THREADS=process.env.TOKIO_WORKER_THREADS||'1';\n" +
+    "process.env.UV_THREADPOOL_SIZE=process.env.UV_THREADPOOL_SIZE||'1';\n" +
+    "process.env.DB_GUARD_COOLDOWN_MS=process.env.DB_GUARD_COOLDOWN_MS||'15000';\n" +
+    "process.env.DB_GUARD_PANIC_COOLDOWN_MS=process.env.DB_GUARD_PANIC_COOLDOWN_MS||'30000';\n" +
+    "process.env.PRISMA_CLIENT_ENGINE_TYPE=process.env.PRISMA_CLIENT_ENGINE_TYPE||'library';\n" +
     "const envCandidates=[\n" +
     "path.join(__dirname,'hostinger-output','runtime-env.json'),\n" +
     "path.join(__dirname,'.builds','source','repository','hostinger-output','runtime-env.json'),\n" +

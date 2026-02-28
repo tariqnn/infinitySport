@@ -6,7 +6,6 @@ import type {
   LandingOffer,
   LandingProgram,
 } from '@infinity/types';
-import { getPgPool } from './pg';
 import { canAttemptDatabaseQuery, noteDatabaseFailure } from './dbGuard';
 
 export type ProgramResponse = {
@@ -478,6 +477,14 @@ async function getPrisma() {
   return mod.prisma;
 }
 
+function getServerPgPool() {
+  const req = (0, eval)('require') as (id: string) => { getPgPool: () => unknown };
+  const mod = req('./pg');
+  return mod.getPgPool() as {
+    query: <T = unknown>(text: string, values?: unknown[]) => Promise<{ rows: T[] }>;
+  };
+}
+
 export async function fetchPrograms(): Promise<ProgramResponse[]> {
   if (!canUseDb()) return [];
   if (!(await canAttemptDatabaseQuery())) return [];
@@ -505,7 +512,7 @@ export async function fetchPackages(): Promise<PackageResponse[]> {
   const stale = getStaleCache<PackageResponse[]>('packages');
   if (!canUseDb()) return stale || FALLBACK_PACKAGES;
   try {
-    const pool = getPgPool();
+    const pool = getServerPgPool();
     const result = await pool.query<{
       id: string;
       sportType: string;
@@ -618,7 +625,7 @@ export async function fetchCoaches(): Promise<CoachResponse[]> {
   const stale = getStaleCache<CoachResponse[]>('coaches');
   if (!canUseDb()) return stale || FALLBACK_COACHES;
   try {
-    const pool = getPgPool();
+    const pool = getServerPgPool();
     const landingResult = await pool.query<{
       id: string;
       name: string;

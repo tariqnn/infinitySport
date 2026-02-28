@@ -93,82 +93,306 @@ const FALLBACK_FACILITIES: { id: string; name: string; description: string }[] =
 
 const FALLBACK_PACKAGES: PackageResponse[] = [
   {
-    id: 'fallback-basketball',
-    sportType: 'basketball',
-    name: 'Basketball Academy',
-    description: 'Skill development, gameplay IQ, and strength progression for youth athletes.',
-    descriptionBullets: ['Fundamentals', 'Conditioning', 'Match play'],
+    id: 'fallback-package-little-kobes',
+    sportType: 'BASKETBALL',
+    name: 'Basketball - Little Kobes U10',
+    description: 'U10 foundational basketball program focused on fun, movement skills, and core fundamentals.',
+    descriptionBullets: [
+      'Have fun and support healthy growth.',
+      'Ball handling and dribbling fundamentals.',
+      'Basic shooting skills and passing types.',
+    ],
+    sessionsCount: 0,
+    trackingType: 'SESSIONS',
+    pricingType: 'FIXED',
+    currentPriceJod: 120,
+    timeSlots: null,
+    isActive: true,
+    sortOrder: 0,
+  },
+  {
+    id: 'fallback-package-volleyball',
+    sportType: 'VOLLEYBALL',
+    name: 'Volleyball',
+    description: 'Volleyball program for ages 7+ with weekday and weekend training slots.',
+    descriptionBullets: [
+      'Starting age: 7 years and up.',
+      '10% discount for siblings.',
+      'Special rate for groups.',
+      'Training schedule: Saturday 3:00-5:00 PM, Tuesday & Sunday 7:00-9:00 PM.',
+    ],
+    sessionsCount: 0,
+    trackingType: 'SESSIONS',
+    pricingType: 'FIXED',
+    currentPriceJod: 120,
+    timeSlots: null,
+    isActive: true,
+    sortOrder: 0,
+  },
+  {
+    id: 'fallback-package-ballers-hoopers',
+    sportType: 'BASKETBALL',
+    name: 'Basketball - Ballers & Hoopers U12–U14',
+    description: 'U12-U14 development track that builds confidence, court movement, and strong finishing basics.',
+    descriptionBullets: [
+      'U12 Ballers: stay confident and improve shooting with footwork.',
+      'U12 Ballers: different types of finishing.',
+      'U14 Hoopers: basic court movement and teamwork habits.',
+      'U14 Hoopers: introduce form-shooting fundamentals.',
+    ],
     sessionsCount: 12,
-    trackingType: 'MONTHLY',
-    pricingType: 'SUBSCRIPTION',
-    currentPriceJod: null,
+    trackingType: 'SESSIONS',
+    pricingType: 'FIXED',
+    currentPriceJod: 120,
     timeSlots: null,
     isActive: true,
     sortOrder: 1,
   },
   {
-    id: 'fallback-gymnastics',
-    sportType: 'gymnastics',
-    name: 'Gymnastics Program',
-    description: 'Balance, flexibility, and discipline training designed for all levels.',
-    descriptionBullets: ['Beginner to advanced', 'Technique focus', 'Safe progression'],
+    id: 'fallback-package-warriors',
+    sportType: 'BASKETBALL',
+    name: 'Basketball - Warriors',
+    description: 'U16+ skilled group focused on game IQ, team culture, and two-way performance.',
+    descriptionBullets: [
+      'Read game situations and make better decisions.',
+      'Be a good teammate and lead by example.',
+      'Refine offensive and defensive skills.',
+    ],
     sessionsCount: 12,
-    trackingType: 'MONTHLY',
-    pricingType: 'SUBSCRIPTION',
-    currentPriceJod: null,
+    trackingType: 'SESSIONS',
+    pricingType: 'FIXED',
+    currentPriceJod: 120,
     timeSlots: null,
     isActive: true,
-    sortOrder: 2,
+    sortOrder: 30,
   },
   {
-    id: 'fallback-volleyball',
-    sportType: 'volleyball',
-    name: 'Volleyball Program',
-    description: 'Competitive volleyball sessions including passing, serving, and team systems.',
-    descriptionBullets: ['Tactical drills', 'Team training', 'Competitive preparation'],
-    sessionsCount: 12,
-    trackingType: 'MONTHLY',
-    pricingType: 'SUBSCRIPTION',
+    id: 'fallback-package-private-1v1',
+    sportType: 'BASKETBALL',
+    name: 'Basketball - Private 1v1 Sessions',
+    description: 'One-on-one personalized basketball training with focused technical correction and progression.',
+    descriptionBullets: [
+      'Individual skill assessment and customized plan.',
+      'Focused shooting, footwork, and ball-handling correction.',
+      'Flexible scheduling based on coach availability.',
+    ],
+    sessionsCount: 0,
+    trackingType: 'SESSIONS',
+    pricingType: 'MANUAL',
     currentPriceJod: null,
     timeSlots: null,
     isActive: true,
-    sortOrder: 3,
+    sortOrder: 40,
+  },
+  {
+    id: 'fallback-package-small-groups',
+    sportType: 'BASKETBALL',
+    name: 'Basketball - Small Groups',
+    description: 'Small-group basketball sessions designed for faster development with close coach attention.',
+    descriptionBullets: [
+      'Low player-to-coach ratio.',
+      'Game-like drills and competitive reps.',
+      'Built for friends, siblings, and team clusters.',
+    ],
+    sessionsCount: 0,
+    trackingType: 'SESSIONS',
+    pricingType: 'MANUAL',
+    currentPriceJod: null,
+    timeSlots: null,
+    isActive: true,
+    sortOrder: 50,
+  },
+  {
+    id: 'fallback-package-gym-a',
+    sportType: 'GYMNASTICS',
+    name: 'Gymnastics Package A',
+    description: 'Beginner gymnastics package focused on mobility, balance, and confidence.',
+    descriptionBullets: [
+      'Foundational body control and flexibility.',
+      'Safe progressions for basic gymnastics skills.',
+      'Great entry point for new athletes.',
+    ],
+    sessionsCount: 12,
+    trackingType: 'SESSIONS',
+    pricingType: 'FIXED',
+    currentPriceJod: 120,
+    timeSlots: null,
+    isActive: true,
+    sortOrder: 60,
+  },
+  {
+    id: 'fallback-package-gym-b',
+    sportType: 'GYMNASTICS',
+    name: 'Gymnastics Package B',
+    description: 'Early-intermediate gymnastics package for strength, posture, and coordination.',
+    descriptionBullets: [
+      'Technique refinement with structured drills.',
+      'Improved core stability and movement quality.',
+      'Progress tracking through coached milestones.',
+    ],
+    sessionsCount: 8,
+    trackingType: 'SESSIONS',
+    pricingType: 'FIXED',
+    currentPriceJod: 100,
+    timeSlots: null,
+    isActive: true,
+    sortOrder: 70,
+  },
+  {
+    id: 'fallback-package-gym-c',
+    sportType: 'GYMNASTICS',
+    name: 'Gymnastics Package C',
+    description: 'Extended gymnastics package with higher volume for faster technical development.',
+    descriptionBullets: [
+      'More sessions for accelerated progress.',
+      'Advanced movement combinations.',
+      'Consistency-focused development cycle.',
+    ],
+    sessionsCount: 18,
+    trackingType: 'SESSIONS',
+    pricingType: 'FIXED',
+    currentPriceJod: 140,
+    timeSlots: null,
+    isActive: true,
+    sortOrder: 80,
+  },
+  {
+    id: 'fallback-package-gym-d',
+    sportType: 'GYMNASTICS',
+    name: 'Gymnastics Package D',
+    description: 'Performance-oriented gymnastics package balancing skill work and conditioning.',
+    descriptionBullets: [
+      'Balanced technical and physical development.',
+      'Coach-guided progression and corrections.',
+      'Suitable for athletes preparing for higher levels.',
+    ],
+    sessionsCount: 12,
+    trackingType: 'SESSIONS',
+    pricingType: 'FIXED',
+    currentPriceJod: 120,
+    timeSlots: null,
+    isActive: true,
+    sortOrder: 90,
   },
 ];
 
 const FALLBACK_COACHES: CoachResponse[] = [
   {
-    id: 'fallback-coach-ammar',
-    name: 'Ammar Salman',
+    id: 'fallback-coach-samer',
+    name: 'Coach Samer Nino',
     sport: 'Basketball',
-    description: 'Head coach focused on fundamentals, game awareness, and athlete growth.',
-    quote: 'Discipline and consistency build champions.',
-    achievements: ['Youth development specialist', 'Team systems coach'],
-    imageUrl: '/ammar-salman.jpg',
+    description:
+      'Founder of Infinity Sports Academy with extensive national team and club coaching experience focused on youth development.',
+    quote: 'Developing disciplined athletes through modern training systems.',
+    achievements: [
+      'Former assistant coach for Jordan national teams',
+      'Led multiple championship-winning age groups',
+      'Founder of Infinity Sports Academy',
+    ],
+    imageUrl: '/samer.png',
     isActive: true,
     order: 1,
   },
   {
-    id: 'fallback-coach-raghad',
-    name: 'Raghad Haimour',
-    sport: 'Gymnastics',
-    description: 'Gymnastics coach delivering structured progressions in a safe training environment.',
-    quote: 'Progress starts with perfect fundamentals.',
-    achievements: ['Progressive training plans', 'Beginner to advanced support'],
-    imageUrl: '/raghad-haimour.jpeg',
+    id: 'fallback-coach-naef',
+    name: 'Coach Naef Asfour',
+    sport: 'Basketball',
+    description: 'FIBA-licensed basketball coach specializing in player development, performance optimization, and tactical systems.',
+    achievements: ['FIBA licensed coach', 'Head Coach of Fuhies Women Team', 'Arab Women Champions 2024'],
+    imageUrl: '/naef-asfour.jpeg',
     isActive: true,
     order: 2,
   },
   {
-    id: 'fallback-coach-rahaf',
-    name: 'Rahaf Haimour',
-    sport: 'Volleyball',
-    description: 'Volleyball coach emphasizing teamwork, technique, and match readiness.',
-    quote: 'Strong teams are built in practice.',
-    achievements: ['Team coordination training', 'Competitive drill design'],
-    imageUrl: '/rahaf-haimour.jpeg',
+    id: 'fallback-coach-raya',
+    name: 'Coach Raya Abu Jamous',
+    sport: 'Gymnastics',
+    description: 'National-level athlete and experienced gymnastics coach with strong background in conditioning and strength training.',
+    quote: 'Building strong foundations for long-term athletic success.',
+    achievements: [],
+    imageUrl: '/raya-abu-jamous.jpeg',
     isActive: true,
     order: 3,
+  },
+  {
+    id: 'fallback-coach-ahmad',
+    name: 'Coach Ahmad Aldarawish',
+    sport: 'Gymnastics',
+    description: 'Dedicated multi-sport athlete and coach focused on conditioning, endurance, and performance growth.',
+    achievements: [],
+    imageUrl: '/ahmad-aldarawesh.jpg',
+    isActive: true,
+    order: 4,
+  },
+  {
+    id: 'fallback-coach-ammar',
+    name: 'Coach Ammar Salman',
+    sport: 'Gymnastics',
+    description: 'Active athlete and coach with a disciplined training background in strength, endurance, and performance techniques.',
+    achievements: [],
+    imageUrl: '/ammar-salman.jpg',
+    isActive: true,
+    order: 5,
+  },
+  {
+    id: 'fallback-coach-wahab',
+    name: 'Coach Abdulwahab Abu Khanfar',
+    sport: 'Volleyball',
+    description: 'Former national team player and founder of Spikers Academy, experienced in youth player development.',
+    achievements: ['Former Jordan national team member', 'Founder of Spikers Academy', 'Premier and First Division competition experience'],
+    imageUrl: '/wahab-abu-khanfar.jpeg',
+    isActive: true,
+    order: 6,
+  },
+  {
+    id: 'fallback-coach-leen',
+    name: 'Coach Leen Al Qassem',
+    sport: 'Volleyball',
+    description: 'Former national team player with physical education background and coaching experience across schools and academies.',
+    achievements: ['Former Jordan national team player', 'Physical education degree', 'FIVB coaching and refereeing certification'],
+    imageUrl: '/leen.jpeg',
+    isActive: true,
+    order: 7,
+  },
+  {
+    id: 'fallback-coach-rahaf',
+    name: 'Coach Rahaf Haimour',
+    sport: 'Volleyball',
+    description: 'Experienced volleyball coach and mentor with strong communication and team leadership skills.',
+    achievements: ['Former Jordan national team player', 'Youth mentorship and professional training experience'],
+    imageUrl: '/rahaf-haimour.jpeg',
+    isActive: true,
+    order: 8,
+  },
+  {
+    id: 'fallback-coach-raghad',
+    name: 'Coach Raghad Haimour',
+    sport: 'Volleyball',
+    description: 'Professional volleyball player and coach with experience preparing athletes for competitions and tournaments.',
+    achievements: ['Coach at Abd Alhammed Sharaf International School', 'Player with Al-Nassr club', 'Jordan national team member'],
+    imageUrl: '/raghad-haimour.jpeg',
+    isActive: true,
+    order: 9,
+  },
+  {
+    id: 'fallback-coach-abdullah',
+    name: 'Coach Abdullah Yahya',
+    sport: 'Volleyball',
+    description: 'National team player and youth coach at Spikers Academy with official FIVB coaching certification.',
+    achievements: ['Jordan men national team player', 'Spikers Academy youth coach', 'FIVB official coaching certificate'],
+    imageUrl: '/abdallah-yahya.jpeg',
+    isActive: true,
+    order: 10,
+  },
+  {
+    id: 'fallback-coach-ayham',
+    name: 'Coach Ayham',
+    sport: 'Volleyball',
+    description: 'Volleyball coach and national-level player committed to youth athlete development.',
+    achievements: ['Jordan men national team player', 'Spikers Academy youth coach'],
+    imageUrl: '/ayham.jpeg',
+    isActive: true,
+    order: 11,
   },
 ];
 
@@ -190,9 +414,6 @@ function readMsFromEnv(name: string, fallback: number): number {
 
 const WEB_CACHE_TTL_MS = readMsFromEnv('WEB_API_CACHE_TTL_MS', 60_000);
 const WEB_STALE_TTL_MS = readMsFromEnv('WEB_API_STALE_TTL_MS', 15 * 60_000);
-const LANDING_DATA_API_BASE = (process.env.LANDING_DATA_API_BASE || process.env.NEXT_PUBLIC_LANDING_DATA_API_BASE || '')
-  .trim()
-  .replace(/\/+$/, '');
 
 function cacheStore(): CacheStore {
   if (!globalCache.__webApiCache) {
@@ -256,89 +477,6 @@ async function getPrisma() {
   return mod.prisma;
 }
 
-async function fetchRemoteJson(path: string): Promise<unknown[] | null> {
-  if (!LANDING_DATA_API_BASE || typeof window !== 'undefined') return null;
-  const url = `${LANDING_DATA_API_BASE}${path}`;
-  try {
-    const response = await fetch(url, { cache: 'no-store' });
-    if (!response.ok) return null;
-    const data = await response.json();
-    return Array.isArray(data) ? data : null;
-  } catch {
-    return null;
-  }
-}
-
-function mapRemotePackageRows(rows: unknown[]): PackageResponse[] {
-  const out: PackageResponse[] = [];
-  for (const row of rows) {
-    const r = row as Record<string, unknown>;
-    if (typeof r.id !== 'string' || typeof r.name !== 'string') continue;
-    out.push({
-      id: r.id,
-      sportType: typeof r.sportType === 'string' ? r.sportType : 'multi',
-      name: r.name,
-      description: typeof r.description === 'string' ? r.description : null,
-      descriptionBullets: Array.isArray(r.descriptionBullets)
-        ? r.descriptionBullets.filter((v): v is string => typeof v === 'string')
-        : null,
-      sessionsCount: typeof r.sessionsCount === 'number' ? r.sessionsCount : 0,
-      trackingType: typeof r.trackingType === 'string' ? r.trackingType : 'SESSIONS',
-      pricingType: typeof r.pricingType === 'string' ? r.pricingType : 'MANUAL',
-      currentPriceJod: typeof r.currentPriceJod === 'number' ? r.currentPriceJod : null,
-      timeSlots: r.timeSlots ?? null,
-      isActive: r.isActive !== false,
-      sortOrder: typeof r.sortOrder === 'number' ? r.sortOrder : 0,
-    });
-  }
-  return out.sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
-}
-
-function mapRemoteCoachRows(rows: unknown[]): CoachResponse[] {
-  const out: CoachResponse[] = [];
-  for (const row of rows) {
-    const r = row as Record<string, unknown>;
-    if (typeof r.id !== 'string') continue;
-    const name =
-      typeof r.name === 'string'
-        ? r.name
-        : [r.firstName, r.lastName].filter((v): v is string => typeof v === 'string' && !!v.trim()).join(' ').trim();
-    if (!name) continue;
-    const sport =
-      typeof r.sport === 'string'
-        ? r.sport
-        : typeof r.specialty === 'string'
-          ? r.specialty
-          : 'Multi-Sport';
-    const description =
-      typeof r.description === 'string'
-        ? r.description
-        : typeof r.bio === 'string'
-          ? r.bio
-          : '';
-    const isActive =
-      typeof r.isActive === 'boolean'
-        ? r.isActive
-        : typeof r.status === 'string'
-          ? r.status.toUpperCase() === 'ACTIVE'
-          : true;
-    out.push({
-      id: r.id,
-      name,
-      sport,
-      description,
-      quote: typeof r.quote === 'string' ? r.quote : undefined,
-      achievements: Array.isArray(r.achievements)
-        ? r.achievements.filter((v): v is string => typeof v === 'string')
-        : [],
-      imageUrl: typeof r.imageUrl === 'string' ? r.imageUrl : '',
-      isActive,
-      order: typeof r.order === 'number' ? r.order : 0,
-    });
-  }
-  return out.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
-}
-
 export async function fetchPrograms(): Promise<ProgramResponse[]> {
   if (!canUseDb()) return [];
   if (!(await canAttemptDatabaseQuery())) return [];
@@ -364,14 +502,6 @@ export async function fetchPackages(): Promise<PackageResponse[]> {
   if (fresh) return fresh;
 
   const stale = getStaleCache<PackageResponse[]>('packages');
-  const remoteRows = await fetchRemoteJson('/api/portal/packages');
-  if (remoteRows) {
-    const mappedRemote = mapRemotePackageRows(remoteRows);
-    if (mappedRemote.length > 0) {
-      writeCache('packages', mappedRemote);
-      return mappedRemote;
-    }
-  }
   if (!canUseDb()) return stale || FALLBACK_PACKAGES;
   if (!(await canAttemptDatabaseQuery())) return stale || FALLBACK_PACKAGES;
   try {
@@ -456,44 +586,53 @@ export async function fetchCoaches(): Promise<CoachResponse[]> {
   if (fresh) return fresh;
 
   const stale = getStaleCache<CoachResponse[]>('coaches');
-  const landingCoachRows = await fetchRemoteJson('/api/portal/landing-coaches');
-  if (landingCoachRows) {
-    const mappedRemote = mapRemoteCoachRows(landingCoachRows);
-    if (mappedRemote.length > 0) {
-      writeCache('coaches', mappedRemote);
-      return mappedRemote;
-    }
-  }
-  const portalCoachRows = await fetchRemoteJson('/api/portal/coaches');
-  if (portalCoachRows) {
-    const mappedRemote = mapRemoteCoachRows(portalCoachRows);
-    if (mappedRemote.length > 0) {
-      writeCache('coaches', mappedRemote);
-      return mappedRemote;
-    }
-  }
   if (!canUseDb()) return stale || FALLBACK_COACHES;
   if (!(await canAttemptDatabaseQuery())) return stale || FALLBACK_COACHES;
   try {
     const prisma = await getPrisma();
-    const rows = await prisma.landingCoach.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] });
-    if (!rows.length) {
-      writeCache('coaches', FALLBACK_COACHES);
-      return FALLBACK_COACHES;
+    const landingRows = await prisma.landingCoach.findMany({
+      where: { isActive: true },
+      orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+    });
+    if (landingRows.length) {
+      const mapped = landingRows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        sport: row.sport,
+        description: row.description,
+        quote: row.quote ?? undefined,
+        achievements: row.achievements ?? [],
+        imageUrl: row.imageUrl,
+        isActive: row.isActive,
+        order: row.order,
+      }));
+      writeCache('coaches', mapped);
+      return mapped;
     }
-    const mapped = rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      sport: row.sport,
-      description: row.description,
-      quote: row.quote ?? undefined,
-      achievements: row.achievements ?? [],
-      imageUrl: row.imageUrl,
-      isActive: row.isActive,
-      order: row.order,
-    }));
-    writeCache('coaches', mapped);
-    return mapped;
+
+    // Secondary source: portal coaches table (firstName/lastName) when landingCoach is empty.
+    const portalRows = await prisma.coach.findMany({
+      where: { status: 'ACTIVE' },
+      orderBy: [{ createdAt: 'asc' }],
+    });
+    if (portalRows.length) {
+      const mappedFromPortal = portalRows.map((row, index) => ({
+        id: row.id,
+        name: [row.firstName, row.lastName].filter(Boolean).join(' ').trim(),
+        sport: row.specialty || 'Multi-Sport',
+        description: row.bio || `${[row.firstName, row.lastName].filter(Boolean).join(' ').trim()} coaching profile.`,
+        quote: undefined,
+        achievements: [],
+        imageUrl: '',
+        isActive: true,
+        order: index + 1,
+      }));
+      writeCache('coaches', mappedFromPortal);
+      return mappedFromPortal;
+    }
+
+    writeCache('coaches', FALLBACK_COACHES);
+    return FALLBACK_COACHES;
   } catch (error) {
     noteDatabaseFailure('fetchCoaches', error);
     return stale || FALLBACK_COACHES;

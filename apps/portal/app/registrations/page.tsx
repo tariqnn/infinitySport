@@ -19,6 +19,7 @@ import { RegisterExistingPersonModal } from './_components/RegisterExistingPerso
 import { RegisterPersonMultiPackageModal } from './_components/RegisterPersonMultiPackageModal';
 import { PersonDetailsModal } from './_components/PersonDetailsModal';
 import { EditRegistrationModal } from './_components/EditRegistrationModal';
+import { CreateTrackerAccountModal } from './_components/CreateTrackerAccountModal';
 
 type Registration = PackageRegistrationRow;
 
@@ -51,6 +52,7 @@ export default function RegistrationsPage() {
   const [registerPersonMultiInitialPerson, setRegisterPersonMultiInitialPerson] = useState<InitialPerson | null>(null);
   const [bulkCreatedCount, setBulkCreatedCount] = useState<number | null>(null);
   const [apiPackages, setApiPackages] = useState<Array<{ name: string; currentPriceJod: number | null }>>([]);
+  const [trackerAccountRow, setTrackerAccountRow] = useState<Registration | null>(null);
 
   /**
    * Package schedule catalog.
@@ -696,12 +698,10 @@ export default function RegistrationsPage() {
                                 Edit registration
                               </DropdownMenu.Item>
                               <DropdownMenu.Item
-                                className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
-                                onSelect={() => {
-                                  window.alert('Coming soon: Generate mobile app account will be available in a future update.');
-                                }}
+                                className="cursor-pointer px-4 py-2 text-sm text-indigo-700 outline-none hover:bg-indigo-50 data-[highlighted]:bg-indigo-50"
+                                onSelect={() => setTrackerAccountRow(row)}
                               >
-                                Generate app account (Coming soon)
+                                Create account for Infinity Tracker
                               </DropdownMenu.Item>
                               <DropdownMenu.Item
                                 className="cursor-pointer px-4 py-2 text-sm text-red-600 outline-none hover:bg-red-50 data-[highlighted]:bg-red-50 disabled:opacity-50"
@@ -864,6 +864,12 @@ export default function RegistrationsPage() {
         packageOptions={packageOpts}
         defaultPricesByPackage={defaultPricesByPackage}
         initialPerson={registerPersonMultiInitialPerson}
+      />
+
+      <CreateTrackerAccountModal
+        open={!!trackerAccountRow}
+        onClose={() => setTrackerAccountRow(null)}
+        registration={trackerAccountRow}
       />
 
       {bulkCreatedCount != null && bulkCreatedCount > 0 && (

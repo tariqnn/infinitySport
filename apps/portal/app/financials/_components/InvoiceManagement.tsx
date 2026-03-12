@@ -5,11 +5,16 @@ import { Card, CardBody, CardHeader, DataTable, Badge, Button, KPIStatCard, Sele
 import { financeApi, dashboardApi, getFirstCompany } from '../../../lib/portalApi';
 import { ExportCsvButton } from '../../_components/ActionButtons';
 import { CreateInvoiceModal } from './CreateInvoiceModal';
+import { CreateCompanyInvoiceModal } from './CreateCompanyInvoiceModal';
 import { EditInvoiceModal } from './EditInvoiceModal';
-import { ArrowDownTrayIcon, CurrencyDollarIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, CurrencyDollarIcon, EyeIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { DonutBreakdown, RevenueAreaChart } from '../../_components/PortalCharts';
+import clsx from 'clsx';
 
 function getInvoiceMeta(row: any): any | null {
+  if (row?.meta && typeof row.meta === 'object') {
+    return row.meta;
+  }
   const desc = row?.description;
   if (!desc || typeof desc !== 'string') return null;
   try {
@@ -20,11 +25,41 @@ function getInvoiceMeta(row: any): any | null {
   }
 }
 
+function isCompanyInvoice(row: any): boolean {
+  const meta = getInvoiceMeta(row);
+  return (
+    meta?.invoiceSource === 'company' ||
+    row?.notes === 'Created from the company invoice creation tab in portal financials.'
+  );
+}
+
+function getInvoiceTitle(row: any): string {
+  if (Array.isArray(row?.lineItems) && row.lineItems.length > 0) {
+    const firstItem = row.lineItems[0] as { description?: unknown };
+    if (typeof firstItem?.description === 'string' && firstItem.description.trim()) {
+      return firstItem.description.trim();
+    }
+  }
+
+  const meta = getInvoiceMeta(row);
+  if (typeof meta?.descriptionText === 'string' && meta.descriptionText.trim()) {
+    return meta.descriptionText.trim();
+  }
+
+  if (typeof row?.description === 'string' && row.description.trim()) {
+    return row.description.trim();
+  }
+
+  return 'Company invoice';
+}
+
 export function InvoiceManagement() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'companies'>('overview');
   const [showCreateInvoiceModal, setShowCreateInvoiceModal] = useState(false);
+  const [showCreateCompanyInvoiceModal, setShowCreateCompanyInvoiceModal] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<any | null>(null);
   const [dateRange, setDateRange] = useState<string>('all');
   const [customStartDate, setCustomStartDate] = useState<string>('');
@@ -69,6 +104,31 @@ export function InvoiceManagement() {
     } catch (e) {
       console.error('Invoice PDF download error:', e);
       alert('Failed to download invoice PDF. Please ensure the API server is running and try again.');
+    }
+  }
+
+  function openInvoicePreview(row: any) {
+    if (!row?.id) return;
+    window.open(`/invoices/${row.id}`, '_blank', 'noopener,noreferrer');
+  }
+
+  async function markInvoicePaid(row: any) {
+    try {
+      await financeApi.invoices.update(row.id, { status: 'PAID', paidAt: new Date().toISOString() });
+      loadData();
+    } catch (error) {
+      console.error('Failed to mark as paid:', error);
+    }
+  }
+
+  async function deleteInvoice(row: any) {
+    if (!confirm(`Delete invoice ${row.number}? This cannot be undone.`)) return;
+    try {
+      await financeApi.invoices.delete(row.id);
+      loadData();
+    } catch (error) {
+      console.error('Failed to delete invoice', error);
+      alert('Failed to delete invoice. It may be in use elsewhere.');
     }
   }
 
@@ -143,6 +203,7 @@ export function InvoiceManagement() {
     i.status === 'DRAFT' || i.status === 'SENT' || i.status === 'OVERDUE'
   );
   const outstandingAmount = outstandingInvoices.reduce((sum, i) => sum + i.amount, 0);
+  const companyInvoices = invoices.filter(isCompanyInvoice);
 
   // Generate revenue data
   const revenueData = [];
@@ -279,14 +340,7 @@ export function InvoiceManagement() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={async () => {
-                try {
-                  await financeApi.invoices.update(row.id, { status: 'PAID', paidAt: new Date().toISOString() });
-                  loadData();
-                } catch (error) {
-                  console.error('Failed to mark as paid:', error);
-                }
-              }}
+              onClick={() => markInvoicePaid(row)}
               className="text-success hover:bg-green-50"
             >
               Mark Paid
@@ -296,16 +350,113 @@ export function InvoiceManagement() {
             variant="destructive"
             size="sm"
             leadingIcon={<TrashIcon className="h-4 w-4" />}
-            onClick={async () => {
-              if (!confirm(`Delete invoice ${row.number}? This cannot be undone.`)) return;
-              try {
-                await financeApi.invoices.delete(row.id);
-                loadData();
-              } catch (error) {
-                console.error('Failed to delete invoice', error);
-                alert('Failed to delete invoice. It may be in use elsewhere.');
-              }
-            }}
+            onClick={() => deleteInvoice(row)}
+          >
+            Delete
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
+  const companyColumns = [
+    {
+      id: 'number',
+      header: 'Invoice #',
+      render: (row: any) => <span className="font-semibold text-textPrimary">{row.number}</span>,
+    },
+    {
+      id: 'clientName',
+      header: 'Company',
+      render: (row: any) => (
+        <div className="space-y-1">
+          <div className="font-semibold text-textPrimary">{row.clientName || 'N/A'}</div>
+          <div className="text-xs text-textMuted">{row.clientEmail || row.clientAddress || 'No extra details'}</div>
+        </div>
+      ),
+    },
+    {
+      id: 'title',
+      header: 'Invoice Title',
+      render: (row: any) => <span className="text-textPrimary">{getInvoiceTitle(row)}</span>,
+    },
+    {
+      id: 'amount',
+      header: 'Amount',
+      render: (row: any) => (
+        <span className="font-semibold text-textPrimary">
+          {row.currency} {(row.amount || 0).toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      id: 'dueDate',
+      header: 'Due Date',
+      render: (row: any) =>
+        row.dueDate ? (
+          <span className="text-textPrimary">{new Date(row.dueDate).toLocaleDateString()}</span>
+        ) : (
+          <span className="text-textMuted">-</span>
+        ),
+    },
+    {
+      id: 'status',
+      header: 'Status',
+      render: (row: any) => {
+        const statusMap: Record<string, { variant: 'success' | 'warning' | 'danger' | 'neutral' | 'info'; label: string }> = {
+          PAID: { variant: 'success', label: 'Paid' },
+          PARTIALLY_PAID: { variant: 'warning', label: 'Partially Paid' },
+          SENT: { variant: 'info', label: 'Sent' },
+          DRAFT: { variant: 'neutral', label: 'Draft' },
+          OVERDUE: { variant: 'danger', label: 'Overdue' },
+        };
+        const status = statusMap[row.status] || { variant: 'neutral' as const, label: row.status };
+        return <Badge variant={status.variant}>{status.label}</Badge>;
+      },
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      render: (row: any) => (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            leadingIcon={<EyeIcon className="h-4 w-4" />}
+            onClick={() => openInvoicePreview(row)}
+          >
+            View
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            leadingIcon={<ArrowDownTrayIcon className="h-4 w-4" />}
+            onClick={() => downloadInvoicePdf(row)}
+          >
+            Download
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setEditingInvoice(row)}
+          >
+            Edit
+          </Button>
+          {row.status !== 'PAID' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => markInvoicePaid(row)}
+              className="text-success hover:bg-green-50"
+            >
+              Mark Paid
+            </Button>
+          )}
+          <Button
+            variant="destructive"
+            size="sm"
+            leadingIcon={<TrashIcon className="h-4 w-4" />}
+            onClick={() => deleteInvoice(row)}
           >
             Delete
           </Button>
@@ -320,144 +471,177 @@ export function InvoiceManagement() {
 
   return (
     <div className="space-y-6">
-      {/* KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KPIStatCard
-          label="Monthly Revenue"
-          value={`JD ${monthlyRevenue.toLocaleString()}`}
-          caption="This month"
-          icon={<CurrencyDollarIcon className="h-6 w-6" />}
-          trend="up"
-        />
-        <KPIStatCard
-          label="Outstanding"
-          value={`JD ${outstandingAmount.toLocaleString()}`}
-          caption={`${stats?.pendingInvoices || 0} invoices`}
-          trend="down"
-        />
-        <KPIStatCard
-          label="Pending Invoices"
-          value={(stats?.pendingInvoices || 0).toString()}
-          caption="Awaiting payment"
-          trend="down"
-        />
-        <KPIStatCard
-          label="Paid This Month"
-          value={invoices.filter(i => i.status === 'PAID' && new Date(i.issuedAt).getMonth() === new Date().getMonth()).length.toString()}
-          caption="Completed"
-          trend="up"
-        />
+      <div className="inline-flex rounded-2xl border border-ui-border bg-white p-1 shadow-sm">
+        {[
+          { id: 'overview', label: 'Invoices' },
+          { id: 'companies', label: 'Company Invoice Creation' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id as 'overview' | 'companies')}
+            className={clsx(
+              'rounded-xl px-4 py-2 text-sm font-semibold transition',
+              activeTab === tab.id
+                ? 'bg-[#0b1f4f] text-white shadow-[0_10px_24px_rgba(11,31,79,0.22)]'
+                : 'text-ui-textMuted hover:bg-ui-softBg hover:text-ui-textPrimary',
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* Charts */}
-      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-        <Card>
-          <CardBody>
-            <h3 className="mb-4 text-lg font-semibold text-textPrimary">Revenue vs Expenses</h3>
-            <RevenueAreaChart data={revenueData} />
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <h3 className="mb-4 text-lg font-semibold text-textPrimary">Payment Methods</h3>
-            <DonutBreakdown data={paymentMix} />
-          </CardBody>
-        </Card>
-      </div>
+      {activeTab === 'overview' ? (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <KPIStatCard
+              label="Monthly Revenue"
+              value={`JD ${monthlyRevenue.toLocaleString()}`}
+              caption="This month"
+              icon={<CurrencyDollarIcon className="h-6 w-6" />}
+              trend="up"
+            />
+            <KPIStatCard
+              label="Outstanding"
+              value={`JD ${outstandingAmount.toLocaleString()}`}
+              caption={`${stats?.pendingInvoices || 0} invoices`}
+              trend="down"
+            />
+            <KPIStatCard
+              label="Pending Invoices"
+              value={(stats?.pendingInvoices || 0).toString()}
+              caption="Awaiting payment"
+              trend="down"
+            />
+            <KPIStatCard
+              label="Paid This Month"
+              value={invoices.filter(i => i.status === 'PAID' && new Date(i.issuedAt).getMonth() === new Date().getMonth()).length.toString()}
+              caption="Completed"
+              trend="up"
+            />
+          </div>
 
-      {/* Invoices Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <h3 className="text-lg font-semibold text-textPrimary">Invoices</h3>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Select
-                  value={dateRange}
-                  onChange={(e) => setDateRange(e.target.value)}
-                  className="min-w-[150px]"
-                >
-                  <option value="all">All Time</option>
-                  <option value="1week">Last 7 Days</option>
-                  <option value="1month">Last Month</option>
-                  <option value="3months">Last 3 Months</option>
-                  <option value="6months">Last 6 Months</option>
-                  <option value="1year">Last Year</option>
-                  <option value="custom">Custom Range</option>
-                </Select>
-                {dateRange === 'custom' && (
-                  <>
-                    <Input
-                      type="date"
-                      value={customStartDate}
-                      onChange={(e) => setCustomStartDate(e.target.value)}
-                      placeholder="Start Date"
-                      className="min-w-[140px]"
-                    />
-                    <Input
-                      type="date"
-                      value={customEndDate}
-                      onChange={(e) => setCustomEndDate(e.target.value)}
-                      placeholder="End Date"
-                      className="min-w-[140px]"
-                    />
-                  </>
-                )}
+          <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+            <Card>
+              <CardBody>
+                <h3 className="mb-4 text-lg font-semibold text-textPrimary">Revenue vs Expenses</h3>
+                <RevenueAreaChart data={revenueData} />
+              </CardBody>
+            </Card>
+            <Card>
+              <CardBody>
+                <h3 className="mb-4 text-lg font-semibold text-textPrimary">Payment Methods</h3>
+                <DonutBreakdown data={paymentMix} />
+              </CardBody>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <h3 className="text-lg font-semibold text-textPrimary">Invoices</h3>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={dateRange}
+                      onChange={(e) => setDateRange(e.target.value)}
+                      className="min-w-[150px]"
+                    >
+                      <option value="all">All Time</option>
+                      <option value="1week">Last 7 Days</option>
+                      <option value="1month">Last Month</option>
+                      <option value="3months">Last 3 Months</option>
+                      <option value="6months">Last 6 Months</option>
+                      <option value="1year">Last Year</option>
+                      <option value="custom">Custom Range</option>
+                    </Select>
+                    {dateRange === 'custom' && (
+                      <>
+                        <Input
+                          type="date"
+                          value={customStartDate}
+                          onChange={(e) => setCustomStartDate(e.target.value)}
+                          placeholder="Start Date"
+                          className="min-w-[140px]"
+                        />
+                        <Input
+                          type="date"
+                          value={customEndDate}
+                          onChange={(e) => setCustomEndDate(e.target.value)}
+                          placeholder="End Date"
+                          className="min-w-[140px]"
+                        />
+                      </>
+                    )}
+                  </div>
+                  <ExportCsvButton
+                    rows={invoices.map(i => {
+                      const issuedAt = new Date(i.issuedAt);
+                      const dueDate = i.dueDate ? new Date(i.dueDate) : null;
+
+                      const formatDateForExcel = (date: Date) => {
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const day = String(date.getDate()).padStart(2, '0');
+                        const year = date.getFullYear();
+                        return `${month}/${day}/${year}`;
+                      };
+
+                      const formatTimeForExcel = (date: Date) => {
+                        const hours = String(date.getHours()).padStart(2, '0');
+                        const minutes = String(date.getMinutes()).padStart(2, '0');
+                        const seconds = String(date.getSeconds()).padStart(2, '0');
+                        return `${hours}:${minutes}:${seconds}`;
+                      };
+
+                      const formatDateTimeForExcel = (date: Date) => {
+                        return `${formatDateForExcel(date)} ${formatTimeForExcel(date)}`;
+                      };
+
+                      return {
+                        number: i.number || '',
+                        member: i.member ? `${i.member.firstName} ${i.member.lastName}` : 'N/A',
+                        amount: i.amount || 0,
+                        currency: i.currency || 'JOD',
+                        status: i.status || '',
+                        issuedDate: formatDateForExcel(issuedAt),
+                        issuedTime: formatTimeForExcel(issuedAt),
+                        issuedDateTime: formatDateTimeForExcel(issuedAt),
+                        dueDate: dueDate ? formatDateForExcel(dueDate) : '',
+                        amountPaid: i.amountPaid || 0,
+                        remaining: (i.amount || 0) - (i.amountPaid || 0),
+                      };
+                    })}
+                    columns={['number', 'member', 'amount', 'currency', 'status', 'issuedDate', 'issuedTime', 'issuedDateTime', 'dueDate', 'amountPaid', 'remaining']}
+                    filename={`invoices-report-${dateRange}-${new Date().toISOString().split('T')[0]}.csv`}
+                    label="Export Report"
+                  />
+                  <Button onClick={() => setShowCreateInvoiceModal(true)} leadingIcon={<PlusIcon className="h-5 w-5" />}>
+                    Create Invoice
+                  </Button>
+                </div>
               </div>
-              <ExportCsvButton
-                rows={invoices.map(i => {
-                  const issuedAt = new Date(i.issuedAt);
-                  const dueDate = i.dueDate ? new Date(i.dueDate) : null;
-                  
-                  // Format dates for Excel compatibility (MM/DD/YYYY format)
-                  const formatDateForExcel = (date: Date) => {
-                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                    const day = String(date.getDate()).padStart(2, '0');
-                    const year = date.getFullYear();
-                    return `${month}/${day}/${year}`;
-                  };
-                  
-                  // Format time for Excel (HH:MM:SS)
-                  const formatTimeForExcel = (date: Date) => {
-                    const hours = String(date.getHours()).padStart(2, '0');
-                    const minutes = String(date.getMinutes()).padStart(2, '0');
-                    const seconds = String(date.getSeconds()).padStart(2, '0');
-                    return `${hours}:${minutes}:${seconds}`;
-                  };
-                  
-                  // Format date-time for Excel (MM/DD/YYYY HH:MM:SS)
-                  const formatDateTimeForExcel = (date: Date) => {
-                    return `${formatDateForExcel(date)} ${formatTimeForExcel(date)}`;
-                  };
-                  
-                  return {
-                    number: i.number || '',
-                    member: i.member ? `${i.member.firstName} ${i.member.lastName}` : 'N/A',
-                    amount: i.amount || 0,
-                    currency: i.currency || 'JOD',
-                    status: i.status || '',
-                    issuedDate: formatDateForExcel(issuedAt),
-                    issuedTime: formatTimeForExcel(issuedAt),
-                    issuedDateTime: formatDateTimeForExcel(issuedAt),
-                    dueDate: dueDate ? formatDateForExcel(dueDate) : '',
-                    amountPaid: i.amountPaid || 0,
-                    remaining: (i.amount || 0) - (i.amountPaid || 0),
-                  };
-                })}
-                columns={['number', 'member', 'amount', 'currency', 'status', 'issuedDate', 'issuedTime', 'issuedDateTime', 'dueDate', 'amountPaid', 'remaining']}
-                filename={`invoices-report-${dateRange}-${new Date().toISOString().split('T')[0]}.csv`}
-                label="Export Report"
-              />
-              <Button onClick={() => setShowCreateInvoiceModal(true)} leadingIcon={<PlusIcon className="h-5 w-5" />}>
-                Create Invoice
+            </CardHeader>
+            <CardBody className="p-0">
+              <DataTable columns={columns} rows={invoices} />
+            </CardBody>
+          </Card>
+        </>
+      ) : (
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <h3 className="text-lg font-semibold text-textPrimary">Company Invoices</h3>
+              <Button onClick={() => setShowCreateCompanyInvoiceModal(true)} leadingIcon={<PlusIcon className="h-5 w-5" />}>
+                Make Invoice for Company
               </Button>
             </div>
-          </div>
-        </CardHeader>
-        <CardBody className="p-0">
-          <DataTable columns={columns} rows={invoices} />
-        </CardBody>
-      </Card>
+          </CardHeader>
+          <CardBody className="p-0">
+            <DataTable columns={companyColumns} rows={companyInvoices} />
+          </CardBody>
+        </Card>
+      )}
 
       {/* Modals */}
       {showCreateInvoiceModal && (
@@ -465,6 +649,19 @@ export function InvoiceManagement() {
           open={showCreateInvoiceModal}
           onClose={() => {
             setShowCreateInvoiceModal(false);
+            loadData();
+          }}
+        />
+      )}
+
+      {showCreateCompanyInvoiceModal && (
+        <CreateCompanyInvoiceModal
+          open={showCreateCompanyInvoiceModal}
+          onCreated={() => {
+            loadData();
+          }}
+          onClose={() => {
+            setShowCreateCompanyInvoiceModal(false);
             loadData();
           }}
         />
@@ -483,4 +680,3 @@ export function InvoiceManagement() {
     </div>
   );
 }
-

@@ -11,6 +11,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const isReceiptPage = pathname?.startsWith("/receipts/");
+  const isInvoicePage = pathname?.startsWith("/invoices/");
 
   useEffect(() => {
     if (!mobileOpen) return;
@@ -52,7 +53,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
     );
   }, [mobileOpen]);
 
-  if (isReceiptPage) {
+  if (isReceiptPage || isInvoicePage) {
     return <div className="min-h-screen bg-white">{children}</div>;
   }
 

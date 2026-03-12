@@ -4,10 +4,8 @@ import { useState } from 'react';
 import { Modal, Select, Input, Button } from '../../_components/ui';
 import { financeApi, getFirstCompany } from '../../../lib/portalApi';
 import { useRouter } from 'next/navigation';
-import { getApiBaseUrl } from '../../../lib/getApiBaseUrl';
-
-const COMPANY_NAME = 'Infinity Sporty';
-const ROUTE_BASE_URL = getApiBaseUrl();
+import { INVOICE_CONFIG } from '../../../lib/invoiceConfig';
+import { downloadInvoicePdf, type InvoiceCreateResult } from './invoiceUtils';
 
 type ServiceType = 'basketball' | 'padel' | 'court-booking' | 'gym' | 'gymnastics';
 
@@ -76,7 +74,7 @@ export function CreateInvoiceFromSubscriptionModal({ open, onClose }: { open: bo
         company: { connect: { id: company.id } },
 
         // Enterprise invoice fields
-        companyName: COMPANY_NAME,
+        companyName: INVOICE_CONFIG.companyName,
         companyAddress: companyAddress.trim(),
         clientName: clientName.trim(),
         clientEmail: clientEmail.trim() || '',
@@ -96,33 +94,9 @@ export function CreateInvoiceFromSubscriptionModal({ open, onClose }: { open: bo
         generatePdf: true,
       };
 
-      const created = await financeApi.invoices.create(invoiceData);
+      const created = (await financeApi.invoices.create(invoiceData)) as InvoiceCreateResult;
 
-      // Download PDF immediately if available
-      let pdfPath: string | undefined = created?.pdfPath;
-      if (!pdfPath && typeof created?.description === 'string') {
-        try {
-          const meta = JSON.parse(created.description);
-          pdfPath = meta?.pdfPath;
-        } catch {}
-      }
-
-      if (pdfPath) {
-        const base = pdfPath.startsWith('/api/') ? (typeof window !== 'undefined' ? window.location.origin : '')  : ROUTE_BASE_URL;
-        const pdfUrl = base + pdfPath;
-        const res = await fetch(pdfUrl, { cache: 'no-store' });
-        if (res.ok) {
-          const blob = await res.blob();
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `${created.number || 'invoice'}.pdf`;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          URL.revokeObjectURL(url);
-        }
-      }
+      await downloadInvoicePdf(created);
 
       router.refresh();
       onClose();

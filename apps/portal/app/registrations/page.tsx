@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageHeader, Card, CardHeader, CardBody, Badge, Select, Input, Button } from '../_components/ui';
-import { packageRegistrationsApi, packageSessionCanceledApi, packagesApi, type PackageRegistrationRow } from '../../lib/portalApi';
+import { packageRegistrationsApi, packageSessionCanceledApi, packagesApi, type PackageOption, type PackageRegistrationRow } from '../../lib/portalApi';
 import { ExportCsvButton } from '../_components/ActionButtons';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { TrashIcon, BanknotesIcon, DocumentTextIcon, PlusCircleIcon, EllipsisVerticalIcon, PauseCircleIcon, PlayCircleIcon, CalendarIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
@@ -51,8 +51,10 @@ export default function RegistrationsPage() {
   const [registerPersonMultiOpen, setRegisterPersonMultiOpen] = useState(false);
   const [registerPersonMultiInitialPerson, setRegisterPersonMultiInitialPerson] = useState<InitialPerson | null>(null);
   const [bulkCreatedCount, setBulkCreatedCount] = useState<number | null>(null);
-  const [apiPackages, setApiPackages] = useState<Array<{ name: string; currentPriceJod: number | null }>>([]);
-  const [trackerAccountRow, setTrackerAccountRow] = useState<Registration | null>(null);
+  const [apiPackages, setApiPackages] = useState<PackageOption[]>([]);
+  const [trackerAccountRegistrations, setTrackerAccountRegistrations] = useState<Registration[]>([]);
+  const [trackerAccountInitialRole, setTrackerAccountInitialRole] = useState<'parent' | 'coach'>('parent');
+  const [trackerCoachOnlyOpen, setTrackerCoachOnlyOpen] = useState(false);
 
   /**
    * Package schedule catalog.
@@ -93,6 +95,35 @@ export default function RegistrationsPage() {
     const x = new Date(d);
     x.setDate(x.getDate() + days);
     return x;
+  }
+
+  function normalizeEmail(value: string | null | undefined) {
+    return (value ?? '').trim().toLowerCase();
+  }
+
+  function normalizePhoneDigits(value: string | null | undefined) {
+    return (value ?? '').replace(/\D/g, '');
+  }
+
+  function phoneLooksSame(left: string | null | undefined, right: string | null | undefined) {
+    const a = normalizePhoneDigits(left);
+    const b = normalizePhoneDigits(right);
+    if (!a || !b) return false;
+    if (a === b) return true;
+    return a.endsWith(b) || b.endsWith(a);
+  }
+
+  function getTrackerLinkedRegistrations(target: Registration): Registration[] {
+    const targetEmail = normalizeEmail(target.customerEmail);
+    const targetPhone = normalizePhoneDigits(target.customerPhone);
+
+    const related = rows.filter((row) => {
+      const sameEmail = targetEmail && normalizeEmail(row.customerEmail) === targetEmail;
+      const samePhone = targetPhone && phoneLooksSame(row.customerPhone, target.customerPhone);
+      return Boolean(sameEmail || samePhone);
+    });
+
+    return related.length > 0 ? related : [target];
   }
 
   /**
@@ -221,7 +252,7 @@ export default function RegistrationsPage() {
   }, [load]);
 
   useEffect(() => {
-    packagesApi.list().then((list) => setApiPackages(list.map((p) => ({ name: p.name, currentPriceJod: p.currentPriceJod })))).catch(() => setApiPackages([]));
+    packagesApi.list().then(setApiPackages).catch(() => setApiPackages([]));
   }, []);
 
   useEffect(() => {
@@ -340,6 +371,11 @@ export default function RegistrationsPage() {
   const defaultPricesByPackage: Record<string, number> = Object.fromEntries(
     apiPackages.filter((p) => p.currentPriceJod != null).map((p) => [p.name, p.currentPriceJod as number]),
   );
+  const defaultSessionsByPackage: Record<string, number> = Object.fromEntries(
+    apiPackages
+      .filter((p) => Number.isFinite(p.sessionsCount) && p.sessionsCount > 0)
+      .map((p) => [p.name, p.sessionsCount]),
+  );
 
   if (loading && rows.length === 0) {
     return <div className="py-12 text-center text-ui-textMuted">Loading registrations...</div>;
@@ -351,15 +387,24 @@ export default function RegistrationsPage() {
         title="Package Registrations"
         subtitle="Registrations from Basketball, Gymnastics, and Volleyball packages"
         actions={
-          <Button
-            variant="secondary"
-            onClick={load}
-            isLoading={loading}
-            disabled={loading}
-            leadingIcon={!loading ? <ArrowPathIcon className="h-4 w-4" /> : undefined}
-          >
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setTrackerCoachOnlyOpen(true)}
+              className="text-indigo-700 border-indigo-200 hover:bg-indigo-50"
+            >
+              Create coach account for Infinity Tracker
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={load}
+              isLoading={loading}
+              disabled={loading}
+              leadingIcon={!loading ? <ArrowPathIcon className="h-4 w-4" /> : undefined}
+            >
+              Refresh
+            </Button>
+          </div>
         }
       />
 
@@ -699,7 +744,10 @@ export default function RegistrationsPage() {
                               </DropdownMenu.Item>
                               <DropdownMenu.Item
                                 className="cursor-pointer px-4 py-2 text-sm text-indigo-700 outline-none hover:bg-indigo-50 data-[highlighted]:bg-indigo-50"
-                                onSelect={() => setTrackerAccountRow(row)}
+                                onSelect={() => {
+                                  setTrackerAccountInitialRole('parent');
+                                  setTrackerAccountRegistrations(getTrackerLinkedRegistrations(row));
+                                }}
                               >
                                 Create account for Infinity Tracker
                               </DropdownMenu.Item>
@@ -791,6 +839,7 @@ export default function RegistrationsPage() {
         }}
         packageOptions={packageOpts}
         defaultPricesByPackage={defaultPricesByPackage}
+        defaultSessionsByPackage={defaultSessionsByPackage}
         initialPerson={addRegistrationInitialPerson}
       />
 
@@ -825,6 +874,7 @@ export default function RegistrationsPage() {
         registration={registerInAnotherPackageRow}
         packageOptions={packageOpts}
         defaultPricesByPackage={defaultPricesByPackage}
+        defaultSessionsByPackage={defaultSessionsByPackage}
       />
 
       <RegisterExistingPersonModal
@@ -867,9 +917,10 @@ export default function RegistrationsPage() {
       />
 
       <CreateTrackerAccountModal
-        open={!!trackerAccountRow}
-        onClose={() => setTrackerAccountRow(null)}
-        registration={trackerAccountRow}
+        open={trackerAccountRegistrations.length > 0 || trackerCoachOnlyOpen}
+        onClose={() => { setTrackerAccountRegistrations([]); setTrackerCoachOnlyOpen(false); }}
+        registrations={trackerCoachOnlyOpen ? [] : trackerAccountRegistrations}
+        initialRole={trackerCoachOnlyOpen ? 'coach' : trackerAccountInitialRole}
       />
 
       {bulkCreatedCount != null && bulkCreatedCount > 0 && (

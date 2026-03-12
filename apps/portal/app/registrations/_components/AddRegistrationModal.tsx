@@ -24,6 +24,14 @@ function computeFinalPrice(base: number, discountType: string, discountValue: nu
   return Math.max(0, b - discountValue);
 }
 
+function addDaysToDateInput(value: string, days: number): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 export type InitialPerson = {
   customerName: string;
   customerPhone: string;
@@ -37,6 +45,7 @@ export function AddRegistrationModal({
   onSuccess,
   packageOptions,
   defaultPricesByPackage,
+  defaultSessionsByPackage,
   initialPerson,
 }: {
   open: boolean;
@@ -44,6 +53,7 @@ export function AddRegistrationModal({
   onSuccess: () => void;
   packageOptions?: string[];
   defaultPricesByPackage?: Record<string, number>;
+  defaultSessionsByPackage?: Record<string, number>;
   initialPerson?: InitialPerson | null;
 }) {
   const packageList = packageOptions?.length ? packageOptions : PACKAGE_OPTIONS;
@@ -52,6 +62,9 @@ export function AddRegistrationModal({
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerAge, setCustomerAge] = useState('');
+  const [sessionsLeft, setSessionsLeft] = useState('');
+  const [nextPaymentDate, setNextPaymentDate] = useState('');
+  const [planLabel, setPlanLabel] = useState('');
   const [basePriceJod, setBasePriceJod] = useState<string>('');
   const [discountOpen, setDiscountOpen] = useState(false);
   const [discountType, setDiscountType] = useState<'NONE' | 'PERCENT' | 'AMOUNT'>('NONE');
@@ -92,6 +105,33 @@ export function AddRegistrationModal({
     }
   }, [packageName, pricing, open, defaultPricesByPackage]);
 
+  useEffect(() => {
+    if (!open) return;
+    const defaultSessions = defaultSessionsByPackage?.[packageName];
+    if (defaultSessions != null && !sessionsLeft.trim()) {
+      setSessionsLeft(String(defaultSessions));
+    }
+    if (packageName && !planLabel.trim()) {
+      setPlanLabel(packageName);
+    }
+  }, [defaultSessionsByPackage, open, packageName, planLabel, sessionsLeft]);
+
+  useEffect(() => {
+    if (!open || !packageName) return;
+    const defaultSessions = defaultSessionsByPackage?.[packageName];
+    if (defaultSessions != null) {
+      setSessionsLeft(String(defaultSessions));
+    }
+    setPlanLabel(packageName);
+  }, [defaultSessionsByPackage, open, packageName]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!nextPaymentDate.trim() && periodStartsAt.trim()) {
+      setNextPaymentDate(addDaysToDateInput(periodStartsAt, 30));
+    }
+  }, [nextPaymentDate, open, periodStartsAt]);
+
   const baseNum = basePriceJod.trim() === '' ? 0 : parseInt(basePriceJod, 10) || 0;
   const discountVal = discountType === 'NONE' ? 0 : parseFloat(discountValue) || 0;
   const finalPrice = computeFinalPrice(baseNum, discountType, discountVal);
@@ -105,6 +145,14 @@ export function AddRegistrationModal({
     }
     if (!packageName.trim()) {
       setError('Please select a package.');
+      return;
+    }
+    if (!sessionsLeft.trim()) {
+      setError('Sessions left is required.');
+      return;
+    }
+    if (!nextPaymentDate.trim()) {
+      setError('Next payment date is required.');
       return;
     }
     const base = Math.max(0, baseNum);
@@ -127,6 +175,9 @@ export function AddRegistrationModal({
         customerPhone: customerPhone.trim(),
         customerEmail: customerEmail.trim() || undefined,
         customerAge: customerAge.trim() ? parseInt(customerAge, 10) : undefined,
+        sessionsLeft: Math.max(0, parseInt(sessionsLeft, 10) || 0),
+        nextPaymentDate: nextPaymentDate.trim(),
+        planLabel: planLabel.trim() || packageName.trim(),
         basePriceJod: basePricePayload,
         discountType,
         discountValue: discountType === 'NONE' ? null : discountVal,
@@ -139,6 +190,9 @@ export function AddRegistrationModal({
       setCustomerPhone('');
       setCustomerEmail('');
       setCustomerAge('');
+      setSessionsLeft('');
+      setNextPaymentDate('');
+      setPlanLabel('');
       setBasePriceJod('');
       setDiscountType('NONE');
       setDiscountValue('');
@@ -169,6 +223,28 @@ export function AddRegistrationModal({
         <Input label="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} required placeholder="Phone" />
         <Input label="Email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} placeholder="Email (optional)" />
         <Input label="Age" type="number" value={customerAge} onChange={(e) => setCustomerAge(e.target.value)} placeholder="Age (optional)" />
+        <Input
+          label="Sessions left"
+          type="number"
+          min={0}
+          value={sessionsLeft}
+          onChange={(e) => setSessionsLeft(e.target.value)}
+          placeholder="e.g. 8"
+          required
+        />
+        <Input
+          label="Next payment date"
+          type="date"
+          value={nextPaymentDate}
+          onChange={(e) => setNextPaymentDate(e.target.value)}
+          required
+        />
+        <Input
+          label="Plan label"
+          value={planLabel}
+          onChange={(e) => setPlanLabel(e.target.value)}
+          placeholder="Optional; defaults to package name"
+        />
         <Input
           label="When they will start"
           type="date"
@@ -229,7 +305,7 @@ export function AddRegistrationModal({
                     value={discountReason}
                     onChange={(e) => setDiscountReason(e.target.value)}
                     placeholder="e.g. Sibling 10%, Group rate"
-                    required={discountType !== 'NONE'}
+                    required
                   />
                 </>
               )}

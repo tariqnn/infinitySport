@@ -489,6 +489,9 @@ export type PackageRegistrationRow = {
   customerPhone: string;
   customerEmail: string | null;
   customerAge: number | null;
+  sessionsLeft: number | null;
+  nextPaymentDate: string | null;
+  planLabel: string | null;
   isPaid: boolean;
   basePriceJod: number;
   discountType: string;
@@ -551,6 +554,9 @@ export const packageRegistrationsApi = {
     customerPhone: string;
     customerEmail?: string | null;
     customerAge?: number | null;
+    sessionsLeft?: number | null;
+    nextPaymentDate?: string | null;
+    planLabel?: string | null;
     basePriceJod?: number;
     discountType?: string;
     discountValue?: number | null;
@@ -566,13 +572,16 @@ export const packageRegistrationsApi = {
     const query = params.toString() ? `?${params.toString()}` : '';
     return portalDbFetch<RegistrationTotals>(`/portal/package-registrations/totals${query}`);
   },
-  bulkCreate: (data: { startDate?: string | null; registrations: Array<{ packageName: string; customerName: string; customerPhone: string; customerEmail?: string | null; customerAge?: number | null; basePriceJod?: number; periodStartsAt?: string | null }> }) =>
+  bulkCreate: (data: { startDate?: string | null; registrations: Array<{ packageName: string; customerName: string; customerPhone: string; customerEmail?: string | null; customerAge?: number | null; sessionsLeft?: number | null; nextPaymentDate?: string | null; planLabel?: string | null; basePriceJod?: number; periodStartsAt?: string | null }> }) =>
     portalDbFetch<{ results: Array<{ success: boolean; id?: string; row?: number; error?: string }> }>('/portal/package-registrations/bulk', { method: 'POST', body: JSON.stringify(data) }),
   bulkCreateForPerson: (data: {
     person: { customerName: string; customerPhone: string; customerEmail?: string | null; customerAge?: number | null };
     periodStartsAt?: string | null;
     registrations: Array<{
       packageName: string;
+      sessionsLeft?: number | null;
+      nextPaymentDate?: string | null;
+      planLabel?: string | null;
       basePriceJod?: number;
       discountType?: string;
       discountValue?: number | null;
@@ -587,6 +596,9 @@ export const packageRegistrationsApi = {
     customerPhone?: string;
     customerEmail?: string | null;
     customerAge?: number | null;
+    sessionsLeft?: number | null;
+    nextPaymentDate?: string | null;
+    planLabel?: string | null;
     isPaid?: boolean;
     isFrozen?: boolean;
     basePriceJod?: number;

@@ -14,6 +14,9 @@ export function EditInvoiceModal({ open, invoice, onClose }: { open: boolean; in
   
   // Extract invoice meta data (for backward compatibility)
   const invoiceMeta = (() => {
+    if (invoice?.meta && typeof invoice.meta === 'object') {
+      return invoice.meta;
+    }
     try {
       if (invoice.description && typeof invoice.description === 'string') {
         return JSON.parse(invoice.description);
@@ -186,4 +189,3 @@ export function EditInvoiceModal({ open, invoice, onClose }: { open: boolean; in
     </Modal>
   );
 }
-

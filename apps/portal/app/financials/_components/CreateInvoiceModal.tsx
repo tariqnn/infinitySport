@@ -4,9 +4,9 @@ import { useMemo, useState, useEffect } from 'react';
 import { Modal, Input, Select, Textarea, Button } from '../../_components/ui';
 import { financeApi, membersApi, getFirstCompany } from '../../../lib/portalApi';
 import { useRouter } from 'next/navigation';
-import { getApiBaseUrl } from '../../../lib/getApiBaseUrl';
 import { getBasketballPackages } from '@infinity/mock-api';
 import { INVOICE_CONFIG } from '../../../lib/invoiceConfig';
+import { downloadInvoicePdf, type InvoiceCreateResult } from './invoiceUtils';
 
 type LineItem = {
   id: string;
@@ -45,8 +45,6 @@ const NOTE_TEMPLATES: Array<{ id: string; label: string; text: string }> = [
     text: 'Late payments may result in suspension from sessions until the outstanding balance is settled.'
   }
 ];
-
-const ROUTE_BASE_URL = getApiBaseUrl();
 
 export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
@@ -329,7 +327,7 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
       else if (status === 'OVERDUE') invoiceStatus = 'OVERDUE';
       else invoiceStatus = 'DRAFT';
 
-      const created = await financeApi.invoices.create({
+      const created = (await financeApi.invoices.create({
         // Existing required fields
         amount: totalAmount, // legacy int column (for dashboards/table); PDF uses lineItems for exact values
         amountPaid: paidAmount,
@@ -388,33 +386,9 @@ export function CreateInvoiceModal({ open, onClose }: { open: boolean; onClose: 
         notes: notes.trim() ? notes.trim() : undefined,
         note: note.trim() ? note.trim() : undefined,
         generatePdf: true,
-      });
+      })) as InvoiceCreateResult;
 
-      // Download PDF immediately if available
-      let pdfPath: string | undefined = created?.pdfPath;
-      if (!pdfPath && typeof created?.description === 'string') {
-        try {
-          const meta = JSON.parse(created.description);
-          pdfPath = meta?.pdfPath;
-        } catch {}
-      }
-
-      if (pdfPath) {
-        const base = pdfPath.startsWith('/api/') ? (typeof window !== 'undefined' ? window.location.origin : '')  : ROUTE_BASE_URL;
-        const pdfUrl = base + pdfPath;
-        const res = await fetch(pdfUrl, { cache: 'no-store' });
-        if (res.ok) {
-          const blob = await res.blob();
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `${created.number || 'invoice'}.pdf`;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          URL.revokeObjectURL(url);
-        }
-      }
+      await downloadInvoicePdf(created);
 
       router.refresh();
       onClose();

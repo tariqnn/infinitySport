@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../lib/db";
+import { getFirebaseAuth, getFirestore } from "../../../../lib/firebase-admin";
+import {
+  buildTrackerChildKey,
+  syncTrackerUserAndPlayers,
+  type TrackerPlayerSyncInput,
+} from "../../../../lib/trackerAccountSync";
 import crypto from "crypto";
 
 const ACTIVE_RECEIPT_WHERE = {
@@ -8,7 +14,6 @@ const ACTIVE_RECEIPT_WHERE = {
 };
 
 type Params = { slug: string[] };
-type MaybePromise<T> = T | Promise<T>;
 
 type RegistrationInput = {
   packageName: string;
@@ -16,6 +21,9 @@ type RegistrationInput = {
   customerPhone: string;
   customerEmail?: string | null;
   customerAge?: number | null;
+  sessionsLeft?: number | null;
+  nextPaymentDate?: string | null;
+  planLabel?: string | null;
   basePriceJod?: number;
   discountType?: string;
   discountValue?: number | null;
@@ -29,9 +37,9 @@ function jsonError(message: string, status = 400) {
 }
 
 async function resolveRouteParams(
-  params: MaybePromise<Params>,
+  params: Promise<Params>,
 ): Promise<Params> {
-  return await Promise.resolve(params);
+  return await params;
 }
 
 function clampNonNegative(value: number): number {
@@ -117,12 +125,16 @@ type MemberTokenPayload = {
   exp: number;
 };
 
-function normalizeEmail(value: string | null | undefined): string {
-  return (value ?? "").trim().toLowerCase();
+function normalizeText(value: unknown): string {
+  return String(value ?? "").trim();
 }
 
-function normalizePhoneDigits(value: string | null | undefined): string {
-  return (value ?? "").replace(/\D/g, "");
+function normalizeEmail(value: unknown): string {
+  return normalizeText(value).toLowerCase();
+}
+
+function normalizePhoneDigits(value: unknown): string {
+  return String(value ?? "").replace(/\D/g, "");
 }
 
 function phoneLooksSame(
@@ -291,6 +303,28 @@ async function getBasePriceJod(packageName: string): Promise<number> {
   return clampNonNegative(pricing?.basePriceJod ?? 0);
 }
 
+async function getDefaultSessionsLeft(packageName: string): Promise<number | null> {
+  const pkg = await prisma.package
+    .findUnique({
+      where: { name: packageName },
+      select: { sessionsCount: true },
+    })
+    .catch(() => null);
+
+  const sessionsCount = Number(pkg?.sessionsCount ?? 0);
+  if (!Number.isFinite(sessionsCount) || sessionsCount <= 0) return null;
+  return Math.round(sessionsCount);
+}
+
+function parseOptionalMembershipDate(
+  value: string | null | undefined,
+): Date | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
 function mapRegistrationRow(row: any) {
   const finalPriceJod = Number(row.finalPriceJod) || 0;
   const collected = (row.receipts || []).reduce(
@@ -304,6 +338,9 @@ function mapRegistrationRow(row: any) {
     customerPhone: row.customerPhone,
     customerEmail: row.customerEmail ?? null,
     customerAge: row.customerAge ?? null,
+    sessionsLeft: row.sessionsLeft ?? null,
+    nextPaymentDate: row.nextPaymentDate ?? null,
+    planLabel: row.planLabel ?? null,
     isPaid: Boolean(row.isPaid) && finalPriceJod > 0,
     basePriceJod: Number(row.basePriceJod) || 0,
     discountType: row.discountType ?? "NONE",
@@ -319,6 +356,94 @@ function mapRegistrationRow(row: any) {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
+}
+
+function mapRegistrationToTrackerPlayer(row: any): TrackerPlayerSyncInput {
+  return {
+    childKey: buildTrackerChildKey(row.customerName, row.customerAge ?? null),
+    registrationId: row.id,
+    name: row.customerName,
+    age: row.customerAge ?? null,
+    primaryPosition: null,
+    sessionsLeft: row.sessionsLeft ?? null,
+    nextPaymentDate: row.nextPaymentDate ?? null,
+    planLabel: row.planLabel ?? row.packageName ?? null,
+  };
+}
+
+async function syncTrackerForRegistrationContact(input: {
+  customerName: string;
+  customerEmail?: string | null;
+  customerPhone?: string | null;
+}) {
+  const customerEmail = normalizeEmail(input.customerEmail);
+  const customerPhone = normalizeText(input.customerPhone);
+
+  if (!customerEmail && !customerPhone) return;
+
+  try {
+    const auth = getFirebaseAuth();
+    const firestore = getFirestore();
+
+    if (!customerEmail) return;
+
+    let userRecord;
+    try {
+      userRecord = await auth.getUserByEmail(customerEmail);
+    } catch (error: unknown) {
+      const fbError = error as { code?: string };
+      if (fbError.code === "auth/user-not-found") return;
+      throw error;
+    }
+
+    const userRef = firestore.collection("users").doc(userRecord.uid);
+    const userSnap = await userRef.get();
+    const userData = userSnap.exists
+      ? ((userSnap.data() as Record<string, unknown>) ?? {})
+      : {};
+    const existingRole = normalizeText(userData.role).toLowerCase();
+    if (existingRole && existingRole !== "parent") return;
+
+    const relatedRegistrations = await prisma.packageRegistration.findMany({
+      where: {
+        OR: [
+          ...(customerEmail ? [{ customerEmail }] : []),
+          ...(customerPhone ? [{ customerPhone }] : []),
+        ],
+      },
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+    });
+
+    const latestByChild = new Map<string, any>();
+    for (const row of relatedRegistrations) {
+      const childKey = buildTrackerChildKey(
+        row.customerName,
+        row.customerAge ?? null,
+      );
+      if (!latestByChild.has(childKey)) {
+        latestByChild.set(childKey, row);
+      }
+    }
+
+    const players = Array.from(latestByChild.values()).map(
+      mapRegistrationToTrackerPlayer,
+    );
+    if (players.length === 0) return;
+
+    await syncTrackerUserAndPlayers({
+      firestore,
+      uid: userRecord.uid,
+      email: customerEmail,
+      name:
+        normalizeText(userData.name) ||
+        normalizeText(userRecord.displayName) ||
+        normalizeText(input.customerName),
+      role: "parent",
+      players,
+    });
+  } catch (error) {
+    console.warn("[portal-db-api] tracker membership sync skipped", error);
+  }
 }
 
 type BookingPaymentMethod = "CASH" | "CARD" | "ONLINE" | "TRANSFER" | "OTHER";
@@ -1413,18 +1538,28 @@ async function getMemberInvoices(request: NextRequest) {
   );
 }
 
+type MemberReceiptRow = NonNullable<
+  Awaited<ReturnType<typeof prisma.receipt.findFirst>>
+> & {
+  registration:
+    | (Record<string, unknown> & {
+        receipts: Array<{ amountPaid: number | null }>;
+      })
+    | null;
+};
+
 async function loadMemberReceiptForRequest(
   receiptId: string,
   request: NextRequest,
 ): Promise<
   | {
-      row: Awaited<ReturnType<typeof prisma.receipt.findFirst>>;
+      row: MemberReceiptRow;
       userEmail: string;
     }
   | { error: NextResponse }
 > {
   const resolved = await resolveMemberUserFromRequest(request);
-  if ("error" in resolved) return resolved.error;
+  if ("error" in resolved) return { error: resolved.error };
 
   const { user } = resolved;
   const row = await prisma.receipt.findFirst({
@@ -1448,7 +1583,7 @@ async function loadMemberReceiptForRequest(
 
   if (!row) return { error: jsonError("Receipt not found", 404) };
 
-  return { row, userEmail: user.email };
+  return { row: row as MemberReceiptRow, userEmail: user.email };
 }
 
 function escapePdfText(value: string): string {
@@ -1496,6 +1631,629 @@ function buildSimpleReceiptPdf(lines: string[]): Buffer {
   return Buffer.from(pdf, "utf8");
 }
 
+type InvoiceMeta = {
+  paymentMethod?: string;
+  descriptionText?: string;
+  invoiceSource?: string;
+  studentFullName?: string;
+  studentAge?: number;
+  guardianName?: string;
+  emergencyPhone?: string;
+  membershipId?: string;
+  programName?: string;
+  coachName?: string;
+  branch?: string;
+  trainingPeriodStart?: string;
+  trainingPeriodEnd?: string;
+  sessionsPerWeek?: number;
+  totalSessions?: number;
+  bankName?: string;
+  accountName?: string;
+  iban?: string;
+  swift?: string;
+  cashAccepted?: boolean;
+  installments?: Array<Record<string, unknown>>;
+};
+
+type NormalizedInvoiceStatus =
+  | "DRAFT"
+  | "SENT"
+  | "PAID"
+  | "PARTIALLY_PAID"
+  | "OVERDUE"
+  | "CANCELLED";
+
+function parseInvoiceMeta(value: unknown): InvoiceMeta {
+  if (typeof value !== "string" || !value.trim()) return {};
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as InvoiceMeta)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function normalizeInvoiceStatus(value: unknown): NormalizedInvoiceStatus {
+  const next = String(value || "DRAFT").trim().toUpperCase();
+  if (
+    next === "DRAFT" ||
+    next === "SENT" ||
+    next === "PAID" ||
+    next === "PARTIALLY_PAID" ||
+    next === "OVERDUE" ||
+    next === "CANCELLED"
+  ) {
+    return next;
+  }
+  return "DRAFT";
+}
+
+function normalizeInvoiceText(value: unknown): string | null {
+  const next = normalizeText(value);
+  return next || null;
+}
+
+function normalizeInvoiceAmount(value: unknown, fieldName: string): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`${fieldName} must be 0 or greater`);
+  }
+  return Math.round(parsed);
+}
+
+function parseInvoiceDate(value: unknown, fieldName: string): Date | null {
+  if (value == null || value === "") return null;
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(`Invalid ${fieldName}`);
+  }
+  return parsed;
+}
+
+function normalizeInvoiceLineItems(value: unknown): Array<{
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+}> | null {
+  if (!Array.isArray(value)) return null;
+  const items = value
+    .map((entry) => {
+      const item = (entry ?? {}) as Record<string, unknown>;
+      const description = normalizeText(item.description);
+      const quantity = Number(item.quantity ?? 0);
+      const unitPrice = Number(item.unitPrice ?? 0);
+      const lineTotal = Number(item.lineTotal ?? quantity * unitPrice);
+      if (!description) return null;
+      if (!Number.isFinite(quantity) || quantity <= 0) return null;
+      if (!Number.isFinite(unitPrice) || unitPrice < 0) return null;
+      if (!Number.isFinite(lineTotal) || lineTotal < 0) return null;
+      return {
+        description,
+        quantity,
+        unitPrice: Math.round(unitPrice),
+        lineTotal: Math.round(lineTotal),
+      };
+    })
+    .filter(Boolean) as Array<{
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    lineTotal: number;
+  }>;
+
+  return items.length > 0 ? items : null;
+}
+
+function buildInvoiceDescription(input: {
+  description?: unknown;
+  paymentMethod?: unknown;
+  invoiceSource?: unknown;
+  studentFullName?: unknown;
+  studentAge?: unknown;
+  guardianName?: unknown;
+  emergencyPhone?: unknown;
+  membershipId?: unknown;
+  programName?: unknown;
+  coachName?: unknown;
+  branch?: unknown;
+  trainingPeriodStart?: unknown;
+  trainingPeriodEnd?: unknown;
+  sessionsPerWeek?: unknown;
+  totalSessions?: unknown;
+  bankName?: unknown;
+  accountName?: unknown;
+  iban?: unknown;
+  swift?: unknown;
+  cashAccepted?: unknown;
+  installments?: unknown;
+}): string | null {
+  const meta: InvoiceMeta = {};
+
+  const descriptionText = normalizeInvoiceText(input.description);
+  if (descriptionText) meta.descriptionText = descriptionText;
+  const paymentMethod = normalizeInvoiceText(input.paymentMethod);
+  if (paymentMethod) meta.paymentMethod = paymentMethod;
+  const invoiceSource = normalizeInvoiceText(input.invoiceSource);
+  if (invoiceSource) meta.invoiceSource = invoiceSource;
+  const studentFullName = normalizeInvoiceText(input.studentFullName);
+  if (studentFullName) meta.studentFullName = studentFullName;
+  const studentAge = input.studentAge == null ? null : Number(input.studentAge);
+  if (studentAge != null && Number.isFinite(studentAge) && studentAge > 0) {
+    meta.studentAge = Math.round(studentAge);
+  }
+  const guardianName = normalizeInvoiceText(input.guardianName);
+  if (guardianName) meta.guardianName = guardianName;
+  const emergencyPhone = normalizeInvoiceText(input.emergencyPhone);
+  if (emergencyPhone) meta.emergencyPhone = emergencyPhone;
+  const membershipId = normalizeInvoiceText(input.membershipId);
+  if (membershipId) meta.membershipId = membershipId;
+  const programName = normalizeInvoiceText(input.programName);
+  if (programName) meta.programName = programName;
+  const coachName = normalizeInvoiceText(input.coachName);
+  if (coachName) meta.coachName = coachName;
+  const branch = normalizeInvoiceText(input.branch);
+  if (branch) meta.branch = branch;
+  const trainingPeriodStart = normalizeInvoiceText(input.trainingPeriodStart);
+  if (trainingPeriodStart) meta.trainingPeriodStart = trainingPeriodStart;
+  const trainingPeriodEnd = normalizeInvoiceText(input.trainingPeriodEnd);
+  if (trainingPeriodEnd) meta.trainingPeriodEnd = trainingPeriodEnd;
+  const sessionsPerWeek =
+    input.sessionsPerWeek == null ? null : Number(input.sessionsPerWeek);
+  if (
+    sessionsPerWeek != null &&
+    Number.isFinite(sessionsPerWeek) &&
+    sessionsPerWeek > 0
+  ) {
+    meta.sessionsPerWeek = sessionsPerWeek;
+  }
+  const totalSessions =
+    input.totalSessions == null ? null : Number(input.totalSessions);
+  if (totalSessions != null && Number.isFinite(totalSessions) && totalSessions > 0) {
+    meta.totalSessions = Math.round(totalSessions);
+  }
+  const bankName = normalizeInvoiceText(input.bankName);
+  if (bankName) meta.bankName = bankName;
+  const accountName = normalizeInvoiceText(input.accountName);
+  if (accountName) meta.accountName = accountName;
+  const iban = normalizeInvoiceText(input.iban);
+  if (iban) meta.iban = iban;
+  const swift = normalizeInvoiceText(input.swift);
+  if (swift) meta.swift = swift;
+  if (typeof input.cashAccepted === "boolean") {
+    meta.cashAccepted = input.cashAccepted;
+  }
+  if (Array.isArray(input.installments) && input.installments.length > 0) {
+    meta.installments = input.installments.filter(
+      (entry) => entry && typeof entry === "object",
+    ) as Array<Record<string, unknown>>;
+  }
+
+  return Object.keys(meta).length > 0 ? JSON.stringify(meta) : null;
+}
+
+function serializeInvoiceRow(row: any) {
+  const meta = parseInvoiceMeta(row.description);
+  return {
+    ...row,
+    description:
+      meta.descriptionText ??
+      (Object.keys(meta).length > 0 ? null : row.description ?? null),
+    meta,
+    paymentMethod: meta.paymentMethod ?? null,
+    pdfPath: `/api/portal/invoices/${row.id}/pdf`,
+  };
+}
+
+async function generateInvoiceNumber(): Promise<string> {
+  const year = new Date().getFullYear();
+  const prefix = `INV-${year}-`;
+  const latest = await prisma.invoice.findFirst({
+    where: { number: { startsWith: prefix } },
+    orderBy: { number: "desc" },
+    select: { number: true },
+  });
+
+  const nextNumber = (() => {
+    if (!latest?.number) return 1;
+    const match = latest.number.match(/^INV-\d{4}-(\d+)$/);
+    if (!match) return 1;
+    const parsed = Number(match[1]);
+    return Number.isFinite(parsed) ? parsed + 1 : 1;
+  })();
+
+  return `${prefix}${String(nextNumber).padStart(4, "0")}`;
+}
+
+async function listInvoices(request: NextRequest) {
+  const companyId = request.nextUrl.searchParams.get("companyId") || undefined;
+  const status = request.nextUrl.searchParams.get("status") || undefined;
+  const startDate = request.nextUrl.searchParams.get("startDate") || undefined;
+  const endDate = request.nextUrl.searchParams.get("endDate") || undefined;
+
+  const where: any = {};
+  if (companyId) where.companyId = companyId;
+  if (status) where.status = normalizeInvoiceStatus(status);
+  if (startDate || endDate) {
+    where.issuedAt = {};
+    if (startDate) {
+      const parsedStart = parseDate(startDate);
+      if (parsedStart) where.issuedAt.gte = parsedStart;
+    }
+    if (endDate) {
+      const parsedEnd = parseDate(endDate);
+      if (parsedEnd) {
+        parsedEnd.setHours(23, 59, 59, 999);
+        where.issuedAt.lte = parsedEnd;
+      }
+    }
+  }
+
+  const rows = await prisma.invoice.findMany({
+    where,
+    orderBy: [{ issuedAt: "desc" }, { createdAt: "desc" }],
+    include: {
+      company: { select: { id: true, name: true } },
+      member: {
+        select: { id: true, firstName: true, lastName: true, email: true },
+      },
+      subscription: { select: { id: true, status: true } },
+    },
+  });
+
+  return NextResponse.json(rows.map(serializeInvoiceRow));
+}
+
+async function getInvoice(id: string) {
+  const row = await prisma.invoice.findUnique({
+    where: { id },
+    include: {
+      company: { select: { id: true, name: true } },
+      member: {
+        select: { id: true, firstName: true, lastName: true, email: true },
+      },
+      subscription: { select: { id: true, status: true } },
+    },
+  });
+  if (!row) return jsonError("Invoice not found", 404);
+  return NextResponse.json(serializeInvoiceRow(row));
+}
+
+async function createInvoice(request: NextRequest) {
+  const body = (await request.json()) as Record<string, unknown>;
+
+  const companyId =
+    extractConnectId(body, "company") || extractConnectId(body, "companyId");
+  if (!companyId) return jsonError("companyId is required");
+
+  try {
+    const amount = normalizeInvoiceAmount(body.amount, "amount");
+    const amountPaid =
+      body.amountPaid == null
+        ? 0
+        : normalizeInvoiceAmount(body.amountPaid, "amountPaid");
+    const issuedAt = parseInvoiceDate(body.issuedAt, "issuedAt") ?? new Date();
+    const dueDate = parseInvoiceDate(body.dueDate, "dueDate");
+    const status = normalizeInvoiceStatus(body.status);
+    const lineItems = normalizeInvoiceLineItems(body.lineItems);
+    const description = buildInvoiceDescription(body);
+    const paidAt =
+      status === "PAID" || amountPaid >= amount
+        ? parseInvoiceDate(body.paidAt, "paidAt") ?? new Date()
+        : parseInvoiceDate(body.paidAt, "paidAt");
+
+    const number = await generateInvoiceNumber();
+    const row = await prisma.invoice.create({
+      data: {
+        company: { connect: { id: companyId } },
+        ...(extractConnectId(body, "member") || extractConnectId(body, "memberId")
+          ? {
+              member: {
+                connect: {
+                  id:
+                    extractConnectId(body, "member") ||
+                    extractConnectId(body, "memberId")!,
+                },
+              },
+            }
+          : {}),
+        ...(extractConnectId(body, "subscription") ||
+        extractConnectId(body, "subscriptionId")
+          ? {
+              subscription: {
+                connect: {
+                  id:
+                    extractConnectId(body, "subscription") ||
+                    extractConnectId(body, "subscriptionId")!,
+                },
+              },
+            }
+          : {}),
+        number,
+        amount,
+        amountPaid,
+        currency: normalizeText(body.currency) || "JOD",
+        status: (amountPaid >= amount && amount > 0 ? "PAID" : status) as any,
+        issuedAt,
+        dueDate,
+        paidAt,
+        description,
+        companyName: normalizeInvoiceText(body.companyName),
+        companyAddress: normalizeInvoiceText(body.companyAddress),
+        logoPath: normalizeInvoiceText(body.logoPath),
+        clientName: normalizeInvoiceText(body.clientName),
+        clientEmail: normalizeInvoiceText(body.clientEmail),
+        clientAddress: normalizeInvoiceText(body.clientAddress),
+        lineItems: lineItems ?? undefined,
+        subtotal:
+          body.subtotal == null
+            ? lineItems?.reduce((sum, item) => sum + item.lineTotal, 0) ?? amount
+            : normalizeInvoiceAmount(body.subtotal, "subtotal"),
+        tax:
+          body.tax == null ? null : normalizeInvoiceAmount(body.tax, "tax"),
+        discount:
+          body.discount == null
+            ? null
+            : normalizeInvoiceAmount(body.discount, "discount"),
+        notes: normalizeInvoiceText(body.notes),
+        companyEmail: normalizeInvoiceText(body.companyEmail),
+        companyPhone: normalizeInvoiceText(body.companyPhone),
+        note: normalizeInvoiceText(body.note),
+        pdfPath: `/api/portal/invoices/__pending__/pdf`,
+      },
+      include: {
+        company: { select: { id: true, name: true } },
+        member: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
+        subscription: { select: { id: true, status: true } },
+      },
+    });
+
+    const finalized = await prisma.invoice.update({
+      where: { id: row.id },
+      data: { pdfPath: `/api/portal/invoices/${row.id}/pdf` },
+      include: {
+        company: { select: { id: true, name: true } },
+        member: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
+        subscription: { select: { id: true, status: true } },
+      },
+    });
+
+    return NextResponse.json(serializeInvoiceRow(finalized), { status: 201 });
+  } catch (error) {
+    return jsonError(
+      error instanceof Error ? error.message : "Failed to create invoice",
+    );
+  }
+}
+
+async function updateInvoice(id: string, request: NextRequest) {
+  const body = (await request.json()) as Record<string, unknown>;
+  const existing = await prisma.invoice.findUnique({ where: { id } });
+  if (!existing) return jsonError("Invoice not found", 404);
+
+  try {
+    const data: Record<string, unknown> = {};
+    if (body.amount !== undefined) {
+      data.amount = normalizeInvoiceAmount(body.amount, "amount");
+    }
+    if (body.amountPaid !== undefined) {
+      data.amountPaid = normalizeInvoiceAmount(body.amountPaid, "amountPaid");
+    }
+    if (body.currency !== undefined) {
+      data.currency = normalizeText(body.currency) || "JOD";
+    }
+    if (body.status !== undefined) {
+      data.status = normalizeInvoiceStatus(body.status);
+    }
+    if (body.issuedAt !== undefined) {
+      data.issuedAt = parseInvoiceDate(body.issuedAt, "issuedAt");
+    }
+    if (body.dueDate !== undefined) {
+      data.dueDate = parseInvoiceDate(body.dueDate, "dueDate");
+    }
+    if (body.paidAt !== undefined) {
+      data.paidAt = parseInvoiceDate(body.paidAt, "paidAt");
+    }
+    if (body.companyEmail !== undefined) {
+      data.companyEmail = normalizeInvoiceText(body.companyEmail);
+    }
+    if (body.companyPhone !== undefined) {
+      data.companyPhone = normalizeInvoiceText(body.companyPhone);
+    }
+    if (body.companyName !== undefined) {
+      data.companyName = normalizeInvoiceText(body.companyName);
+    }
+    if (body.companyAddress !== undefined) {
+      data.companyAddress = normalizeInvoiceText(body.companyAddress);
+    }
+    if (body.clientName !== undefined) {
+      data.clientName = normalizeInvoiceText(body.clientName);
+    }
+    if (body.clientEmail !== undefined) {
+      data.clientEmail = normalizeInvoiceText(body.clientEmail);
+    }
+    if (body.clientAddress !== undefined) {
+      data.clientAddress = normalizeInvoiceText(body.clientAddress);
+    }
+    if (body.note !== undefined) {
+      data.note = normalizeInvoiceText(body.note);
+    }
+    if (body.notes !== undefined) {
+      data.notes = normalizeInvoiceText(body.notes);
+    }
+    if (body.lineItems !== undefined) {
+      data.lineItems = normalizeInvoiceLineItems(body.lineItems);
+    }
+    if (body.subtotal !== undefined) {
+      data.subtotal =
+        body.subtotal == null
+          ? null
+          : normalizeInvoiceAmount(body.subtotal, "subtotal");
+    }
+    if (body.tax !== undefined) {
+      data.tax =
+        body.tax == null ? null : normalizeInvoiceAmount(body.tax, "tax");
+    }
+    if (body.discount !== undefined) {
+      data.discount =
+        body.discount == null
+          ? null
+          : normalizeInvoiceAmount(body.discount, "discount");
+    }
+
+    const existingMeta = parseInvoiceMeta(existing.description);
+    const hasMetaPatch = [
+      "paymentMethod",
+      "invoiceSource",
+      "studentFullName",
+      "studentAge",
+      "guardianName",
+      "emergencyPhone",
+      "membershipId",
+      "programName",
+      "coachName",
+      "branch",
+      "trainingPeriodStart",
+      "trainingPeriodEnd",
+      "sessionsPerWeek",
+      "totalSessions",
+      "bankName",
+      "accountName",
+      "iban",
+      "swift",
+      "cashAccepted",
+      "installments",
+    ].some((key) => body[key] !== undefined);
+    if (body.description !== undefined || hasMetaPatch || Object.keys(existingMeta).length > 0) {
+      const nextMeta = buildInvoiceDescription({
+        ...existingMeta,
+        ...body,
+        description:
+          body.description !== undefined
+            ? body.description
+            : existingMeta.descriptionText ?? undefined,
+      });
+      data.description =
+        nextMeta ??
+        (body.description !== undefined
+          ? normalizeInvoiceText(body.description)
+          : existing.description);
+    }
+
+    const memberId =
+      extractConnectId(body, "member") || extractConnectId(body, "memberId");
+    if (memberId) {
+      data.member = { connect: { id: memberId } };
+    } else if (body.member !== undefined || body.memberId !== undefined) {
+      data.member = { disconnect: true };
+    }
+
+    const subscriptionId =
+      extractConnectId(body, "subscription") ||
+      extractConnectId(body, "subscriptionId");
+    if (subscriptionId) {
+      data.subscription = { connect: { id: subscriptionId } };
+    } else if (
+      body.subscription !== undefined ||
+      body.subscriptionId !== undefined
+    ) {
+      data.subscription = { disconnect: true };
+    }
+
+    const nextAmount = Number(data.amount ?? existing.amount);
+    const nextAmountPaid = Number(data.amountPaid ?? existing.amountPaid);
+    const nextStatus = normalizeInvoiceStatus(data.status ?? existing.status);
+    if (!("paidAt" in data) && (nextStatus === "PAID" || nextAmountPaid >= nextAmount)) {
+      data.paidAt = existing.paidAt ?? new Date();
+    }
+
+    const row = await prisma.invoice.update({
+      where: { id },
+      data: data as any,
+      include: {
+        company: { select: { id: true, name: true } },
+        member: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
+        subscription: { select: { id: true, status: true } },
+      },
+    });
+
+    return NextResponse.json(serializeInvoiceRow(row));
+  } catch (error) {
+    return jsonError(
+      error instanceof Error ? error.message : "Failed to update invoice",
+    );
+  }
+}
+
+async function deleteInvoice(id: string) {
+  try {
+    await prisma.invoice.delete({ where: { id } });
+    return new NextResponse(null, { status: 204 });
+  } catch (error: any) {
+    if (error?.code === "P2025") return jsonError("Invoice not found", 404);
+    return jsonError("Failed to delete invoice", 500);
+  }
+}
+
+async function getInvoicePdf(id: string) {
+  const row = await prisma.invoice.findUnique({
+    where: { id },
+    include: {
+      company: { select: { id: true, name: true } },
+      member: {
+        select: { id: true, firstName: true, lastName: true, email: true },
+      },
+    },
+  });
+  if (!row) return jsonError("Invoice not found", 404);
+
+  const meta = parseInvoiceMeta(row.description);
+  const items = Array.isArray(row.lineItems)
+    ? (row.lineItems as Array<Record<string, unknown>>)
+    : [];
+  const memberName = `${row.member?.firstName || ""} ${row.member?.lastName || ""}`.trim();
+  const lines = [
+    `Infinity Sports Invoice - ${row.number}`,
+    `Issue Date: ${new Date(row.issuedAt).toLocaleDateString("en-GB")}`,
+    `Due Date: ${row.dueDate ? new Date(row.dueDate).toLocaleDateString("en-GB") : "Not set"}`,
+    `Company: ${row.companyName || row.company?.name || "Infinity Sports"}`,
+    `Client: ${row.clientName || memberName || "N/A"}`,
+    `Amount: ${row.currency} ${row.amount}`,
+    `Paid: ${row.currency} ${row.amountPaid || 0}`,
+    `Remaining: ${row.currency} ${Math.max(0, row.amount - (row.amountPaid || 0))}`,
+    `Status: ${row.status}`,
+    `Payment Method: ${meta.paymentMethod || "Not specified"}`,
+  ];
+
+  for (const item of items.slice(0, 6)) {
+    const description = normalizeText(item.description) || "Item";
+    const lineTotal = Number(item.lineTotal ?? 0);
+    lines.push(`${description}: ${row.currency} ${lineTotal}`);
+  }
+
+  if (row.note) {
+    lines.push(`Note: ${row.note}`);
+  }
+
+  const pdf = buildSimpleReceiptPdf(lines);
+  return new NextResponse(new Uint8Array(pdf), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `inline; filename="${row.number}.pdf"`,
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
 async function getMemberReceipt(receiptId: string, request: NextRequest) {
   const loaded = await loadMemberReceiptForRequest(receiptId, request);
   if ("error" in loaded) return loaded.error;
@@ -1503,7 +2261,8 @@ async function getMemberReceipt(receiptId: string, request: NextRequest) {
   const { row } = loaded;
 
   const collected = (row.registration?.receipts || []).reduce(
-    (sum, rec) => sum + Number(rec.amountPaid || 0),
+    (sum: number, rec: { amountPaid: number | null }) =>
+      sum + Number(rec.amountPaid || 0),
     0,
   );
   return NextResponse.json({
@@ -1535,7 +2294,7 @@ async function getMemberReceiptPdf(receiptId: string, request: NextRequest) {
   ];
 
   const pdf = buildSimpleReceiptPdf(lines);
-  return new NextResponse(pdf, {
+  return new NextResponse(new Uint8Array(pdf), {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
@@ -1574,11 +2333,12 @@ async function createPackageRegistration(payload: RegistrationInput) {
   if (!customerName) throw new Error("Customer name is required");
   if (!customerPhone) throw new Error("Customer phone is required");
 
-  const basePriceJod = clampNonNegative(
+  const [basePriceJod, defaultSessionsLeft] = await Promise.all([
     payload.basePriceJod != null
-      ? Number(payload.basePriceJod)
-      : await getBasePriceJod(packageName),
-  );
+      ? Promise.resolve(clampNonNegative(Number(payload.basePriceJod)))
+      : getBasePriceJod(packageName),
+    getDefaultSessionsLeft(packageName),
+  ]);
 
   const discountType = (payload.discountType || "NONE").toUpperCase();
   const discountValue =
@@ -1607,13 +2367,24 @@ async function createPackageRegistration(payload: RegistrationInput) {
   const periodEndsAt = periodStartsAt
     ? new Date(periodStartsAt.getTime() + 30 * 24 * 60 * 60 * 1000)
     : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const nextPaymentDate = payload.nextPaymentDate
+    ? parseOptionalMembershipDate(payload.nextPaymentDate)
+    : periodEndsAt;
+  if (payload.nextPaymentDate && !nextPaymentDate) {
+    throw new Error("Invalid next payment date");
+  }
+  const sessionsLeft =
+    payload.sessionsLeft == null
+      ? defaultSessionsLeft
+      : Math.max(0, Math.round(Number(payload.sessionsLeft) || 0));
+  const planLabel = normalizeText(payload.planLabel) || packageName;
   const { billingPeriodKey, priceLockedUntil } = billingPeriodFromDate(now);
 
   const createData: Record<string, unknown> = {
     packageName,
     customerName,
     customerPhone,
-    customerEmail: (payload.customerEmail || "").trim() || null,
+    customerEmail: normalizeEmail(payload.customerEmail) || null,
     customerAge: payload.customerAge ?? null,
     isPaid: false,
     basePriceJod,
@@ -1630,6 +2401,9 @@ async function createPackageRegistration(payload: RegistrationInput) {
     billingPeriodKey,
     priceLockedUntil,
     periodEndsAt,
+    sessionsLeft,
+    nextPaymentDate,
+    planLabel,
   };
   if (periodStartsAt) createData.periodStartsAt = periodStartsAt;
 
@@ -1644,6 +2418,12 @@ async function createPackageRegistration(payload: RegistrationInput) {
   await findOrCreateUserFromRegistration({
     customerEmail: row.customerEmail,
     customerName: row.customerName,
+    customerPhone: row.customerPhone,
+  });
+
+  await syncTrackerForRegistrationContact({
+    customerName: row.customerName,
+    customerEmail: row.customerEmail,
     customerPhone: row.customerPhone,
   });
 
@@ -1952,11 +2732,12 @@ async function bulkCreateForPerson(request: NextRequest) {
 
       for (const entry of body.registrations) {
         const packageName = (entry.packageName || "").trim();
-        const basePriceJod = clampNonNegative(
+        const [basePriceJod, defaultSessionsLeft] = await Promise.all([
           entry.basePriceJod != null
-            ? Number(entry.basePriceJod)
-            : await getBasePriceJod(packageName),
-        );
+            ? Promise.resolve(clampNonNegative(Number(entry.basePriceJod)))
+            : getBasePriceJod(packageName),
+          getDefaultSessionsLeft(packageName),
+        ]);
         const discountType = (entry.discountType || "NONE").toUpperCase();
         const discountValue =
           discountType === "NONE" ? null : Number(entry.discountValue ?? 0);
@@ -1975,6 +2756,17 @@ async function bulkCreateForPerson(request: NextRequest) {
         const periodEndsAt = periodStartsAt
           ? new Date(periodStartsAt.getTime() + 30 * 24 * 60 * 60 * 1000)
           : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+        const nextPaymentDate = entry.nextPaymentDate
+          ? parseOptionalMembershipDate(entry.nextPaymentDate)
+          : periodEndsAt;
+        if (entry.nextPaymentDate && !nextPaymentDate) {
+          throw new Error("Invalid next payment date");
+        }
+        const sessionsLeft =
+          entry.sessionsLeft == null
+            ? defaultSessionsLeft
+            : Math.max(0, Math.round(Number(entry.sessionsLeft) || 0));
+        const planLabel = normalizeText(entry.planLabel) || packageName;
         const { billingPeriodKey, priceLockedUntil } =
           billingPeriodFromDate(now);
 
@@ -1982,7 +2774,7 @@ async function bulkCreateForPerson(request: NextRequest) {
           packageName,
           customerName,
           customerPhone,
-          customerEmail: (body.person.customerEmail || "").trim() || null,
+          customerEmail: normalizeEmail(body.person.customerEmail) || null,
           customerAge: body.person.customerAge ?? null,
           isPaid: false,
           basePriceJod,
@@ -1998,6 +2790,9 @@ async function bulkCreateForPerson(request: NextRequest) {
           billingPeriodKey,
           priceLockedUntil,
           periodEndsAt,
+          sessionsLeft,
+          nextPaymentDate,
+          planLabel,
         };
         if (periodStartsAt) createData.periodStartsAt = periodStartsAt;
 
@@ -2018,6 +2813,12 @@ async function bulkCreateForPerson(request: NextRequest) {
     await findOrCreateUserFromRegistration({
       customerEmail: body.person.customerEmail ?? null,
       customerName,
+      customerPhone,
+    });
+
+    await syncTrackerForRegistrationContact({
+      customerName,
+      customerEmail: body.person.customerEmail ?? null,
       customerPhone,
     });
 
@@ -2044,6 +2845,9 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
     customerPhone?: string;
     customerEmail?: string | null;
     customerAge?: number | null;
+    sessionsLeft?: number | null;
+    nextPaymentDate?: string | null;
+    planLabel?: string | null;
     isPaid?: boolean;
     isFrozen?: boolean;
     basePriceJod?: number;
@@ -2077,7 +2881,7 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
     updateData.customerPhone = customerPhone;
   }
   if (body.customerEmail !== undefined) {
-    updateData.customerEmail = String(body.customerEmail || "").trim() || null;
+    updateData.customerEmail = normalizeEmail(body.customerEmail) || null;
   }
   if (body.customerAge !== undefined) {
     if (body.customerAge == null) {
@@ -2089,6 +2893,31 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
       }
       updateData.customerAge = Math.round(parsedAge);
     }
+  }
+  if (body.sessionsLeft !== undefined) {
+    if (body.sessionsLeft == null) {
+      updateData.sessionsLeft = null;
+    } else {
+      const parsedSessionsLeft = Number(body.sessionsLeft);
+      if (!Number.isFinite(parsedSessionsLeft) || parsedSessionsLeft < 0) {
+        return jsonError("sessionsLeft must be 0 or greater");
+      }
+      updateData.sessionsLeft = Math.round(parsedSessionsLeft);
+    }
+  }
+  if (body.nextPaymentDate !== undefined) {
+    if (body.nextPaymentDate) {
+      const nextPaymentDate = parseOptionalMembershipDate(body.nextPaymentDate);
+      if (!nextPaymentDate) {
+        return jsonError("Invalid next payment date");
+      }
+      updateData.nextPaymentDate = nextPaymentDate;
+    } else {
+      updateData.nextPaymentDate = null;
+    }
+  }
+  if (body.planLabel !== undefined) {
+    updateData.planLabel = normalizeText(body.planLabel) || null;
   }
   if (body.isPaid !== undefined) updateData.isPaid = Boolean(body.isPaid);
 
@@ -2227,17 +3056,25 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
     customerPhone: row.customerPhone,
   });
 
+  await syncTrackerForRegistrationContact({
+    customerName: row.customerName,
+    customerEmail: row.customerEmail ?? null,
+    customerPhone: row.customerPhone,
+  });
+
   return NextResponse.json(mapRegistrationRow(row));
 }
 
 async function reregisterPackage(id: string) {
-  const existing = await prisma.packageRegistration.findUnique({
+  const existing = (await prisma.packageRegistration.findUnique({
     where: { id },
-  });
+  })) as any;
   if (!existing) return jsonError("Registration not found", 404);
 
   const now = new Date();
   const periodEndsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const sessionsLeft =
+    existing.sessionsLeft ?? (await getDefaultSessionsLeft(existing.packageName));
   const { billingPeriodKey, priceLockedUntil } = billingPeriodFromDate(now);
 
   const row = await prisma.packageRegistration.create({
@@ -2256,13 +3093,22 @@ async function reregisterPackage(id: string) {
       billingPeriodKey,
       priceLockedUntil,
       periodEndsAt,
+      sessionsLeft,
+      nextPaymentDate: existing.nextPaymentDate ?? periodEndsAt,
+      planLabel: existing.planLabel ?? existing.packageName,
     },
     include: { receipts: { where: ACTIVE_RECEIPT_WHERE } },
-  });
+  } as any);
 
   await findOrCreateUserFromRegistration({
     customerEmail: row.customerEmail,
     customerName: row.customerName,
+    customerPhone: row.customerPhone,
+  });
+
+  await syncTrackerForRegistrationContact({
+    customerName: row.customerName,
+    customerEmail: row.customerEmail,
     customerPhone: row.customerPhone,
   });
 
@@ -3312,6 +4158,18 @@ async function dispatchGet(request: NextRequest, params: Params) {
     return NextResponse.json(rows);
   }
 
+  if (resource === "invoices" && !id) {
+    return listInvoices(request);
+  }
+
+  if (resource === "invoices" && id && !action) {
+    return getInvoice(id);
+  }
+
+  if (resource === "invoices" && id && action === "pdf") {
+    return getInvoicePdf(id);
+  }
+
   if (resource === "bookings" && id === "overview") {
     return getBookingOverview(request);
   }
@@ -3567,6 +4425,10 @@ async function dispatchPost(request: NextRequest, params: Params) {
     });
 
     return NextResponse.json(company);
+  }
+
+  if (resource === "invoices" && !id) {
+    return createInvoice(request);
   }
 
   if (resource === "bookings" && id && action === "payments") {
@@ -3888,6 +4750,10 @@ async function dispatchPatch(request: NextRequest, params: Params) {
     return updatePackageRegistration(id, request);
   }
 
+  if (resource === "invoices" && !action) {
+    return updateInvoice(id, request);
+  }
+
   if (resource === "receipts" && action === "void") {
     return voidReceipt(id, request);
   }
@@ -3921,12 +4787,16 @@ async function dispatchDelete(_request: NextRequest, params: Params) {
     }
   }
 
+  if (resource === "invoices") {
+    return deleteInvoice(id);
+  }
+
   return jsonError("Not found", 404);
 }
 
 export async function GET(
   request: NextRequest,
-  context: { params: MaybePromise<Params> },
+  context: { params: Promise<Params> },
 ) {
   try {
     return await dispatchGet(request, await resolveRouteParams(context.params));
@@ -3941,7 +4811,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  context: { params: MaybePromise<Params> },
+  context: { params: Promise<Params> },
 ) {
   try {
     return await dispatchPost(
@@ -3959,7 +4829,7 @@ export async function POST(
 
 export async function PATCH(
   request: NextRequest,
-  context: { params: MaybePromise<Params> },
+  context: { params: Promise<Params> },
 ) {
   try {
     return await dispatchPatch(
@@ -3977,7 +4847,7 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  context: { params: MaybePromise<Params> },
+  context: { params: Promise<Params> },
 ) {
   try {
     return await dispatchDelete(

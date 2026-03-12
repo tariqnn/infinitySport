@@ -34,6 +34,9 @@ export function EditRegistrationModal({
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerAge, setCustomerAge] = useState('');
+  const [sessionsLeft, setSessionsLeft] = useState('');
+  const [nextPaymentDate, setNextPaymentDate] = useState('');
+  const [planLabel, setPlanLabel] = useState('');
   const [periodStartsAt, setPeriodStartsAt] = useState('');
   const [basePriceJod, setBasePriceJod] = useState('');
   const [discountOpen, setDiscountOpen] = useState(false);
@@ -50,6 +53,9 @@ export function EditRegistrationModal({
     setCustomerPhone(registration.customerPhone || '');
     setCustomerEmail(registration.customerEmail || '');
     setCustomerAge(registration.customerAge != null ? String(registration.customerAge) : '');
+    setSessionsLeft(registration.sessionsLeft != null ? String(registration.sessionsLeft) : '');
+    setNextPaymentDate(toDateInputValue(registration.nextPaymentDate));
+    setPlanLabel(registration.planLabel || registration.packageName || '');
     setPeriodStartsAt(toDateInputValue(registration.periodStartsAt));
     setBasePriceJod(String(Math.max(0, Number(registration.basePriceJod) || 0)));
 
@@ -104,6 +110,16 @@ export function EditRegistrationModal({
     if (!Number.isFinite(baseNumber) || baseNumber < 0) {
       return setError('Base price must be 0 or greater.');
     }
+    if (!sessionsLeft.trim()) {
+      return setError('Sessions left is required.');
+    }
+    const parsedSessionsLeft = Number(sessionsLeft);
+    if (!Number.isFinite(parsedSessionsLeft) || parsedSessionsLeft < 0) {
+      return setError('Sessions left must be 0 or greater.');
+    }
+    if (!nextPaymentDate.trim()) {
+      return setError('Next payment date is required.');
+    }
 
     if (discountType !== 'NONE') {
       if (discountType === 'PERCENT' && (discountNumber < 0 || discountNumber > 100)) {
@@ -134,6 +150,9 @@ export function EditRegistrationModal({
         customerPhone: nextCustomerPhone,
         customerEmail: nextCustomerEmail || null,
         customerAge: agePayload,
+        sessionsLeft: Math.round(parsedSessionsLeft),
+        nextPaymentDate: nextPaymentDate.trim() || null,
+        planLabel: planLabel.trim() || nextPackageName,
         basePriceJod: baseNumber,
         discountType,
         discountValue: discountType === 'NONE' ? null : discountNumber,
@@ -167,6 +186,27 @@ export function EditRegistrationModal({
         <Input label="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} required />
         <Input label="Email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
         <Input label="Age" type="number" min={0} value={customerAge} onChange={(e) => setCustomerAge(e.target.value)} />
+        <Input
+          label="Sessions left"
+          type="number"
+          min={0}
+          value={sessionsLeft}
+          onChange={(e) => setSessionsLeft(e.target.value)}
+          required
+        />
+        <Input
+          label="Next payment date"
+          type="date"
+          value={nextPaymentDate}
+          onChange={(e) => setNextPaymentDate(e.target.value)}
+          required
+        />
+        <Input
+          label="Plan label"
+          value={planLabel}
+          onChange={(e) => setPlanLabel(e.target.value)}
+          placeholder="Optional; defaults to package name"
+        />
         <Input
           label="When they will start"
           type="date"
@@ -237,4 +277,3 @@ export function EditRegistrationModal({
     </Modal>
   );
 }
-

@@ -66,7 +66,15 @@ export function BulkAddModal({
     e.preventDefault();
     setResult(null);
     const registrations = usePaste
-      ? parsePaste().filter((r) => r.customerName && r.customerPhone)
+      ? parsePaste()
+          .filter((r) => r.customerName && r.customerPhone)
+          .map((r) => ({
+            packageName: r.packageName || packageList[0],
+            customerName: r.customerName.trim(),
+            customerPhone: r.customerPhone.trim(),
+            customerEmail: r.customerEmail.trim() || undefined,
+            customerAge: r.customerAge.trim() ? parseInt(r.customerAge, 10) : undefined,
+          }))
       : rows.filter((r) => r.customerName.trim() && r.customerPhone.trim()).map((r) => ({
           packageName: r.packageName || packageList[0],
           customerName: r.customerName.trim(),

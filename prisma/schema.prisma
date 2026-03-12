@@ -351,6 +351,18 @@ model Invoice {
   issuedAt    DateTime      @default(now())
   paidAt      DateTime?
   description String?
+  companyName String?
+  companyAddress String?
+  logoPath    String?
+  clientName  String?
+  clientEmail String?
+  clientAddress String?
+  lineItems   Json?
+  subtotal    Int?
+  tax         Int?
+  discount    Int?
+  notes       String?
+  pdfPath     String?
   companyEmail String?
   companyPhone String?
   note        String?       @db.Text
@@ -600,6 +612,9 @@ model PackageRegistration {
   priceLockedUntil DateTime? // optional end of billing period
   periodStartsAt   DateTime? // when they will start (optional; used for periodEndsAt = periodStartsAt + 30d)
   periodEndsAt     DateTime?
+  sessionsLeft     Int?
+  nextPaymentDate  DateTime?
+  planLabel        String?
   isFrozen         Boolean   @default(false)
   frozenAt         DateTime?
   sessionsBonus    Int       @default(0)

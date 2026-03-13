@@ -10,6 +10,12 @@ export type TrackerPlayerSyncInput = {
   nextPaymentDate?: string | Date | admin.firestore.Timestamp | null;
   planLabel?: string | null;
   pointsBalance?: number | null;
+  isPaid?: boolean | null;
+  paymentStatus?: string | null;
+  finalPriceJod?: number | null;
+  collectedJod?: number | null;
+  remainingJod?: number | null;
+  registrationStatus?: string | null;
 };
 
 export type TrackerSyncResult = {
@@ -22,8 +28,41 @@ export type TrackerSyncResult = {
       pointsBalance: number;
       nextPaymentDate: string | null;
       planLabel: string | null;
+      isPaid: boolean | null;
+      paymentStatus: string | null;
+      finalPriceJod: number | null;
+      collectedJod: number | null;
+      remainingJod: number | null;
+      registrationStatus: string | null;
     };
   }>;
+};
+
+export type TrackerReceiptSyncInput = {
+  id: string;
+  receiptId: string;
+  registrationId?: string | null;
+  childKey?: string | null;
+  studentName?: string | null;
+  studentAge?: number | null;
+  packageName?: string | null;
+  personName?: string | null;
+  personPhone?: string | null;
+  dateTimeIssued?: string | Date | admin.firestore.Timestamp | null;
+  amountPaid?: number | null;
+  paymentMethod?: string | null;
+  status?: string | null;
+  voidedAt?: string | Date | admin.firestore.Timestamp | null;
+  voidReason?: string | null;
+  detailPath?: string | null;
+  pdfPath?: string | null;
+  planLabel?: string | null;
+  nextPaymentDate?: string | Date | admin.firestore.Timestamp | null;
+  paymentStatus?: string | null;
+  finalPriceJod?: number | null;
+  collectedJod?: number | null;
+  remainingJod?: number | null;
+  registrationStatus?: string | null;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -50,6 +89,16 @@ function coerceOptionalNumber(value: unknown): number | null {
   if (typeof value === 'string' && value.trim()) {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function coerceOptionalBoolean(value: unknown): boolean | null {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true') return true;
+    if (normalized === 'false') return false;
   }
   return null;
 }
@@ -86,6 +135,23 @@ function toIsoDate(value: unknown): string | null {
   return null;
 }
 
+function toIsoDateTime(value: unknown): string | null {
+  if (!value) return null;
+  if (value instanceof admin.firestore.Timestamp) {
+    return value.toDate().toISOString();
+  }
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.toISOString();
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const parsed = new Date(trimmed);
+    return Number.isNaN(parsed.getTime()) ? trimmed : parsed.toISOString();
+  }
+  return null;
+}
+
 function getNestedRecord(source: Record<string, unknown>, key: string): Record<string, unknown> {
   const value = source[key];
   return isRecord(value) ? value : {};
@@ -101,6 +167,111 @@ function getExistingPlayerIds(source: Record<string, unknown>): string[] {
 
 export function buildTrackerChildKey(name: string, age?: number | null): string {
   return `${normalizePlayerName(name)}|${age ?? ''}`;
+}
+
+function mapGuestPlayerStatus(registrationStatus: unknown): string {
+  const normalized = normalizeText(registrationStatus).toUpperCase();
+  if (normalized === 'ACTIVE' || normalized === 'EXPIRING_SOON' || !normalized) return 'active';
+  if (normalized === 'FROZEN') return 'frozen';
+  if (normalized === 'EXPIRED') return 'expired';
+  return normalized.toLowerCase();
+}
+
+export async function syncGuestAccessSnapshot(params: {
+  firestore: admin.firestore.Firestore;
+  uid?: string | null;
+  email: string;
+  name?: string | null;
+  playerIds?: string[];
+  photoUrl?: string | null;
+  pointsBalance?: number | null;
+  bookingPointsBalance?: number | null;
+  manualPointsBalance?: number | null;
+  source?: string | null;
+}) {
+  const normalizedEmail = normalizeText(params.email).toLowerCase();
+  if (!normalizedEmail) return;
+
+  const guestRef = params.firestore.collection('guestAccess').doc(normalizedEmail);
+  const existingGuestSnap = await guestRef.get();
+  const existingGuestData = existingGuestSnap.exists
+    ? ((existingGuestSnap.data() as Record<string, unknown>) ?? {})
+    : {};
+
+  let playerIds = Array.isArray(params.playerIds)
+    ? params.playerIds.map((playerId) => normalizeText(playerId)).filter(Boolean)
+    : getExistingPlayerIds(existingGuestData);
+  const parentUid =
+    normalizeNullableText(params.uid) || normalizeNullableText(existingGuestData.parentUid);
+
+  if (playerIds.length === 0 && parentUid) {
+    const parentSnap = await params.firestore.collection('users').doc(parentUid).get();
+    const parentData = parentSnap.exists
+      ? ((parentSnap.data() as Record<string, unknown>) ?? {})
+      : {};
+    playerIds = getExistingPlayerIds(parentData);
+  }
+
+  const playerSnapshots = await Promise.all(
+    playerIds.map((playerId) =>
+      params.firestore.collection('players').doc(playerId).get(),
+    ),
+  );
+
+  const players = playerSnapshots
+    .filter((snap) => snap.exists)
+    .map((snap) => {
+      const data = (snap.data() as Record<string, unknown>) ?? {};
+      const overview = getNestedRecord(data, 'portalOverview');
+      return {
+        id: snap.id,
+        name: normalizeText(data.name),
+        age: coerceOptionalNumber(data.age),
+        primaryPosition:
+          normalizeText(data.primaryPosition) ||
+          normalizeText(data.position) ||
+          'Not set',
+        photoUrl: normalizeText(data.photoUrl) || '',
+        sessionsLeft: coerceOptionalNumber(overview.sessionsLeft),
+        pointsBalance: Math.max(0, coerceOptionalNumber(overview.pointsBalance) ?? 0),
+        planLabel: normalizeNullableText(overview.planLabel),
+        paymentStatus: normalizeNullableText(overview.paymentStatus),
+        registrationStatus: normalizeNullableText(overview.registrationStatus),
+        status: mapGuestPlayerStatus(overview.registrationStatus),
+      };
+    });
+
+  await guestRef.set(
+    {
+      email: normalizedEmail,
+      name: normalizeText(params.name) || normalizeText(existingGuestData.name),
+      photoUrl:
+        normalizeText(params.photoUrl) ||
+        normalizeText(existingGuestData.photoUrl) ||
+        '',
+      parentUid,
+      playerIds,
+      players,
+      pointsBalance:
+        params.pointsBalance != null
+          ? Math.max(0, coerceOptionalNumber(params.pointsBalance) ?? 0)
+          : Math.max(0, coerceOptionalNumber(existingGuestData.pointsBalance) ?? 0),
+      bookingPointsBalance:
+        params.bookingPointsBalance != null
+          ? Math.max(0, coerceOptionalNumber(params.bookingPointsBalance) ?? 0)
+          : Math.max(0, coerceOptionalNumber(existingGuestData.bookingPointsBalance) ?? 0),
+      manualPointsBalance:
+        params.manualPointsBalance != null
+          ? Math.max(0, coerceOptionalNumber(params.manualPointsBalance) ?? 0)
+          : Math.max(0, coerceOptionalNumber(existingGuestData.manualPointsBalance) ?? 0),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      source:
+        normalizeText(params.source) ||
+        normalizeText(existingGuestData.source) ||
+        'portal',
+    },
+    { merge: true },
+  );
 }
 
 export async function syncTrackerUserAndPlayers(params: {
@@ -184,6 +355,12 @@ export async function syncTrackerUserAndPlayers(params: {
     const hasNextPaymentDate = Object.prototype.hasOwnProperty.call(player, 'nextPaymentDate');
     const hasPlanLabel = Object.prototype.hasOwnProperty.call(player, 'planLabel');
     const hasPointsBalance = Object.prototype.hasOwnProperty.call(player, 'pointsBalance');
+    const hasIsPaid = Object.prototype.hasOwnProperty.call(player, 'isPaid');
+    const hasPaymentStatus = Object.prototype.hasOwnProperty.call(player, 'paymentStatus');
+    const hasFinalPriceJod = Object.prototype.hasOwnProperty.call(player, 'finalPriceJod');
+    const hasCollectedJod = Object.prototype.hasOwnProperty.call(player, 'collectedJod');
+    const hasRemainingJod = Object.prototype.hasOwnProperty.call(player, 'remainingJod');
+    const hasRegistrationStatus = Object.prototype.hasOwnProperty.call(player, 'registrationStatus');
 
     const childKey =
       normalizeText(player.childKey) ||
@@ -226,6 +403,33 @@ export async function syncTrackerUserAndPlayers(params: {
 
     if (hasPlanLabel) {
       membershipUpdate.planLabel = normalizeNullableText(player.planLabel);
+    }
+
+    if (hasIsPaid) {
+      membershipUpdate.isPaid = coerceOptionalBoolean(player.isPaid);
+    }
+
+    if (hasPaymentStatus) {
+      membershipUpdate.paymentStatus = normalizeNullableText(player.paymentStatus);
+    }
+
+    if (hasFinalPriceJod) {
+      const amount = coerceOptionalNumber(player.finalPriceJod);
+      membershipUpdate.finalPriceJod = amount == null ? null : Math.max(0, Math.round(amount));
+    }
+
+    if (hasCollectedJod) {
+      const amount = coerceOptionalNumber(player.collectedJod);
+      membershipUpdate.collectedJod = amount == null ? null : Math.max(0, Math.round(amount));
+    }
+
+    if (hasRemainingJod) {
+      const amount = coerceOptionalNumber(player.remainingJod);
+      membershipUpdate.remainingJod = amount == null ? null : Math.max(0, Math.round(amount));
+    }
+
+    if (hasRegistrationStatus) {
+      membershipUpdate.registrationStatus = normalizeNullableText(player.registrationStatus);
     }
 
     const primaryPosition =
@@ -285,6 +489,30 @@ export async function syncTrackerUserAndPlayers(params: {
         hasPlanLabel
           ? normalizeNullableText(player.planLabel)
           : normalizeNullableText(existingOverview.planLabel),
+      isPaid:
+        hasIsPaid
+          ? coerceOptionalBoolean(player.isPaid)
+          : coerceOptionalBoolean(existingOverview.isPaid),
+      paymentStatus:
+        hasPaymentStatus
+          ? normalizeNullableText(player.paymentStatus)
+          : normalizeNullableText(existingOverview.paymentStatus),
+      finalPriceJod:
+        hasFinalPriceJod
+          ? coerceOptionalNumber(player.finalPriceJod)
+          : coerceOptionalNumber(existingOverview.finalPriceJod),
+      collectedJod:
+        hasCollectedJod
+          ? coerceOptionalNumber(player.collectedJod)
+          : coerceOptionalNumber(existingOverview.collectedJod),
+      remainingJod:
+        hasRemainingJod
+          ? coerceOptionalNumber(player.remainingJod)
+          : coerceOptionalNumber(existingOverview.remainingJod),
+      registrationStatus:
+        hasRegistrationStatus
+          ? normalizeNullableText(player.registrationStatus)
+          : normalizeNullableText(existingOverview.registrationStatus),
     };
 
     writtenPlayerIds.push(playerRef.id);
@@ -317,8 +545,110 @@ export async function syncTrackerUserAndPlayers(params: {
     { merge: true },
   );
 
+  await syncGuestAccessSnapshot({
+    firestore,
+    uid,
+    email: accountEmail,
+    name: accountName,
+    playerIds,
+    photoUrl: normalizeText(existingUserData.photoUrl) || '',
+  });
+
   return {
     playerIds,
     players: writtenPlayers,
   };
+}
+
+export async function syncTrackerUserReceipts(params: {
+  firestore: admin.firestore.Firestore;
+  uid: string;
+  receipts?: TrackerReceiptSyncInput[];
+}): Promise<{ synced: number }> {
+  const { firestore, uid, receipts = [] } = params;
+  const userRef = firestore.collection('users').doc(uid);
+  const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
+
+  if (receipts.length === 0) {
+    await userRef.set(
+      {
+        portalReceiptsSyncedAt: serverTimestamp,
+        updatedAt: serverTimestamp,
+      },
+      { merge: true },
+    );
+    return { synced: 0 };
+  }
+
+  const writeChunks: TrackerReceiptSyncInput[][] = [];
+  for (let i = 0; i < receipts.length; i += 400) {
+    writeChunks.push(receipts.slice(i, i + 400));
+  }
+
+  for (const chunk of writeChunks) {
+    const batch = firestore.batch();
+
+    for (const receipt of chunk) {
+      const docRef = userRef.collection('portalReceipts').doc(receipt.id);
+      const issuedAt = toTimestamp(receipt.dateTimeIssued);
+      const nextPaymentDate = toTimestamp(receipt.nextPaymentDate);
+      const voidedAt = toTimestamp(receipt.voidedAt);
+
+      batch.set(
+        docRef,
+        {
+          id: receipt.id,
+          receiptId: normalizeText(receipt.receiptId) || receipt.id,
+          registrationId: normalizeNullableText(receipt.registrationId),
+          childKey: normalizeNullableText(receipt.childKey),
+          studentName: normalizeNullableText(receipt.studentName) || normalizeNullableText(receipt.personName),
+          studentAge:
+            receipt.studentAge == null
+              ? null
+              : Math.max(0, Math.round(coerceOptionalNumber(receipt.studentAge) ?? 0)),
+          packageName: normalizeNullableText(receipt.packageName),
+          personName: normalizeNullableText(receipt.personName),
+          personPhone: normalizeNullableText(receipt.personPhone),
+          dateTimeIssued: issuedAt,
+          dateTimeIssuedIso: toIsoDateTime(receipt.dateTimeIssued),
+          amountPaid: Math.max(0, Math.round(coerceOptionalNumber(receipt.amountPaid) ?? 0)),
+          paymentMethod: normalizeNullableText(receipt.paymentMethod),
+          status: normalizeNullableText(receipt.status) || 'ACTIVE',
+          voidedAt,
+          voidedAtIso: toIsoDateTime(receipt.voidedAt),
+          voidReason: normalizeNullableText(receipt.voidReason),
+          detailPath: normalizeNullableText(receipt.detailPath),
+          pdfPath: normalizeNullableText(receipt.pdfPath),
+          source: 'portal',
+          documentType: 'REGISTRATION_RECEIPT',
+          portalOverview: {
+            planLabel: normalizeNullableText(receipt.planLabel),
+            nextPaymentDate,
+            nextPaymentDateIso: toIsoDate(receipt.nextPaymentDate),
+            paymentStatus: normalizeNullableText(receipt.paymentStatus),
+            finalPriceJod: coerceOptionalNumber(receipt.finalPriceJod),
+            collectedJod: coerceOptionalNumber(receipt.collectedJod),
+            remainingJod: coerceOptionalNumber(receipt.remainingJod),
+            registrationStatus: normalizeNullableText(receipt.registrationStatus),
+          },
+          syncedAt: serverTimestamp,
+          updatedAt: serverTimestamp,
+        },
+        { merge: true },
+      );
+    }
+
+    batch.set(
+      userRef,
+      {
+        portalReceiptsSyncedAt: serverTimestamp,
+        updatedAt: serverTimestamp,
+      },
+      { merge: true },
+    );
+
+    await batch.commit();
+  }
+
+  return { synced: receipts.length };
 }

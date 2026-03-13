@@ -2,10 +2,45 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '../../../lib/db';
+import { getFirestore } from '../../../../portal/lib/firebase-admin';
+import { syncBlockedSlotsSnapshotToFirestore } from '../../../../portal/lib/bookingAvailabilityRealtimeSync';
 
 export interface BookingAvailabilityState {
   status: 'idle' | 'success' | 'error';
   message?: string;
+}
+
+function isPrismaNotFoundError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === 'P2025'
+  );
+}
+
+async function syncBlockedSlotsRealtimeSnapshot() {
+  try {
+    const firestore = getFirestore();
+    const slots = await prisma.blockedSlot.findMany({
+      orderBy: [{ label: 'asc' }, { dayOfWeek: 'asc' }, { courtType: 'asc' }, { time: 'asc' }],
+    });
+    await syncBlockedSlotsSnapshotToFirestore({
+      firestore,
+      blockedSlots: slots.map((slot) => ({
+        id: slot.id,
+        dayOfWeek: slot.dayOfWeek,
+        courtType: slot.courtType,
+        time: slot.time,
+        isBlocked: slot.isBlocked,
+        label: slot.label,
+        startDate: slot.startDate,
+        endDate: slot.endDate,
+      })),
+    });
+  } catch (error) {
+    console.warn('[booking-availability] firebase sync skipped', error);
+  }
 }
 
 export async function listBlockedSlotsAction() {
@@ -28,10 +63,11 @@ export async function updateBlockedSlotAction(
       data: { isBlocked },
     });
 
+    await syncBlockedSlotsRealtimeSnapshot();
     revalidatePath('/booking-availability');
     return { status: 'success', message: isBlocked ? 'Slot marked as blocked.' : 'Slot marked as free.' };
-  } catch (error: any) {
-    if (error?.code === 'P2025') return { status: 'error', message: 'Blocked slot not found.' };
+  } catch (error) {
+    if (isPrismaNotFoundError(error)) return { status: 'error', message: 'Blocked slot not found.' };
     return { status: 'error', message: 'Unable to update.' };
   }
 }
@@ -79,6 +115,7 @@ export async function createClubBookingAction(
       });
     }
 
+    await syncBlockedSlotsRealtimeSnapshot();
     revalidatePath('/booking-availability');
     return { status: 'success', message: 'Club booking created.' };
   } catch {
@@ -125,6 +162,7 @@ export async function createSingleSlotAction(
       },
     });
 
+    await syncBlockedSlotsRealtimeSnapshot();
     revalidatePath('/booking-availability');
     return { status: 'success', message: 'Slot added.' };
   } catch {
@@ -142,10 +180,11 @@ export async function deleteBlockedSlotAction(
 
     await prisma.blockedSlot.delete({ where: { id } });
 
+    await syncBlockedSlotsRealtimeSnapshot();
     revalidatePath('/booking-availability');
     return { status: 'success', message: 'Slot deleted.' };
-  } catch (error: any) {
-    if (error?.code === 'P2025') return { status: 'error', message: 'Blocked slot not found.' };
+  } catch (error) {
+    if (isPrismaNotFoundError(error)) return { status: 'error', message: 'Blocked slot not found.' };
     return { status: 'error', message: 'Unable to delete slot.' };
   }
 }
@@ -160,6 +199,7 @@ export async function deleteClubBookingByLabelAction(
 
     await prisma.blockedSlot.deleteMany({ where: { label: decodeURIComponent(label) } });
 
+    await syncBlockedSlotsRealtimeSnapshot();
     revalidatePath('/booking-availability');
     return { status: 'success', message: 'Club booking deleted.' };
   } catch {
@@ -212,6 +252,7 @@ export async function updateClubBookingAction(
       });
     }
 
+    await syncBlockedSlotsRealtimeSnapshot();
     revalidatePath('/booking-availability');
     return { status: 'success', message: 'Club booking updated.' };
   } catch {

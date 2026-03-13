@@ -36,6 +36,7 @@
     "prisma:seed-club-bookings": "cd prisma && ts-node --project tsconfig.json seed-club-bookings.ts",
     "prisma:seed-package-pricing": "cd prisma && ts-node --project tsconfig.json seed-package-pricing.ts",
     "prisma:seed-packages": "cd prisma && ts-node --project tsconfig.json seed-packages.ts",
+    "bookings:backfill:firebase": "node scripts/backfill-bookings-to-firestore.js",
     "start:portal": "npm --workspace apps/portal run start",
     "start:admin": "npm --workspace apps/admin run start",
     "start:web": "npm --workspace apps/web run start",

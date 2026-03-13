@@ -11,6 +11,7 @@ import {
   ClipboardDocumentListIcon,
   MapIcon,
   InboxStackIcon,
+  GiftTopIcon,
 } from "@heroicons/react/24/outline";
 import clsx from "clsx";
 
@@ -22,12 +23,14 @@ const NAV_SECTIONS = [
       { label: "Coaches", href: "/coaches", icon: UserGroupIcon },
       { label: "Bookings", href: "/bookings", icon: CalendarIcon },
       { label: "Registrations", href: "/registrations", icon: ClipboardDocumentListIcon },
+      { label: "Guest Accounts", href: "/guests", icon: UserGroupIcon },
     ],
   },
   {
     label: "Operations",
     items: [
       { label: "Classes", href: "/classes", icon: MapIcon },
+      { label: "Shop", href: "/shop", icon: GiftTopIcon },
       { label: "Inventory", href: "/inventory", icon: InboxStackIcon },
     ],
   },

@@ -2,6 +2,11 @@
 import { NextResponse } from 'next/server';
 import { getPgPool } from '../../../../lib/pg';
 import { noteDatabaseFailure } from '../../../../lib/dbGuard';
+import { getFirestore } from '../../../../../portal/lib/firebase-admin';
+import {
+  bookingCourtNameFromId,
+  listMobileBookingInboxEntries,
+} from '../../../../../portal/lib/bookingRealtimeSync';
 
 const COURT_TYPES = ['Basketball AC', 'Basketball 3x3', 'Padel', 'Volleyball'] as const;
 type BookedPayload = { booked: Record<string, Record<string, string[]>> };
@@ -34,6 +39,55 @@ function toTimeStr(d: Date): string {
   const h = String(d.getHours()).padStart(2, '0');
   const m = String(d.getMinutes()).padStart(2, '0');
   return `${h}:${m}`;
+}
+
+function parseFirestoreDateValue(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { toDate?: unknown }).toDate === 'function'
+  ) {
+    const date = (value as { toDate: () => Date }).toDate();
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  const parsed = new Date(String(value));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function normalizeText(value: unknown): string {
+  return String(value ?? '').trim();
+}
+
+function resolveCourtType(data: Record<string, unknown>): (typeof COURT_TYPES)[number] | null {
+  const direct =
+    normalizeText(data.facilityArea) ||
+    normalizeText(data.courtName) ||
+    bookingCourtNameFromId(normalizeText(data.courtId));
+  if ((COURT_TYPES as readonly string[]).includes(direct)) {
+    return direct as (typeof COURT_TYPES)[number];
+  }
+  return null;
+}
+
+function mergeBookedRange(
+  booked: Record<string, Record<string, string[]>>,
+  courtType: (typeof COURT_TYPES)[number],
+  startTime: Date,
+  endTime: Date,
+) {
+  const slot = new Date(startTime);
+  while (slot.getTime() < endTime.getTime()) {
+    const dateStr = toDateStr(slot);
+    const timeStr = toTimeStr(slot);
+    if (!booked[dateStr]) booked[dateStr] = {};
+    if (!booked[dateStr][courtType]) booked[dateStr][courtType] = [];
+    if (!booked[dateStr][courtType].includes(timeStr)) {
+      booked[dateStr][courtType].push(timeStr);
+    }
+    slot.setTime(slot.getTime() + 60 * 60 * 1000);
+  }
 }
 
 export async function GET(request: Request) {
@@ -100,6 +154,31 @@ export async function GET(request: Request) {
         if (!booked[dateStr][courtType].includes(timeStr)) booked[dateStr][courtType].push(timeStr);
         slot.setTime(slot.getTime() + 60 * 60 * 1000);
       }
+    }
+
+    try {
+      const firestore = getFirestore();
+      const pendingEntries = await listMobileBookingInboxEntries({
+        firestore,
+        limit: 300,
+      });
+      for (const entry of pendingEntries) {
+        const data = entry.data;
+        if (data.dbImported === true) continue;
+        const status = normalizeText(data.status).toUpperCase();
+        if (['CANCELLED', 'CONFLICT', 'ERROR'].includes(status)) continue;
+
+        const courtType = resolveCourtType(data);
+        const startTime = parseFirestoreDateValue(data.startTime ?? data.startTimeIso);
+        const endTime = parseFirestoreDateValue(data.endTime ?? data.endTimeIso);
+        if (!courtType || !startTime || !endTime) continue;
+        if (startTime.getTime() >= end.getTime() || endTime.getTime() <= start.getTime()) {
+          continue;
+        }
+        mergeBookedRange(booked, courtType, startTime, endTime);
+      }
+    } catch (error) {
+      console.warn('[booked-slots] firestore overlay skipped', error);
     }
 
     const payload: BookedPayload = { booked };

@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as admin from 'firebase-admin';
+import { prisma } from '../../../lib/db';
 import { getFirebaseAuth, getFirestore } from '../../../lib/firebase-admin';
+import { buildRegistrationMembershipSummaries } from '../../../lib/registrationMembership';
+import { loadTrackerReceiptSyncInputsForContact } from '../../../lib/registrationReceiptSync';
 import {
   buildTrackerChildKey,
+  syncTrackerUserReceipts,
   syncTrackerUserAndPlayers,
   type TrackerPlayerSyncInput,
 } from '../../../lib/trackerAccountSync';
@@ -62,6 +66,12 @@ function buildParentPlayerInputs(body: Record<string, unknown>): TrackerPlayerSy
         sessionsLeft: coerceOptionalNumber(body.sessionsLeft),
         nextPaymentDate: normalizeText(body.nextPaymentDate) || null,
         planLabel: normalizeText(body.planLabel) || null,
+        isPaid: typeof body.isPaid === 'boolean' ? body.isPaid : null,
+        paymentStatus: normalizeText(body.paymentStatus) || null,
+        finalPriceJod: coerceOptionalNumber(body.finalPriceJod),
+        collectedJod: coerceOptionalNumber(body.collectedJod),
+        remainingJod: coerceOptionalNumber(body.remainingJod),
+        registrationStatus: normalizeText(body.registrationStatus) || null,
       },
     ];
   }
@@ -81,6 +91,12 @@ function buildParentPlayerInputs(body: Record<string, unknown>): TrackerPlayerSy
       sessionsLeft: coerceOptionalNumber(data.sessionsLeft),
       nextPaymentDate: normalizeText(data.nextPaymentDate) || null,
       planLabel: normalizeText(data.planLabel) || null,
+      isPaid: typeof data.isPaid === 'boolean' ? data.isPaid : null,
+      paymentStatus: normalizeText(data.paymentStatus) || null,
+      finalPriceJod: coerceOptionalNumber(data.finalPriceJod),
+      collectedJod: coerceOptionalNumber(data.collectedJod),
+      remainingJod: coerceOptionalNumber(data.remainingJod),
+      registrationStatus: normalizeText(data.registrationStatus) || null,
     };
   });
 }
@@ -114,6 +130,139 @@ function summarizeMembership(players: Awaited<ReturnType<typeof syncTrackerUserA
   return players[0]?.membership ?? null;
 }
 
+function trackerPlayerIdentityKey(player: {
+  registrationId?: string | null;
+  childKey?: string | null;
+  name?: string | null;
+  age?: number | null;
+}): string {
+  const registrationId = normalizeText(player.registrationId);
+  if (registrationId) return `registration:${registrationId}`;
+
+  const childKey = normalizeText(player.childKey);
+  if (childKey) return `child:${childKey}`;
+
+  return `name:${buildTrackerChildKey(normalizeText(player.name), coerceOptionalNumber(player.age))}`;
+}
+
+function trackerSummaryToPlayerInput(summary: Awaited<ReturnType<typeof buildRegistrationMembershipSummaries>>[number]): TrackerPlayerSyncInput {
+  return {
+    childKey: buildTrackerChildKey(summary.studentName, summary.customerAge),
+    registrationId: summary.id,
+    name: summary.studentName,
+    age: summary.customerAge,
+    primaryPosition: null,
+    sessionsLeft: summary.sessionsRemaining,
+    nextPaymentDate: summary.nextPaymentDate,
+    planLabel: summary.planLabel || summary.packageName,
+    pointsBalance: summary.pointsBalance,
+    isPaid: summary.isPaid,
+    paymentStatus: summary.paymentStatus,
+    finalPriceJod: summary.finalPriceJod,
+    collectedJod: summary.collectedJod,
+    remainingJod: summary.remainingJod,
+    registrationStatus: summary.status,
+  };
+}
+
+async function enrichParentPlayers(
+  players: TrackerPlayerSyncInput[],
+  identity: {
+    email?: string | null;
+    phone?: string | null;
+  },
+): Promise<TrackerPlayerSyncInput[]> {
+  const submittedRegistrationIds = Array.from(
+    new Set(
+      players
+        .map((player) => normalizeText(player.registrationId))
+        .filter(Boolean),
+    ),
+  );
+
+  const normalizedEmail = normalizeEmail(identity.email);
+  const normalizedPhone = normalizeText(identity.phone);
+  const whereOr: Array<Record<string, unknown>> = [];
+
+  if (normalizedEmail) {
+    whereOr.push({
+      customerEmail: { equals: normalizedEmail, mode: 'insensitive' },
+    });
+  }
+
+  if (normalizedPhone) {
+    whereOr.push({ customerPhone: normalizedPhone });
+  }
+
+  if (submittedRegistrationIds.length > 0) {
+    whereOr.push({ id: { in: submittedRegistrationIds } });
+  }
+
+  if (whereOr.length === 0) return players;
+
+  const registrations = await prisma.packageRegistration.findMany({
+    where: whereOr.length === 1 ? whereOr[0] : { OR: whereOr },
+    include: {
+      receipts: {
+        where: {
+          status: 'ACTIVE',
+          voidedAt: null,
+        },
+      },
+    },
+  });
+
+  const summaries = await buildRegistrationMembershipSummaries(prisma, registrations);
+  const summaryByRegistrationId = new Map(summaries.map((summary) => [summary.id, summary]));
+  const summaryByChildKey = new Map(
+    summaries.map((summary) => [
+      buildTrackerChildKey(summary.studentName, summary.customerAge),
+      summary,
+    ]),
+  );
+
+  const merged = new Map<string, TrackerPlayerSyncInput>();
+
+  for (const summary of summaries) {
+    const summaryPlayer = trackerSummaryToPlayerInput(summary);
+    merged.set(trackerPlayerIdentityKey(summaryPlayer), summaryPlayer);
+  }
+
+  for (const player of players) {
+    const registrationId = normalizeText(player.registrationId);
+    const normalizedChildKey =
+      normalizeText(player.childKey) ||
+      buildTrackerChildKey(normalizeText(player.name), coerceOptionalNumber(player.age));
+    const summary = (registrationId
+      ? summaryByRegistrationId.get(registrationId)
+      : undefined) || summaryByChildKey.get(normalizedChildKey);
+    const summaryChildKey = summary
+      ? buildTrackerChildKey(summary.studentName, summary.customerAge)
+      : null;
+
+    const nextPlayer: TrackerPlayerSyncInput = {
+      ...player,
+      childKey: normalizedChildKey || summaryChildKey || null,
+      registrationId: registrationId || summary?.id || null,
+      name: normalizeText(player.name) || summary?.studentName || '',
+      age: player.age ?? summary?.customerAge ?? null,
+      sessionsLeft: summary?.sessionsRemaining ?? player.sessionsLeft ?? null,
+      nextPaymentDate: summary?.nextPaymentDate ?? player.nextPaymentDate ?? null,
+      planLabel: normalizeText(player.planLabel) || summary?.planLabel || summary?.packageName || null,
+      isPaid: summary?.isPaid ?? player.isPaid ?? null,
+      paymentStatus: summary?.paymentStatus ?? (normalizeText(player.paymentStatus) || null),
+      finalPriceJod: summary?.finalPriceJod ?? coerceOptionalNumber(player.finalPriceJod),
+      collectedJod: summary?.collectedJod ?? coerceOptionalNumber(player.collectedJod),
+      remainingJod: summary?.remainingJod ?? coerceOptionalNumber(player.remainingJod),
+      registrationStatus: summary?.status ?? (normalizeText(player.registrationStatus) || null),
+    };
+
+    merged.set(trackerPlayerIdentityKey(nextPlayer), nextPlayer);
+  }
+
+  return Array.from(merged.values());
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as Record<string, unknown>;
@@ -134,7 +283,12 @@ export async function POST(request: NextRequest) {
     const auth = getFirebaseAuth();
     const firestore = getFirestore();
 
-    const parentPlayers = role === 'parent' ? buildParentPlayerInputs(body) : [];
+    const parentPlayers = role === 'parent'
+      ? await enrichParentPlayers(buildParentPlayerInputs(body), {
+          email,
+          phone: normalizeText(body.phone),
+        })
+      : [];
     if (role === 'parent') {
       const validationError = validateParentPlayers(parentPlayers);
       if (validationError) {
@@ -188,6 +342,19 @@ export async function POST(request: NextRequest) {
       players: role === 'parent' ? parentPlayers : undefined,
     });
 
+    if (role === 'parent') {
+      const receiptSyncRows = await loadTrackerReceiptSyncInputsForContact({
+        customerEmail: email,
+        customerPhone: normalizeText(body.phone),
+      });
+
+      await syncTrackerUserReceipts({
+        firestore,
+        uid: userRecord.uid,
+        receipts: receiptSyncRows,
+      });
+    }
+
     console.info('[tracker-account] membership sync', {
       uid: userRecord.uid,
       email,
@@ -217,6 +384,12 @@ export async function POST(request: NextRequest) {
           pointsBalance: player.membership.pointsBalance,
           nextPaymentDate: toIsoDate(player.membership.nextPaymentDate),
           planLabel: player.membership.planLabel,
+          isPaid: player.membership.isPaid,
+          paymentStatus: player.membership.paymentStatus,
+          finalPriceJod: player.membership.finalPriceJod,
+          collectedJod: player.membership.collectedJod,
+          remainingJod: player.membership.remainingJod,
+          registrationStatus: player.membership.registrationStatus,
         },
       })),
     });

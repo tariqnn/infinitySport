@@ -88,6 +88,7 @@ type RecurringBlockDraft = {
 type CourtRateDraft = {
   name: string;
   hourlyRate: string;
+  rewardPointsPerHour: string;
 };
 
 type ExportRow = Record<string, string | number | null | undefined>;
@@ -102,10 +103,10 @@ const DEFAULT_PAYMENT_DRAFT: PaymentDraft = {
 
 const DAY_NAMES = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 const DEFAULT_COURT_RATE_SEED: BookingCourtRate[] = [
-  { name: 'Basketball AC', hourlyRate: 40 },
-  { name: 'Basketball 3x3', hourlyRate: 30 },
-  { name: 'Padel', hourlyRate: 35 },
-  { name: 'Volleyball', hourlyRate: 35 },
+  { name: 'Basketball AC', hourlyRate: 40, rewardPointsPerHour: 10 },
+  { name: 'Basketball 3x3', hourlyRate: 30, rewardPointsPerHour: 10 },
+  { name: 'Padel', hourlyRate: 35, rewardPointsPerHour: 10 },
+  { name: 'Volleyball', hourlyRate: 35, rewardPointsPerHour: 10 },
 ];
 
 function formatCurrency(value: number): string {
@@ -448,16 +449,21 @@ function getCourtHourlyRate(court: string | null | undefined, lookup: Record<str
 }
 
 function buildCourtRateDrafts(source: BookingCourtRate[]): CourtRateDraft[] {
-  const byName = new Map<string, number>();
+  const byName = new Map<string, { hourlyRate: number; rewardPointsPerHour: number }>();
   source.forEach((row) => {
     const name = String(row.name || '').trim();
     if (!name) return;
-    const amount = Math.max(1, Math.round(Number(row.hourlyRate || 0)));
-    byName.set(name, amount);
+    const hourlyRate = Math.max(1, Math.round(Number(row.hourlyRate || 0)));
+    const rewardPointsPerHour = Math.max(0, Math.round(Number(row.rewardPointsPerHour || 0)));
+    byName.set(name, { hourlyRate, rewardPointsPerHour });
   });
   return Array.from(byName.entries())
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([name, hourlyRate]) => ({ name, hourlyRate: String(hourlyRate) }));
+    .map(([name, values]) => ({
+      name,
+      hourlyRate: String(values.hourlyRate),
+      rewardPointsPerHour: String(values.rewardPointsPerHour),
+    }));
 }
 
 function buildBookingRowsForExport(rows: BookingOverviewRow[], courtRateLookup: Record<string, number>): ExportRow[] {
@@ -1274,7 +1280,11 @@ export default function BookingsPage() {
       if (!source.length) {
         source = courtOptions
           .filter((court) => court.name !== 'ALL')
-          .map((court) => ({ name: court.name, hourlyRate: court.hourlyRate || 30 }));
+          .map((court) => ({
+            name: court.name,
+            hourlyRate: court.hourlyRate || 30,
+            rewardPointsPerHour: 10,
+          }));
       }
       if (!source.length) {
         source = DEFAULT_COURT_RATE_SEED;
@@ -1293,8 +1303,9 @@ export default function BookingsPage() {
       .map((row) => ({
         name: String(row.name || '').trim(),
         hourlyRate: Math.round(Number(row.hourlyRate || 0)),
+        rewardPointsPerHour: Math.max(0, Math.round(Number(row.rewardPointsPerHour || 0))),
       }))
-      .filter((row) => row.name || row.hourlyRate > 0);
+      .filter((row) => row.name || row.hourlyRate > 0 || row.rewardPointsPerHour >= 0);
 
     if (cleaned.length === 0) {
       setCourtRatesError('No court rates to save.');
@@ -1306,6 +1317,7 @@ export default function BookingsPage() {
     for (const row of cleaned) {
       const name = row.name;
       const hourlyRate = row.hourlyRate;
+      const rewardPointsPerHour = row.rewardPointsPerHour;
       if (!name) {
         setCourtRatesError('Court name is required.');
         return;
@@ -1314,13 +1326,17 @@ export default function BookingsPage() {
         setCourtRatesError(`Invalid hourly rate for ${name}.`);
         return;
       }
+      if (!Number.isFinite(rewardPointsPerHour) || rewardPointsPerHour < 0) {
+        setCourtRatesError(`Invalid reward points per hour for ${name}.`);
+        return;
+      }
       const key = name.toLowerCase();
       if (seen.has(key)) {
         setCourtRatesError(`Duplicate court name: ${name}`);
         return;
       }
       seen.add(key);
-      payload.push({ name, hourlyRate });
+      payload.push({ name, hourlyRate, rewardPointsPerHour });
     }
 
     setCourtRatesSaving(true);
@@ -2013,7 +2029,7 @@ export default function BookingsPage() {
         ) : null}
       </Modal>
 
-      <Modal open={courtRatesOpen} onClose={() => setCourtRatesOpen(false)} title="Edit Court Rates" description="Update hourly price for each court" size="md">
+      <Modal open={courtRatesOpen} onClose={() => setCourtRatesOpen(false)} title="Edit Court Rates" description="Update hourly price and booking reward points for each court" size="md">
         <div className="space-y-4">
           {courtRatesError ? <p className="text-sm text-ui-danger">{courtRatesError}</p> : null}
           {courtRatesLoading ? (
@@ -2026,14 +2042,14 @@ export default function BookingsPage() {
                 <Button
                   size="sm"
                   variant="secondary"
-                  onClick={() => setCourtRatesDraft((prev) => [...prev, { name: '', hourlyRate: '30' }])}
+                  onClick={() => setCourtRatesDraft((prev) => [...prev, { name: '', hourlyRate: '30', rewardPointsPerHour: '10' }])}
                   leadingIcon={<PlusIcon className="h-3.5 w-3.5" />}
                 >
                   Add Court
                 </Button>
               </div>
               {courtRatesDraft.map((row, index) => (
-                <div key={`${row.name}-${index}`} className="grid grid-cols-[1fr_140px_auto] items-center gap-2 rounded-lg border border-ui-border bg-ui-softBg p-2">
+                <div key={`${row.name}-${index}`} className="grid grid-cols-[1fr_140px_140px_auto] items-center gap-2 rounded-lg border border-ui-border bg-ui-softBg p-2">
                   <input
                     type="text"
                     value={row.name}
@@ -2061,6 +2077,21 @@ export default function BookingsPage() {
                     }
                     className="control-field h-10 w-full"
                   />
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={row.rewardPointsPerHour}
+                    onChange={(e) =>
+                      setCourtRatesDraft((prev) =>
+                        prev.map((item, itemIndex) =>
+                          itemIndex === index ? { ...item, rewardPointsPerHour: e.target.value } : item,
+                        ),
+                      )
+                    }
+                    className="control-field h-10 w-full"
+                    title="Reward points per hour"
+                  />
                   <button
                     type="button"
                     aria-label="Remove court rate row"
@@ -2075,6 +2106,11 @@ export default function BookingsPage() {
               ))}
             </div>
           )}
+          {!courtRatesLoading && courtRatesDraft.length > 0 ? (
+            <p className="text-xs text-ui-textMuted">
+              Reward points apply automatically when a booking is confirmed or successfully imported from the app.
+            </p>
+          ) : null}
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setCourtRatesOpen(false)}>Cancel</Button>
             <Button onClick={() => void saveCourtRates()} isLoading={courtRatesSaving || courtRatesLoading}>Save Rates</Button>

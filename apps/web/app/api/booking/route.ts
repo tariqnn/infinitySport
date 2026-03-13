@@ -6,9 +6,15 @@ import { NextResponse } from 'next/server';
 import { getPgPool } from '../../../lib/pg';
 import { isValidPhoneNumber } from '../../../lib/phoneValidation';
 import {
+  bookingCourtNameFromId,
+  listMobileBookingInboxEntries,
+  syncBookingRecordToFirestore,
+} from '../../../../portal/lib/bookingRealtimeSync';
+import {
   isDatabaseUnavailableError,
   noteDatabaseFailure,
 } from '../../../lib/dbGuard';
+import { getFirestore } from '../../../../portal/lib/firebase-admin';
 
 type CourtType = 'Basketball AC' | 'Basketball 3x3' | 'Padel' | 'Volleyball';
 
@@ -70,6 +76,95 @@ const courtTypeForId = (courtId: string): CourtType | null => {
   if (courtId === 'volleyball') return 'Volleyball';
   return null;
 };
+
+async function syncLandingBookingToFirestore(input: {
+  id: string;
+  companyId: string;
+  facilityArea: string;
+  startTime: Date;
+  endTime: Date;
+  status: string;
+  isPaid: boolean;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string | null;
+  notes: string;
+}) {
+  try {
+    const firestore = getFirestore();
+    await syncBookingRecordToFirestore({
+      firestore,
+      booking: {
+        id: input.id,
+        companyId: input.companyId,
+        facilityArea: input.facilityArea,
+        startTime: input.startTime,
+        endTime: input.endTime,
+        status: input.status,
+        source: 'WEBSITE',
+        isPaid: input.isPaid,
+        customerName: input.customerName,
+        customerPhone: input.customerPhone,
+        customerEmail: input.customerEmail,
+        notes: input.notes,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+  } catch (error) {
+    console.warn('[booking] firestore sync skipped', error);
+  }
+}
+
+function parseFirestoreDateValue(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { toDate?: unknown }).toDate === 'function'
+  ) {
+    const date = (value as { toDate: () => Date }).toDate();
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  const parsed = new Date(String(value));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+async function hasPendingMobileBookingOverlap(input: {
+  courtName: string;
+  startTime: Date;
+  endTime: Date;
+}) {
+  try {
+    const firestore = getFirestore();
+    const entries = await listMobileBookingInboxEntries({
+      firestore,
+      limit: 300,
+    });
+    for (const entry of entries) {
+      const data = entry.data;
+      if (data.dbImported === true) continue;
+      const status = String(data.status ?? '').trim().toUpperCase();
+      if (['CANCELLED', 'CONFLICT', 'ERROR'].includes(status)) continue;
+      const courtName =
+        String(data.facilityArea ?? data.courtName ?? '').trim() ||
+        bookingCourtNameFromId(String(data.courtId ?? '').trim()) ||
+        '';
+      const startTime = parseFirestoreDateValue(data.startTime ?? data.startTimeIso);
+      const endTime = parseFirestoreDateValue(data.endTime ?? data.endTimeIso);
+      if (!courtName || !startTime || !endTime) continue;
+      if (courtName !== input.courtName) continue;
+      if (startTime.getTime() < input.endTime.getTime() && endTime.getTime() > input.startTime.getTime()) {
+        return true;
+      }
+    }
+  } catch (error) {
+    console.warn('[booking] firestore overlap check skipped', error);
+  }
+
+  return false;
+}
 
 const dayKey = (dateStr: string) => {
   const [y, m, d] = dateStr.split('-').map((n) => Number(n));
@@ -269,6 +364,18 @@ export async function POST(request: Request) {
     const pool = getPgPool();
 
     if (courtType) {
+      const pendingOverlap = await hasPendingMobileBookingOverlap({
+        courtName: courtType,
+        startTime,
+        endTime,
+      });
+      if (pendingOverlap) {
+        return NextResponse.json(
+          { error: 'This time slot is already booked. Please select another time.' },
+          { status: 409 },
+        );
+      }
+
       const overlap = await pool.query<{ id: string }>(
         `
         SELECT "id"
@@ -333,6 +440,8 @@ export async function POST(request: Request) {
       throw new Error('Failed to resolve company for booking');
     }
 
+    const bookingId = randomUUID();
+    const notes = 'Public booking from landing page';
     await pool.query(
       `
       INSERT INTO "Booking" (
@@ -353,7 +462,7 @@ export async function POST(request: Request) {
       VALUES ($1, $2, $3, $4, $5, 'PENDING', false, $6, $7, $8, $9, NOW(), NOW())
       `,
       [
-        randomUUID(),
+        bookingId,
         companyId,
         courtType || courtName,
         startTime,
@@ -361,9 +470,23 @@ export async function POST(request: Request) {
         name,
         phone,
         typeof email === 'string' ? email : null,
-        'Public booking from landing page',
+        notes,
       ],
     );
+
+    await syncLandingBookingToFirestore({
+      id: bookingId,
+      companyId,
+      facilityArea: courtType || courtName,
+      startTime,
+      endTime,
+      status: 'PENDING',
+      isPaid: false,
+      customerName: name,
+      customerPhone: phone,
+      customerEmail: typeof email === 'string' ? email : null,
+      notes,
+    });
 
     return NextResponse.json({
       success: true,

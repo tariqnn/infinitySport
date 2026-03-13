@@ -10,6 +10,7 @@ import { MarkAsPaidModal } from './_components/MarkAsPaidModal';
 import { ViewReceiptsModal } from './_components/ViewReceiptsModal';
 import { BulkAddPeopleModal } from './_components/BulkAddPeopleModal';
 import { IncreaseSessionModal } from './_components/IncreaseSessionModal';
+import { AddPointsModal } from './_components/AddPointsModal';
 import { RegistrationTotalsPanel } from './_components/RegistrationTotalsPanel';
 import { CancelSessionDayModal } from './_components/CancelSessionDayModal';
 import { AddRegistrationModal, type InitialPerson } from './_components/AddRegistrationModal';
@@ -30,6 +31,8 @@ export default function RegistrationsPage() {
   const [dateRange, setDateRange] = useState<string>('all');
   const [customStartDate, setCustomStartDate] = useState<string>('');
   const [customEndDate, setCustomEndDate] = useState<string>('');
+  const [searchInput, setSearchInput] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const [freezingId, setFreezingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [markingUnpaidId, setMarkingUnpaidId] = useState<string | null>(null);
@@ -40,6 +43,7 @@ export default function RegistrationsPage() {
   const [viewReceiptsRegistration, setViewReceiptsRegistration] = useState<Registration | null>(null);
   const [bulkAddOpen, setBulkAddOpen] = useState(false);
   const [increaseSessionRegistration, setIncreaseSessionRegistration] = useState<Registration | null>(null);
+  const [addPointsRegistration, setAddPointsRegistration] = useState<Registration | null>(null);
   const [cancelSessionDayOpen, setCancelSessionDayOpen] = useState(false);
   const [addRegistrationOpen, setAddRegistrationOpen] = useState(false);
   const [detailsModalRow, setDetailsModalRow] = useState<Registration | null>(null);
@@ -153,6 +157,12 @@ export default function RegistrationsPage() {
     return null;
   }
 
+  function getCycleStart(r: Registration): Date | null {
+    if (r.periodStartsAt) return new Date(r.periodStartsAt);
+    if (r.createdAt) return new Date(r.createdAt);
+    return null;
+  }
+
   /** Days remaining (positive) or 0 if expired. Returns null if frozen (countdown paused). */
   function getDaysRemaining(r: Registration): number | null {
     if (r.isFrozen) return null;
@@ -172,7 +182,7 @@ export default function RegistrationsPage() {
   function getSessionsRemaining(r: Registration): { remaining: number; total: number; used: number } | null {
     const schedule = getPackageSchedule(r.packageName);
     if (!schedule) return null;
-    const start = r.createdAt ? new Date(r.createdAt) : null;
+    const start = getCycleStart(r);
     const end = getPeriodEnd(r);
     if (!start || !end) return null;
 
@@ -219,13 +229,21 @@ export default function RegistrationsPage() {
     return out;
   }, [dateRange, customStartDate, customEndDate]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSearchTerm(searchInput.trim());
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
   const load = useCallback(async () => {
     try {
       setLoading(true);
       const data = await packageRegistrationsApi.list(
         packageFilter || undefined,
         dateFilters.startDate,
-        dateFilters.endDate
+        dateFilters.endDate,
+        searchTerm || undefined,
       );
       setRows(data);
 
@@ -245,7 +263,7 @@ export default function RegistrationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [packageFilter, dateFilters]);
+  }, [packageFilter, dateFilters, searchTerm]);
 
   useEffect(() => {
     load();
@@ -304,7 +322,7 @@ export default function RegistrationsPage() {
 
   async function handleMarkUnpaid(r: Registration) {
     if (markingUnpaidId) return;
-    if (!confirm(`Mark ${r.customerName} as unpaid? All receipts for this registration will be voided. This cannot be undone.`)) return;
+    if (!confirm(`Mark ${r.customerName} as unpaid? Only the active receipts for the current cycle will be voided. This cannot be undone.`)) return;
     setMarkingUnpaidId(r.id);
     try {
       await packageRegistrationsApi.markUnpaid(r.id);
@@ -319,7 +337,7 @@ export default function RegistrationsPage() {
 
   async function handleReregister(r: Registration) {
     if (reregisteringId) return;
-    if (!confirm(`Create a new registration for ${r.customerName} (same package & price, unpaid)? The current registration will stay as-is.`)) return;
+    if (!confirm(`Renew ${r.customerName} on the same record? The current cycle will be saved to history, the record stays the same, and the new cycle starts unpaid.`)) return;
     setReregisteringId(r.id);
     try {
       await packageRegistrationsApi.reregister(r.id);
@@ -470,6 +488,14 @@ export default function RegistrationsPage() {
                   </>
                 )}
               </div>
+              <div className="min-w-[280px] flex-1">
+                <Input
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder="Search by player ID, name, phone, or email"
+                  className="w-full"
+                />
+              </div>
               <Button variant="secondary" onClick={() => setCancelSessionDayOpen(true)} className="inline-flex items-center gap-1">
                 Record canceled day
               </Button>
@@ -542,6 +568,8 @@ export default function RegistrationsPage() {
                     customerPhone: r.customerPhone || '',
                     customerEmail: r.customerEmail || '',
                     customerAge: r.customerAge ? String(r.customerAge) : '',
+                    playerCode: r.playerCode || '',
+                    currentCycle: String(r.currentCycle ?? 1),
                     basePriceJod: String(r.basePriceJod ?? 0),
                     finalPriceJod: String(finalPrice),
                     collectedJod: String(collected),
@@ -568,6 +596,8 @@ export default function RegistrationsPage() {
                   'customerPhone',
                   'customerEmail',
                   'customerAge',
+                  'playerCode',
+                  'currentCycle',
                   'basePriceJod',
                   'finalPriceJod',
                   'collectedJod',
@@ -597,6 +627,7 @@ export default function RegistrationsPage() {
                   `Exported: ${new Date().toLocaleString()} (trace for records)`,
                   `Filter - Package: ${packageFilter || 'All packages'}`,
                   `Filter - Date range: ${dateRange === 'custom' ? `${customStartDate || '?'} to ${customEndDate || '?'}` : dateRange === 'all' ? 'All time' : dateRange}`,
+                  `Filter - Search: ${searchTerm || 'None'}`,
                   `Total rows: ${rows.length}`,
                 ]}
                 label="Export to Excel"
@@ -610,7 +641,7 @@ export default function RegistrationsPage() {
               <thead className="sticky top-0 z-10 bg-ui-softBg border-b border-ui-border shadow-sm">
                 <tr>
                   <th className="w-[15%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Package</th>
-                  <th className="w-[12%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Name</th>
+                  <th className="w-[12%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Player</th>
                   <th className="w-[14%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Contact</th>
                   <th className="w-[4%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Age</th>
                   <th className="w-[7%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Price</th>
@@ -621,7 +652,17 @@ export default function RegistrationsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-ui-border">
-                {rows.map((row) => {
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-10 text-center text-sm text-ui-textMuted">
+                      {loading
+                        ? 'Loading registrations...'
+                        : searchTerm
+                          ? 'No registrations matched that search.'
+                          : 'No registrations found for the selected filters.'}
+                    </td>
+                  </tr>
+                ) : rows.map((row) => {
                   const collected = row.collected ?? 0;
                   const paymentStatus = getPaymentStatus(row);
                   return (
@@ -638,12 +679,16 @@ export default function RegistrationsPage() {
                         >
                           {row.customerName}
                         </button>
+                        <span className="block truncate text-xs text-ui-textMuted">
+                          {row.playerCode ? `ID ${row.playerCode}` : 'ID pending'}
+                          {` - Cycle ${row.currentCycle ?? 1}`}
+                        </span>
                       </td>
                       <td className="px-4 py-2 min-w-0">
-                        <span className="block truncate text-sm text-ui-textPrimary" title={row.customerEmail ? `${row.customerPhone} • ${row.customerEmail}` : row.customerPhone}>{row.customerPhone}</span>
+                        <span className="block truncate text-sm text-ui-textPrimary" title={row.customerEmail ? `${row.customerPhone} | ${row.customerEmail}` : row.customerPhone}>{row.customerPhone}</span>
                         {row.customerEmail && <span className="block truncate text-xs text-ui-textMuted" title={row.customerEmail}>{row.customerEmail}</span>}
                       </td>
-                      <td className="px-4 py-2 whitespace-nowrap text-ui-textPrimary">{row.customerAge ? `${row.customerAge} y` : '—'}</td>
+                      <td className="px-4 py-2 whitespace-nowrap text-ui-textPrimary">{row.customerAge ? `${row.customerAge} y` : '-'}</td>
                       <td className="px-4 py-2 whitespace-nowrap text-ui-textPrimary">{row.finalPriceJod ?? 0} JOD</td>
                       <td className="px-4 py-2 min-w-0">
                         <div className="flex flex-col gap-0.5">
@@ -654,7 +699,7 @@ export default function RegistrationsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-2 min-w-0 whitespace-nowrap text-sm text-ui-textPrimary">
-                        {row.periodStartsAt ? new Date(row.periodStartsAt).toLocaleDateString() : '—'}
+                        {row.periodStartsAt ? new Date(row.periodStartsAt).toLocaleDateString() : new Date(row.createdAt).toLocaleDateString()}
                       </td>
                       <td className="px-4 py-2 min-w-0">{renderRemainingShort(row)}</td>
                       <td className="sticky right-0 z-20 w-[20%] min-w-0 bg-background border-l border-ui-border px-4 py-2 overflow-visible">
@@ -710,6 +755,12 @@ export default function RegistrationsPage() {
                                 onSelect={() => setIncreaseSessionRegistration(row)}
                               >
                                 +1 Session
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item
+                                className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
+                                onSelect={() => setAddPointsRegistration(row)}
+                              >
+                                Add points
                               </DropdownMenu.Item>
                               <DropdownMenu.Item
                                 className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
@@ -811,6 +862,18 @@ export default function RegistrationsPage() {
           registration={increaseSessionRegistration}
           onSuccess={() => {
             setIncreaseSessionRegistration(null);
+            load();
+          }}
+        />
+      )}
+
+      {addPointsRegistration && (
+        <AddPointsModal
+          open={true}
+          onClose={() => setAddPointsRegistration(null)}
+          registration={addPointsRegistration}
+          onSuccess={() => {
+            setAddPointsRegistration(null);
             load();
           }}
         />

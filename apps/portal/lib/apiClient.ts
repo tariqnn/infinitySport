@@ -127,6 +127,21 @@ export const apiClient = {
   updateInventoryItem: (id: string, data: any) => request<any>(`/portal/inventory/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteInventoryItem: (id: string) => request<void>(`/portal/inventory/${id}`, { method: 'DELETE' }),
 
+  // Shop Items
+  getShopItems: (companyId?: string, status?: string) => {
+    const params = new URLSearchParams();
+    if (companyId) params.append('companyId', companyId);
+    if (status && status !== 'all') params.append('status', status);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return request<any[]>(`/portal/shop-items${query}`);
+  },
+  getShopItem: (id: string) => request<any>(`/portal/shop-items/${id}`),
+  createShopItem: (data: any) => request<any>('/portal/shop-items', { method: 'POST', body: JSON.stringify(data) }),
+  updateShopItem: (id: string, data: any) => request<any>(`/portal/shop-items/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteShopItem: (id: string) => request<void>(`/portal/shop-items/${id}`, { method: 'DELETE' }),
+  publishShopItems: (companyId: string) =>
+    request<any>('/portal/shop-items/publish', { method: 'POST', body: JSON.stringify({ companyId }) }),
+
   // Staff Tasks
   getStaffTasks: (companyId?: string, status?: string) => {
     const params = new URLSearchParams();

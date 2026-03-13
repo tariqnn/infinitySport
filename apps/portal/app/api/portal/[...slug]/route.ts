@@ -1,11 +1,57 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../lib/db";
 import { getFirebaseAuth, getFirestore } from "../../../../lib/firebase-admin";
+import { loadTrackerReceiptSyncInputsForContact } from "../../../../lib/registrationReceiptSync";
+import {
+  buildRegistrationMembershipSummaries,
+  type RegistrationMembershipSummary,
+} from "../../../../lib/registrationMembership";
 import {
   buildTrackerChildKey,
+  syncGuestAccessSnapshot,
+  syncTrackerUserReceipts,
   syncTrackerUserAndPlayers,
   type TrackerPlayerSyncInput,
 } from "../../../../lib/trackerAccountSync";
+import {
+  bookingCourtNameFromId,
+  listMobileBookingInboxEntries,
+  markBookingDeletedInFirestore,
+  syncBookingCourtsToFirestore,
+  syncBookingRecordToFirestore,
+  syncBookingRecordsToFirestore,
+  updateMobileBookingInboxEntry,
+} from "../../../../lib/bookingRealtimeSync";
+import { syncTrackerShopCatalog } from "../../../../lib/shopCatalogSync";
+import {
+  addRegistrationPointAdjustment,
+  listRegistrationPointAdjustments,
+} from "../../../../lib/registrationPoints";
+import {
+  addBookingRewardPointAdjustment,
+  calculateBookingRewardPoints,
+} from "../../../../lib/bookingRewardPoints";
+import {
+  addGuestPointAdjustment,
+  listGuestAccounts,
+  listDeletedGuestAccountEmails,
+  listGuestPointAdjustments,
+  loadGuestTotalPointsByEmail,
+  markGuestAccountDeleted,
+  restoreGuestAccount,
+} from "../../../../lib/guestPointAccounts";
+import {
+  addRegistrationRenewalHistory,
+  ensureRegistrationProfile,
+  loadCurrentCycleReceiptTotals,
+  listRegistrationRenewalHistory,
+  loadCurrentCycleReceiptIds,
+  loadRegistrationProfiles,
+  searchRegistrationIds,
+  stampReceiptCycle,
+  stampSessionAdjustmentCycle,
+  updateRegistrationCurrentCycle,
+} from "../../../../lib/registrationLifecycle";
 import crypto from "crypto";
 
 const ACTIVE_RECEIPT_WHERE = {
@@ -51,6 +97,17 @@ function parseDate(value: string | null): Date | null {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return null;
   return d;
+}
+
+function coerceOptionalInteger(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.round(value);
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.round(parsed) : null;
+  }
+  return null;
 }
 
 function extractConnectId(obj: unknown, key: string): string | null {
@@ -327,10 +384,13 @@ function parseOptionalMembershipDate(
 
 function mapRegistrationRow(row: any) {
   const finalPriceJod = Number(row.finalPriceJod) || 0;
-  const collected = (row.receipts || []).reduce(
-    (sum: number, rec: any) => sum + (rec.amountPaid || 0),
-    0,
-  );
+  const collected =
+    row.collected != null
+      ? Number(row.collected || 0)
+      : (row.receipts || []).reduce(
+          (sum: number, rec: any) => sum + (rec.amountPaid || 0),
+          0,
+        );
   return {
     id: row.id,
     packageName: row.packageName,
@@ -338,9 +398,12 @@ function mapRegistrationRow(row: any) {
     customerPhone: row.customerPhone,
     customerEmail: row.customerEmail ?? null,
     customerAge: row.customerAge ?? null,
+    playerCode: row.playerCode ?? null,
+    currentCycle: row.currentCycle ?? 1,
     sessionsLeft: row.sessionsLeft ?? null,
     nextPaymentDate: row.nextPaymentDate ?? null,
     planLabel: row.planLabel ?? null,
+    pointsBalance: Math.max(0, Number(row.pointsBalance ?? 0) || 0),
     isPaid: Boolean(row.isPaid) && finalPriceJod > 0,
     basePriceJod: Number(row.basePriceJod) || 0,
     discountType: row.discountType ?? "NONE",
@@ -358,16 +421,75 @@ function mapRegistrationRow(row: any) {
   };
 }
 
-function mapRegistrationToTrackerPlayer(row: any): TrackerPlayerSyncInput {
+async function enrichRegistrationRowsWithProfile(rows: any[]) {
+  if (rows.length === 0) return [];
+
+  const existingProfiles = await loadRegistrationProfiles(
+    prisma,
+    rows.map((row) => row.id),
+  );
+
+  for (const row of rows) {
+    if (existingProfiles.has(row.id)) continue;
+    await ensureRegistrationProfile(prisma, {
+      registrationId: row.id,
+      customerName: row.customerName,
+      customerAge: row.customerAge ?? null,
+      customerPhone: row.customerPhone ?? null,
+      customerEmail: row.customerEmail ?? null,
+    });
+  }
+
+  const profiles = await loadRegistrationProfiles(
+    prisma,
+    rows.map((row) => row.id),
+  );
+
+  return rows.map((row) => {
+    const profile = profiles.get(row.id);
+    return {
+      ...row,
+      playerCode: profile?.playerCode ?? null,
+      currentCycle: profile?.currentCycle ?? 1,
+    };
+  });
+}
+
+async function serializeRegistrationRows(rows: any[]) {
+  const profiledRows = await enrichRegistrationRowsWithProfile(rows);
+  const summaries = await buildRegistrationMembershipSummaries(prisma, profiledRows);
+  const summaryById = new Map(summaries.map((summary) => [summary.id, summary]));
+
+  return profiledRows.map((row) => {
+    const summary = summaryById.get(row.id);
+    return mapRegistrationRow({
+      ...row,
+      pointsBalance: summary?.pointsBalance ?? 0,
+      collected: summary?.collectedJod ?? 0,
+      isPaid: summary?.isPaid ?? row.isPaid,
+    });
+  });
+}
+
+function mapRegistrationSummaryToTrackerPlayer(
+  row: RegistrationMembershipSummary,
+): TrackerPlayerSyncInput {
   return {
-    childKey: buildTrackerChildKey(row.customerName, row.customerAge ?? null),
+    childKey: buildTrackerChildKey(row.studentName, row.customerAge ?? null),
     registrationId: row.id,
-    name: row.customerName,
+    name: row.studentName,
     age: row.customerAge ?? null,
     primaryPosition: null,
-    sessionsLeft: row.sessionsLeft ?? null,
+    sessionsLeft: row.sessionsRemaining,
     nextPaymentDate: row.nextPaymentDate ?? null,
     planLabel: row.planLabel ?? row.packageName ?? null,
+    pointsBalance: row.pointsBalance,
+    isPaid: row.isPaid,
+    paymentStatus: row.paymentStatus,
+    finalPriceJod: row.finalPriceJod,
+    collectedJod: row.collectedJod,
+    remainingJod: row.remainingJod,
+    registrationStatus: row.status,
   };
 }
 
@@ -411,22 +533,25 @@ async function syncTrackerForRegistrationContact(input: {
           ...(customerPhone ? [{ customerPhone }] : []),
         ],
       },
+      include: { receipts: { where: ACTIVE_RECEIPT_WHERE } },
       orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
     });
 
-    const latestByChild = new Map<string, any>();
-    for (const row of relatedRegistrations) {
-      const childKey = buildTrackerChildKey(
-        row.customerName,
-        row.customerAge ?? null,
-      );
+    const summaries = await buildRegistrationMembershipSummaries(
+      prisma,
+      relatedRegistrations,
+    );
+
+    const latestByChild = new Map<string, RegistrationMembershipSummary>();
+    for (const row of summaries) {
+      const childKey = buildTrackerChildKey(row.studentName, row.customerAge ?? null);
       if (!latestByChild.has(childKey)) {
         latestByChild.set(childKey, row);
       }
     }
 
     const players = Array.from(latestByChild.values()).map(
-      mapRegistrationToTrackerPlayer,
+      mapRegistrationSummaryToTrackerPlayer,
     );
     if (players.length === 0) return;
 
@@ -441,8 +566,75 @@ async function syncTrackerForRegistrationContact(input: {
       role: "parent",
       players,
     });
+
+    const receipts = await loadTrackerReceiptSyncInputsForContact({
+      customerEmail,
+      customerPhone,
+    });
+
+    await syncTrackerUserReceipts({
+      firestore,
+      uid: userRecord.uid,
+      receipts,
+    });
   } catch (error) {
     console.warn("[portal-db-api] tracker membership sync skipped", error);
+  }
+}
+
+async function syncGuestAccessForEmail(input: {
+  customerEmail?: string | null;
+  customerName?: string | null;
+}) {
+  const customerEmail = normalizeEmail(input.customerEmail);
+  if (!customerEmail) return;
+
+  try {
+    await restoreGuestAccount(prisma, customerEmail);
+    const firestore = getFirestore();
+    const totals =
+      (await loadGuestTotalPointsByEmail(prisma, [customerEmail])).get(customerEmail) ?? {
+        rewardPoints: 0,
+        manualPoints: 0,
+        totalPoints: 0,
+      };
+
+    let uid: string | null = null;
+    let accountName: string | null = normalizeText(input.customerName) || null;
+    let photoUrl: string | null = null;
+
+    try {
+      const auth = getFirebaseAuth();
+      const userRecord = await auth.getUserByEmail(customerEmail);
+      uid = userRecord.uid;
+      accountName = normalizeText(userRecord.displayName) || accountName;
+
+      const userSnap = await firestore.collection("users").doc(userRecord.uid).get();
+      const userData = userSnap.exists
+        ? ((userSnap.data() as Record<string, unknown>) ?? {})
+        : {};
+      accountName = normalizeText(userData.name) || accountName;
+      photoUrl = normalizeText(userData.photoUrl) || null;
+    } catch (error: unknown) {
+      const fbError = error as { code?: string };
+      if (fbError.code !== "auth/user-not-found") {
+        throw error;
+      }
+    }
+
+    await syncGuestAccessSnapshot({
+      firestore,
+      uid,
+      email: customerEmail,
+      name: accountName,
+      photoUrl,
+      pointsBalance: totals.totalPoints,
+      bookingPointsBalance: totals.rewardPoints,
+      manualPointsBalance: totals.manualPoints,
+      source: "portal",
+    });
+  } catch (error) {
+    console.warn("[portal-db-api] guest access sync skipped", error);
   }
 }
 
@@ -506,14 +698,32 @@ const HOURLY_RATE_BY_COURT: Record<string, number> = {
 };
 
 type CourtRateMap = Record<string, number>;
+type CourtRewardPointMap = Record<string, number>;
+
+const REWARD_POINTS_BY_COURT: Record<string, number> = {
+  "Basketball AC": 10,
+  "Basketball 3x3": 10,
+  Padel: 10,
+  Volleyball: 10,
+};
 
 const BOOKING_SOURCE_PATTERN = /\[SOURCE:(WEBSITE|APP|ADMIN)\]/i;
 
 const bookingInfraState = globalThis as unknown as {
   __portalBookingInfraReady?: boolean;
   __portalBookingInfraVersion?: number;
+  __portalMobileBookingImportAt?: number;
+  __portalBookingRealtimeFullSyncAt?: number;
 };
-const BOOKING_INFRA_VERSION = 2;
+const BOOKING_INFRA_VERSION = 3;
+const MOBILE_BOOKING_IMPORT_INTERVAL_MS = 8_000;
+const BOOKING_REALTIME_FULL_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+
+const shopInfraState = globalThis as unknown as {
+  __portalShopInfraReady?: boolean;
+  __portalShopInfraVersion?: number;
+};
+const SHOP_INFRA_VERSION = 1;
 
 function toIsoDate(value: Date): string {
   return value.toISOString().slice(0, 10);
@@ -558,19 +768,20 @@ function getCourtRate(court: string | null | undefined, rates?: CourtRateMap): n
   return HOURLY_RATE_BY_COURT[court] ?? 30;
 }
 
-async function listStoredCourtRates(): Promise<Array<{ courtType: string; hourlyRate: number }>> {
+async function listStoredCourtRates(): Promise<Array<{ courtType: string; hourlyRate: number; rewardPointsPerHour: number }>> {
   await ensureBookingInfrastructure();
   const rows = (await prisma.$queryRawUnsafe(
     `
-      SELECT "courtType", "hourlyRate"
+      SELECT "courtType", "hourlyRate", "rewardPointsPerHour"
       FROM "CourtRate"
       ORDER BY "courtType" ASC
     `,
-  )) as Array<{ courtType: string; hourlyRate: number }>;
+  )) as Array<{ courtType: string; hourlyRate: number; rewardPointsPerHour: number }>;
   return rows
     .map((row) => ({
       courtType: String(row.courtType || "").trim(),
       hourlyRate: Number(row.hourlyRate || 0),
+      rewardPointsPerHour: Number(row.rewardPointsPerHour || 0),
     }))
     .filter((row) => !!row.courtType && Number.isFinite(row.hourlyRate) && row.hourlyRate > 0);
 }
@@ -580,6 +791,27 @@ async function getEffectiveCourtRates(): Promise<CourtRateMap> {
   const stored = await listStoredCourtRates();
   for (const row of stored) {
     defaults[row.courtType] = row.hourlyRate;
+  }
+  return defaults;
+}
+
+function getCourtRewardPoints(
+  court: string | null | undefined,
+  rewards?: CourtRewardPointMap,
+): number {
+  if (!court) return 0;
+  if (rewards && Number.isFinite(rewards[court])) return Math.max(0, Number(rewards[court]));
+  return Math.max(0, REWARD_POINTS_BY_COURT[court] ?? 0);
+}
+
+async function getEffectiveCourtRewardPoints(): Promise<CourtRewardPointMap> {
+  const defaults: CourtRewardPointMap = { ...REWARD_POINTS_BY_COURT };
+  const stored = await listStoredCourtRates();
+  for (const row of stored) {
+    defaults[row.courtType] = Math.max(
+      0,
+      Math.round(Number(row.rewardPointsPerHour || defaults[row.courtType] || 0)),
+    );
   }
   return defaults;
 }
@@ -624,6 +856,431 @@ function normalizeSource(value: unknown): "WEBSITE" | "APP" | "ADMIN" | null {
   if (candidate === "APP") return "APP";
   if (candidate === "ADMIN") return "ADMIN";
   return null;
+}
+
+function normalizeBookingStatusValue(
+  value: unknown,
+): "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED" {
+  const candidate = String(value || "").trim().toUpperCase();
+  if (candidate === "CONFIRMED") return "CONFIRMED";
+  if (candidate === "CANCELLED") return "CANCELLED";
+  if (candidate === "COMPLETED") return "COMPLETED";
+  return "PENDING";
+}
+
+function parseFirestoreDateValue(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as { toDate?: unknown }).toDate === "function"
+  ) {
+    const date = (value as { toDate: () => Date }).toDate();
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  const parsed = new Date(String(value));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function resolveBookingCourtNameFromPayload(payload: Record<string, unknown>): string | null {
+  const direct =
+    normalizeText(payload.facilityArea) ||
+    normalizeText(payload.courtName) ||
+    normalizeText(payload.courtType) ||
+    normalizeText(payload.court);
+  if (direct) return direct;
+
+  const courtRecord =
+    payload.court && typeof payload.court === "object"
+      ? (payload.court as Record<string, unknown>)
+      : null;
+  const nestedName =
+    normalizeText(courtRecord?.name) || normalizeText(courtRecord?.facilityArea);
+  if (nestedName) return nestedName;
+
+  const courtId =
+    normalizeText(payload.courtId) ||
+    normalizeText(courtRecord?.id) ||
+    normalizeText(courtRecord?.courtId);
+  return bookingCourtNameFromId(courtId) || null;
+}
+
+function buildRealtimeBookingSyncPayload(
+  row: {
+    id: string;
+    companyId: string;
+    facilityArea: string | null;
+    startTime: Date;
+    endTime: Date;
+    status: string;
+    isPaid: boolean;
+    customerName: string | null;
+    customerPhone: string | null;
+    customerEmail: string | null;
+    notes: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  },
+  financials?: BookingFinancialSummary | null,
+) {
+  return {
+    id: row.id,
+    companyId: row.companyId,
+    facilityArea: row.facilityArea,
+    startTime: row.startTime,
+    endTime: row.endTime,
+    status: row.status,
+    source: inferBookingSource(row.notes),
+    isPaid: row.isPaid,
+    customerName: row.customerName,
+    customerPhone: row.customerPhone,
+    customerEmail: row.customerEmail,
+    notes: row.notes,
+    totalHours: financials?.totalHours ?? null,
+    totalAmount: financials?.totalAmount ?? null,
+    paidAmount: financials?.netPaid ?? null,
+    remainingAmount: financials?.remainingAmount ?? null,
+    paymentStatus: financials?.paymentStatus ?? null,
+    latestPaymentMethod: financials?.latestPaymentMethod ?? null,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    deleted: false,
+  };
+}
+
+async function resolveActiveCompanyId(): Promise<string> {
+  const existing = await prisma.company.findFirst({
+    where: { status: "ACTIVE" as any },
+    orderBy: { createdAt: "desc" },
+    select: { id: true },
+  });
+  if (existing?.id) return existing.id;
+
+  const created = await prisma.company.create({
+    data: {
+      name: "Infinity Sport",
+      contactName: "Infinity Sport",
+      contactEmail: "infinitysportsacademyjo@gmail.com",
+      status: "ACTIVE" as any,
+    },
+    select: { id: true },
+  });
+  return created.id;
+}
+
+async function syncBookingRealtimeCourts(
+  courtRates?: CourtRateMap,
+  rewardPoints?: CourtRewardPointMap,
+) {
+  try {
+    const firestore = getFirestore();
+    const rates = courtRates ?? (await getEffectiveCourtRates());
+    const rewardMap = rewardPoints ?? (await getEffectiveCourtRewardPoints());
+    const knownCourts = Array.from(
+      new Set([...DEFAULT_BOOKING_COURTS, ...Object.keys(rates)]),
+    ).sort((a, b) => a.localeCompare(b));
+    await syncBookingCourtsToFirestore({
+      firestore,
+      courts: knownCourts.map((name) => ({
+        name,
+        hourlyRate: getCourtRate(name, rates),
+        rewardPointsPerHour: getCourtRewardPoints(name, rewardMap),
+      })),
+    });
+  } catch (error) {
+    console.warn("[portal-db-api] booking court sync skipped", error);
+  }
+}
+
+async function syncBookingRealtimeById(
+  bookingId: string,
+  courtRates?: CourtRateMap,
+) {
+  try {
+    const firestore = getFirestore();
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: {
+        id: true,
+        companyId: true,
+        facilityArea: true,
+        startTime: true,
+        endTime: true,
+        status: true,
+        isPaid: true,
+        customerName: true,
+        customerPhone: true,
+        customerEmail: true,
+        notes: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    if (!booking) {
+      await markBookingDeletedInFirestore({ firestore, bookingId });
+      return;
+    }
+
+    const rates = courtRates ?? (await getEffectiveCourtRates());
+    const payments = await listPaymentsForBookingIds([bookingId]);
+    const financials = computeBookingFinancials(
+      {
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        facilityArea: booking.facilityArea,
+      },
+      payments,
+      rates,
+    );
+    await syncBookingRecordToFirestore({
+      firestore,
+      booking: buildRealtimeBookingSyncPayload(booking, financials),
+    });
+  } catch (error) {
+    console.warn("[portal-db-api] booking sync skipped", error);
+  }
+}
+
+async function maybeSyncAllBookingsToRealtime(force = false) {
+  const now = Date.now();
+  if (
+    !force &&
+    bookingInfraState.__portalBookingRealtimeFullSyncAt &&
+    now - bookingInfraState.__portalBookingRealtimeFullSyncAt <
+      BOOKING_REALTIME_FULL_SYNC_INTERVAL_MS
+  ) {
+    return;
+  }
+
+  bookingInfraState.__portalBookingRealtimeFullSyncAt = now;
+
+  try {
+    const firestore = getFirestore();
+    const courtRates = await getEffectiveCourtRates();
+    const rewardPoints = await getEffectiveCourtRewardPoints();
+    await syncBookingRealtimeCourts(courtRates, rewardPoints);
+
+    const bookings = await prisma.booking.findMany({
+      select: {
+        id: true,
+        companyId: true,
+        facilityArea: true,
+        startTime: true,
+        endTime: true,
+        status: true,
+        isPaid: true,
+        customerName: true,
+        customerPhone: true,
+        customerEmail: true,
+        notes: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+    const payments = await listPaymentsForBookingIds(bookings.map((row) => row.id));
+    const paymentsByBooking = new Map<string, BookingPaymentRow[]>();
+    for (const payment of payments) {
+      const current = paymentsByBooking.get(payment.bookingId) || [];
+      current.push(payment);
+      paymentsByBooking.set(payment.bookingId, current);
+    }
+
+    await syncBookingRecordsToFirestore({
+      firestore,
+      bookings: bookings.map((row) => {
+        const financials = computeBookingFinancials(
+          {
+            startTime: row.startTime,
+            endTime: row.endTime,
+            facilityArea: row.facilityArea,
+          },
+          paymentsByBooking.get(row.id) || [],
+          courtRates,
+        );
+        return buildRealtimeBookingSyncPayload(row, financials);
+      }),
+    });
+  } catch (error) {
+    console.warn("[portal-db-api] booking full realtime sync skipped", error);
+  }
+}
+
+async function importPendingMobileBookingsFromFirestore(force = false) {
+  const now = Date.now();
+  if (
+    !force &&
+    bookingInfraState.__portalMobileBookingImportAt &&
+    now - bookingInfraState.__portalMobileBookingImportAt <
+      MOBILE_BOOKING_IMPORT_INTERVAL_MS
+  ) {
+    return;
+  }
+  bookingInfraState.__portalMobileBookingImportAt = now;
+
+  try {
+    const firestore = getFirestore();
+    const entries = await listMobileBookingInboxEntries({
+      firestore,
+      limit: 200,
+    });
+    const pendingEntries = entries.filter((entry) => {
+      const status = normalizeText(entry.data.status).toUpperCase();
+      const imported = entry.data.dbImported === true;
+      if (imported) return false;
+      return !["SYNCED", "CANCELLED"].includes(status);
+    });
+    if (!pendingEntries.length) return;
+
+    const defaultCompanyId = await resolveActiveCompanyId();
+
+    for (const entry of pendingEntries) {
+      const payload = entry.data;
+      const bookingId = normalizeText(payload.bookingId) || entry.id;
+      const facilityArea = resolveBookingCourtNameFromPayload(payload);
+      const startTime = parseFirestoreDateValue(
+        payload.startTime ?? payload.startTimeIso,
+      );
+      const endTime = parseFirestoreDateValue(payload.endTime ?? payload.endTimeIso);
+      const customerName = normalizeText(payload.customerName);
+      const customerPhone = normalizeText(payload.customerPhone);
+      const customerEmail = normalizeText(payload.customerEmail) || null;
+      const status = normalizeBookingStatusValue(payload.status);
+      const notes = normalizeText(payload.notes);
+      const companyId = normalizeText(payload.companyId) || defaultCompanyId;
+
+      if (
+        !facilityArea ||
+        !startTime ||
+        !endTime ||
+        !customerName ||
+        !customerPhone ||
+        endTime.getTime() <= startTime.getTime()
+      ) {
+        await updateMobileBookingInboxEntry({
+          firestore,
+          id: entry.id,
+          data: {
+            status: "ERROR",
+            syncError: "Missing or invalid booking fields.",
+            dbImported: false,
+          },
+        });
+        continue;
+      }
+
+      const existing = await prisma.booking.findUnique({
+        where: { id: bookingId },
+        select: { id: true },
+      });
+      if (existing) {
+        await updateMobileBookingInboxEntry({
+          firestore,
+          id: entry.id,
+          data: {
+            status: "SYNCED",
+            dbImported: true,
+            dbBookingId: bookingId,
+            syncError: null,
+          },
+        });
+        await syncBookingRealtimeById(bookingId);
+        continue;
+      }
+
+      const availability = await validateBookingAvailability({
+        bookingId: null,
+        startTime,
+        endTime,
+        facilityArea,
+        adminOverride: false,
+      });
+      if (availability.conflict) {
+        await updateMobileBookingInboxEntry({
+          firestore,
+          id: entry.id,
+          data: {
+            status: "CONFLICT",
+            dbImported: false,
+            syncError: availability.conflict,
+            conflict: availability.conflictMeta ?? null,
+          },
+        });
+        continue;
+      }
+
+      const row = await prisma.booking.create({
+        data: {
+          id: bookingId,
+          companyId,
+          facilityArea,
+          startTime,
+          endTime,
+          status,
+          isPaid: Boolean(payload.isPaid),
+          customerName,
+          customerPhone,
+          customerEmail,
+          notes: withSourceTag(notes || "Mobile app booking", "APP"),
+        },
+        select: {
+          id: true,
+          companyId: true,
+          facilityArea: true,
+          startTime: true,
+          endTime: true,
+          status: true,
+          isPaid: true,
+          customerName: true,
+          customerPhone: true,
+          customerEmail: true,
+          notes: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      await addBookingAuditLog({
+        bookingId: row.id,
+        action: "BOOKING_IMPORTED_FROM_APP",
+        payload: {
+          inboxId: entry.id,
+          source: "APP",
+        },
+      });
+
+      await maybeAwardBookingRewardPoints({
+        bookingId: row.id,
+        startTime: row.startTime,
+        endTime: row.endTime,
+        facilityArea: row.facilityArea,
+        status: row.status,
+        source: "APP",
+        customerName: row.customerName,
+        customerEmail: row.customerEmail,
+        customerPhone: row.customerPhone,
+      });
+
+      await updateMobileBookingInboxEntry({
+        firestore,
+        id: entry.id,
+        data: {
+          status: "SYNCED",
+          dbImported: true,
+          dbBookingId: row.id,
+          syncError: null,
+          conflict: null,
+        },
+      });
+
+      await syncBookingRealtimeById(row.id);
+    }
+  } catch (error) {
+    console.warn("[portal-db-api] mobile booking import skipped", error);
+  }
 }
 
 function normalizeDayOfWeek(value: unknown): string | null {
@@ -686,6 +1343,67 @@ function computeBookingFinancials(
     paymentStatus,
     latestPaymentMethod,
   };
+}
+
+async function maybeAwardBookingRewardPoints(input: {
+  bookingId: string;
+  startTime: Date;
+  endTime: Date;
+  facilityArea: string | null;
+  status: string | null | undefined;
+  source: "WEBSITE" | "APP" | "ADMIN";
+  customerName: string | null | undefined;
+  customerEmail: string | null | undefined;
+  customerPhone: string | null | undefined;
+}) {
+  const customerEmail = normalizeEmail(input.customerEmail);
+  if (!customerEmail) return { awarded: false, points: 0 };
+
+  const normalizedStatus = normalizeBookingStatusValue(input.status);
+  const eligible =
+    normalizedStatus !== "CANCELLED" &&
+    (input.source === "APP" ||
+      normalizedStatus === "CONFIRMED" ||
+      normalizedStatus === "COMPLETED");
+  if (!eligible) return { awarded: false, points: 0 };
+
+  const totalHours = hoursBetween(new Date(input.startTime), new Date(input.endTime));
+  const rewardPointsPerHour = getCourtRewardPoints(
+    input.facilityArea,
+    await getEffectiveCourtRewardPoints(),
+  );
+  const points = calculateBookingRewardPoints({
+    totalHours,
+    rewardPointsPerHour,
+  });
+  if (points <= 0) return { awarded: false, points: 0 };
+
+  const reason =
+    input.source === "APP"
+      ? `Booking reward - mobile app import (${input.bookingId})`
+      : `Booking reward - ${normalizedStatus.toLowerCase()} (${input.bookingId})`;
+
+  const result = await addBookingRewardPointAdjustment(prisma, {
+    bookingId: input.bookingId,
+    customerEmail,
+    change: points,
+    reason,
+    source: input.source,
+  });
+
+  if (!result.awarded) return result;
+
+  await syncTrackerForRegistrationContact({
+    customerName: normalizeText(input.customerName) || "Booking customer",
+    customerEmail,
+    customerPhone: input.customerPhone ?? null,
+  });
+  await syncGuestAccessForEmail({
+    customerEmail,
+    customerName: input.customerName ?? null,
+  });
+
+  return result;
 }
 
 async function ensureBookingInfrastructure() {
@@ -767,19 +1485,25 @@ async function ensureBookingInfrastructure() {
     CREATE TABLE IF NOT EXISTS "CourtRate" (
       "courtType" TEXT PRIMARY KEY,
       "hourlyRate" INTEGER NOT NULL CHECK ("hourlyRate" > 0),
+      "rewardPointsPerHour" INTEGER NOT NULL DEFAULT 10 CHECK ("rewardPointsPerHour" >= 0),
       "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "CourtRate"
+    ADD COLUMN IF NOT EXISTS "rewardPointsPerHour" INTEGER NOT NULL DEFAULT 10
+  `);
   for (const [courtType, hourlyRate] of Object.entries(HOURLY_RATE_BY_COURT)) {
     await prisma.$executeRawUnsafe(
       `
-        INSERT INTO "CourtRate" ("courtType", "hourlyRate", "createdAt", "updatedAt")
-        VALUES ($1, $2, NOW(), NOW())
+        INSERT INTO "CourtRate" ("courtType", "hourlyRate", "rewardPointsPerHour", "createdAt", "updatedAt")
+        VALUES ($1, $2, $3, NOW(), NOW())
         ON CONFLICT ("courtType") DO NOTHING
       `,
       courtType,
       Math.max(1, Math.round(Number(hourlyRate || 0))),
+      Math.max(0, Math.round(Number(REWARD_POINTS_BY_COURT[courtType] ?? 0))),
     );
   }
 
@@ -1055,10 +1779,14 @@ type MemberRegistrationSummary = {
   packageName: string;
   customerAge: number | null;
   isPaid: boolean;
+  paymentStatus: "UNPAID" | "PARTIAL" | "PAID";
   finalPriceJod: number;
   collectedJod: number;
+  remainingJod: number;
   status: string;
   daysLeft: number;
+  nextPaymentDate: string | null;
+  planLabel: string | null;
   periodStartsAt: string | null;
   periodEndsAt: string | null;
   sessionsBonus: number;
@@ -1080,102 +1808,7 @@ async function listMemberRegistrationsByEmail(
   });
 
   if (rows.length === 0) return [];
-
-  const packageNames = Array.from(
-    new Set(rows.map((row) => row.packageName).filter(Boolean)),
-  );
-  const [packages, classSessionCounts] = await Promise.all([
-    prisma.package
-      .findMany({
-        where: { name: { in: packageNames } },
-        select: { name: true, sessionsCount: true, trackingType: true },
-      })
-      .catch(
-        () =>
-          [] as Array<{
-            name: string;
-            sessionsCount: number;
-            trackingType: string;
-          }>,
-      ),
-    prisma.classSession
-      .groupBy({
-        by: ["packageName"],
-        where: {
-          packageName: { in: packageNames },
-          status: "HELD",
-        },
-        _count: { _all: true },
-      })
-      .catch(
-        () => [] as Array<{ packageName: string; _count: { _all: number } }>,
-      ),
-  ]);
-
-  const packageMeta = new Map(packages.map((pkg) => [pkg.name, pkg]));
-  const consumedByPackage = new Map(
-    classSessionCounts.map((row) => [
-      row.packageName,
-      Number(row._count?._all || 0),
-    ]),
-  );
-
-  const now = Date.now();
-
-  return rows.map((row) => {
-    const collectedJod = (row.receipts || []).reduce(
-      (sum, rec) => sum + Number(rec.amountPaid || 0),
-      0,
-    );
-    const finalPriceJod = Number(row.finalPriceJod) || 0;
-    const endsAt = row.periodEndsAt
-      ? new Date(row.periodEndsAt).getTime()
-      : null;
-    const daysLeft =
-      endsAt == null
-        ? 0
-        : Math.max(0, Math.ceil((endsAt - now) / (24 * 60 * 60 * 1000)));
-
-    let status = String(row.status || "ACTIVE");
-    if (status === "ACTIVE") {
-      if (row.isFrozen) status = "FROZEN";
-      else if (daysLeft <= 0) status = "EXPIRED";
-      else if (daysLeft <= 7) status = "EXPIRING_SOON";
-    }
-
-    const pkg = packageMeta.get(row.packageName);
-    const trackingType = String(pkg?.trackingType || "");
-    const isSessionTracked =
-      trackingType === "SESSIONS" || trackingType === "BOTH";
-    const sessionsBase = Number(pkg?.sessionsCount || 0);
-    const sessionsBonus = Number(row.sessionsBonus || 0);
-    const consumed = consumedByPackage.get(row.packageName) || 0;
-    const sessionsRemaining = isSessionTracked
-      ? Math.max(0, sessionsBase + sessionsBonus - consumed)
-      : null;
-
-    return {
-      id: row.id,
-      studentName: row.customerName,
-      packageName: row.packageName,
-      customerAge: row.customerAge ?? null,
-      isPaid: Boolean(row.isPaid) && finalPriceJod > 0,
-      finalPriceJod,
-      collectedJod,
-      status,
-      daysLeft,
-      periodStartsAt: row.periodStartsAt
-        ? new Date(row.periodStartsAt).toISOString()
-        : null,
-      periodEndsAt: row.periodEndsAt
-        ? new Date(row.periodEndsAt).toISOString()
-        : null,
-      sessionsBonus,
-      sessionsRemaining,
-      createdAt: new Date(row.createdAt).toISOString(),
-      updatedAt: new Date(row.updatedAt).toISOString(),
-    };
-  });
+  return buildRegistrationMembershipSummaries(prisma, rows);
 }
 
 async function findOrCreateUserFromRegistration(reg: {
@@ -2427,7 +3060,8 @@ async function createPackageRegistration(payload: RegistrationInput) {
     customerPhone: row.customerPhone,
   });
 
-  return mapRegistrationRow(row);
+  const [serialized] = await serializeRegistrationRows([row]);
+  return serialized;
 }
 
 async function listPackageRegistrations(request: NextRequest) {
@@ -2435,17 +3069,27 @@ async function listPackageRegistrations(request: NextRequest) {
     request.nextUrl.searchParams.get("packageName") || undefined;
   const startDate = request.nextUrl.searchParams.get("startDate") || undefined;
   const endDate = request.nextUrl.searchParams.get("endDate") || undefined;
+  const search = normalizeText(request.nextUrl.searchParams.get("search"));
 
   const where: any = {};
   if (packageName) where.packageName = packageName;
+  if (search) {
+    const matchedIds = await searchRegistrationIds(prisma, search);
+    if (matchedIds.length === 0) return NextResponse.json([]);
+    where.id = { in: matchedIds };
+  }
   if (startDate || endDate) {
-    where.createdAt = {};
-    if (startDate) where.createdAt.gte = new Date(startDate);
+    const range: Record<string, Date> = {};
+    if (startDate) range.gte = new Date(startDate);
     if (endDate) {
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
-      where.createdAt.lte = end;
+      range.lte = end;
     }
+    where.OR = [
+      { periodStartsAt: range },
+      { periodStartsAt: null, createdAt: range },
+    ];
   }
 
   const rows = await prisma.packageRegistration.findMany({
@@ -2454,7 +3098,7 @@ async function listPackageRegistrations(request: NextRequest) {
     orderBy: { createdAt: "desc" },
   });
 
-  return NextResponse.json(rows.map(mapRegistrationRow));
+  return NextResponse.json(await serializeRegistrationRows(rows));
 }
 
 async function getRegistrationTotals(request: NextRequest) {
@@ -2466,13 +3110,17 @@ async function getRegistrationTotals(request: NextRequest) {
   const where: any = {};
   if (packageName) where.packageName = packageName;
   if (startDate || endDate) {
-    where.createdAt = {};
-    if (startDate) where.createdAt.gte = new Date(startDate);
+    const range: Record<string, Date> = {};
+    if (startDate) range.gte = new Date(startDate);
     if (endDate) {
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
-      where.createdAt.lte = end;
+      range.lte = end;
     }
+    where.OR = [
+      { periodStartsAt: range },
+      { periodStartsAt: null, createdAt: range },
+    ];
   }
 
   const regs = await prisma.packageRegistration.findMany({
@@ -2610,6 +3258,403 @@ async function getDashboardStats(request: NextRequest) {
     openTasks,
     lowInventory,
   });
+}
+
+const SHOP_ITEM_STATUSES = ["ACTIVE", "SOLD_OUT", "HIDDEN"] as const;
+type ShopItemStatus = (typeof SHOP_ITEM_STATUSES)[number];
+
+type ShopItemRow = {
+  id: string;
+  companyId: string;
+  name: string;
+  category: string | null;
+  description: string | null;
+  imageUrl: string | null;
+  pointsCost: number;
+  quantityAvailable: number | null;
+  status: string;
+  isFeatured: boolean;
+  redemptionNote: string | null;
+  sortOrder: number;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+};
+
+function normalizeShopItemStatus(value: unknown): ShopItemStatus {
+  const normalized = String(value || "ACTIVE").trim().toUpperCase();
+  return (SHOP_ITEM_STATUSES as readonly string[]).includes(normalized)
+    ? (normalized as ShopItemStatus)
+    : "ACTIVE";
+}
+
+function serializeShopItemRow(row: ShopItemRow) {
+  return {
+    id: row.id,
+    companyId: row.companyId,
+    name: row.name,
+    category: row.category,
+    description: row.description,
+    imageUrl: row.imageUrl,
+    pointsCost: Number(row.pointsCost || 0),
+    quantityAvailable:
+      row.quantityAvailable == null ? null : Number(row.quantityAvailable || 0),
+    status: normalizeShopItemStatus(row.status),
+    isFeatured: Boolean(row.isFeatured),
+    redemptionNote: row.redemptionNote,
+    sortOrder: Number(row.sortOrder || 0),
+    createdAt: new Date(row.createdAt).toISOString(),
+    updatedAt: new Date(row.updatedAt).toISOString(),
+  };
+}
+
+async function ensureShopInfrastructure() {
+  if (
+    shopInfraState.__portalShopInfraReady &&
+    (shopInfraState.__portalShopInfraVersion || 0) >= SHOP_INFRA_VERSION
+  ) {
+    return;
+  }
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "PortalShopItem" (
+      "id" TEXT PRIMARY KEY,
+      "companyId" TEXT NOT NULL REFERENCES "Company"("id") ON DELETE CASCADE,
+      "name" TEXT NOT NULL,
+      "category" TEXT NULL,
+      "description" TEXT NULL,
+      "imageUrl" TEXT NULL,
+      "pointsCost" INTEGER NOT NULL CHECK ("pointsCost" > 0),
+      "quantityAvailable" INTEGER NULL CHECK ("quantityAvailable" >= 0),
+      "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+      "isFeatured" BOOLEAN NOT NULL DEFAULT false,
+      "redemptionNote" TEXT NULL,
+      "sortOrder" INTEGER NOT NULL DEFAULT 0,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "PortalShopItem_companyId_idx"
+    ON "PortalShopItem" ("companyId");
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "PortalShopItem_status_idx"
+    ON "PortalShopItem" ("status");
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "PortalShopItem_sortOrder_idx"
+    ON "PortalShopItem" ("sortOrder");
+  `);
+
+  shopInfraState.__portalShopInfraReady = true;
+  shopInfraState.__portalShopInfraVersion = SHOP_INFRA_VERSION;
+}
+
+async function loadShopItemRows(
+  companyId?: string | null,
+  status?: ShopItemStatus | null,
+): Promise<ShopItemRow[]> {
+  await ensureShopInfrastructure();
+
+  return (await prisma.$queryRawUnsafe(
+    `
+      SELECT
+        "id",
+        "companyId",
+        "name",
+        "category",
+        "description",
+        "imageUrl",
+        "pointsCost",
+        "quantityAvailable",
+        "status",
+        "isFeatured",
+        "redemptionNote",
+        "sortOrder",
+        "createdAt",
+        "updatedAt"
+      FROM "PortalShopItem"
+      WHERE ($1::text IS NULL OR "companyId" = $1)
+        AND ($2::text IS NULL OR "status" = $2)
+      ORDER BY "isFeatured" DESC, "sortOrder" ASC, "createdAt" DESC
+    `,
+    companyId ?? null,
+    status ?? null,
+  )) as ShopItemRow[];
+}
+
+async function loadShopItemById(id: string): Promise<ShopItemRow | null> {
+  await ensureShopInfrastructure();
+  const rows = (await prisma.$queryRawUnsafe(
+    `
+      SELECT
+        "id",
+        "companyId",
+        "name",
+        "category",
+        "description",
+        "imageUrl",
+        "pointsCost",
+        "quantityAvailable",
+        "status",
+        "isFeatured",
+        "redemptionNote",
+        "sortOrder",
+        "createdAt",
+        "updatedAt"
+      FROM "PortalShopItem"
+      WHERE "id" = $1
+      LIMIT 1
+    `,
+    id,
+  )) as ShopItemRow[];
+  return rows[0] ?? null;
+}
+
+async function syncShopCatalogForCompany(companyId: string) {
+  const firestore = getFirestore();
+  const rows = await loadShopItemRows(companyId, null);
+  return syncTrackerShopCatalog({
+    firestore,
+    companyId,
+    items: rows.map((row) => ({
+      id: row.id,
+      companyId: row.companyId,
+      name: row.name,
+      category: row.category,
+      description: row.description,
+      imageUrl: row.imageUrl,
+      pointsCost: Number(row.pointsCost || 0),
+      quantityAvailable:
+        row.quantityAvailable == null ? null : Number(row.quantityAvailable || 0),
+      status: normalizeShopItemStatus(row.status),
+      isFeatured: Boolean(row.isFeatured),
+      redemptionNote: row.redemptionNote,
+      sortOrder: Number(row.sortOrder || 0),
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    })),
+  });
+}
+
+function buildShopItemPayload(
+  source: Record<string, unknown>,
+  existing?: ReturnType<typeof serializeShopItemRow> | null,
+) {
+  const name =
+    source.name !== undefined ? normalizeText(source.name) : existing?.name || "";
+  const category =
+    source.category !== undefined
+      ? normalizeText(source.category) || null
+      : existing?.category || null;
+  const description =
+    source.description !== undefined
+      ? normalizeText(source.description) || null
+      : existing?.description || null;
+  const imageUrl =
+    source.imageUrl !== undefined
+      ? normalizeText(source.imageUrl) || null
+      : existing?.imageUrl || null;
+  const pointsCost =
+    source.pointsCost !== undefined
+      ? coerceOptionalInteger(source.pointsCost)
+      : existing?.pointsCost ?? null;
+  const quantityAvailable =
+    source.quantityAvailable !== undefined
+      ? normalizeText(source.quantityAvailable) === ""
+        ? null
+        : coerceOptionalInteger(source.quantityAvailable)
+      : existing?.quantityAvailable ?? null;
+  const status =
+    source.status !== undefined
+      ? normalizeShopItemStatus(source.status)
+      : normalizeShopItemStatus(existing?.status);
+  const isFeatured =
+    source.isFeatured !== undefined
+      ? Boolean(source.isFeatured)
+      : Boolean(existing?.isFeatured);
+  const redemptionNote =
+    source.redemptionNote !== undefined
+      ? normalizeText(source.redemptionNote) || null
+      : existing?.redemptionNote || null;
+  const sortOrder =
+    source.sortOrder !== undefined
+      ? Math.max(0, coerceOptionalInteger(source.sortOrder) ?? 0)
+      : existing?.sortOrder ?? 0;
+
+  if (!name) throw new Error("Item name is required.");
+  if (pointsCost == null || pointsCost <= 0) {
+    throw new Error("Points required must be greater than 0.");
+  }
+  if (quantityAvailable != null && quantityAvailable < 0) {
+    throw new Error("Quantity available cannot be negative.");
+  }
+
+  return {
+    name,
+    category,
+    description,
+    imageUrl,
+    pointsCost,
+    quantityAvailable,
+    status,
+    isFeatured,
+    redemptionNote,
+    sortOrder,
+  };
+}
+
+async function listShopItems(request: NextRequest) {
+  const companyId = normalizeText(request.nextUrl.searchParams.get("companyId"));
+  const statusParam = normalizeText(request.nextUrl.searchParams.get("status"));
+  const rows = await loadShopItemRows(
+    companyId || null,
+    statusParam && statusParam.toUpperCase() !== "ALL"
+      ? normalizeShopItemStatus(statusParam)
+      : null,
+  );
+  return NextResponse.json(rows.map(serializeShopItemRow));
+}
+
+async function publishShopCatalog(request: NextRequest) {
+  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+  const companyId =
+    normalizeText(body.companyId) ||
+    normalizeText(request.nextUrl.searchParams.get("companyId"));
+  if (!companyId) return jsonError("companyId is required");
+
+  const result = await syncShopCatalogForCompany(companyId);
+  return NextResponse.json({ success: true, synced: result.synced });
+}
+
+async function createShopItem(request: NextRequest) {
+  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+  const companyId = normalizeText(body.companyId);
+  if (!companyId) return jsonError("companyId is required");
+
+  try {
+    const payload = buildShopItemPayload(body);
+    const id = crypto.randomUUID();
+    await ensureShopInfrastructure();
+    await prisma.$executeRawUnsafe(
+      `
+        INSERT INTO "PortalShopItem" (
+          "id",
+          "companyId",
+          "name",
+          "category",
+          "description",
+          "imageUrl",
+          "pointsCost",
+          "quantityAvailable",
+          "status",
+          "isFeatured",
+          "redemptionNote",
+          "sortOrder",
+          "createdAt",
+          "updatedAt"
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
+      `,
+      id,
+      companyId,
+      payload.name,
+      payload.category,
+      payload.description,
+      payload.imageUrl,
+      payload.pointsCost,
+      payload.quantityAvailable,
+      payload.status,
+      payload.isFeatured,
+      payload.redemptionNote,
+      payload.sortOrder,
+    );
+
+    const row = await loadShopItemById(id);
+    if (!row) return jsonError("Failed to create shop item", 500);
+
+    try {
+      await syncShopCatalogForCompany(companyId);
+    } catch (error) {
+      console.error("[portal-shop] Failed to sync catalog after create:", error);
+    }
+
+    return NextResponse.json(serializeShopItemRow(row), { status: 201 });
+  } catch (error) {
+    return jsonError(
+      error instanceof Error ? error.message : "Failed to create shop item",
+    );
+  }
+}
+
+async function updateShopItem(id: string, request: NextRequest) {
+  const existing = await loadShopItemById(id);
+  if (!existing) return jsonError("Shop item not found", 404);
+
+  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+
+  try {
+    const payload = buildShopItemPayload(body, serializeShopItemRow(existing));
+    await prisma.$executeRawUnsafe(
+      `
+        UPDATE "PortalShopItem"
+        SET
+          "name" = $2,
+          "category" = $3,
+          "description" = $4,
+          "imageUrl" = $5,
+          "pointsCost" = $6,
+          "quantityAvailable" = $7,
+          "status" = $8,
+          "isFeatured" = $9,
+          "redemptionNote" = $10,
+          "sortOrder" = $11,
+          "updatedAt" = NOW()
+        WHERE "id" = $1
+      `,
+      id,
+      payload.name,
+      payload.category,
+      payload.description,
+      payload.imageUrl,
+      payload.pointsCost,
+      payload.quantityAvailable,
+      payload.status,
+      payload.isFeatured,
+      payload.redemptionNote,
+      payload.sortOrder,
+    );
+
+    const row = await loadShopItemById(id);
+    if (!row) return jsonError("Shop item not found", 404);
+
+    try {
+      await syncShopCatalogForCompany(row.companyId);
+    } catch (error) {
+      console.error("[portal-shop] Failed to sync catalog after update:", error);
+    }
+
+    return NextResponse.json(serializeShopItemRow(row));
+  } catch (error) {
+    return jsonError(
+      error instanceof Error ? error.message : "Failed to update shop item",
+    );
+  }
+}
+
+async function removeShopItem(id: string) {
+  const existing = await loadShopItemById(id);
+  if (!existing) return jsonError("Shop item not found", 404);
+
+  await prisma.$executeRawUnsafe(`DELETE FROM "PortalShopItem" WHERE "id" = $1`, id);
+
+  try {
+    await syncShopCatalogForCompany(existing.companyId);
+  } catch (error) {
+    console.error("[portal-shop] Failed to sync catalog after delete:", error);
+  }
+
+  return NextResponse.json({ success: true });
 }
 
 async function bulkCreatePackageRegistrations(request: NextRequest) {
@@ -3062,43 +4107,76 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
     customerPhone: row.customerPhone,
   });
 
-  return NextResponse.json(mapRegistrationRow(row));
+  const [serialized] = await serializeRegistrationRows([row]);
+  return NextResponse.json(serialized);
 }
 
 async function reregisterPackage(id: string) {
   const existing = (await prisma.packageRegistration.findUnique({
     where: { id },
+    include: { receipts: { where: ACTIVE_RECEIPT_WHERE } },
   })) as any;
   if (!existing) return jsonError("Registration not found", 404);
 
+  const profile = await ensureRegistrationProfile(prisma, {
+    registrationId: existing.id,
+    customerName: existing.customerName,
+    customerAge: existing.customerAge ?? null,
+    customerPhone: existing.customerPhone ?? null,
+    customerEmail: existing.customerEmail ?? null,
+  });
+  const summaries = await buildRegistrationMembershipSummaries(prisma, [existing]);
+  const summary = summaries[0];
+
+  await addRegistrationRenewalHistory(prisma, {
+    registrationId: existing.id,
+    playerCode: profile.playerCode,
+    cycleNumber: profile.currentCycle,
+    action: "REREGISTERED",
+    snapshot: {
+      packageName: existing.packageName,
+      customerName: existing.customerName,
+      periodStartsAt: existing.periodStartsAt,
+      periodEndsAt: existing.periodEndsAt,
+      nextPaymentDate: existing.nextPaymentDate,
+      finalPriceJod: existing.finalPriceJod,
+      collectedJod: summary?.collectedJod ?? 0,
+      remainingJod: summary?.remainingJod ?? 0,
+      paymentStatus: summary?.paymentStatus ?? "UNPAID",
+      isPaid: existing.isPaid,
+      sessionsLeft: existing.sessionsLeft,
+      sessionsBonus: existing.sessionsBonus,
+      isFrozen: existing.isFrozen,
+    },
+  });
+
   const now = new Date();
+  const periodStartsAt = now;
   const periodEndsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
   const sessionsLeft =
     existing.sessionsLeft ?? (await getDefaultSessionsLeft(existing.packageName));
   const { billingPeriodKey, priceLockedUntil } = billingPeriodFromDate(now);
 
-  const row = await prisma.packageRegistration.create({
+  const row = await updatePackageRegistrationCompat({
+    where: { id },
     data: {
-      packageName: existing.packageName,
-      customerName: existing.customerName,
-      customerPhone: existing.customerPhone,
-      customerEmail: existing.customerEmail,
-      customerAge: existing.customerAge,
       isPaid: false,
-      basePriceJod: existing.basePriceJod,
-      discountType: existing.discountType,
-      discountValue: existing.discountValue,
-      discountReason: existing.discountReason,
-      finalPriceJod: existing.finalPriceJod,
       billingPeriodKey,
       priceLockedUntil,
+      periodStartsAt,
       periodEndsAt,
+      nextPaymentDate: periodEndsAt,
       sessionsLeft,
-      nextPaymentDate: existing.nextPaymentDate ?? periodEndsAt,
+      sessionsBonus: 0,
+      isFrozen: false,
+      frozenAt: null,
+      status: "ACTIVE",
       planLabel: existing.planLabel ?? existing.packageName,
     },
     include: { receipts: { where: ACTIVE_RECEIPT_WHERE } },
-  } as any);
+  });
+
+  await updateRegistrationCurrentCycle(prisma, id, profile.currentCycle + 1);
 
   await findOrCreateUserFromRegistration({
     customerEmail: row.customerEmail,
@@ -3112,7 +4190,8 @@ async function reregisterPackage(id: string) {
     customerPhone: row.customerPhone,
   });
 
-  return NextResponse.json(mapRegistrationRow(row));
+  const [serialized] = await serializeRegistrationRows([row]);
+  return NextResponse.json(serialized);
 }
 
 async function markRegistrationPaid(id: string, request: NextRequest) {
@@ -3129,6 +4208,14 @@ async function markRegistrationPaid(id: string, request: NextRequest) {
   if (!registration) return jsonError("Registration not found", 404);
   if (!(body.privateNote || "").trim())
     return jsonError("Private note is required");
+
+  await ensureRegistrationProfile(prisma, {
+    registrationId: registration.id,
+    customerName: registration.customerName,
+    customerAge: registration.customerAge ?? null,
+    customerPhone: registration.customerPhone ?? null,
+    customerEmail: registration.customerEmail ?? null,
+  });
 
   const method = (body.paymentMethod || "CASH").toUpperCase();
   if (!["CASH", "CARD", "TRANSFER", "OTHER"].includes(method))
@@ -3177,16 +4264,24 @@ async function markRegistrationPaid(id: string, request: NextRequest) {
     }
   }
 
-  const aggregate = await prisma.receipt.aggregate({
-    where: { registrationId: id, ...ACTIVE_RECEIPT_WHERE },
-    _sum: { amountPaid: true },
+  await stampReceiptCycle(prisma, {
+    receiptId: receipt.id,
+    registrationId: id,
   });
-  const totalCollected = aggregate._sum.amountPaid ?? 0;
+
+  const totalCollected =
+    (await loadCurrentCycleReceiptTotals(prisma, [id])).get(id) ?? 0;
   const targetPrice = Number(registration.finalPriceJod || 0);
 
   await prisma.packageRegistration.update({
     where: { id },
     data: { isPaid: targetPrice > 0 && totalCollected >= targetPrice },
+  });
+
+  await syncTrackerForRegistrationContact({
+    customerName: registration.customerName,
+    customerEmail: registration.customerEmail ?? null,
+    customerPhone: registration.customerPhone,
   });
 
   return NextResponse.json(receipt);
@@ -3204,16 +4299,13 @@ async function markRegistrationUnpaid(id: string, request: NextRequest) {
   });
   if (!registration) return jsonError("Registration not found", 404);
 
-  const activeReceipts = await prisma.receipt.findMany({
-    where: { registrationId: id, ...ACTIVE_RECEIPT_WHERE },
-    select: { id: true },
-  });
+  const activeReceiptIds = await loadCurrentCycleReceiptIds(prisma, id);
 
   const now = new Date();
   await prisma.$transaction(async (tx) => {
-    if (activeReceipts.length > 0) {
+    if (activeReceiptIds.length > 0) {
       await tx.receipt.updateMany({
-        where: { id: { in: activeReceipts.map((r) => r.id) } },
+        where: { id: { in: activeReceiptIds } },
         data: {
           status: "VOIDED",
           voidedAt: now,
@@ -3228,9 +4320,15 @@ async function markRegistrationUnpaid(id: string, request: NextRequest) {
     });
   });
 
+  await syncTrackerForRegistrationContact({
+    customerName: registration.customerName,
+    customerEmail: registration.customerEmail ?? null,
+    customerPhone: registration.customerPhone,
+  });
+
   return NextResponse.json({
     success: true,
-    voidedCount: activeReceipts.length,
+    voidedCount: activeReceiptIds.length,
   });
 }
 
@@ -3250,7 +4348,7 @@ async function addSessionAdjustment(id: string, request: NextRequest) {
   if (!registration) return jsonError("Registration not found", 404);
   if (!(body.reason || "").trim()) return jsonError("Reason is required");
 
-  await prisma.sessionAdjustment.create({
+  const adjustment = await prisma.sessionAdjustment.create({
     data: {
       registrationId: id,
       change: 1,
@@ -3259,10 +4357,21 @@ async function addSessionAdjustment(id: string, request: NextRequest) {
     },
   });
 
+  await stampSessionAdjustmentCycle(prisma, {
+    adjustmentId: adjustment.id,
+    registrationId: id,
+  });
+
   const sessionsBonus = (Number(registration.sessionsBonus) || 0) + 1;
   await prisma.packageRegistration.update({
     where: { id },
     data: { sessionsBonus },
+  });
+
+  await syncTrackerForRegistrationContact({
+    customerName: registration.customerName,
+    customerEmail: registration.customerEmail ?? null,
+    customerPhone: registration.customerPhone,
   });
 
   return NextResponse.json({ success: true, sessionsBonus });
@@ -3274,6 +4383,301 @@ async function listSessionAdjustments(id: string) {
     orderBy: { createdAt: "desc" },
   });
   return NextResponse.json(rows);
+}
+
+async function addPointAdjustment(id: string, request: NextRequest) {
+  const body = (await request.json()) as {
+    points?: number;
+    reason?: string;
+    createdBy?: string | null;
+  };
+  const registration = await prisma.packageRegistration.findUnique({
+    where: { id },
+  });
+  if (!registration) return jsonError("Registration not found", 404);
+
+  const points = Math.round(Number(body.points || 0));
+  if (!Number.isFinite(points) || points <= 0) {
+    return jsonError("Points must be greater than 0");
+  }
+  if (!(body.reason || "").trim()) return jsonError("Reason is required");
+
+  await addRegistrationPointAdjustment(prisma, {
+    registrationId: id,
+    change: points,
+    reason: body.reason.trim(),
+    createdBy: typeof body.createdBy === "string" ? body.createdBy : null,
+  });
+
+  await syncTrackerForRegistrationContact({
+    customerName: registration.customerName,
+    customerEmail: registration.customerEmail ?? null,
+    customerPhone: registration.customerPhone,
+  });
+
+  const relatedRegistrations = await prisma.packageRegistration.findMany({
+    where: {
+      OR: [
+        { id },
+        ...(registration.customerEmail
+          ? [
+              {
+                customerEmail: {
+                  equals: normalizeEmail(registration.customerEmail),
+                  mode: "insensitive" as const,
+                },
+              },
+            ]
+          : []),
+        ...(registration.customerPhone
+          ? [{ customerPhone: registration.customerPhone }]
+          : []),
+      ],
+    },
+    include: { receipts: { where: ACTIVE_RECEIPT_WHERE } },
+  });
+  const summaries = await buildRegistrationMembershipSummaries(
+    prisma,
+    relatedRegistrations,
+  );
+  const summary = summaries.find((row) => row.id === id);
+
+  return NextResponse.json({
+    success: true,
+    addedPoints: points,
+    pointsBalance: summary?.pointsBalance ?? points,
+  });
+}
+
+async function listPointAdjustments(id: string) {
+  const registration = await prisma.packageRegistration.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!registration) return jsonError("Registration not found", 404);
+
+  const rows = await listRegistrationPointAdjustments(prisma, id);
+  return NextResponse.json(rows);
+}
+
+async function getGuestAccounts(request: NextRequest) {
+  const search = request.nextUrl.searchParams.get("search");
+  const normalizedSearch = normalizeText(search).toLowerCase();
+  const rows = await listGuestAccounts(prisma);
+
+  try {
+    const firestore = getFirestore();
+    const deletedEmails = await listDeletedGuestAccountEmails(prisma);
+    const guestSnapshot = await firestore.collection("guestAccess").get();
+    const merged = new Map<
+      string,
+      {
+        email: string;
+        name: string | null;
+        bookingsCount: number;
+        lastBookingAt: string | null;
+        lastCourt: string | null;
+        rewardPoints: number;
+        manualPoints: number;
+        totalPoints: number;
+        linkedPlayersCount: number;
+        parentUid: string | null;
+        hasGuestAccess: boolean;
+      }
+    >();
+
+    for (const row of rows) {
+      merged.set(row.email, {
+        ...row,
+        linkedPlayersCount: 0,
+        parentUid: null,
+        hasGuestAccess: false,
+      });
+    }
+
+    for (const snap of guestSnapshot.docs) {
+      const guestDoc = (snap.data() as Record<string, unknown>) ?? {};
+      const email = normalizeEmail(guestDoc.email || snap.id);
+      if (!email || deletedEmails.has(email)) continue;
+      const name = normalizeText(guestDoc.name) || null;
+
+      const playerIds = Array.isArray(guestDoc.playerIds)
+        ? guestDoc.playerIds.map((entry) => normalizeText(entry)).filter(Boolean)
+        : Array.isArray(guestDoc.players)
+          ? guestDoc.players
+              .map((entry) =>
+                entry && typeof entry === "object"
+                  ? normalizeText((entry as Record<string, unknown>).id)
+                  : "",
+              )
+              .filter(Boolean)
+          : [];
+      const rewardPoints = clampNonNegative(
+        Number(guestDoc.bookingPointsBalance ?? guestDoc.rewardPoints ?? 0),
+      );
+      const manualPoints = Math.round(Number(guestDoc.manualPointsBalance ?? 0));
+      const totalPoints = clampNonNegative(
+        Number(guestDoc.pointsBalance ?? rewardPoints + manualPoints),
+      );
+
+      const existing = merged.get(email);
+      merged.set(email, {
+        email,
+        name: existing?.name || name,
+        bookingsCount: existing?.bookingsCount ?? 0,
+        lastBookingAt:
+          existing?.lastBookingAt ??
+          parseFirestoreDateValue(guestDoc.updatedAt)?.toISOString() ??
+          null,
+        lastCourt: existing?.lastCourt ?? null,
+        rewardPoints:
+          existing && existing.rewardPoints > 0 ? existing.rewardPoints : rewardPoints,
+        manualPoints:
+          existing && existing.manualPoints !== 0 ? existing.manualPoints : manualPoints,
+        totalPoints:
+          existing && existing.totalPoints > 0 ? existing.totalPoints : totalPoints,
+        linkedPlayersCount: playerIds.length,
+        parentUid: normalizeText(guestDoc.parentUid) || null,
+        hasGuestAccess: true,
+      });
+    }
+
+    const responseRows = Array.from(merged.values())
+      .filter((row) => {
+        if (!normalizedSearch) return true;
+        return (
+          row.email.includes(normalizedSearch) ||
+          (row.name || "").toLowerCase().includes(normalizedSearch)
+        );
+      })
+      .sort((a, b) => {
+        const aTime = a.lastBookingAt ? new Date(a.lastBookingAt).getTime() : 0;
+        const bTime = b.lastBookingAt ? new Date(b.lastBookingAt).getTime() : 0;
+        if (aTime !== bTime) return bTime - aTime;
+        return a.email.localeCompare(b.email);
+      });
+
+    return NextResponse.json(responseRows);
+  } catch (error) {
+    console.warn("[portal-db-api] guest account firebase lookup skipped", error);
+    return NextResponse.json(
+      rows
+        .filter((row) => {
+          if (!normalizedSearch) return true;
+          return (
+            row.email.includes(normalizedSearch) ||
+            (row.name || "").toLowerCase().includes(normalizedSearch)
+          );
+        })
+        .map((row) => ({
+          ...row,
+          linkedPlayersCount: 0,
+          parentUid: null,
+          hasGuestAccess: false,
+        })),
+    );
+  }
+}
+
+async function removeGuestAccount(email: string) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) return jsonError("Guest email is required");
+
+  await markGuestAccountDeleted(prisma, normalizedEmail);
+  try {
+    await getFirestore().collection("guestAccess").doc(normalizedEmail).delete();
+  } catch (error) {
+    console.warn("[portal-db-api] guest access delete skipped", error);
+  }
+
+  return NextResponse.json({ success: true });
+}
+
+async function getGuestPointHistory(email: string) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) return jsonError("Guest email is required");
+  const rows = await listGuestPointAdjustments(prisma, normalizedEmail);
+  return NextResponse.json(rows);
+}
+
+async function addGuestPoints(email: string, request: NextRequest) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) return jsonError("Guest email is required");
+
+  const body = (await request.json().catch(() => ({}))) as {
+    points?: number;
+    reason?: string;
+    createdBy?: string | null;
+    customerName?: string | null;
+  };
+
+  const points = Math.round(Number(body.points || 0));
+  const reason = String(body.reason || "").trim();
+  if (!Number.isFinite(points) || points === 0) {
+    return jsonError("Points change must be a non-zero number");
+  }
+  if (!reason) return jsonError("Reason is required");
+
+  await addGuestPointAdjustment(prisma, {
+    customerEmail: normalizedEmail,
+    change: points,
+    reason,
+    createdBy:
+      typeof body.createdBy === "string" ? body.createdBy : null,
+  });
+
+  await syncTrackerForRegistrationContact({
+    customerName: normalizeText(body.customerName) || normalizedEmail,
+    customerEmail: normalizedEmail,
+    customerPhone: null,
+  });
+  await syncGuestAccessForEmail({
+    customerEmail: normalizedEmail,
+    customerName: body.customerName ?? null,
+  });
+
+  const totals =
+    (await loadGuestTotalPointsByEmail(prisma, [normalizedEmail])).get(normalizedEmail) ?? {
+      rewardPoints: 0,
+      manualPoints: 0,
+      totalPoints: 0,
+    };
+
+  return NextResponse.json({
+    success: true,
+    totalPoints: totals.totalPoints,
+    rewardPoints: totals.rewardPoints,
+    manualPoints: totals.manualPoints,
+  });
+}
+
+async function getRegistrationHistory(id: string) {
+  const registration = await prisma.packageRegistration.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      customerName: true,
+      customerAge: true,
+      customerPhone: true,
+      customerEmail: true,
+    },
+  });
+  if (!registration) return jsonError("Registration not found", 404);
+
+  const profile = await ensureRegistrationProfile(prisma, {
+    registrationId: registration.id,
+    customerName: registration.customerName,
+    customerAge: registration.customerAge ?? null,
+    customerPhone: registration.customerPhone ?? null,
+    customerEmail: registration.customerEmail ?? null,
+  });
+
+  const history = await listRegistrationRenewalHistory(prisma, id);
+  return NextResponse.json({
+    playerCode: profile.playerCode,
+    currentCycle: profile.currentCycle,
+    history,
+  });
 }
 
 async function getReceipt(id: string) {
@@ -3321,16 +4725,21 @@ async function voidReceipt(id: string, request: NextRequest) {
     data: { status: "VOIDED", voidedAt: new Date(), voidReason: reason },
   });
 
-  const aggregate = await prisma.receipt.aggregate({
-    where: { registrationId: receipt.registrationId, ...ACTIVE_RECEIPT_WHERE },
-    _sum: { amountPaid: true },
-  });
-  const totalCollected = aggregate._sum.amountPaid ?? 0;
+  const totalCollected =
+    (await loadCurrentCycleReceiptTotals(prisma, [receipt.registrationId])).get(
+      receipt.registrationId,
+    ) ?? 0;
   const targetPrice = Number(receipt.registration.finalPriceJod || 0);
 
   await prisma.packageRegistration.update({
     where: { id: receipt.registrationId },
     data: { isPaid: targetPrice > 0 && totalCollected >= targetPrice },
+  });
+
+  await syncTrackerForRegistrationContact({
+    customerName: receipt.registration.customerName,
+    customerEmail: receipt.registration.customerEmail ?? null,
+    customerPhone: receipt.registration.customerPhone,
   });
 
   return NextResponse.json({ success: true });
@@ -3380,38 +4789,58 @@ function compareByDateDesc(a: { createdAt: string }, b: { createdAt: string }): 
 }
 
 async function getBookingCourtRates() {
-  const map = await getEffectiveCourtRates();
+  const [map, rewardPoints] = await Promise.all([
+    getEffectiveCourtRates(),
+    getEffectiveCourtRewardPoints(),
+  ]);
   const rows = Object.entries(map)
-    .map(([name, hourlyRate]) => ({ name, hourlyRate }))
+    .map(([name, hourlyRate]) => ({
+      name,
+      hourlyRate,
+      rewardPointsPerHour: getCourtRewardPoints(name, rewardPoints),
+    }))
     .sort((a, b) => a.name.localeCompare(b.name));
+  await syncBookingRealtimeCourts(map, rewardPoints);
   return NextResponse.json(rows);
 }
 
 async function updateBookingCourtRates(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as {
-    rates?: Array<{ name?: string; hourlyRate?: number }>;
+    rates?: Array<{ name?: string; hourlyRate?: number; rewardPointsPerHour?: number }>;
     createdByAdminId?: string | null;
   };
   const rates = Array.isArray(body.rates) ? body.rates : [];
   if (!rates.length) return jsonError("rates array is required");
 
   await ensureBookingInfrastructure();
+  const existingRewardPoints = await getEffectiveCourtRewardPoints();
   for (const item of rates) {
     const courtName = String(item?.name || "").trim();
     const hourlyRate = Math.round(Number(item?.hourlyRate || 0));
+    const rewardPointsPerHour =
+      item?.rewardPointsPerHour !== undefined
+        ? Math.max(0, Math.round(Number(item?.rewardPointsPerHour || 0)))
+        : getCourtRewardPoints(courtName, existingRewardPoints);
     if (!courtName) return jsonError("Court name is required");
     if (!Number.isFinite(hourlyRate) || hourlyRate <= 0) {
       return jsonError(`Hourly rate must be greater than 0 for court: ${courtName}`);
     }
+    if (!Number.isFinite(rewardPointsPerHour) || rewardPointsPerHour < 0) {
+      return jsonError(`Reward points per hour cannot be negative for court: ${courtName}`);
+    }
     await prisma.$executeRawUnsafe(
       `
-        INSERT INTO "CourtRate" ("courtType", "hourlyRate", "createdAt", "updatedAt")
-        VALUES ($1, $2, NOW(), NOW())
+        INSERT INTO "CourtRate" ("courtType", "hourlyRate", "rewardPointsPerHour", "createdAt", "updatedAt")
+        VALUES ($1, $2, $3, NOW(), NOW())
         ON CONFLICT ("courtType")
-        DO UPDATE SET "hourlyRate" = EXCLUDED."hourlyRate", "updatedAt" = NOW()
+        DO UPDATE SET
+          "hourlyRate" = EXCLUDED."hourlyRate",
+          "rewardPointsPerHour" = EXCLUDED."rewardPointsPerHour",
+          "updatedAt" = NOW()
       `,
       courtName,
       hourlyRate,
+      rewardPointsPerHour,
     );
   }
 
@@ -3421,17 +4850,23 @@ async function updateBookingCourtRates(request: NextRequest) {
       rates: rates.map((row) => ({
         name: String(row?.name || "").trim(),
         hourlyRate: Math.round(Number(row?.hourlyRate || 0)),
+        rewardPointsPerHour: Math.max(0, Math.round(Number(row?.rewardPointsPerHour || 0))),
       })),
     },
     createdByAdminId:
       typeof body.createdByAdminId === "string" ? body.createdByAdminId : null,
   });
 
+  await syncBookingRealtimeCourts();
   return getBookingCourtRates();
 }
 
 async function getBookingOverview(request: NextRequest) {
-  const courtRates = await getEffectiveCourtRates();
+  await importPendingMobileBookingsFromFirestore();
+  const [courtRates, rewardPoints] = await Promise.all([
+    getEffectiveCourtRates(),
+    getEffectiveCourtRewardPoints(),
+  ]);
   const { start, end } = parseOverviewDateRange(request);
   const companyId = request.nextUrl.searchParams.get("companyId") || undefined;
   const court = (request.nextUrl.searchParams.get("court") || "").trim();
@@ -3751,6 +5186,9 @@ async function getBookingOverview(request: NextRequest) {
     })
     .sort(compareByDateDesc);
 
+  await syncBookingRealtimeCourts(courtRates, rewardPoints);
+  await maybeSyncAllBookingsToRealtime();
+
   return NextResponse.json({
     range: { start: start.toISOString(), end: end.toISOString() },
     filters: {
@@ -3780,6 +5218,7 @@ async function getBookingOverview(request: NextRequest) {
     courts: knownCourts.map((name) => ({
       name,
       hourlyRate: getCourtRate(name, courtRates),
+      rewardPointsPerHour: getCourtRewardPoints(name, rewardPoints),
     })),
     labels: Array.from(
       new Set(blockedSlots.map((row) => String(row.label || "").trim()).filter(Boolean)),
@@ -3888,6 +5327,8 @@ async function addBookingPayment(bookingId: string, request: NextRequest) {
     },
     createdByAdminId: body.createdByAdminId ?? null,
   });
+
+  await syncBookingRealtimeById(bookingId, courtRates);
 
   return NextResponse.json({
     success: true,
@@ -4179,14 +5620,17 @@ async function dispatchGet(request: NextRequest, params: Params) {
   }
 
   if (resource === "bookings" && id === "customers" && action && extra === "profile") {
+    await importPendingMobileBookingsFromFirestore();
     return getBookingCustomerProfile(action);
   }
 
   if (resource === "bookings" && id && action === "payments") {
+    await importPendingMobileBookingsFromFirestore();
     return getBookingPayments(id);
   }
 
   if (resource === "bookings" && !id) {
+    await importPendingMobileBookingsFromFirestore();
     const companyId =
       request.nextUrl.searchParams.get("companyId") || undefined;
     const startDate = request.nextUrl.searchParams.get("startDate");
@@ -4216,10 +5660,12 @@ async function dispatchGet(request: NextRequest, params: Params) {
       orderBy: { startTime: "asc" },
     });
 
+    await maybeSyncAllBookingsToRealtime();
     return NextResponse.json(bookings);
   }
 
   if (resource === "bookings" && id) {
+    await importPendingMobileBookingsFromFirestore();
     const row = await prisma.booking.findUnique({
       where: { id },
       include: {
@@ -4232,6 +5678,7 @@ async function dispatchGet(request: NextRequest, params: Params) {
       },
     });
     if (!row) return jsonError("Booking not found", 404);
+    await syncBookingRealtimeById(id);
     return NextResponse.json(row);
   }
 
@@ -4297,6 +5744,24 @@ async function dispatchGet(request: NextRequest, params: Params) {
     return NextResponse.json(rows);
   }
 
+  if (resource === "shop-items" && !id) {
+    return listShopItems(request);
+  }
+
+  if (resource === "shop-items" && id) {
+    const row = await loadShopItemById(id);
+    if (!row) return jsonError("Shop item not found", 404);
+    return NextResponse.json(serializeShopItemRow(row));
+  }
+
+  if (resource === "guest-accounts" && !id) {
+    return getGuestAccounts(request);
+  }
+
+  if (resource === "guest-accounts" && id && action === "point-adjustments") {
+    return getGuestPointHistory(id);
+  }
+
   if (resource === "dashboard" && id === "stats") {
     return getDashboardStats(request);
   }
@@ -4350,6 +5815,17 @@ async function dispatchGet(request: NextRequest, params: Params) {
     action === "session-adjustments"
   ) {
     return listSessionAdjustments(id);
+  }
+
+  if (
+    resource === "package-registrations" &&
+    action === "point-adjustments"
+  ) {
+    return listPointAdjustments(id);
+  }
+
+  if (resource === "package-registrations" && action === "history") {
+    return getRegistrationHistory(id);
   }
 
   if (resource === "receipts" && id && !action) {
@@ -4431,6 +5907,18 @@ async function dispatchPost(request: NextRequest, params: Params) {
     return createInvoice(request);
   }
 
+  if (resource === "shop-items" && id === "publish" && !action) {
+    return publishShopCatalog(request);
+  }
+
+  if (resource === "shop-items" && !id) {
+    return createShopItem(request);
+  }
+
+  if (resource === "guest-accounts" && id && action === "point-adjustment") {
+    return addGuestPoints(id, request);
+  }
+
   if (resource === "bookings" && id && action === "payments") {
     return addBookingPayment(id, request);
   }
@@ -4445,6 +5933,7 @@ async function dispatchPost(request: NextRequest, params: Params) {
   }
 
   if (resource === "bookings" && !id) {
+    await importPendingMobileBookingsFromFirestore();
     const body = (await request.json()) as Record<string, unknown>;
 
     const companyId =
@@ -4545,6 +6034,20 @@ async function dispatchPost(request: NextRequest, params: Params) {
       createdByAdminId,
     });
 
+    await maybeAwardBookingRewardPoints({
+      bookingId: row.id,
+      startTime: row.startTime,
+      endTime: row.endTime,
+      facilityArea: row.facilityArea,
+      status: row.status,
+      source,
+      customerName: row.customerName,
+      customerEmail: row.customerEmail,
+      customerPhone: row.customerPhone,
+    });
+
+    await syncBookingRealtimeById(row.id);
+
     return NextResponse.json(row);
   }
 
@@ -4584,6 +6087,10 @@ async function dispatchPost(request: NextRequest, params: Params) {
 
   if (resource === "package-registrations" && action === "session-adjustment") {
     return addSessionAdjustment(id, request);
+  }
+
+  if (resource === "package-registrations" && action === "point-adjustment") {
+    return addPointAdjustment(id, request);
   }
 
   if (resource === "package-session-canceled" && !id) {
@@ -4635,6 +6142,7 @@ async function dispatchPatch(request: NextRequest, params: Params) {
   }
 
   if (resource === "bookings" && !action) {
+    await importPendingMobileBookingsFromFirestore();
     const body = (await request.json()) as Record<string, unknown>;
     const data: any = {};
     const existing = await prisma.booking.findUnique({ where: { id } });
@@ -4739,6 +6247,18 @@ async function dispatchPatch(request: NextRequest, params: Params) {
         },
         createdByAdminId,
       });
+      await maybeAwardBookingRewardPoints({
+        bookingId: row.id,
+        startTime: row.startTime,
+        endTime: row.endTime,
+        facilityArea: row.facilityArea,
+        status: row.status,
+        source: inferBookingSource(row.notes),
+        customerName: row.customerName,
+        customerEmail: row.customerEmail,
+        customerPhone: row.customerPhone,
+      });
+      await syncBookingRealtimeById(row.id);
       return NextResponse.json(row);
     } catch (error: any) {
       if (error?.code === "P2025") return jsonError("Booking not found", 404);
@@ -4748,6 +6268,10 @@ async function dispatchPatch(request: NextRequest, params: Params) {
 
   if (resource === "package-registrations" && !action) {
     return updatePackageRegistration(id, request);
+  }
+
+  if (resource === "shop-items" && !action) {
+    return updateShopItem(id, request);
   }
 
   if (resource === "invoices" && !action) {
@@ -4769,11 +6293,25 @@ async function dispatchDelete(_request: NextRequest, params: Params) {
   if (resource === "bookings") {
     try {
       await prisma.booking.delete({ where: { id } });
+      try {
+        const firestore = getFirestore();
+        await markBookingDeletedInFirestore({ firestore, bookingId: id });
+      } catch (error) {
+        console.warn("[portal-db-api] booking delete sync skipped", error);
+      }
       return NextResponse.json({ success: true });
     } catch (error: any) {
       if (error?.code === "P2025") return jsonError("Booking not found", 404);
       return jsonError("Failed to delete booking", 500);
     }
+  }
+
+  if (resource === "shop-items") {
+    return removeShopItem(id);
+  }
+
+  if (resource === "guest-accounts") {
+    return removeGuestAccount(id);
   }
 
   if (resource === "package-registrations") {

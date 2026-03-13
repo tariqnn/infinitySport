@@ -163,6 +163,7 @@ export type BookingPaymentRow = {
 export type BookingCourtRate = {
   name: string;
   hourlyRate: number;
+  rewardPointsPerHour: number;
 };
 
 export type BookingOverviewResponse = {
@@ -455,6 +456,118 @@ export const inventoryApi = {
   delete: (id: string) => portalFetch<void>(`/portal/inventory/${id}`, { method: 'DELETE' }),
 };
 
+export type ShopItemStatus = 'ACTIVE' | 'SOLD_OUT' | 'HIDDEN';
+
+export type GuestAccountRow = {
+  email: string;
+  name: string | null;
+  bookingsCount: number;
+  lastBookingAt: string | null;
+  lastCourt: string | null;
+  rewardPoints: number;
+  manualPoints: number;
+  totalPoints: number;
+  linkedPlayersCount: number;
+  parentUid: string | null;
+  hasGuestAccess: boolean;
+};
+
+export type GuestPointAdjustmentRow = {
+  id: string;
+  customerEmail: string;
+  change: number;
+  reason: string;
+  createdBy: string | null;
+  createdAt: string;
+};
+
+export type ShopItemRow = {
+  id: string;
+  companyId: string;
+  name: string;
+  category: string | null;
+  description: string | null;
+  imageUrl: string | null;
+  pointsCost: number;
+  quantityAvailable: number | null;
+  status: ShopItemStatus;
+  isFeatured: boolean;
+  redemptionNote: string | null;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const shopApi = {
+  list: (companyId?: string, status?: ShopItemStatus | 'all') => {
+    const params = new URLSearchParams();
+    if (companyId) params.append('companyId', companyId);
+    if (status && status !== 'all') params.append('status', status);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return portalFetch<ShopItemRow[]>(`/portal/shop-items${query}`);
+  },
+  create: (data: {
+    companyId: string;
+    name: string;
+    category?: string | null;
+    description?: string | null;
+    imageUrl?: string | null;
+    pointsCost: number;
+    quantityAvailable?: number | null;
+    status?: ShopItemStatus;
+    isFeatured?: boolean;
+    redemptionNote?: string | null;
+    sortOrder?: number;
+  }) => portalFetch<ShopItemRow>('/portal/shop-items', { method: 'POST', body: JSON.stringify(data) }),
+  update: (
+    id: string,
+    data: Partial<{
+      name: string;
+      category: string | null;
+      description: string | null;
+      imageUrl: string | null;
+      pointsCost: number;
+      quantityAvailable: number | null;
+      status: ShopItemStatus;
+      isFeatured: boolean;
+      redemptionNote: string | null;
+      sortOrder: number;
+    }>
+  ) => portalFetch<ShopItemRow>(`/portal/shop-items/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  delete: (id: string) => portalFetch<void>(`/portal/shop-items/${id}`, { method: 'DELETE' }),
+  publish: (companyId: string) =>
+    portalFetch<{ success: boolean; synced: number }>('/portal/shop-items/publish', {
+      method: 'POST',
+      body: JSON.stringify({ companyId }),
+    }),
+};
+
+export const guestAccountsApi = {
+  list: (search?: string) => {
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return portalDbFetch<GuestAccountRow[]>(`/portal/guest-accounts${query}`);
+  },
+  addPointAdjustment: (
+    email: string,
+    data: { points: number; reason: string; createdBy?: string | null; customerName?: string | null },
+  ) =>
+    portalDbFetch<{ success: boolean; totalPoints: number; rewardPoints: number; manualPoints: number }>(
+      `/portal/guest-accounts/${encodeURIComponent(email)}/point-adjustment`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+  getPointAdjustments: (email: string) =>
+    portalDbFetch<GuestPointAdjustmentRow[]>(
+      `/portal/guest-accounts/${encodeURIComponent(email)}/point-adjustments`,
+    ),
+  delete: (email: string) =>
+    portalDbFetch<{ success: boolean }>(
+      `/portal/guest-accounts/${encodeURIComponent(email)}`,
+      { method: 'DELETE' },
+    ),
+};
+
 export const tasksApi = {
   list: (companyId?: string, status?: string) => {
     const params = new URLSearchParams();
@@ -489,9 +602,12 @@ export type PackageRegistrationRow = {
   customerPhone: string;
   customerEmail: string | null;
   customerAge: number | null;
+  playerCode?: string | null;
+  currentCycle?: number;
   sessionsLeft: number | null;
   nextPaymentDate: string | null;
   planLabel: string | null;
+  pointsBalance?: number;
   isPaid: boolean;
   basePriceJod: number;
   discountType: string;
@@ -506,6 +622,16 @@ export type PackageRegistrationRow = {
   collected?: number; // sum of active receipts (from API when available)
   createdAt: string;
   updatedAt: string;
+};
+
+export type RegistrationRenewalHistoryRow = {
+  id: string;
+  registrationId: string;
+  playerCode: string;
+  cycleNumber: number;
+  action: string;
+  snapshot: Record<string, unknown> | null;
+  createdAt: string;
 };
 
 export type PackagePricingRow = { packageName: string; basePriceJod: number | null };
@@ -540,11 +666,12 @@ export type RegistrationTotals = {
 };
 
 export const packageRegistrationsApi = {
-  list: (packageName?: string, startDate?: string, endDate?: string) => {
+  list: (packageName?: string, startDate?: string, endDate?: string, search?: string) => {
     const params = new URLSearchParams();
     if (packageName) params.append('packageName', packageName);
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
+    if (search) params.append('search', search);
     const query = params.toString() ? `?${params.toString()}` : '';
     return portalDbFetch<PackageRegistrationRow[]>(`/portal/package-registrations${query}`);
   },
@@ -624,6 +751,16 @@ export const packageRegistrationsApi = {
     portalDbFetch<{ success: boolean; sessionsBonus: number }>(`/portal/package-registrations/${id}/session-adjustment`, { method: 'POST', body: JSON.stringify(data) }),
   getSessionAdjustments: (id: string) =>
     portalDbFetch<Array<{ id: string; change: number; reason: string; createdAt: string }>>(`/portal/package-registrations/${id}/session-adjustments`),
+  addPointAdjustment: (id: string, data: { points: number; reason: string; createdBy?: string | null }) =>
+    portalDbFetch<{ success: boolean; addedPoints: number; pointsBalance: number }>(`/portal/package-registrations/${id}/point-adjustment`, { method: 'POST', body: JSON.stringify(data) }),
+  getPointAdjustments: (id: string) =>
+    portalDbFetch<Array<{ id: string; change: number; reason: string; createdBy: string | null; createdAt: string }>>(`/portal/package-registrations/${id}/point-adjustments`),
+  getHistory: (id: string) =>
+    portalDbFetch<{
+      playerCode: string | null;
+      currentCycle: number;
+      history: RegistrationRenewalHistoryRow[];
+    }>(`/portal/package-registrations/${id}/history`),
 };
 
 export type PackageOption = {

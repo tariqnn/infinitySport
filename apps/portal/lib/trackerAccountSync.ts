@@ -38,6 +38,14 @@ export type TrackerSyncResult = {
   }>;
 };
 
+type TrackerSyncedPlayer = TrackerSyncResult['players'][number];
+
+type TrackerPlayerLookupMaps = {
+  byRegistrationId: Map<string, admin.firestore.QueryDocumentSnapshot>;
+  byChildKey: Map<string, admin.firestore.QueryDocumentSnapshot>;
+  byName: Map<string, admin.firestore.QueryDocumentSnapshot>;
+};
+
 export type TrackerReceiptSyncInput = {
   id: string;
   receiptId: string;
@@ -165,8 +173,358 @@ function getExistingPlayerIds(source: Record<string, unknown>): string[] {
     .filter(Boolean);
 }
 
+function getExistingGuardianIds(source: Record<string, unknown>): string[] {
+  const value = source.guardianIds;
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => normalizeText(entry))
+    .filter(Boolean);
+}
+
 export function buildTrackerChildKey(name: string, age?: number | null): string {
   return `${normalizePlayerName(name)}|${age ?? ''}`;
+}
+
+function createTrackerPlayerLookupMaps(): TrackerPlayerLookupMaps {
+  return {
+    byRegistrationId: new Map(),
+    byChildKey: new Map(),
+    byName: new Map(),
+  };
+}
+
+function indexTrackerPlayerSnapshot(
+  lookup: TrackerPlayerLookupMaps,
+  snap: admin.firestore.QueryDocumentSnapshot,
+) {
+  const data = (snap.data() as Record<string, unknown>) ?? {};
+  const syncData = getNestedRecord(data, 'portalSync');
+  const registrationId = normalizeText(syncData.registrationId);
+  const childKey =
+    normalizeText(syncData.childKey) ||
+    buildTrackerChildKey(
+      normalizeText(data.name),
+      coerceOptionalNumber(data.age),
+    );
+  const normalizedName = normalizePlayerName(data.name);
+  if (registrationId && !lookup.byRegistrationId.has(registrationId)) {
+    lookup.byRegistrationId.set(registrationId, snap);
+  }
+  if (childKey && !lookup.byChildKey.has(childKey)) {
+    lookup.byChildKey.set(childKey, snap);
+  }
+  if (normalizedName && !lookup.byName.has(normalizedName)) {
+    lookup.byName.set(normalizedName, snap);
+  }
+}
+
+async function findExistingTrackerPlayerSnapshot(params: {
+  firestore: admin.firestore.Firestore;
+  player: TrackerPlayerSyncInput;
+  lookup?: TrackerPlayerLookupMaps;
+}): Promise<admin.firestore.QueryDocumentSnapshot | null> {
+  const registrationId = normalizeText(params.player.registrationId);
+  const playerName = normalizeText(params.player.name);
+  const childKey =
+    normalizeText(params.player.childKey) ||
+    buildTrackerChildKey(playerName, coerceOptionalNumber(params.player.age));
+
+  const fromLookup =
+    (registrationId ? params.lookup?.byRegistrationId.get(registrationId) : undefined) ||
+    (childKey ? params.lookup?.byChildKey.get(childKey) : undefined) ||
+    params.lookup?.byName.get(normalizePlayerName(playerName));
+  if (fromLookup) return fromLookup;
+
+  if (registrationId) {
+    const registrationSnapshot = await params.firestore
+      .collection('players')
+      .where('portalSync.registrationId', '==', registrationId)
+      .limit(1)
+      .get();
+    if (!registrationSnapshot.empty) {
+      const snap = registrationSnapshot.docs[0];
+      if (params.lookup) indexTrackerPlayerSnapshot(params.lookup, snap);
+      return snap;
+    }
+  }
+
+  if (childKey) {
+    const childKeySnapshot = await params.firestore
+      .collection('players')
+      .where('portalSync.childKey', '==', childKey)
+      .limit(1)
+      .get();
+    if (!childKeySnapshot.empty) {
+      const snap = childKeySnapshot.docs[0];
+      if (params.lookup) indexTrackerPlayerSnapshot(params.lookup, snap);
+      return snap;
+    }
+  }
+
+  return null;
+}
+
+export async function syncTrackerPlayerProfile(params: {
+  firestore: admin.firestore.Firestore;
+  player: TrackerPlayerSyncInput;
+  parentUid?: string | null;
+  lookup?: TrackerPlayerLookupMaps;
+}): Promise<TrackerSyncedPlayer> {
+  const { firestore, player, parentUid = null, lookup } = params;
+  const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
+  const playerName = normalizeText(player.name);
+  if (!playerName) {
+    throw new Error('Player name is required.');
+  }
+
+  const hasAge = Object.prototype.hasOwnProperty.call(player, 'age');
+  const hasPosition = Object.prototype.hasOwnProperty.call(player, 'primaryPosition');
+  const hasSessionsLeft = Object.prototype.hasOwnProperty.call(player, 'sessionsLeft');
+  const hasNextPaymentDate = Object.prototype.hasOwnProperty.call(player, 'nextPaymentDate');
+  const hasPlanLabel = Object.prototype.hasOwnProperty.call(player, 'planLabel');
+  const hasPointsBalance = Object.prototype.hasOwnProperty.call(player, 'pointsBalance');
+  const hasIsPaid = Object.prototype.hasOwnProperty.call(player, 'isPaid');
+  const hasPaymentStatus = Object.prototype.hasOwnProperty.call(player, 'paymentStatus');
+  const hasFinalPriceJod = Object.prototype.hasOwnProperty.call(player, 'finalPriceJod');
+  const hasCollectedJod = Object.prototype.hasOwnProperty.call(player, 'collectedJod');
+  const hasRemainingJod = Object.prototype.hasOwnProperty.call(player, 'remainingJod');
+  const hasRegistrationStatus = Object.prototype.hasOwnProperty.call(player, 'registrationStatus');
+
+  const childKey =
+    normalizeText(player.childKey) ||
+    buildTrackerChildKey(playerName, hasAge ? player.age ?? null : null);
+  const existingSnap = await findExistingTrackerPlayerSnapshot({
+    firestore,
+    player: { ...player, childKey, name: playerName },
+    lookup,
+  });
+  const existingData = existingSnap
+    ? ((existingSnap.data() as Record<string, unknown>) ?? {})
+    : {};
+  const existingOverview = getNestedRecord(existingData, 'portalOverview');
+  const existingSync = getNestedRecord(existingData, 'portalSync');
+  const playerRef = existingSnap
+    ? existingSnap.ref
+    : firestore.collection('players').doc();
+
+  const nextPointsBalance =
+    hasPointsBalance
+      ? Math.max(0, coerceOptionalNumber(player.pointsBalance) ?? 0)
+      : Math.max(0, coerceOptionalNumber(existingOverview.pointsBalance) ?? 0);
+
+  const membershipUpdate: Record<string, unknown> = {
+    pointsBalance: nextPointsBalance,
+  };
+
+  if (hasSessionsLeft) {
+    membershipUpdate.sessionsLeft =
+      player.sessionsLeft == null
+        ? null
+        : Math.max(0, Math.round(coerceOptionalNumber(player.sessionsLeft) ?? 0));
+  }
+
+  if (hasNextPaymentDate) {
+    membershipUpdate.nextPaymentDate = toTimestamp(player.nextPaymentDate);
+  }
+
+  if (hasPlanLabel) {
+    membershipUpdate.planLabel = normalizeNullableText(player.planLabel);
+  }
+
+  if (hasIsPaid) {
+    membershipUpdate.isPaid = coerceOptionalBoolean(player.isPaid);
+  }
+
+  if (hasPaymentStatus) {
+    membershipUpdate.paymentStatus = normalizeNullableText(player.paymentStatus);
+  }
+
+  if (hasFinalPriceJod) {
+    const amount = coerceOptionalNumber(player.finalPriceJod);
+    membershipUpdate.finalPriceJod = amount == null ? null : Math.max(0, Math.round(amount));
+  }
+
+  if (hasCollectedJod) {
+    const amount = coerceOptionalNumber(player.collectedJod);
+    membershipUpdate.collectedJod = amount == null ? null : Math.max(0, Math.round(amount));
+  }
+
+  if (hasRemainingJod) {
+    const amount = coerceOptionalNumber(player.remainingJod);
+    membershipUpdate.remainingJod = amount == null ? null : Math.max(0, Math.round(amount));
+  }
+
+  if (hasRegistrationStatus) {
+    membershipUpdate.registrationStatus = normalizeNullableText(player.registrationStatus);
+  }
+
+  const primaryPosition =
+    (hasPosition ? normalizeText(player.primaryPosition) : '') ||
+    normalizeText(existingData.primaryPosition) ||
+    normalizeText(existingData.position) ||
+    'Not set';
+
+  const nextAge = hasAge
+    ? (player.age == null ? null : Math.max(0, Math.round(coerceOptionalNumber(player.age) ?? 0)))
+    : undefined;
+
+  const guardianIds = Array.from(
+    new Set([
+      ...getExistingGuardianIds(existingData),
+      ...(parentUid ? [parentUid] : []),
+    ]),
+  );
+
+  const playerUpdate: Record<string, unknown> = {
+    id: playerRef.id,
+    name: playerName,
+    parentId: normalizeNullableText(parentUid) || normalizeNullableText(existingData.parentId),
+    guardianIds,
+    primaryPosition,
+    position: primaryPosition,
+    portalOverview: membershipUpdate,
+    portalSync: {
+      source: 'portal',
+      childKey,
+      registrationId:
+        normalizeNullableText(player.registrationId) ||
+        normalizeNullableText(existingSync.registrationId),
+      syncedAt: serverTimestamp,
+    },
+    updatedAt: serverTimestamp,
+  };
+
+  if (nextAge !== undefined) {
+    playerUpdate.age = nextAge;
+  } else if (!existingSnap) {
+    playerUpdate.age = null;
+  }
+
+  if (!existingSnap) {
+    playerUpdate.createdAt = serverTimestamp;
+  }
+
+  await playerRef.set(playerUpdate, { merge: true });
+
+  const membershipSummary = {
+    sessionsLeft:
+      hasSessionsLeft
+        ? (player.sessionsLeft == null
+            ? null
+            : Math.max(0, Math.round(coerceOptionalNumber(player.sessionsLeft) ?? 0)))
+        : coerceOptionalNumber(existingOverview.sessionsLeft),
+    pointsBalance: nextPointsBalance,
+    nextPaymentDate:
+      hasNextPaymentDate
+        ? toIsoDate(player.nextPaymentDate)
+        : toIsoDate(existingOverview.nextPaymentDate),
+    planLabel:
+      hasPlanLabel
+        ? normalizeNullableText(player.planLabel)
+        : normalizeNullableText(existingOverview.planLabel),
+    isPaid:
+      hasIsPaid
+        ? coerceOptionalBoolean(player.isPaid)
+        : coerceOptionalBoolean(existingOverview.isPaid),
+    paymentStatus:
+      hasPaymentStatus
+        ? normalizeNullableText(player.paymentStatus)
+        : normalizeNullableText(existingOverview.paymentStatus),
+    finalPriceJod:
+      hasFinalPriceJod
+        ? coerceOptionalNumber(player.finalPriceJod)
+        : coerceOptionalNumber(existingOverview.finalPriceJod),
+    collectedJod:
+      hasCollectedJod
+        ? coerceOptionalNumber(player.collectedJod)
+        : coerceOptionalNumber(existingOverview.collectedJod),
+    remainingJod:
+      hasRemainingJod
+        ? coerceOptionalNumber(player.remainingJod)
+        : coerceOptionalNumber(existingOverview.remainingJod),
+    registrationStatus:
+      hasRegistrationStatus
+        ? normalizeNullableText(player.registrationStatus)
+        : normalizeNullableText(existingOverview.registrationStatus),
+  };
+
+  if (lookup) {
+    const refreshedSnap = await playerRef.get();
+    if (refreshedSnap.exists) {
+      indexTrackerPlayerSnapshot(
+        lookup,
+        refreshedSnap as admin.firestore.QueryDocumentSnapshot,
+      );
+    }
+  }
+
+  return {
+    id: playerRef.id,
+    name: playerName,
+    membership: membershipSummary,
+  };
+}
+
+export async function syncTrackerPlayerAccount(params: {
+  firestore: admin.firestore.Firestore;
+  uid: string;
+  email: string;
+  name: string;
+  playerId: string;
+}): Promise<TrackerSyncResult> {
+  const { firestore, uid, email, name, playerId } = params;
+  const normalizedPlayerId = normalizeText(playerId);
+  if (!normalizedPlayerId) {
+    throw new Error('playerId is required for player accounts.');
+  }
+
+  const userRef = firestore.collection('users').doc(uid);
+  const playerRef = firestore.collection('players').doc(normalizedPlayerId);
+  const [existingUserSnap, playerSnap] = await Promise.all([userRef.get(), playerRef.get()]);
+  if (!playerSnap.exists) {
+    throw new Error('Linked player profile was not found.');
+  }
+
+  const existingUserData = existingUserSnap.exists
+    ? ((existingUserSnap.data() as Record<string, unknown>) ?? {})
+    : {};
+  const playerData = (playerSnap.data() as Record<string, unknown>) ?? {};
+  const overview = getNestedRecord(playerData, 'portalOverview');
+
+  await userRef.set(
+    {
+      name: normalizeText(name) || normalizeText(playerData.name) || normalizeText(existingUserData.name),
+      email: normalizeText(email) || normalizeText(existingUserData.email),
+      role: 'player',
+      playerId: normalizedPlayerId,
+      playerIds: [normalizedPlayerId],
+      photoUrl: normalizeText(existingUserData.photoUrl) || '',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+
+  return {
+    playerIds: [normalizedPlayerId],
+    players: [
+      {
+        id: normalizedPlayerId,
+        name: normalizeText(playerData.name),
+        membership: {
+          sessionsLeft: coerceOptionalNumber(overview.sessionsLeft),
+          pointsBalance: Math.max(0, coerceOptionalNumber(overview.pointsBalance) ?? 0),
+          nextPaymentDate: toIsoDate(overview.nextPaymentDate),
+          planLabel: normalizeNullableText(overview.planLabel),
+          isPaid: coerceOptionalBoolean(overview.isPaid),
+          paymentStatus: normalizeNullableText(overview.paymentStatus),
+          finalPriceJod: coerceOptionalNumber(overview.finalPriceJod),
+          collectedJod: coerceOptionalNumber(overview.collectedJod),
+          remainingJod: coerceOptionalNumber(overview.remainingJod),
+          registrationStatus: normalizeNullableText(overview.registrationStatus),
+        },
+      },
+    ],
+  };
 }
 
 function mapGuestPlayerStatus(registrationStatus: unknown): string {
@@ -315,213 +673,23 @@ export async function syncTrackerUserAndPlayers(params: {
     .collection('players')
     .where('parentId', '==', uid)
     .get();
-
-  const existingByRegistrationId = new Map<string, admin.firestore.QueryDocumentSnapshot>();
-  const existingByChildKey = new Map<string, admin.firestore.QueryDocumentSnapshot>();
-  const existingByName = new Map<string, admin.firestore.QueryDocumentSnapshot>();
-
+  const lookup = createTrackerPlayerLookupMaps();
   for (const snap of existingPlayersSnapshot.docs) {
-    const data = (snap.data() as Record<string, unknown>) ?? {};
-    const syncData = getNestedRecord(data, 'portalSync');
-    const registrationId = normalizeText(syncData.registrationId);
-    const childKey =
-      normalizeText(syncData.childKey) ||
-      buildTrackerChildKey(
-        normalizeText(data.name),
-        coerceOptionalNumber(data.age),
-      );
-    const normalizedName = normalizePlayerName(data.name);
-    if (registrationId && !existingByRegistrationId.has(registrationId)) {
-      existingByRegistrationId.set(registrationId, snap);
-    }
-    if (childKey && !existingByChildKey.has(childKey)) {
-      existingByChildKey.set(childKey, snap);
-    }
-    if (normalizedName && !existingByName.has(normalizedName)) {
-      existingByName.set(normalizedName, snap);
-    }
+    indexTrackerPlayerSnapshot(lookup, snap);
   }
 
   const writtenPlayerIds: string[] = [];
   const writtenPlayers: TrackerSyncResult['players'] = [];
 
   for (const player of players) {
-    const playerName = normalizeText(player.name);
-    if (!playerName) continue;
-
-    const hasAge = Object.prototype.hasOwnProperty.call(player, 'age');
-    const hasPosition = Object.prototype.hasOwnProperty.call(player, 'primaryPosition');
-    const hasSessionsLeft = Object.prototype.hasOwnProperty.call(player, 'sessionsLeft');
-    const hasNextPaymentDate = Object.prototype.hasOwnProperty.call(player, 'nextPaymentDate');
-    const hasPlanLabel = Object.prototype.hasOwnProperty.call(player, 'planLabel');
-    const hasPointsBalance = Object.prototype.hasOwnProperty.call(player, 'pointsBalance');
-    const hasIsPaid = Object.prototype.hasOwnProperty.call(player, 'isPaid');
-    const hasPaymentStatus = Object.prototype.hasOwnProperty.call(player, 'paymentStatus');
-    const hasFinalPriceJod = Object.prototype.hasOwnProperty.call(player, 'finalPriceJod');
-    const hasCollectedJod = Object.prototype.hasOwnProperty.call(player, 'collectedJod');
-    const hasRemainingJod = Object.prototype.hasOwnProperty.call(player, 'remainingJod');
-    const hasRegistrationStatus = Object.prototype.hasOwnProperty.call(player, 'registrationStatus');
-
-    const childKey =
-      normalizeText(player.childKey) ||
-      buildTrackerChildKey(playerName, hasAge ? player.age ?? null : null);
-    const registrationId = normalizeText(player.registrationId);
-
-    const existingSnap =
-      (registrationId ? existingByRegistrationId.get(registrationId) : undefined) ||
-      existingByChildKey.get(childKey) ||
-      existingByName.get(normalizePlayerName(playerName));
-    const existingData = existingSnap
-      ? ((existingSnap.data() as Record<string, unknown>) ?? {})
-      : {};
-    const existingOverview = getNestedRecord(existingData, 'portalOverview');
-    const existingSync = getNestedRecord(existingData, 'portalSync');
-    const playerRef = existingSnap
-      ? existingSnap.ref
-      : firestore.collection('players').doc();
-
-    const nextPointsBalance =
-      hasPointsBalance
-        ? Math.max(0, coerceOptionalNumber(player.pointsBalance) ?? 0)
-        : Math.max(0, coerceOptionalNumber(existingOverview.pointsBalance) ?? 0);
-
-    const membershipUpdate: Record<string, unknown> = {
-      pointsBalance: nextPointsBalance,
-    };
-
-    if (hasSessionsLeft) {
-      membershipUpdate.sessionsLeft =
-        player.sessionsLeft == null
-          ? null
-          : Math.max(0, Math.round(coerceOptionalNumber(player.sessionsLeft) ?? 0));
-    }
-
-    if (hasNextPaymentDate) {
-      const nextPaymentTimestamp = toTimestamp(player.nextPaymentDate);
-      membershipUpdate.nextPaymentDate = nextPaymentTimestamp;
-    }
-
-    if (hasPlanLabel) {
-      membershipUpdate.planLabel = normalizeNullableText(player.planLabel);
-    }
-
-    if (hasIsPaid) {
-      membershipUpdate.isPaid = coerceOptionalBoolean(player.isPaid);
-    }
-
-    if (hasPaymentStatus) {
-      membershipUpdate.paymentStatus = normalizeNullableText(player.paymentStatus);
-    }
-
-    if (hasFinalPriceJod) {
-      const amount = coerceOptionalNumber(player.finalPriceJod);
-      membershipUpdate.finalPriceJod = amount == null ? null : Math.max(0, Math.round(amount));
-    }
-
-    if (hasCollectedJod) {
-      const amount = coerceOptionalNumber(player.collectedJod);
-      membershipUpdate.collectedJod = amount == null ? null : Math.max(0, Math.round(amount));
-    }
-
-    if (hasRemainingJod) {
-      const amount = coerceOptionalNumber(player.remainingJod);
-      membershipUpdate.remainingJod = amount == null ? null : Math.max(0, Math.round(amount));
-    }
-
-    if (hasRegistrationStatus) {
-      membershipUpdate.registrationStatus = normalizeNullableText(player.registrationStatus);
-    }
-
-    const primaryPosition =
-      (hasPosition ? normalizeText(player.primaryPosition) : '') ||
-      normalizeText(existingData.primaryPosition) ||
-      normalizeText(existingData.position) ||
-      'Not set';
-
-    const nextAge = hasAge
-      ? (player.age == null ? null : Math.max(0, Math.round(coerceOptionalNumber(player.age) ?? 0)))
-      : undefined;
-
-    const playerUpdate: Record<string, unknown> = {
-      id: playerRef.id,
-      name: playerName,
-      parentId: uid,
-      guardianIds: [uid],
-      primaryPosition,
-      position: primaryPosition,
-      portalOverview: membershipUpdate,
-      portalSync: {
-        source: 'portal',
-        childKey,
-        registrationId:
-          normalizeNullableText(player.registrationId) ||
-          normalizeNullableText(existingSync.registrationId),
-        syncedAt: serverTimestamp,
-      },
-      updatedAt: serverTimestamp,
-    };
-
-    if (nextAge !== undefined) {
-      playerUpdate.age = nextAge;
-    } else if (!existingSnap) {
-      playerUpdate.age = null;
-    }
-
-    if (!existingSnap) {
-      playerUpdate.createdAt = serverTimestamp;
-    }
-
-    await playerRef.set(playerUpdate, { merge: true });
-
-    const membershipSummary = {
-      sessionsLeft:
-        hasSessionsLeft
-          ? (player.sessionsLeft == null
-              ? null
-              : Math.max(0, Math.round(coerceOptionalNumber(player.sessionsLeft) ?? 0)))
-          : coerceOptionalNumber(existingOverview.sessionsLeft),
-      pointsBalance: nextPointsBalance,
-      nextPaymentDate:
-        hasNextPaymentDate
-          ? toIsoDate(player.nextPaymentDate)
-          : toIsoDate(existingOverview.nextPaymentDate),
-      planLabel:
-        hasPlanLabel
-          ? normalizeNullableText(player.planLabel)
-          : normalizeNullableText(existingOverview.planLabel),
-      isPaid:
-        hasIsPaid
-          ? coerceOptionalBoolean(player.isPaid)
-          : coerceOptionalBoolean(existingOverview.isPaid),
-      paymentStatus:
-        hasPaymentStatus
-          ? normalizeNullableText(player.paymentStatus)
-          : normalizeNullableText(existingOverview.paymentStatus),
-      finalPriceJod:
-        hasFinalPriceJod
-          ? coerceOptionalNumber(player.finalPriceJod)
-          : coerceOptionalNumber(existingOverview.finalPriceJod),
-      collectedJod:
-        hasCollectedJod
-          ? coerceOptionalNumber(player.collectedJod)
-          : coerceOptionalNumber(existingOverview.collectedJod),
-      remainingJod:
-        hasRemainingJod
-          ? coerceOptionalNumber(player.remainingJod)
-          : coerceOptionalNumber(existingOverview.remainingJod),
-      registrationStatus:
-        hasRegistrationStatus
-          ? normalizeNullableText(player.registrationStatus)
-          : normalizeNullableText(existingOverview.registrationStatus),
-    };
-
-    writtenPlayerIds.push(playerRef.id);
-    writtenPlayers.push({
-      id: playerRef.id,
-      name: playerName,
-      membership: membershipSummary,
+    const syncedPlayer = await syncTrackerPlayerProfile({
+      firestore,
+      player,
+      parentUid: uid,
+      lookup,
     });
-
+    writtenPlayerIds.push(syncedPlayer.id);
+    writtenPlayers.push(syncedPlayer);
   }
 
   const existingPlayerIds = getExistingPlayerIds(existingUserData);

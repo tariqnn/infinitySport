@@ -602,6 +602,7 @@ export type PackageRegistrationRow = {
   customerPhone: string;
   customerEmail: string | null;
   customerAge: number | null;
+  playerId?: string | null;
   playerCode?: string | null;
   currentCycle?: number;
   sessionsLeft: number | null;

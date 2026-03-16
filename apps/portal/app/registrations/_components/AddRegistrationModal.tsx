@@ -198,8 +198,8 @@ export function AddRegistrationModal({
       setDiscountValue('');
       setDiscountReason('');
       setPeriodStartsAt('');
-    } catch (err: any) {
-      setError(err?.message || 'Failed to add registration');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to add registration');
     } finally {
       setLoading(false);
     }

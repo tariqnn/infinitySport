@@ -21,6 +21,7 @@ import { RegisterPersonMultiPackageModal } from './_components/RegisterPersonMul
 import { PersonDetailsModal } from './_components/PersonDetailsModal';
 import { EditRegistrationModal } from './_components/EditRegistrationModal';
 import { CreateTrackerAccountModal } from './_components/CreateTrackerAccountModal';
+import { CreatePlayerAccountModal } from './_components/CreatePlayerAccountModal';
 
 type Registration = PackageRegistrationRow;
 
@@ -59,6 +60,7 @@ export default function RegistrationsPage() {
   const [trackerAccountRegistrations, setTrackerAccountRegistrations] = useState<Registration[]>([]);
   const [trackerAccountInitialRole, setTrackerAccountInitialRole] = useState<'parent' | 'coach'>('parent');
   const [trackerCoachOnlyOpen, setTrackerCoachOnlyOpen] = useState(false);
+  const [playerAccountRegistration, setPlayerAccountRegistration] = useState<Registration | null>(null);
 
   /**
    * Package schedule catalog.
@@ -803,6 +805,12 @@ export default function RegistrationsPage() {
                                 Create account for Infinity Tracker
                               </DropdownMenu.Item>
                               <DropdownMenu.Item
+                                className="cursor-pointer px-4 py-2 text-sm text-violet-700 outline-none hover:bg-violet-50 data-[highlighted]:bg-violet-50"
+                                onSelect={() => setPlayerAccountRegistration(row)}
+                              >
+                                Create player account
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item
                                 className="cursor-pointer px-4 py-2 text-sm text-red-600 outline-none hover:bg-red-50 data-[highlighted]:bg-red-50 disabled:opacity-50"
                                 onSelect={() => handleDelete(row)}
                                 disabled={deletingId === row.id}
@@ -984,6 +992,12 @@ export default function RegistrationsPage() {
         onClose={() => { setTrackerAccountRegistrations([]); setTrackerCoachOnlyOpen(false); }}
         registrations={trackerCoachOnlyOpen ? [] : trackerAccountRegistrations}
         initialRole={trackerCoachOnlyOpen ? 'coach' : trackerAccountInitialRole}
+      />
+
+      <CreatePlayerAccountModal
+        open={!!playerAccountRegistration}
+        onClose={() => setPlayerAccountRegistration(null)}
+        registration={playerAccountRegistration}
       />
 
       {bulkCreatedCount != null && bulkCreatedCount > 0 && (

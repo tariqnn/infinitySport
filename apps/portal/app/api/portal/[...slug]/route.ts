@@ -9,6 +9,7 @@ import {
 import {
   buildTrackerChildKey,
   syncGuestAccessSnapshot,
+  syncTrackerPlayerProfile,
   syncTrackerUserReceipts,
   syncTrackerUserAndPlayers,
   type TrackerPlayerSyncInput,
@@ -493,6 +494,48 @@ function mapRegistrationSummaryToTrackerPlayer(
   };
 }
 
+async function syncStandaloneTrackerPlayers(
+  summaries: RegistrationMembershipSummary[],
+) {
+  if (summaries.length === 0) return [];
+
+  const firestore = getFirestore();
+  const latestByChild = new Map<string, RegistrationMembershipSummary>();
+  for (const row of summaries) {
+    const childKey = buildTrackerChildKey(row.studentName, row.customerAge ?? null);
+    if (!latestByChild.has(childKey)) {
+      latestByChild.set(childKey, row);
+    }
+  }
+
+  const syncedPlayers = [];
+  for (const row of latestByChild.values()) {
+    const syncedPlayer = await syncTrackerPlayerProfile({
+      firestore,
+      player: mapRegistrationSummaryToTrackerPlayer(row),
+    });
+    syncedPlayers.push(syncedPlayer);
+  }
+  return syncedPlayers;
+}
+
+async function ensureTrackerPlayerForRegistration(
+  registrationId: string,
+): Promise<string | null> {
+  const registration = await prisma.packageRegistration.findUnique({
+    where: { id: registrationId },
+    include: { receipts: { where: ACTIVE_RECEIPT_WHERE } },
+  });
+  if (!registration) return null;
+
+  const summaries = await buildRegistrationMembershipSummaries(prisma, [registration]);
+  const summary = summaries.find((row) => row.id === registrationId);
+  if (!summary) return null;
+
+  const [syncedPlayer] = await syncStandaloneTrackerPlayers([summary]);
+  return syncedPlayer?.id ?? null;
+}
+
 async function syncTrackerForRegistrationContact(input: {
   customerName: string;
   customerEmail?: string | null;
@@ -504,27 +547,7 @@ async function syncTrackerForRegistrationContact(input: {
   if (!customerEmail && !customerPhone) return;
 
   try {
-    const auth = getFirebaseAuth();
     const firestore = getFirestore();
-
-    if (!customerEmail) return;
-
-    let userRecord;
-    try {
-      userRecord = await auth.getUserByEmail(customerEmail);
-    } catch (error: unknown) {
-      const fbError = error as { code?: string };
-      if (fbError.code === "auth/user-not-found") return;
-      throw error;
-    }
-
-    const userRef = firestore.collection("users").doc(userRecord.uid);
-    const userSnap = await userRef.get();
-    const userData = userSnap.exists
-      ? ((userSnap.data() as Record<string, unknown>) ?? {})
-      : {};
-    const existingRole = normalizeText(userData.role).toLowerCase();
-    if (existingRole && existingRole !== "parent") return;
 
     const relatedRegistrations = await prisma.packageRegistration.findMany({
       where: {
@@ -554,6 +577,28 @@ async function syncTrackerForRegistrationContact(input: {
       mapRegistrationSummaryToTrackerPlayer,
     );
     if (players.length === 0) return;
+
+    await syncStandaloneTrackerPlayers(summaries);
+
+    if (!customerEmail) return;
+
+    const auth = getFirebaseAuth();
+    let userRecord;
+    try {
+      userRecord = await auth.getUserByEmail(customerEmail);
+    } catch (error: unknown) {
+      const fbError = error as { code?: string };
+      if (fbError.code === "auth/user-not-found") return;
+      throw error;
+    }
+
+    const userRef = firestore.collection("users").doc(userRecord.uid);
+    const userSnap = await userRef.get();
+    const userData = userSnap.exists
+      ? ((userSnap.data() as Record<string, unknown>) ?? {})
+      : {};
+    const existingRole = normalizeText(userData.role).toLowerCase();
+    if (existingRole && existingRole !== "parent") return;
 
     await syncTrackerUserAndPlayers({
       firestore,
@@ -3060,8 +3105,17 @@ async function createPackageRegistration(payload: RegistrationInput) {
     customerPhone: row.customerPhone,
   });
 
+  let trackerPlayerId: string | null = null;
+  try {
+    trackerPlayerId = await ensureTrackerPlayerForRegistration(row.id);
+  } catch (error) {
+    console.warn("[portal-db-api] tracker player sync skipped on registration create", error);
+  }
   const [serialized] = await serializeRegistrationRows([row]);
-  return serialized;
+  return {
+    ...serialized,
+    playerId: trackerPlayerId,
+  };
 }
 
 async function listPackageRegistrations(request: NextRequest) {

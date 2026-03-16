@@ -6,10 +6,14 @@ import { buildRegistrationMembershipSummaries } from '../../../lib/registrationM
 import { loadTrackerReceiptSyncInputsForContact } from '../../../lib/registrationReceiptSync';
 import {
   buildTrackerChildKey,
+  syncTrackerPlayerProfile,
+  syncTrackerPlayerAccount,
   syncTrackerUserReceipts,
   syncTrackerUserAndPlayers,
   type TrackerPlayerSyncInput,
 } from '../../../lib/trackerAccountSync';
+
+const AUTO_PLAYER_EMAIL_DOMAIN = 'players.infinitytrack.app';
 
 function generatePassword(length = 10): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
@@ -130,6 +134,11 @@ function summarizeMembership(players: Awaited<ReturnType<typeof syncTrackerUserA
   return players[0]?.membership ?? null;
 }
 
+function buildAutoPlayerEmail(playerId: string): string {
+  const safePlayerId = normalizeText(playerId).replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/-+/g, '-');
+  return `${safePlayerId || 'player'}@${AUTO_PLAYER_EMAIL_DOMAIN}`;
+}
+
 function trackerPlayerIdentityKey(player: {
   registrationId?: string | null;
   childKey?: string | null;
@@ -163,6 +172,98 @@ function trackerSummaryToPlayerInput(summary: Awaited<ReturnType<typeof buildReg
     remainingJod: summary.remainingJod,
     registrationStatus: summary.status,
   };
+}
+
+async function ensureTrackerPlayerForRegistration(registrationId: string) {
+  const registration = await prisma.packageRegistration.findUnique({
+    where: { id: registrationId },
+    include: {
+      receipts: {
+        where: {
+          status: 'ACTIVE',
+          voidedAt: null,
+        },
+      },
+    },
+  });
+  if (!registration) {
+    throw new Error('Registration not found.');
+  }
+
+  const [summary] = await buildRegistrationMembershipSummaries(prisma, [registration]);
+  if (!summary) {
+    throw new Error('Could not build player profile from registration.');
+  }
+
+  const syncedPlayer = await syncTrackerPlayerProfile({
+    firestore: getFirestore(),
+    player: trackerSummaryToPlayerInput(summary),
+  });
+
+  return {
+    playerId: syncedPlayer.id,
+    registration,
+    membership: syncedPlayer.membership,
+    name: syncedPlayer.name,
+  };
+}
+
+async function resolveExistingPlayerUser(params: {
+  firestore: admin.firestore.Firestore;
+  auth: admin.auth.Auth;
+  playerId: string;
+  fallbackEmail?: string | null;
+}) {
+  const normalizedPlayerId = normalizeText(params.playerId);
+  if (!normalizedPlayerId) return null;
+
+  const userQuery = await params.firestore
+    .collection('users')
+    .where('playerId', '==', normalizedPlayerId)
+    .limit(5)
+    .get();
+
+  for (const doc of userQuery.docs) {
+    const data = (doc.data() as Record<string, unknown>) ?? {};
+    const role = normalizeText(data.role);
+    if (role && role !== 'player') {
+      continue;
+    }
+    try {
+      const authUser = await params.auth.getUser(doc.id);
+      return {
+        uid: authUser.uid,
+        email: normalizeEmail(authUser.email || data.email || params.fallbackEmail),
+        userRecord: authUser,
+      };
+    } catch (error: unknown) {
+      const fbError = error as { code?: string };
+      if (fbError.code === 'auth/user-not-found') {
+        await doc.ref.delete().catch(() => undefined);
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  const fallbackEmail = normalizeEmail(params.fallbackEmail);
+  if (fallbackEmail) {
+    try {
+      const authUser = await params.auth.getUserByEmail(fallbackEmail);
+      return {
+        uid: authUser.uid,
+        email: normalizeEmail(authUser.email || fallbackEmail),
+        userRecord: authUser,
+      };
+    } catch (error: unknown) {
+      const fbError = error as { code?: string };
+      if (fbError.code !== 'auth/user-not-found') {
+        throw error;
+      }
+    }
+  }
+
+  return null;
 }
 
 async function enrichParentPlayers(
@@ -266,22 +367,68 @@ async function enrichParentPlayers(
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as Record<string, unknown>;
-    const name = normalizeText(body.name);
-    const email = normalizeEmail(body.email);
     const role = normalizeText(body.role);
+    const requestedName = normalizeText(body.name);
+    const requestedEmail = normalizeEmail(body.email);
+    const providedPassword = normalizeText(body.password);
+    const providedPlayerId = normalizeText(body.playerId);
+    const providedRegistrationId = normalizeText(body.registrationId);
+    const autoGenerate = body.autoGenerate === true;
 
-    if (!name) {
-      return NextResponse.json({ error: 'Name is required.' }, { status: 400 });
+    let name = requestedName;
+    let email = requestedEmail;
+    let resolvedPlayerId = providedPlayerId;
+    let playerRegistrationMembership: Result['membership'] | null = null;
+
+    if (role !== 'parent' && role !== 'coach' && role !== 'player') {
+      return NextResponse.json({ error: 'Role must be "parent", "coach", or "player".' }, { status: 400 });
     }
-    if (!email) {
-      return NextResponse.json({ error: 'Email is required to create a Firebase account.' }, { status: 400 });
-    }
-    if (role !== 'parent' && role !== 'coach') {
-      return NextResponse.json({ error: 'Role must be "parent" or "coach".' }, { status: 400 });
+    if (providedPassword && providedPassword.length < 6) {
+      return NextResponse.json({ error: 'Password must be at least 6 characters.' }, { status: 400 });
     }
 
     const auth = getFirebaseAuth();
     const firestore = getFirestore();
+
+    if (role === 'player') {
+      if (!resolvedPlayerId && providedRegistrationId) {
+        const linkedPlayer = await ensureTrackerPlayerForRegistration(providedRegistrationId);
+        resolvedPlayerId = linkedPlayer.playerId;
+        name = name || linkedPlayer.name || linkedPlayer.registration.customerName;
+        playerRegistrationMembership = {
+          sessionsLeft: linkedPlayer.membership.sessionsLeft,
+          pointsBalance: linkedPlayer.membership.pointsBalance,
+          nextPaymentDate: toIsoDate(linkedPlayer.membership.nextPaymentDate),
+          planLabel: linkedPlayer.membership.planLabel,
+        };
+      }
+
+      if (!resolvedPlayerId) {
+        return NextResponse.json({ error: 'playerId or registrationId is required for player accounts.' }, { status: 400 });
+      }
+
+      if (!name) {
+        return NextResponse.json({ error: 'Name is required.' }, { status: 400 });
+      }
+
+      if (autoGenerate && !email) {
+        email = buildAutoPlayerEmail(resolvedPlayerId);
+      }
+
+      if (!email) {
+        return NextResponse.json({ error: 'Email is required to create a Firebase account.' }, { status: 400 });
+      }
+      if (!autoGenerate && !providedPassword) {
+        return NextResponse.json({ error: 'Password is required for player accounts.' }, { status: 400 });
+      }
+    } else {
+      if (!name) {
+        return NextResponse.json({ error: 'Name is required.' }, { status: 400 });
+      }
+      if (!email) {
+        return NextResponse.json({ error: 'Email is required to create a Firebase account.' }, { status: 400 });
+      }
+    }
 
     const parentPlayers = role === 'parent'
       ? await enrichParentPlayers(buildParentPlayerInputs(body), {
@@ -300,25 +447,55 @@ export async function POST(request: NextRequest) {
     let created = false;
     let password: string | null = null;
 
-    try {
-      userRecord = await auth.getUserByEmail(email);
-    } catch (error: unknown) {
-      const fbError = error as { code?: string };
-      if (fbError.code !== 'auth/user-not-found') {
-        throw error;
+    if (role === 'player') {
+      const existingPlayerUser = await resolveExistingPlayerUser({
+        firestore,
+        auth,
+        playerId: resolvedPlayerId,
+        fallbackEmail: email,
+      });
+      if (existingPlayerUser) {
+        userRecord = existingPlayerUser.userRecord;
+        email = existingPlayerUser.email || email;
       }
     }
 
     if (!userRecord) {
-      password = generatePassword(10);
+      try {
+        userRecord = await auth.getUserByEmail(email);
+      } catch (error: unknown) {
+        const fbError = error as { code?: string };
+        if (fbError.code !== 'auth/user-not-found') {
+          throw error;
+        }
+      }
+    }
+
+    if (!userRecord) {
+      password = role === 'player'
+        ? (providedPassword || generatePassword(10))
+        : (providedPassword || generatePassword(10));
       userRecord = await auth.createUser({
         email,
         password,
         displayName: name,
       });
       created = true;
-    } else if (userRecord.displayName !== name) {
-      userRecord = await auth.updateUser(userRecord.uid, { displayName: name });
+    } else {
+      const updatePayload: admin.auth.UpdateRequest = {};
+      if (userRecord.displayName !== name) {
+        updatePayload.displayName = name;
+      }
+      if (role === 'player') {
+        if (email && normalizeEmail(userRecord.email) !== email) {
+          updatePayload.email = email;
+        }
+        password = providedPassword || generatePassword(10);
+        updatePayload.password = password;
+      }
+      if (Object.keys(updatePayload).length > 0) {
+        userRecord = await auth.updateUser(userRecord.uid, updatePayload);
+      }
     }
 
     const existingUserSnap = await firestore.collection('users').doc(userRecord.uid).get();
@@ -333,14 +510,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const syncResult = await syncTrackerUserAndPlayers({
-      firestore,
-      uid: userRecord.uid,
-      email,
-      name,
-      role: role as 'parent' | 'coach',
-      players: role === 'parent' ? parentPlayers : undefined,
-    });
+    const syncResult = role === 'player'
+      ? await syncTrackerPlayerAccount({
+          firestore,
+          uid: userRecord.uid,
+          email,
+          name,
+          playerId: resolvedPlayerId,
+        })
+      : await syncTrackerUserAndPlayers({
+          firestore,
+          uid: userRecord.uid,
+          email,
+          name,
+          role: role as 'parent' | 'coach',
+          players: role === 'parent' ? parentPlayers : undefined,
+        });
 
     if (role === 'parent') {
       const receiptSyncRows = await loadTrackerReceiptSyncInputsForContact({
@@ -370,12 +555,14 @@ export async function POST(request: NextRequest) {
       updatedExisting: !created,
       user: {
         uid: userRecord.uid,
-        email,
+        email: normalizeEmail(userRecord.email || email),
         role,
       },
       ...(password ? { password } : {}),
       playerIds: syncResult.playerIds,
-      membership: summarizeMembership(syncResult.players),
+      membership: role === 'player'
+        ? (playerRegistrationMembership ?? summarizeMembership(syncResult.players))
+        : summarizeMembership(syncResult.players),
       players: syncResult.players.map((player) => ({
         id: player.id,
         name: player.name,

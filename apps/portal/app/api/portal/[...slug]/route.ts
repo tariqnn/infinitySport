@@ -1,3 +1,4 @@
+import type { QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../lib/db";
 import { getFirebaseAuth, getFirestore } from "../../../../lib/firebase-admin";
@@ -34,7 +35,6 @@ import {
 } from "../../../../lib/bookingRewardPoints";
 import {
   addGuestPointAdjustment,
-  listGuestAccounts,
   listDeletedGuestAccountEmails,
   listGuestPointAdjustments,
   loadGuestTotalPointsByEmail,
@@ -191,8 +191,150 @@ function normalizeEmail(value: unknown): string {
   return normalizeText(value).toLowerCase();
 }
 
+/** True when the string looks like a normal email (used for Prisma / points, not for Firestore doc ids). */
+function isValidGuestEmail(value: string): boolean {
+  const s = normalizeEmail(value);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+}
+
+/**
+ * Firestore collection for guest snapshots (default: `guestAccess`).
+ * Override with env: FIRESTORE_GUEST_ACCESS_COLLECTIONS=guestAccess,otherCollection
+ */
+function guestAccessCollectionIds(): string[] {
+  const env = process.env.FIRESTORE_GUEST_ACCESS_COLLECTIONS?.trim();
+  if (env) {
+    return env
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return ["guestAccess"];
+}
+
+/** Primary email stored on guest documents (field name variants from app / console). */
+function guestDocPrimaryEmail(guestDoc: Record<string, unknown>): string {
+  const candidates: unknown[] = [
+    guestDoc.email,
+    guestDoc.Email,
+    guestDoc.userEmail,
+    guestDoc.contactEmail,
+    guestDoc.customerEmail,
+  ];
+  for (const raw of candidates) {
+    const n = normalizeEmail(raw);
+    if (n && isValidGuestEmail(n)) return n;
+  }
+  return "";
+}
+
+function guestDocDisplayName(guestDoc: Record<string, unknown>): string | null {
+  const candidates: unknown[] = [
+    guestDoc.name,
+    guestDoc.Name,
+    guestDoc.displayName,
+    guestDoc.fullName,
+    guestDoc.customerName,
+  ];
+  for (const raw of candidates) {
+    const t = normalizeText(raw);
+    if (t) return t;
+  }
+  return null;
+}
+
+/** Contact email from guestAccess document data, or from doc id when the id itself is an email. */
+function resolveGuestContactEmail(
+  docId: string,
+  guestDoc: Record<string, unknown>,
+): string {
+  const fromField = guestDocPrimaryEmail(guestDoc);
+  if (fromField) return fromField;
+  const fromId = normalizeEmail(docId);
+  if (fromId && isValidGuestEmail(fromId)) return fromId;
+  return "";
+}
+
+function parseGuestAccessDeleteTarget(raw: string): {
+  collectionId: string;
+  docId: string;
+} {
+  const decoded = decodeURIComponent(raw || "").trim();
+  const idx = decoded.indexOf("::");
+  if (idx > 0) {
+    const collectionId = decoded.slice(0, idx).trim();
+    const docId = decoded.slice(idx + 2).trim();
+    if (collectionId && docId) return { collectionId, docId };
+  }
+  return { collectionId: "guestAccess", docId: decoded };
+}
+
 function normalizePhoneDigits(value: unknown): string {
   return String(value ?? "").replace(/\D/g, "");
+}
+
+async function sendBookingCreatedNotificationEmail(input: {
+  bookingId: string;
+  source: string;
+  status: string;
+  facilityArea: string | null;
+  startTime: Date;
+  endTime: Date;
+  customerName: string | null;
+  customerPhone: string | null;
+  customerEmail: string | null;
+}) {
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey) return;
+
+  const recipient = process.env.BOOKING_NOTIFICATION_EMAIL?.trim();
+  if (!recipient) return;
+
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const startLabel = formatter.format(input.startTime);
+  const endLabel = formatter.format(input.endTime);
+
+  const rows = [
+    `Booking ID: ${input.bookingId}`,
+    `Source: ${input.source}`,
+    `Status: ${input.status}`,
+    `Facility: ${input.facilityArea ?? "-"}`,
+    `Start: ${startLabel}`,
+    `End: ${endLabel}`,
+    `Customer: ${input.customerName ?? "-"}`,
+    `Phone: ${input.customerPhone ?? "-"}`,
+    `Email: ${input.customerEmail ?? "-"}`,
+  ];
+
+  try {
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${resendKey}`,
+      },
+      body: JSON.stringify({
+        from:
+          process.env.BOOKING_FROM_EMAIL ||
+          "Infinity Sport <bookings@infinitysports.jo>",
+        to: [recipient],
+        subject: `New Booking Created (${input.status})`,
+        text: rows.join("\n"),
+        html: `<h2>New Booking Created</h2><ul>${rows
+          .map((line) => `<li>${line}</li>`)
+          .join("")}</ul>`,
+      }),
+    });
+  } catch (error) {
+    console.warn("[portal-db-api] booking notification email failed", error);
+  }
 }
 
 function phoneLooksSame(
@@ -1307,6 +1449,18 @@ async function importPendingMobileBookingsFromFirestore(force = false) {
         customerName: row.customerName,
         customerEmail: row.customerEmail,
         customerPhone: row.customerPhone,
+      });
+
+      await sendBookingCreatedNotificationEmail({
+        bookingId: row.id,
+        source: "APP",
+        status: row.status,
+        facilityArea: row.facilityArea,
+        startTime: row.startTime,
+        endTime: row.endTime,
+        customerName: row.customerName,
+        customerPhone: row.customerPhone,
+        customerEmail: row.customerEmail,
       });
 
       await updateMobileBookingInboxEntry({
@@ -4514,47 +4668,72 @@ async function listPointAdjustments(id: string) {
   return NextResponse.json(rows);
 }
 
+/**
+ * Guest accounts list: Firestore `guestAccess` only (no Postgres booking rollup).
+ * Point adjustments / sync still use Prisma elsewhere when staff edits guests.
+ */
 async function getGuestAccounts(request: NextRequest) {
   const search = request.nextUrl.searchParams.get("search");
   const normalizedSearch = normalizeText(search).toLowerCase();
-  const rows = await listGuestAccounts(prisma);
 
   try {
     const firestore = getFirestore();
     const deletedEmails = await listDeletedGuestAccountEmails(prisma);
-    const guestSnapshot = await firestore.collection("guestAccess").get();
-    const merged = new Map<
-      string,
-      {
-        email: string;
-        name: string | null;
-        bookingsCount: number;
-        lastBookingAt: string | null;
-        lastCourt: string | null;
-        rewardPoints: number;
-        manualPoints: number;
-        totalPoints: number;
-        linkedPlayersCount: number;
-        parentUid: string | null;
-        hasGuestAccess: boolean;
-      }
-    >();
 
-    for (const row of rows) {
-      merged.set(row.email, {
-        ...row,
-        linkedPlayersCount: 0,
-        parentUid: null,
-        hasGuestAccess: false,
-      });
+    type GuestDocRef = {
+      snap: QueryDocumentSnapshot;
+      collectionId: string;
+    };
+
+    const docs: GuestDocRef[] = [];
+    for (const collectionId of guestAccessCollectionIds()) {
+      try {
+        const guestSnapshot = await firestore.collection(collectionId).get();
+        for (const snap of guestSnapshot.docs) {
+          docs.push({ snap, collectionId });
+        }
+      } catch (subError) {
+        console.warn(
+          `[portal-db-api] guest collection read failed: ${collectionId}`,
+          subError,
+        );
+      }
     }
 
-    for (const snap of guestSnapshot.docs) {
-      const guestDoc = (snap.data() as Record<string, unknown>) ?? {};
-      const email = normalizeEmail(guestDoc.email || snap.id);
-      if (!email || deletedEmails.has(email)) continue;
-      const name = normalizeText(guestDoc.name) || null;
+    type GuestMergedRow = {
+      email: string;
+      firestoreDocId: string | null;
+      guestAccessCollection: string | null;
+      name: string | null;
+      bookingsCount: number;
+      lastBookingAt: string | null;
+      lastCourt: string | null;
+      rewardPoints: number;
+      manualPoints: number;
+      totalPoints: number;
+      linkedPlayersCount: number;
+      parentUid: string | null;
+      hasGuestAccess: boolean;
+    };
 
+    docs.sort((a, b) => {
+      const aCanon = isValidGuestEmail(a.snap.id) ? 0 : 1;
+      const bCanon = isValidGuestEmail(b.snap.id) ? 0 : 1;
+      if (aCanon !== bCanon) return aCanon - bCanon;
+      const c = a.collectionId.localeCompare(b.collectionId);
+      if (c !== 0) return c;
+      return a.snap.id.localeCompare(b.snap.id);
+    });
+
+    const responseRows: GuestMergedRow[] = [];
+
+    for (const { snap, collectionId } of docs) {
+      const guestDoc = (snap.data() as Record<string, unknown>) ?? {};
+      const docId = snap.id;
+      const contactEmail = resolveGuestContactEmail(docId, guestDoc);
+      if (contactEmail && deletedEmails.has(contactEmail)) continue;
+
+      const name = guestDocDisplayName(guestDoc);
       const playerIds = Array.isArray(guestDoc.playerIds)
         ? guestDoc.playerIds.map((entry) => normalizeText(entry)).filter(Boolean)
         : Array.isArray(guestDoc.players)
@@ -4574,33 +4753,33 @@ async function getGuestAccounts(request: NextRequest) {
         Number(guestDoc.pointsBalance ?? rewardPoints + manualPoints),
       );
 
-      const existing = merged.get(email);
-      merged.set(email, {
-        email,
-        name: existing?.name || name,
-        bookingsCount: existing?.bookingsCount ?? 0,
-        lastBookingAt:
-          existing?.lastBookingAt ??
-          parseFirestoreDateValue(guestDoc.updatedAt)?.toISOString() ??
-          null,
-        lastCourt: existing?.lastCourt ?? null,
-        rewardPoints:
-          existing && existing.rewardPoints > 0 ? existing.rewardPoints : rewardPoints,
-        manualPoints:
-          existing && existing.manualPoints !== 0 ? existing.manualPoints : manualPoints,
-        totalPoints:
-          existing && existing.totalPoints > 0 ? existing.totalPoints : totalPoints,
+      const fbLastAt =
+        parseFirestoreDateValue(guestDoc.updatedAt)?.toISOString() ?? null;
+
+      responseRows.push({
+        email: contactEmail || docId,
+        firestoreDocId: docId,
+        guestAccessCollection: collectionId,
+        name,
+        bookingsCount: 0,
+        lastBookingAt: fbLastAt,
+        lastCourt: null,
+        rewardPoints,
+        manualPoints,
+        totalPoints,
         linkedPlayersCount: playerIds.length,
         parentUid: normalizeText(guestDoc.parentUid) || null,
         hasGuestAccess: true,
       });
     }
 
-    const responseRows = Array.from(merged.values())
+    const filtered = responseRows
       .filter((row) => {
         if (!normalizedSearch) return true;
+        const emailHaystack =
+          `${row.email} ${row.firestoreDocId || ""} ${row.guestAccessCollection || ""}`.toLowerCase();
         return (
-          row.email.includes(normalizedSearch) ||
+          emailHaystack.includes(normalizedSearch) ||
           (row.name || "").toLowerCase().includes(normalizedSearch)
         );
       })
@@ -4608,40 +4787,77 @@ async function getGuestAccounts(request: NextRequest) {
         const aTime = a.lastBookingAt ? new Date(a.lastBookingAt).getTime() : 0;
         const bTime = b.lastBookingAt ? new Date(b.lastBookingAt).getTime() : 0;
         if (aTime !== bTime) return bTime - aTime;
-        return a.email.localeCompare(b.email);
+        const aKey = `${a.guestAccessCollection || ""}:${a.firestoreDocId || ""}:${a.email}`;
+        const bKey = `${b.guestAccessCollection || ""}:${b.firestoreDocId || ""}:${b.email}`;
+        return aKey.localeCompare(bKey);
       });
 
-    return NextResponse.json(responseRows);
+    return NextResponse.json(filtered);
   } catch (error) {
-    console.warn("[portal-db-api] guest account firebase lookup skipped", error);
-    return NextResponse.json(
-      rows
-        .filter((row) => {
-          if (!normalizedSearch) return true;
-          return (
-            row.email.includes(normalizedSearch) ||
-            (row.name || "").toLowerCase().includes(normalizedSearch)
-          );
-        })
-        .map((row) => ({
-          ...row,
-          linkedPlayersCount: 0,
-          parentUid: null,
-          hasGuestAccess: false,
-        })),
-    );
+    console.warn("[portal-db-api] guest account firebase-only list failed", error);
+    return NextResponse.json([]);
   }
 }
 
-async function removeGuestAccount(email: string) {
-  const normalizedEmail = normalizeEmail(email);
-  if (!normalizedEmail) return jsonError("Guest email is required");
+async function removeGuestAccount(id: string) {
+  const raw = decodeURIComponent(id || "").trim();
+  if (!raw) return jsonError("Guest id is required");
 
-  await markGuestAccountDeleted(prisma, normalizedEmail);
+  const firestore = getFirestore();
+  const allowedCollections = new Set(guestAccessCollectionIds());
+
+  const tryDeleteGuestAccessDoc = async (
+    collectionId: string,
+    docKey: string,
+  ): Promise<boolean> => {
+    if (!allowedCollections.has(collectionId)) return false;
+    const ref = firestore.collection(collectionId).doc(docKey);
+    const snap = await ref.get();
+    if (!snap.exists) return false;
+    await ref.delete();
+    return true;
+  };
+
+  const { collectionId: parsedCollection, docId: parsedDocId } =
+    parseGuestAccessDeleteTarget(raw);
+  const explicitCollection =
+    raw.includes("::") && allowedCollections.has(parsedCollection);
+
   try {
-    await getFirestore().collection("guestAccess").doc(normalizedEmail).delete();
+    if (explicitCollection) {
+      if (await tryDeleteGuestAccessDoc(parsedCollection, parsedDocId)) {
+        if (isValidGuestEmail(parsedDocId)) {
+          await markGuestAccountDeleted(prisma, normalizeEmail(parsedDocId));
+        }
+        return NextResponse.json({ success: true });
+      }
+    } else {
+      for (const cid of guestAccessCollectionIds()) {
+        if (await tryDeleteGuestAccessDoc(cid, parsedDocId)) {
+          if (isValidGuestEmail(parsedDocId)) {
+            await markGuestAccountDeleted(prisma, normalizeEmail(parsedDocId));
+          }
+          return NextResponse.json({ success: true });
+        }
+      }
+
+      const normalizedKey = normalizeEmail(parsedDocId);
+      if (normalizedKey !== parsedDocId) {
+        for (const cid of guestAccessCollectionIds()) {
+          if (await tryDeleteGuestAccessDoc(cid, normalizedKey)) {
+            await markGuestAccountDeleted(prisma, normalizedKey);
+            return NextResponse.json({ success: true });
+          }
+        }
+      }
+    }
   } catch (error) {
     console.warn("[portal-db-api] guest access delete skipped", error);
+  }
+
+  // No guestAccess document (e.g. bookings-only guest): hide from portal via deletion ledger.
+  if (isValidGuestEmail(parsedDocId)) {
+    await markGuestAccountDeleted(prisma, normalizeEmail(parsedDocId));
   }
 
   return NextResponse.json({ success: true });
@@ -6098,6 +6314,18 @@ async function dispatchPost(request: NextRequest, params: Params) {
       customerName: row.customerName,
       customerEmail: row.customerEmail,
       customerPhone: row.customerPhone,
+    });
+
+    await sendBookingCreatedNotificationEmail({
+      bookingId: row.id,
+      source,
+      status: row.status,
+      facilityArea: row.facilityArea,
+      startTime: row.startTime,
+      endTime: row.endTime,
+      customerName: row.customerName,
+      customerPhone: row.customerPhone,
+      customerEmail: row.customerEmail,
     });
 
     await syncBookingRealtimeById(row.id);

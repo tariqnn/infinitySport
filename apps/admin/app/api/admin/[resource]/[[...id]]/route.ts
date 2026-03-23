@@ -1,4 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  academyEventToAdminApi,
+  createAcademyEvent,
+  deleteAcademyEvent,
+  getAcademyEvent,
+  listAcademyEvents,
+  updateAcademyEvent,
+} from '../../../../../lib/academyEventsFirestore';
 import { prisma } from '../../../../../lib/db';
 
 type RouteParams = {
@@ -136,12 +144,12 @@ async function handleGet(resource: string, id: string | null) {
 
   if (resource === 'events') {
     if (id) {
-      const row = await prisma.event.findUnique({ where: { id } });
+      const row = await getAcademyEvent(id);
       if (!row) return jsonError('Event not found', 404);
-      return NextResponse.json(row);
+      return NextResponse.json(academyEventToAdminApi(row));
     }
-    const rows = await prisma.event.findMany({ orderBy: { date: 'asc' } });
-    return NextResponse.json(rows);
+    const rows = await listAcademyEvents();
+    return NextResponse.json(rows.map(academyEventToAdminApi));
   }
 
   if (resource === 'announcements') {
@@ -238,17 +246,37 @@ async function handlePost(resource: string, body: JsonBody) {
     const imageUrl = toTrimmedString(body.imageUrl);
     if (!imageUrl) return jsonError('Event image is required');
 
-    const row = await prisma.event.create({
-      data: {
-        title,
-        description: toOptionalString(body.description),
-        date: toDate(body.date) || new Date(),
-        location: toTrimmedString(body.location) || 'Infinity Campus',
-        imageUrl,
-        highlight: toBoolean(body.highlight, true),
-      },
+    const startAt = toDate(body.date) || new Date();
+    const endAt = hasOwn(body, 'endAt') ? toDate(body.endAt) : null;
+    const published = toBoolean(body.highlight ?? body.published, true);
+
+    const firestoreId = await createAcademyEvent({
+      title,
+      location: toTrimmedString(body.location) || 'Infinity Campus',
+      startAt,
+      endAt,
+      description: toOptionalString(body.description),
+      published,
+      imageUrl,
     });
-    return NextResponse.json(row, { status: 201 });
+
+    try {
+      const row = await prisma.event.create({
+        data: {
+          id: firestoreId,
+          title,
+          description: toOptionalString(body.description),
+          date: startAt,
+          location: toTrimmedString(body.location) || 'Infinity Campus',
+          imageUrl,
+          highlight: published,
+        },
+      });
+      return NextResponse.json(row, { status: 201 });
+    } catch (prismaError) {
+      await deleteAcademyEvent(firestoreId).catch(() => undefined);
+      throw prismaError;
+    }
   }
 
   if (resource === 'coaches') {
@@ -419,18 +447,50 @@ async function handlePatch(resource: string, id: string | null, body: JsonBody) 
 
   if (resource === 'events') {
     if (!id) return jsonError('Event id is required', 400);
-    const data: JsonBody = {};
-    if (hasOwn(body, 'title')) data.title = toTrimmedString(body.title) || '';
-    if (hasOwn(body, 'description')) data.description = toOptionalString(body.description);
-    if (hasOwn(body, 'date')) data.date = toDate(body.date) || new Date();
-    if (hasOwn(body, 'location')) data.location = toTrimmedString(body.location) || 'Infinity Campus';
+    const existing = await getAcademyEvent(id);
+    if (!existing) return jsonError('Event not found', 404);
+
+    const patchFs: Parameters<typeof updateAcademyEvent>[1] = {};
+    if (hasOwn(body, 'title')) patchFs.title = toTrimmedString(body.title) || '';
+    if (hasOwn(body, 'description')) patchFs.description = toOptionalString(body.description);
+    if (hasOwn(body, 'date')) patchFs.startAt = toDate(body.date) || new Date();
+    if (hasOwn(body, 'location')) patchFs.location = toTrimmedString(body.location) || 'Infinity Campus';
+    if (hasOwn(body, 'endAt')) patchFs.endAt = toDate(body.endAt);
     if (hasOwn(body, 'imageUrl')) {
       const imageUrl = toTrimmedString(body.imageUrl);
       if (!imageUrl) return jsonError('Event image is required');
-      data.imageUrl = imageUrl;
+      patchFs.imageUrl = imageUrl;
     }
-    if (hasOwn(body, 'highlight')) data.highlight = toBoolean(body.highlight, true);
-    const row = await prisma.event.update({ where: { id }, data: data as never });
+    if (hasOwn(body, 'highlight') || hasOwn(body, 'published')) {
+      patchFs.published = toBoolean(body.highlight ?? body.published, true);
+    }
+
+    await updateAcademyEvent(id, patchFs);
+
+    const fresh = await getAcademyEvent(id);
+    if (!fresh) return jsonError('Event not found', 404);
+
+    await prisma.event.upsert({
+      where: { id },
+      create: {
+        id: fresh.id,
+        title: fresh.title,
+        description: fresh.description,
+        date: fresh.startAt ?? new Date(),
+        location: fresh.location || 'Infinity Campus',
+        imageUrl: fresh.imageUrl,
+        highlight: fresh.published,
+      },
+      update: {
+        title: fresh.title,
+        description: fresh.description,
+        date: fresh.startAt ?? new Date(),
+        location: fresh.location || 'Infinity Campus',
+        imageUrl: fresh.imageUrl,
+        highlight: fresh.published,
+      },
+    });
+    const row = await prisma.event.findUnique({ where: { id } });
     return NextResponse.json(row);
   }
 
@@ -574,7 +634,12 @@ async function handleDelete(resource: string, id: string | null) {
   }
 
   if (resource === 'events') {
-    await prisma.event.delete({ where: { id } });
+    await deleteAcademyEvent(id);
+    try {
+      await prisma.event.delete({ where: { id } });
+    } catch {
+      // Row may only exist in Firestore if DB was out of sync
+    }
     return new NextResponse(null, { status: 204 });
   }
 

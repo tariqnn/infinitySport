@@ -226,6 +226,14 @@ The Portal works per company. If the database has no company yet:
 
 In the Portal, you usually pick the company from a dropdown or login; that sets **company ID**. All portal data (members, bookings, subscriptions, etc.) is then scoped to that company.
 
+### Guest Accounts (Firebase)
+
+The **Guest Accounts** page loads Firestore guest snapshots from **`guestAccess`** by default (one table row per document). To read additional collection names, set this next to your Portal Firebase env (e.g. `apps/portal/.env.local`):
+
+```env
+FIRESTORE_GUEST_ACCESS_COLLECTIONS=guestAccess,another_collection_id
+```
+
 ---
 
 ## 10. If Something Fails

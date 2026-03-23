@@ -397,17 +397,6 @@ export async function POST(request: Request) {
     }
 
     const endTimeStr = endTime.toTimeString().slice(0, 5);
-    await Promise.allSettled([
-      sendBookingConfirmationEmail({
-        name,
-        phone,
-        email: typeof email === 'string' ? email : undefined,
-        courtName,
-        date,
-        time: `${time} - ${endTimeStr} (${durationHours}h)`,
-      }),
-      sendBookingWhatsAppMessage({ phone, courtName, date, time: `${time} - ${endTimeStr}` }),
-    ]);
     const companyResult = await pool.query<{ id: string }>(
       `
       SELECT "id"
@@ -487,6 +476,23 @@ export async function POST(request: Request) {
       customerEmail: typeof email === 'string' ? email : null,
       notes,
     });
+
+    await Promise.allSettled([
+      sendBookingConfirmationEmail({
+        name,
+        phone,
+        email: typeof email === 'string' ? email : undefined,
+        courtName,
+        date,
+        time: `${time} - ${endTimeStr} (${durationHours}h)`,
+      }),
+      sendBookingWhatsAppMessage({
+        phone,
+        courtName,
+        date,
+        time: `${time} - ${endTimeStr}`,
+      }),
+    ]);
 
     return NextResponse.json({
       success: true,

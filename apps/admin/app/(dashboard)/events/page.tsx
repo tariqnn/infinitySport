@@ -11,7 +11,7 @@ export default function EventsPage() {
       <PageHero
         eyebrow="Events"
         title="Calendar & showcases"
-        description="Plan high-energy showcases and keep the landing page in lock-step."
+        description="Events are saved to Firestore (academyEvents) for the Infinity Track app and synced to the website database."
       />
       <EventsManager />
     </>

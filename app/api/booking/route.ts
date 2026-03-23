@@ -281,17 +281,6 @@ export async function POST(request: Request) {
     }
 
     const endTimeStr = endTime.toTimeString().slice(0, 5);
-    await Promise.allSettled([
-      sendBookingConfirmationEmail({
-        name,
-        phone,
-        email: typeof email === 'string' ? email : undefined,
-        courtName,
-        date,
-        time: `${time} - ${endTimeStr} (${durationHours}h)`,
-      }),
-      sendBookingWhatsAppMessage({ phone, courtName, date, time: `${time} - ${endTimeStr}` }),
-    ]);
 
     const { prisma } = await import('../../../lib/db');
     let company = await prisma.company.findFirst({
@@ -325,6 +314,23 @@ export async function POST(request: Request) {
         notes: 'Public booking from landing page',
       },
     });
+
+    await Promise.allSettled([
+      sendBookingConfirmationEmail({
+        name,
+        phone,
+        email: typeof email === 'string' ? email : undefined,
+        courtName,
+        date,
+        time: `${time} - ${endTimeStr} (${durationHours}h)`,
+      }),
+      sendBookingWhatsAppMessage({
+        phone,
+        courtName,
+        date,
+        time: `${time} - ${endTimeStr}`,
+      }),
+    ]);
 
     return NextResponse.json({
       success: true,

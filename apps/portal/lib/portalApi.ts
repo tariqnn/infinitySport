@@ -460,6 +460,10 @@ export type ShopItemStatus = 'ACTIVE' | 'SOLD_OUT' | 'HIDDEN';
 
 export type GuestAccountRow = {
   email: string;
+  /** Firestore `guestAccess` document id when this row comes from Firebase (may differ from `email` for UID-keyed docs). */
+  firestoreDocId?: string | null;
+  /** Which Firestore collection this row was loaded from (default `guestAccess`). */
+  guestAccessCollection?: string | null;
   name: string | null;
   bookingsCount: number;
   lastBookingAt: string | null;
@@ -561,9 +565,10 @@ export const guestAccountsApi = {
     portalDbFetch<GuestPointAdjustmentRow[]>(
       `/portal/guest-accounts/${encodeURIComponent(email)}/point-adjustments`,
     ),
-  delete: (email: string) =>
+  /** Pass `firestoreDocId` when present so the correct `guestAccess` document is removed (UID-keyed docs). */
+  delete: (accountKey: string) =>
     portalDbFetch<{ success: boolean }>(
-      `/portal/guest-accounts/${encodeURIComponent(email)}`,
+      `/portal/guest-accounts/${encodeURIComponent(accountKey)}`,
       { method: 'DELETE' },
     ),
 };

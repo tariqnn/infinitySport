@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '../../../lib/db';
-import { getFirestore } from '../../../../portal/lib/firebase-admin';
+import { getFirestore } from '../../../lib/firebase-admin';
 import { syncBlockedSlotsSnapshotToFirestore } from '../../../../portal/lib/bookingAvailabilityRealtimeSync';
 
 export interface BookingAvailabilityState {

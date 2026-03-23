@@ -8,7 +8,7 @@
     "packages/*"
   ],
   "scripts": {
-    "postinstall": "(npm run prisma:generate || echo 'Prisma generate skipped (prisma not available)') && npm install @swc/helpers@0.5.18 --ignore-scripts",
+    "postinstall": "node scripts/postinstall.mjs",
     "build": "node prisma-migrate-if-env.js && npm run build:web",
     "postbuild": "node sync-web-next-output.js",
     "start": "npm run start:web",
@@ -37,6 +37,8 @@
     "prisma:seed-package-pricing": "cd prisma && ts-node --project tsconfig.json seed-package-pricing.ts",
     "prisma:seed-packages": "cd prisma && ts-node --project tsconfig.json seed-packages.ts",
     "bookings:backfill:firebase": "node scripts/backfill-bookings-to-firestore.js",
+    "firebase:functions:install": "npm --prefix functions install",
+    "firebase:functions:deploy": "npm --prefix functions run deploy",
     "start:portal": "npm --workspace apps/portal run start",
     "start:admin": "npm --workspace apps/admin run start",
     "start:web": "npm --workspace apps/web run start",

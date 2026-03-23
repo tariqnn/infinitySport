@@ -12,6 +12,9 @@ interface EventState {
   message?: string;
 }
 
+/** Admin API row (Prisma + Firestore academyEvents); `endAt` optional for mobile app. */
+type AdminEventRow = LandingEvent & { endAt?: string | Date | null };
+
 const initialState: EventState = { status: 'idle' };
 const appBaseUrl = (process.env.NEXT_PUBLIC_APP_BASE_URL || '').replace(/\/$/, '');
 
@@ -33,10 +36,17 @@ function SubmitButton({ label, pending }: { label: string; pending: boolean }) {
   );
 }
 
+function toDatetimeLocalValue(value: string | Date | null | undefined): string {
+  if (value == null || value === '') return '';
+  const d = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toISOString().slice(0, 16);
+}
+
 export function EventsManager() {
-  const [events, setEvents] = useState<LandingEvent[]>([]);
+  const [events, setEvents] = useState<AdminEventRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState<LandingEvent | null>(null);
+  const [editing, setEditing] = useState<AdminEventRow | null>(null);
   const [createState, setCreateState] = useState<EventState>(initialState);
   const [editState, setEditState] = useState<EventState>(initialState);
   const [deleteState, setDeleteState] = useState<EventState>(initialState);
@@ -54,10 +64,11 @@ export function EventsManager() {
       try {
         const apiEvents = await apiClient.getEvents();
         // Transform API events to LandingEvent format
-        const transformed: LandingEvent[] = apiEvents.map((e: any) => ({
+        const transformed: AdminEventRow[] = apiEvents.map((e: any) => ({
           id: e.id,
           title: e.title,
           date: e.date,
+          endAt: e.endAt ?? undefined,
           location: e.location,
           description: e.description || undefined,
           imageUrl: e.imageUrl || undefined,
@@ -104,10 +115,14 @@ export function EventsManager() {
       const dateStr = formData.get('date')?.toString() || '';
       const date = new Date(dateStr);
 
+      const endAtStr = formData.get('endAt')?.toString() || '';
+      const endAt = endAtStr ? new Date(endAtStr) : null;
+
       const payload = {
         title: formData.get('title')?.toString() || '',
         description: formData.get('description')?.toString() || undefined,
         date: date,
+        endAt,
         location: formData.get('location')?.toString() || 'Infinity Campus',
         imageUrl,
         highlight: formData.get('isActive')?.toString() !== 'hidden',
@@ -123,10 +138,11 @@ export function EventsManager() {
 
       // Reload events
       const apiEvents = await apiClient.getEvents();
-      const transformed: LandingEvent[] = apiEvents.map((e: any) => ({
+      const transformed: AdminEventRow[] = apiEvents.map((e: any) => ({
         id: e.id,
         title: e.title,
         date: e.date,
+        endAt: e.endAt ?? undefined,
         location: e.location,
         description: e.description || undefined,
         imageUrl: e.imageUrl || undefined,
@@ -162,10 +178,11 @@ export function EventsManager() {
       
       // Reload events
       const apiEvents = await apiClient.getEvents();
-      const transformed: LandingEvent[] = apiEvents.map((e: any) => ({
+      const transformed: AdminEventRow[] = apiEvents.map((e: any) => ({
         id: e.id,
         title: e.title,
         date: e.date,
+        endAt: e.endAt ?? undefined,
         location: e.location,
         description: e.description || undefined,
         imageUrl: e.imageUrl || undefined,
@@ -209,13 +226,22 @@ export function EventsManager() {
           <input name="title" defaultValue={current?.title} className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2" required />
         </label>
         <label className="text-sm font-semibold text-slate-600">
-          Date & time
+          Start (date & time)
           <input
             type="datetime-local"
             name="date"
             defaultValue={current ? new Date(current.date).toISOString().slice(0, 16) : ''}
             className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2"
             required
+          />
+        </label>
+        <label className="text-sm font-semibold text-slate-600">
+          End (optional)
+          <input
+            type="datetime-local"
+            name="endAt"
+            defaultValue={current?.endAt ? toDatetimeLocalValue(current.endAt) : ''}
+            className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2"
           />
         </label>
         <label className="text-sm font-semibold text-slate-600">
@@ -238,10 +264,10 @@ export function EventsManager() {
         onUploadComplete={(url) => setImageUrl(url)}
       />
       <label className="text-sm font-semibold text-slate-600">
-        Visibility
+        Published (Infinity Track app)
         <select name="isActive" defaultValue={current?.isActive === false ? 'hidden' : 'visible'} className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2">
-          <option value="visible">Visible</option>
-          <option value="hidden">Hidden</option>
+          <option value="visible">Published — show in app & notifications</option>
+          <option value="hidden">Draft — not listed in app</option>
         </select>
       </label>
       {(isEditing ? editState : createState).message ? (
@@ -298,7 +324,7 @@ export function EventsManager() {
                 </p>
               </div>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                {event.isActive === false ? 'Hidden' : 'Visible'}
+                {event.isActive === false ? 'Draft' : 'Published'}
               </span>
               <button
                 className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600"

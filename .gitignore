@@ -36,6 +36,10 @@ yarn-error.log*
 .env
 .env*.local
 
+# Firebase Admin keys at repo root (never commit)
+/firebase-adminsdk.local.json
+/*-firebase-adminsdk-*.json
+
 # vercel
 .vercel
 

@@ -27,6 +27,24 @@ function formatDateTime(value: string | null): string {
   return date.toLocaleString();
 }
 
+function guestAccountRowKey(row: GuestAccountRow): string {
+  return `${row.guestAccessCollection ?? 'prisma'}::${row.firestoreDocId ?? ''}::${row.email}`;
+}
+
+/** Firestore delete id: collection + doc id when from Firebase; otherwise contact email (Prisma-only). */
+function guestAccountDeleteApiKey(row: GuestAccountRow): string {
+  if (row.firestoreDocId) {
+    const col = row.guestAccessCollection?.trim() || 'guestAccess';
+    return `${col}::${row.firestoreDocId}`;
+  }
+  return row.email;
+}
+
+function isGuestPointsEmail(email: string): boolean {
+  const s = email.trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+}
+
 export default function GuestAccountsPage() {
   const [rows, setRows] = useState<GuestAccountRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +53,7 @@ export default function GuestAccountsPage() {
   const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [selectedGuest, setSelectedGuest] = useState<GuestAccountRow | null>(null);
-  const [deletingEmail, setDeletingEmail] = useState<string | null>(null);
+  const [deletingKey, setDeletingKey] = useState<string | null>(null);
   const hasLoadedRef = useRef(false);
 
   const load = useCallback(async (preserveRows = false) => {
@@ -71,18 +89,19 @@ export default function GuestAccountsPage() {
       return;
     }
 
-    setDeletingEmail(row.email);
+    const deleteKey = guestAccountDeleteApiKey(row);
+    setDeletingKey(guestAccountRowKey(row));
     setError(null);
     try {
-      await guestAccountsApi.delete(row.email);
-      if (selectedGuest?.email === row.email) {
+      await guestAccountsApi.delete(deleteKey);
+      if (selectedGuest && guestAccountRowKey(selectedGuest) === guestAccountRowKey(row)) {
         setSelectedGuest(null);
       }
       await load(true);
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'Failed to delete guest account.');
     } finally {
-      setDeletingEmail(null);
+      setDeletingKey(null);
     }
   }
 
@@ -102,7 +121,7 @@ export default function GuestAccountsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Guest Accounts"
-        subtitle="Manage booking reward points for guests and linked booking contacts."
+        subtitle="Guest list from Firebase guestAccess; use Adjust Points to sync Prisma totals back to Firestore when needed."
         actions={
           <Button
             variant="secondary"
@@ -187,7 +206,8 @@ export default function GuestAccountsPage() {
           <div>
             <h2 className="text-lg font-semibold text-ui-textPrimary">Guest Point Accounts</h2>
             <p className="mt-1 text-sm text-ui-textMuted">
-              Booking-derived points plus manual adjustments for guests and booking contacts.
+              Loaded from Firebase <span className="font-mono">guestAccess</span> (points and players on each doc).
+              Bookings columns stay empty here unless you add that data in Firestore.
             </p>
           </div>
           <Badge variant="neutral">{rows.length} accounts</Badge>
@@ -197,8 +217,8 @@ export default function GuestAccountsPage() {
             <div className="px-6 py-12 text-center">
               <p className="text-base font-semibold text-ui-textPrimary">No guest accounts found</p>
               <p className="mt-2 text-sm text-ui-textMuted">
-                Guest accounts appear once a guest email exists in Firebase guest access, or when bookings/manual
-                guest point adjustments exist for that email.
+                Guest accounts are listed from Firebase <span className="font-mono">guestAccess</span> only. Add or
+                sync documents there to see them here.
               </p>
             </div>
           ) : (
@@ -219,12 +239,29 @@ export default function GuestAccountsPage() {
                 <tbody>
                   {rows.map((row, index) => (
                     <tr
-                      key={row.email}
+                      key={guestAccountRowKey(row)}
                       className={`border-t border-ui-border ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}
                     >
                       <td className="px-4 py-4">
                         <p className="font-medium text-ui-textPrimary">{row.name || 'Guest booking account'}</p>
                         <p className="mt-1 text-xs text-ui-textMuted">{row.email}</p>
+                        {row.firestoreDocId && row.firestoreDocId !== row.email ? (
+                          <p className="mt-0.5 text-[11px] text-ui-textMuted">
+                            Firebase doc: <span className="font-mono">{row.firestoreDocId}</span>
+                            {row.guestAccessCollection ? (
+                              <>
+                                {' '}
+                                · <span className="font-mono">{row.guestAccessCollection}</span>
+                              </>
+                            ) : null}
+                          </p>
+                        ) : row.guestAccessCollection &&
+                          row.guestAccessCollection !== 'guestAccess' ? (
+                          <p className="mt-0.5 text-[11px] text-ui-textMuted">
+                            Collection:{' '}
+                            <span className="font-mono">{row.guestAccessCollection}</span>
+                          </p>
+                        ) : null}
                       </td>
                       <td className="px-4 py-4 text-ui-textPrimary">{row.bookingsCount}</td>
                       <td className="px-4 py-4">
@@ -241,14 +278,24 @@ export default function GuestAccountsPage() {
                       <td className="px-4 py-4 text-right font-bold text-ui-textPrimary">{row.totalPoints}</td>
                       <td className="px-4 py-4 text-right">
                         <div className="flex justify-end gap-2">
-                          <Button size="sm" variant="secondary" onClick={() => setSelectedGuest(row)}>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={!isGuestPointsEmail(row.email)}
+                            title={
+                              !isGuestPointsEmail(row.email)
+                                ? 'Set a contact email on this guest in Firebase to adjust Prisma-backed points.'
+                                : undefined
+                            }
+                            onClick={() => setSelectedGuest(row)}
+                          >
                             Adjust Points
                           </Button>
                           <Button
                             size="sm"
                             variant="destructive"
                             onClick={() => void handleDeleteGuest(row)}
-                            isLoading={deletingEmail === row.email}
+                            isLoading={deletingKey === guestAccountRowKey(row)}
                             leadingIcon={<TrashIcon className="h-4 w-4" />}
                           >
                             Delete

@@ -1,20 +1,28 @@
+const { Buffer } = require("node:buffer");
+const admin = require("firebase-admin");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
 
-const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
-const BOOKING_NOTIFICATION_EMAIL = defineSecret("BOOKING_NOTIFICATION_EMAIL");
-const BOOKING_FROM_EMAIL = defineSecret("BOOKING_FROM_EMAIL");
+const TWILIO_ACCOUNT_SID = defineSecret("TWILIO_ACCOUNT_SID");
+const TWILIO_AUTH_TOKEN = defineSecret("TWILIO_AUTH_TOKEN");
+const TWILIO_WHATSAPP_FROM = defineSecret("TWILIO_WHATSAPP_FROM");
+/** Owner WhatsApp in E.164, e.g. +962791234567 */
+const OWNER_WHATSAPP = defineSecret("OWNER_WHATSAPP");
+
+const bookingSecrets = [
+  TWILIO_ACCOUNT_SID,
+  TWILIO_AUTH_TOKEN,
+  TWILIO_WHATSAPP_FROM,
+  OWNER_WHATSAPP
+];
+
+const APP_NOTIFICATION_TOPIC = "infinity_portal_all";
+const APP_NOTIFICATION_CHANNEL_ID = "infinity_portal_high_priority";
+
+if (!admin.apps.length) admin.initializeApp();
 
 function normalizeText(value) {
   return String(value ?? "").trim();
-}
-
-function resolveSender(raw) {
-  const candidate = normalizeText(raw);
-  const hasEmail = /<[^<>\s@]+@[^<>\s@]+\.[^<>\s@]+>/.test(candidate);
-  const plainEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidate);
-  if (hasEmail || plainEmail) return candidate;
-  return "onboarding@resend.dev";
 }
 
 function toDate(value) {
@@ -41,24 +49,85 @@ function formatDate(value) {
   }).format(date);
 }
 
-async function sendResendEmail({ apiKey, from, to, subject, text, html }) {
-  const response = await fetch("https://api.resend.com/emails", {
+function bookingIdFromData(data) {
+  return normalizeText(data.id || data.bookingId || "");
+}
+
+function registrationIdFromData(data) {
+  return normalizeText(data.id || data.registrationId || "");
+}
+
+function isAppSource(data) {
+  return normalizeText(data.source).toUpperCase() === "APP";
+}
+
+function buildTopicNotification({ title, body, data }) {
+  return {
+    topic: APP_NOTIFICATION_TOPIC,
+    notification: {
+      title,
+      body
+    },
+    android: {
+      priority: "high",
+      notification: {
+        channelId: APP_NOTIFICATION_CHANNEL_ID,
+        clickAction: "FLUTTER_NOTIFICATION_CLICK",
+        defaultSound: true,
+        priority: "high",
+        sound: "default"
+      }
+    },
+    apns: {
+      headers: {
+        "apns-priority": "10"
+      },
+      payload: {
+        aps: {
+          sound: "default"
+        }
+      }
+    },
+    data
+  };
+}
+
+/**
+ * Twilio WhatsApp: To must be whatsapp:+E164
+ */
+async function sendTwilioWhatsApp({ toE164, body }) {
+  const sid = TWILIO_ACCOUNT_SID.value();
+  const token = TWILIO_AUTH_TOKEN.value();
+  const from = TWILIO_WHATSAPP_FROM.value();
+
+  if (!sid || !token || !from) {
+    console.log("[booking-wa] Missing TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, or TWILIO_WHATSAPP_FROM");
+    return;
+  }
+  if (!toE164?.startsWith("+")) {
+    console.log("[booking-wa] Skip: phone must be E.164 (start with +):", toE164);
+    return;
+  }
+
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`;
+  const form = new URLSearchParams({
+    From: from,
+    To: `whatsapp:${toE164}`,
+    Body: body
+  });
+
+  const response = await fetch(url, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`
+      Authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}`,
+      "Content-Type": "application/x-www-form-urlencoded"
     },
-    body: JSON.stringify({
-      from,
-      to: [to],
-      subject,
-      text,
-      html
-    })
+    body: form
   });
+
   if (!response.ok) {
-    const payload = await response.text();
-    throw new Error(`Resend request failed (${response.status}): ${payload}`);
+    const text = await response.text();
+    throw new Error(`Twilio WhatsApp failed (${response.status}): ${text}`);
   }
 }
 
@@ -67,56 +136,112 @@ async function notifyBookingCreated(snapshot, sourceCollection) {
   const bookingId = normalizeText(data.id || snapshot.id);
   const status = normalizeText(data.status || "PENDING").toUpperCase();
   const facilityArea = normalizeText(data.facilityArea || data.courtName || "-");
-  const customerName = normalizeText(data.customerName || data.name || "-");
-  const customerPhone = normalizeText(data.customerPhone || data.phone || "-");
-  const customerEmail = normalizeText(data.customerEmail || data.email || "-");
+  const customerName = normalizeText(data.customerName || data.name || "Guest");
+  const customerPhone = normalizeText(data.customerPhone || data.phone || "");
   const startLabel = formatDate(data.startTime || data.startTimeIso);
   const endLabel = formatDate(data.endTime || data.endTimeIso);
 
-  const apiKey = RESEND_API_KEY.value();
-  const to = BOOKING_NOTIFICATION_EMAIL.value();
-  const from = resolveSender(BOOKING_FROM_EMAIL.value());
-
-  if (!apiKey || !to) {
-    console.log(
-      "[booking-email] Missing secrets. Set RESEND_API_KEY and BOOKING_NOTIFICATION_EMAIL."
-    );
+  const ownerTo = OWNER_WHATSAPP.value();
+  if (!ownerTo) {
+    console.log("[booking-wa] Missing OWNER_WHATSAPP secret");
     return;
   }
 
-  const lines = [
-    `Collection: ${sourceCollection}`,
-    `Booking ID: ${bookingId}`,
+  const ownerBody = [
+    "Infinity Sports - New booking",
+    `Source: ${sourceCollection}`,
+    `ID: ${bookingId}`,
     `Status: ${status}`,
-    `Facility: ${facilityArea}`,
+    `Court: ${facilityArea}`,
     `Start: ${startLabel}`,
     `End: ${endLabel}`,
     `Customer: ${customerName}`,
-    `Phone: ${customerPhone}`,
-    `Email: ${customerEmail}`
-  ];
+    `Phone: ${customerPhone || "-"}`
+  ].join("\n");
 
-  await sendResendEmail({
-    apiKey,
-    from,
-    to,
-    subject: `New Booking Created (${status})`,
-    text: lines.join("\n"),
-    html: `<h2>New Booking Created</h2><ul>${lines
-      .map((line) => `<li>${line}</li>`)
-      .join("")}</ul>`
-  });
+  try {
+    await sendTwilioWhatsApp({ toE164: ownerTo, body: ownerBody });
+  } catch (e) {
+    console.error("[booking-wa] owner message failed", e);
+  }
+
+  if (customerPhone && customerPhone.startsWith("+")) {
+    const userBody = [
+      "Infinity Sports - Booking received",
+      `Hi ${customerName},`,
+      "We received your booking request.",
+      `Court: ${facilityArea}`,
+      `Start: ${startLabel}`,
+      `End: ${endLabel}`,
+      `Status: ${status}`,
+      "We will contact you if we need anything else."
+    ].join("\n");
+
+    try {
+      await sendTwilioWhatsApp({ toE164: customerPhone, body: userBody });
+    } catch (e) {
+      console.error("[booking-wa] customer message failed", e);
+    }
+  } else {
+    console.log("[booking-wa] No customer WhatsApp (need E.164 phone starting with +)");
+  }
+}
+
+async function sendBookingPushNotification(data) {
+  const title = "New booking";
+  const body = `${normalizeText(data.facilityArea || data.courtName || "Court")} | ${normalizeText(data.status || "PENDING")}`;
+  try {
+    await admin.messaging().send(
+      buildTopicNotification({
+        title,
+        body,
+        data: {
+          type: "BOOKING_CREATED",
+          bookingId: bookingIdFromData(data),
+          status: normalizeText(data.status || "PENDING"),
+          facilityArea: normalizeText(data.facilityArea || data.courtName || "")
+        }
+      })
+    );
+  } catch (error) {
+    console.error("[booking-push] broadcast failed", error);
+  }
+}
+
+async function sendRegistrationPushNotification(data) {
+  const title = "New registration";
+  const body = `${normalizeText(data.customerName || "Member")} | ${normalizeText(data.packageName || "Package")}`;
+  try {
+    await admin.messaging().send(
+      buildTopicNotification({
+        title,
+        body,
+        data: {
+          type: "REGISTRATION_CREATED",
+          registrationId: registrationIdFromData(data),
+          packageName: normalizeText(data.packageName || ""),
+          customerName: normalizeText(data.customerName || "")
+        }
+      })
+    );
+  } catch (error) {
+    console.error("[registration-push] broadcast failed", error);
+  }
 }
 
 exports.onPortalBookingCreated = onDocumentCreated(
   {
     document: "portalBookings/{bookingId}",
     region: "us-central1",
-    secrets: [RESEND_API_KEY, BOOKING_NOTIFICATION_EMAIL, BOOKING_FROM_EMAIL]
+    secrets: bookingSecrets
   },
   async (event) => {
     if (!event.data) return;
-    await notifyBookingCreated(event.data, "portalBookings");
+    const data = event.data.data() || {};
+    await Promise.allSettled([
+      notifyBookingCreated(event.data, "portalBookings"),
+      isAppSource(data) ? Promise.resolve() : sendBookingPushNotification(data)
+    ]);
   }
 );
 
@@ -124,10 +249,40 @@ exports.onPortalBookingInboxCreated = onDocumentCreated(
   {
     document: "portalBookingInbox/{bookingId}",
     region: "us-central1",
-    secrets: [RESEND_API_KEY, BOOKING_NOTIFICATION_EMAIL, BOOKING_FROM_EMAIL]
+    secrets: bookingSecrets
   },
   async (event) => {
     if (!event.data) return;
-    await notifyBookingCreated(event.data, "portalBookingInbox");
+    const data = event.data.data() || {};
+    await Promise.allSettled([
+      notifyBookingCreated(event.data, "portalBookingInbox"),
+      isAppSource(data) ? sendBookingPushNotification(data) : Promise.resolve()
+    ]);
+  }
+);
+
+exports.onPortalRegistrationCreated = onDocumentCreated(
+  {
+    document: "portalRegistrations/{registrationId}",
+    region: "us-central1"
+  },
+  async (event) => {
+    if (!event.data) return;
+    const data = event.data.data() || {};
+    if (isAppSource(data)) return;
+    await sendRegistrationPushNotification(data);
+  }
+);
+
+exports.onPortalRegistrationInboxCreated = onDocumentCreated(
+  {
+    document: "portalRegistrationInbox/{registrationId}",
+    region: "us-central1"
+  },
+  async (event) => {
+    if (!event.data) return;
+    const data = event.data.data() || {};
+    if (!isAppSource(data)) return;
+    await sendRegistrationPushNotification(data);
   }
 );

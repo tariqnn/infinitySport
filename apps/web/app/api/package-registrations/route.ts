@@ -5,6 +5,8 @@ import { NextResponse } from "next/server";
 import { getPgPool } from "../../../lib/pg";
 import { isValidPhoneNumber } from "../../../lib/phoneValidation";
 import { isDatabaseUnavailableError, noteDatabaseFailure } from "../../../lib/dbGuard";
+import { syncRegistrationRecordToFirestore } from "../../../../portal/lib/registrationRealtimeSync";
+import { getFirestore } from "../../../../portal/lib/firebase-admin";
 
 function ensureDatabaseUrl(): boolean {
   const explicitCandidates = [
@@ -134,6 +136,52 @@ async function ensureMemberAccount(params: {
   }
 }
 
+async function syncLandingRegistrationToFirestore(input: {
+  id: string;
+  packageName: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string | null;
+  customerAge: number | null;
+  basePriceJod: number;
+  finalPriceJod: number;
+}) {
+  try {
+    const now = new Date();
+    const firestore = getFirestore();
+    await syncRegistrationRecordToFirestore({
+      firestore,
+      registration: {
+        id: input.id,
+        packageName: input.packageName,
+        customerName: input.customerName,
+        customerPhone: input.customerPhone,
+        customerEmail: input.customerEmail,
+        customerAge: input.customerAge,
+        currentCycle: 1,
+        sessionsLeft: null,
+        planLabel: input.packageName,
+        isPaid: false,
+        basePriceJod: input.basePriceJod,
+        discountType: "NONE",
+        finalPriceJod: input.finalPriceJod,
+        periodStartsAt: null,
+        periodEndsAt: null,
+        isFrozen: false,
+        sessionsBonus: 0,
+        collected: 0,
+        status: "ACTIVE",
+        source: "WEBSITE",
+        createdAt: now,
+        updatedAt: now,
+        deleted: false,
+      },
+    });
+  } catch (error) {
+    console.warn("[package-registrations] firestore sync skipped", error);
+  }
+}
+
 export async function POST(request: Request) {
   try {
     if (!ensureDatabaseUrl()) {
@@ -247,6 +295,21 @@ export async function POST(request: Request) {
       customerEmail: typeof customerEmail === "string" ? customerEmail : null,
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
+    });
+
+    await syncLandingRegistrationToFirestore({
+      id: registrationId,
+      packageName: cleanPackage,
+      customerName: customerName.trim(),
+      customerPhone: customerPhone.trim(),
+      customerEmail:
+        typeof customerEmail === "string" && customerEmail.trim()
+          ? customerEmail.trim()
+          : null,
+      customerAge:
+        typeof customerAge === "number" && customerAge > 0 ? customerAge : null,
+      basePriceJod,
+      finalPriceJod: basePriceJod,
     });
 
     return NextResponse.json({ success: true, id: registrationId });

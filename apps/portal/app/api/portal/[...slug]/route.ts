@@ -30,6 +30,10 @@ import {
   listRegistrationPointAdjustments,
 } from "../../../../lib/registrationPoints";
 import {
+  markRegistrationDeletedInFirestore,
+  syncRegistrationRecordToFirestore,
+} from "../../../../lib/registrationRealtimeSync";
+import {
   addBookingRewardPointAdjustment,
   calculateBookingRewardPoints,
 } from "../../../../lib/bookingRewardPoints";
@@ -271,70 +275,6 @@ function parseGuestAccessDeleteTarget(raw: string): {
 
 function normalizePhoneDigits(value: unknown): string {
   return String(value ?? "").replace(/\D/g, "");
-}
-
-async function sendBookingCreatedNotificationEmail(input: {
-  bookingId: string;
-  source: string;
-  status: string;
-  facilityArea: string | null;
-  startTime: Date;
-  endTime: Date;
-  customerName: string | null;
-  customerPhone: string | null;
-  customerEmail: string | null;
-}) {
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) return;
-
-  const recipient = process.env.BOOKING_NOTIFICATION_EMAIL?.trim();
-  if (!recipient) return;
-
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  const startLabel = formatter.format(input.startTime);
-  const endLabel = formatter.format(input.endTime);
-
-  const rows = [
-    `Booking ID: ${input.bookingId}`,
-    `Source: ${input.source}`,
-    `Status: ${input.status}`,
-    `Facility: ${input.facilityArea ?? "-"}`,
-    `Start: ${startLabel}`,
-    `End: ${endLabel}`,
-    `Customer: ${input.customerName ?? "-"}`,
-    `Phone: ${input.customerPhone ?? "-"}`,
-    `Email: ${input.customerEmail ?? "-"}`,
-  ];
-
-  try {
-    await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${resendKey}`,
-      },
-      body: JSON.stringify({
-        from:
-          process.env.BOOKING_FROM_EMAIL ||
-          "Infinity Sport <bookings@infinitysports.jo>",
-        to: [recipient],
-        subject: `New Booking Created (${input.status})`,
-        text: rows.join("\n"),
-        html: `<h2>New Booking Created</h2><ul>${rows
-          .map((line) => `<li>${line}</li>`)
-          .join("")}</ul>`,
-      }),
-    });
-  } catch (error) {
-    console.warn("[portal-db-api] booking notification email failed", error);
-  }
 }
 
 function phoneLooksSame(
@@ -612,6 +552,66 @@ async function serializeRegistrationRows(rows: any[]) {
       isPaid: summary?.isPaid ?? row.isPaid,
     });
   });
+}
+
+async function syncRegistrationRealtimeById(
+  registrationId: string,
+  source: "ADMIN" | "WEBSITE" | "PORTAL_DB" = "ADMIN",
+) {
+  try {
+    const firestore = getFirestore();
+    const row = await prisma.packageRegistration.findUnique({
+      where: { id: registrationId },
+      include: { receipts: { where: ACTIVE_RECEIPT_WHERE } },
+    });
+
+    if (!row) {
+      await markRegistrationDeletedInFirestore({
+        firestore,
+        registrationId,
+      });
+      return;
+    }
+
+    const [serialized] = await serializeRegistrationRows([row]);
+    if (!serialized) return;
+
+    await syncRegistrationRecordToFirestore({
+      firestore,
+      registration: {
+        id: serialized.id,
+        packageName: serialized.packageName,
+        customerName: serialized.customerName,
+        customerPhone: serialized.customerPhone,
+        customerEmail: serialized.customerEmail,
+        customerAge: serialized.customerAge,
+        playerCode: serialized.playerCode,
+        currentCycle: serialized.currentCycle,
+        sessionsLeft: serialized.sessionsLeft,
+        nextPaymentDate: serialized.nextPaymentDate,
+        planLabel: serialized.planLabel,
+        isPaid: serialized.isPaid,
+        basePriceJod: serialized.basePriceJod,
+        discountType: serialized.discountType,
+        discountValue: serialized.discountValue,
+        discountReason: serialized.discountReason,
+        finalPriceJod: serialized.finalPriceJod,
+        periodStartsAt: serialized.periodStartsAt,
+        periodEndsAt: serialized.periodEndsAt,
+        isFrozen: serialized.isFrozen,
+        frozenAt: serialized.frozenAt,
+        sessionsBonus: serialized.sessionsBonus,
+        collected: serialized.collected,
+        status: row.status,
+        source,
+        createdAt: serialized.createdAt,
+        updatedAt: serialized.updatedAt,
+        deleted: false,
+      },
+    });
+  } catch (error) {
+    console.warn("[portal-db-api] registration realtime sync skipped", error);
+  }
 }
 
 function mapRegistrationSummaryToTrackerPlayer(
@@ -1128,7 +1128,9 @@ function buildRealtimeBookingSyncPayload(
     notes: row.notes,
     totalHours: financials?.totalHours ?? null,
     totalAmount: financials?.totalAmount ?? null,
-    paidAmount: financials?.netPaid ?? null,
+    paidAmount: financials?.paidAmount ?? null,
+    refundAmount: financials?.refundAmount ?? null,
+    netPaid: financials?.netPaid ?? null,
     remainingAmount: financials?.remainingAmount ?? null,
     paymentStatus: financials?.paymentStatus ?? null,
     latestPaymentMethod: financials?.latestPaymentMethod ?? null,
@@ -1449,18 +1451,6 @@ async function importPendingMobileBookingsFromFirestore(force = false) {
         customerName: row.customerName,
         customerEmail: row.customerEmail,
         customerPhone: row.customerPhone,
-      });
-
-      await sendBookingCreatedNotificationEmail({
-        bookingId: row.id,
-        source: "APP",
-        status: row.status,
-        facilityArea: row.facilityArea,
-        startTime: row.startTime,
-        endTime: row.endTime,
-        customerName: row.customerName,
-        customerPhone: row.customerPhone,
-        customerEmail: row.customerEmail,
       });
 
       await updateMobileBookingInboxEntry({
@@ -3265,6 +3255,7 @@ async function createPackageRegistration(payload: RegistrationInput) {
   } catch (error) {
     console.warn("[portal-db-api] tracker player sync skipped on registration create", error);
   }
+  await syncRegistrationRealtimeById(row.id, "ADMIN");
   const [serialized] = await serializeRegistrationRows([row]);
   return {
     ...serialized,
@@ -4074,6 +4065,14 @@ async function bulkCreateForPerson(request: NextRequest) {
       customerEmail: body.person.customerEmail ?? null,
       customerPhone,
     });
+    await Promise.all(
+      created
+        .map((row) => normalizeText(row.id))
+        .filter(Boolean)
+        .map((registrationId) =>
+          syncRegistrationRealtimeById(registrationId, "ADMIN"),
+        ),
+    );
 
     return NextResponse.json({
       created: created.length,
@@ -4314,6 +4313,7 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
     customerEmail: row.customerEmail ?? null,
     customerPhone: row.customerPhone,
   });
+  await syncRegistrationRealtimeById(row.id, "ADMIN");
 
   const [serialized] = await serializeRegistrationRows([row]);
   return NextResponse.json(serialized);
@@ -4397,6 +4397,7 @@ async function reregisterPackage(id: string) {
     customerEmail: row.customerEmail,
     customerPhone: row.customerPhone,
   });
+  await syncRegistrationRealtimeById(row.id, "ADMIN");
 
   const [serialized] = await serializeRegistrationRows([row]);
   return NextResponse.json(serialized);
@@ -4485,6 +4486,7 @@ async function markRegistrationPaid(id: string, request: NextRequest) {
     where: { id },
     data: { isPaid: targetPrice > 0 && totalCollected >= targetPrice },
   });
+  await syncRegistrationRealtimeById(id, "ADMIN");
 
   await syncTrackerForRegistrationContact({
     customerName: registration.customerName,
@@ -4527,6 +4529,7 @@ async function markRegistrationUnpaid(id: string, request: NextRequest) {
       data: { isPaid: false },
     });
   });
+  await syncRegistrationRealtimeById(id, "ADMIN");
 
   await syncTrackerForRegistrationContact({
     customerName: registration.customerName,
@@ -4575,6 +4578,7 @@ async function addSessionAdjustment(id: string, request: NextRequest) {
     where: { id },
     data: { sessionsBonus },
   });
+  await syncRegistrationRealtimeById(id, "ADMIN");
 
   await syncTrackerForRegistrationContact({
     customerName: registration.customerName,
@@ -5005,6 +5009,7 @@ async function voidReceipt(id: string, request: NextRequest) {
     where: { id: receipt.registrationId },
     data: { isPaid: targetPrice > 0 && totalCollected >= targetPrice },
   });
+  await syncRegistrationRealtimeById(receipt.registrationId, "ADMIN");
 
   await syncTrackerForRegistrationContact({
     customerName: receipt.registration.customerName,
@@ -6316,18 +6321,6 @@ async function dispatchPost(request: NextRequest, params: Params) {
       customerPhone: row.customerPhone,
     });
 
-    await sendBookingCreatedNotificationEmail({
-      bookingId: row.id,
-      source,
-      status: row.status,
-      facilityArea: row.facilityArea,
-      startTime: row.startTime,
-      endTime: row.endTime,
-      customerName: row.customerName,
-      customerPhone: row.customerPhone,
-      customerEmail: row.customerEmail,
-    });
-
     await syncBookingRealtimeById(row.id);
 
     return NextResponse.json(row);
@@ -6599,6 +6592,12 @@ async function dispatchDelete(_request: NextRequest, params: Params) {
   if (resource === "package-registrations") {
     try {
       await prisma.packageRegistration.delete({ where: { id } });
+      try {
+        const firestore = getFirestore();
+        await markRegistrationDeletedInFirestore({ firestore, registrationId: id });
+      } catch (error) {
+        console.warn("[portal-db-api] registration delete sync skipped", error);
+      }
       return NextResponse.json({ success: true });
     } catch (error: any) {
       if (error?.code === "P2025")

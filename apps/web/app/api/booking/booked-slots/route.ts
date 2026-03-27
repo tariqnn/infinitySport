@@ -65,7 +65,7 @@ function resolveCourtType(data: Record<string, unknown>): (typeof COURT_TYPES)[n
     normalizeText(data.facilityArea) ||
     normalizeText(data.courtName) ||
     bookingCourtNameFromId(normalizeText(data.courtId));
-  if ((COURT_TYPES as readonly string[]).includes(direct)) {
+  if (direct && (COURT_TYPES as readonly string[]).includes(direct)) {
     return direct as (typeof COURT_TYPES)[number];
   }
   return null;

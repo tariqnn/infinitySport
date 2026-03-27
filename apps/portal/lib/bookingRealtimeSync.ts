@@ -22,6 +22,8 @@ export type BookingRealtimeRecordInput = {
   totalHours?: number | null;
   totalAmount?: number | null;
   paidAmount?: number | null;
+  refundAmount?: number | null;
+  netPaid?: number | null;
   remainingAmount?: number | null;
   paymentStatus?: string | null;
   latestPaymentMethod?: string | null;
@@ -31,6 +33,11 @@ export type BookingRealtimeRecordInput = {
 };
 
 export type MobileBookingInboxEntry = {
+  id: string;
+  data: Record<string, unknown>;
+};
+
+export type MobileBookingActionInboxEntry = {
   id: string;
   data: Record<string, unknown>;
 };
@@ -131,6 +138,8 @@ function serializeBookingRecord(input: BookingRealtimeRecordInput) {
   const totalHours = normalizeNumber(input.totalHours);
   const totalAmount = normalizeNumber(input.totalAmount);
   const paidAmount = normalizeNumber(input.paidAmount);
+  const refundAmount = normalizeNumber(input.refundAmount);
+  const netPaid = normalizeNumber(input.netPaid);
   const remainingAmount = normalizeNumber(input.remainingAmount);
 
   return {
@@ -154,6 +163,8 @@ function serializeBookingRecord(input: BookingRealtimeRecordInput) {
       totalHours,
       totalAmount,
       paidAmount,
+      refundAmount,
+      netPaid,
       remainingAmount,
       paymentStatus: normalizeNullableText(input.paymentStatus),
       latestPaymentMethod: normalizeNullableText(input.latestPaymentMethod),
@@ -272,6 +283,44 @@ export async function updateMobileBookingInboxEntry(params: {
 }) {
   const { firestore, id, data } = params;
   await firestore.collection("portalBookingInbox").doc(id).set(
+    {
+      ...data,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtIso: new Date().toISOString(),
+    },
+    { merge: true },
+  );
+}
+
+export async function listMobileBookingActionInboxEntries(params: {
+  firestore: admin.firestore.Firestore;
+  limit?: number;
+}): Promise<MobileBookingActionInboxEntry[]> {
+  const { firestore, limit = 200 } = params;
+  let snapshot: admin.firestore.QuerySnapshot;
+  try {
+    snapshot = await firestore
+      .collection("portalBookingActionInbox")
+      .orderBy("createdAt", "asc")
+      .limit(limit)
+      .get();
+  } catch {
+    snapshot = await firestore.collection("portalBookingActionInbox").limit(limit).get();
+  }
+
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    data: (doc.data() as Record<string, unknown>) ?? {},
+  }));
+}
+
+export async function updateMobileBookingActionInboxEntry(params: {
+  firestore: admin.firestore.Firestore;
+  id: string;
+  data: Record<string, unknown>;
+}) {
+  const { firestore, id, data } = params;
+  await firestore.collection("portalBookingActionInbox").doc(id).set(
     {
       ...data,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),

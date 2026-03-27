@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { NextResponse } from 'next/server';
 import { isValidPhoneNumber } from '../../../lib/phoneValidation';
+import { syncBookingRecordToFirestore } from '../../../apps/portal/lib/bookingRealtimeSync';
+import { getFirestore } from '../../../apps/portal/lib/firebase-admin';
 
 type CourtType = 'Basketball AC' | 'Basketball 3x3' | 'Padel' | 'Volleyball';
 
@@ -86,113 +88,120 @@ async function fetchBlockedMapFromDb(): Promise<Record<string, Partial<Record<Co
   return blocked;
 }
 
-async function sendBookingWhatsAppMessage(data: {
-  phone: string;
-  courtName: string;
-  date: string;
-  time: string;
-}) {
+async function sendTwilioWhatsApp(toE164: string, body: string) {
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
   const from = process.env.TWILIO_WHATSAPP_FROM;
-
-  if (!sid || !token || !from) return;
-  if (!data.phone?.startsWith('+')) return;
+  if (!sid || !token || !from) {
+    console.log('[booking] TWILIO_* env missing, WhatsApp skipped');
+    return;
+  }
+  if (!toE164.startsWith('+')) return;
 
   const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`;
-  const body = new URLSearchParams({
+  const form = new URLSearchParams({
     From: from,
-    To: `whatsapp:${data.phone}`,
-    Body: `Infinity Sports: Booking received.\nCourt: ${data.courtName}\nDate: ${data.date}\nTime: ${data.time}`,
+    To: `whatsapp:${toE164}`,
+    Body: body,
   });
 
-  await fetch(url, {
+  const res = await fetch(url, {
     method: 'POST',
     headers: {
       Authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString('base64')}`,
       'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body,
+    body: form,
   });
+  if (!res.ok) {
+    console.warn('[booking] Twilio WhatsApp failed', await res.text());
+  }
 }
 
-async function sendBookingConfirmationEmail(data: {
-  name: string;
-  phone: string;
-  email?: string;
-  courtName: string;
-  date: string;
-  time: string;
+async function _notifyBookingWhatsAppBoth(input: {
+  bookingId: string;
+  facilityArea: string;
+  customerName: string;
+  customerPhone: string;
+  dateLabel: string;
+  timeRange: string;
 }) {
-  const emailContent = {
-    to: process.env.BOOKING_NOTIFICATION_EMAIL || 'hello@infinitysport.jo',
-    subject: `New Court Booking - ${data.courtName}`,
-    html: `
-      <h2>New Court Booking Request</h2>
-      <p><strong>Name:</strong> ${data.name}</p>
-      <p><strong>Phone:</strong> ${data.phone}</p>
-      <p><strong>Court:</strong> ${data.courtName}</p>
-      <p><strong>Date:</strong> ${new Date(data.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-      <p><strong>Time:</strong> ${data.time}</p>
-      <hr>
-      <p>Please confirm this booking with the customer.</p>
-    `,
-    text: `
-New Court Booking Request
+  const owner = process.env.OWNER_WHATSAPP?.trim();
+  const status = 'PENDING';
 
-Name: ${data.name}
-Phone: ${data.phone}
-Court: ${data.courtName}
-Date: ${new Date(data.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-Time: ${data.time}
-    `.trim(),
-  };
-
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) {
-    console.log('[booking] RESEND_API_KEY missing, email not sent');
-    return;
+  if (owner) {
+    const ownerBody = [
+      'Infinity Sports — New booking',
+      `ID: ${input.bookingId}`,
+      `Status: ${status}`,
+      `Court: ${input.facilityArea}`,
+      `Date: ${input.dateLabel}`,
+      `Time: ${input.timeRange}`,
+      `Customer: ${input.customerName}`,
+      `Phone: ${input.customerPhone}`,
+    ].join('\n');
+    try {
+      await sendTwilioWhatsApp(owner, ownerBody);
+    } catch (e) {
+      console.warn('[booking] owner WhatsApp failed', e);
+    }
   }
 
-  await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${resendKey}`,
-    },
-    body: JSON.stringify({
-      from: process.env.BOOKING_FROM_EMAIL || 'Infinity Sport <bookings@infinitysports.jo>',
-      to: [emailContent.to],
-      subject: emailContent.subject,
-      html: emailContent.html,
-      text: emailContent.text,
-    }),
-  });
+  if (input.customerPhone.startsWith('+')) {
+    const userBody = [
+      'Infinity Sports — Booking received',
+      `Hi ${input.customerName},`,
+      'We received your booking request.',
+      `Court: ${input.facilityArea}`,
+      `Date: ${input.dateLabel}`,
+      `Time: ${input.timeRange}`,
+      `Status: ${status}`,
+      'We will contact you if we need anything else.',
+    ].join('\n');
+    try {
+      await sendTwilioWhatsApp(input.customerPhone, userBody);
+    } catch (e) {
+      console.warn('[booking] customer WhatsApp failed', e);
+    }
+  }
+}
 
-  if (data.email) {
-    await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${resendKey}`,
+async function syncLandingBookingToFirestore(input: {
+  id: string;
+  companyId: string;
+  facilityArea: string;
+  startTime: Date;
+  endTime: Date;
+  status: string;
+  isPaid: boolean;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string | null;
+  notes: string;
+}) {
+  try {
+    const firestore = getFirestore();
+    await syncBookingRecordToFirestore({
+      firestore,
+      booking: {
+        id: input.id,
+        companyId: input.companyId,
+        facilityArea: input.facilityArea,
+        startTime: input.startTime,
+        endTime: input.endTime,
+        status: input.status,
+        source: 'WEBSITE',
+        isPaid: input.isPaid,
+        customerName: input.customerName,
+        customerPhone: input.customerPhone,
+        customerEmail: input.customerEmail,
+        notes: input.notes,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       },
-      body: JSON.stringify({
-        from: process.env.BOOKING_FROM_EMAIL || 'Infinity Sport <bookings@infinitysports.jo>',
-        to: [data.email],
-        subject: `Booking received - ${data.courtName}`,
-        html: `
-          <h2>Your booking request is received</h2>
-          <p>Hi ${data.name},</p>
-          <p>We received your booking request:</p>
-          <ul>
-            <li><strong>Court:</strong> ${data.courtName}</li>
-            <li><strong>Date:</strong> ${new Date(data.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</li>
-            <li><strong>Time:</strong> ${data.time}</li>
-          </ul>
-          <p>We will contact you to confirm.</p>
-        `,
-      }),
     });
+  } catch (error) {
+    console.warn('[booking] firestore sync skipped', error);
   }
 }
 
@@ -280,7 +289,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const endTimeStr = endTime.toTimeString().slice(0, 5);
+    const _endTimeStr = endTime.toTimeString().slice(0, 5);
 
     const { prisma } = await import('../../../lib/db');
     let company = await prisma.company.findFirst({
@@ -300,7 +309,8 @@ export async function POST(request: Request) {
       });
     }
 
-    await prisma.booking.create({
+    const notes = 'Public booking from landing page';
+    const booking = await prisma.booking.create({
       data: {
         companyId: company.id,
         facilityArea: courtType || courtName,
@@ -311,26 +321,24 @@ export async function POST(request: Request) {
         customerName: name,
         customerPhone: phone,
         customerEmail: typeof email === 'string' ? email : null,
-        notes: 'Public booking from landing page',
+        notes,
       },
+      select: { id: true },
     });
 
-    await Promise.allSettled([
-      sendBookingConfirmationEmail({
-        name,
-        phone,
-        email: typeof email === 'string' ? email : undefined,
-        courtName,
-        date,
-        time: `${time} - ${endTimeStr} (${durationHours}h)`,
-      }),
-      sendBookingWhatsAppMessage({
-        phone,
-        courtName,
-        date,
-        time: `${time} - ${endTimeStr}`,
-      }),
-    ]);
+    await syncLandingBookingToFirestore({
+      id: booking.id,
+      companyId: company.id,
+      facilityArea: courtType || courtName,
+      startTime,
+      endTime,
+      status: 'PENDING',
+      isPaid: false,
+      customerName: name,
+      customerPhone: phone,
+      customerEmail: typeof email === 'string' ? email : null,
+      notes,
+    });
 
     return NextResponse.json({
       success: true,

@@ -1,0 +1,229 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isString(field, maxLen) {
+      return field is string && field.size() > 0 && field.size() <= maxLen;
+    }
+
+    function isOptionalString(field, maxLen) {
+      return !(field is string) || field.size() <= maxLen;
+    }
+
+    function isOptionalEmail(field) {
+      return field == null || (field is string && field.size() <= 254);
+    }
+
+    function isOptionalTimestamp(field) {
+      return field == null || field is timestamp;
+    }
+
+    function isOptionalNumber(field) {
+      return field == null || field is number;
+    }
+
+    function isBookingInboxCreate() {
+      return request.resource.data.keys().hasOnly([
+        'id',
+        'bookingId',
+        'companyId',
+        'facilityArea',
+        'courtName',
+        'status',
+        'source',
+        'isPaid',
+        'customerName',
+        'customerPhone',
+        'customerEmail',
+        'notes',
+        'startTime',
+        'startTimeIso',
+        'endTime',
+        'endTimeIso',
+        'dbImported',
+        'createdAt',
+        'createdAtIso',
+        'updatedAt',
+        'updatedAtIso'
+      ]) &&
+      request.resource.data.id == request.resource.id &&
+      request.resource.data.bookingId == request.resource.id &&
+      request.resource.data.status == 'PENDING' &&
+      request.resource.data.source == 'APP' &&
+      request.resource.data.isPaid == false &&
+      request.resource.data.dbImported == false &&
+      isString(request.resource.data.customerName, 160) &&
+      isString(request.resource.data.customerPhone, 60) &&
+      isString(request.resource.data.facilityArea, 160) &&
+      isString(request.resource.data.courtName, 160) &&
+      (request.resource.data.companyId == null || isOptionalString(request.resource.data.companyId, 120)) &&
+      isOptionalEmail(request.resource.data.customerEmail) &&
+      isOptionalString(request.resource.data.notes, 800) &&
+      request.resource.data.startTime is timestamp &&
+      request.resource.data.endTime is timestamp &&
+      isString(request.resource.data.startTimeIso, 40) &&
+      isString(request.resource.data.endTimeIso, 40) &&
+      isString(request.resource.data.createdAtIso, 40) &&
+      isString(request.resource.data.updatedAtIso, 40) &&
+      isOptionalTimestamp(request.resource.data.createdAt) &&
+      isOptionalTimestamp(request.resource.data.updatedAt);
+    }
+
+    function isRegistrationInboxCreate() {
+      return request.resource.data.keys().hasOnly([
+        'id',
+        'registrationId',
+        'packageName',
+        'customerName',
+        'customerPhone',
+        'customerEmail',
+        'customerAge',
+        'sessionsLeft',
+        'planLabel',
+        'basePriceJod',
+        'discountValue',
+        'discountReason',
+        'finalPriceJod',
+        'nextPaymentDate',
+        'nextPaymentDateIso',
+        'periodStartsAt',
+        'periodStartsAtIso',
+        'periodEndsAt',
+        'periodEndsAtIso',
+        'isFrozen',
+        'frozenAt',
+        'frozenAtIso',
+        'sessionsBonus',
+        'collected',
+        'discountType',
+        'source',
+        'status',
+        'dbImported',
+        'createdAt',
+        'createdAtIso',
+        'updatedAt',
+        'updatedAtIso'
+      ]) &&
+      request.resource.data.id == request.resource.id &&
+      request.resource.data.registrationId == request.resource.id &&
+      request.resource.data.status == 'PENDING' &&
+      request.resource.data.source == 'APP' &&
+      request.resource.data.discountType in ['NONE', 'PERCENT', 'AMOUNT'] &&
+      request.resource.data.dbImported == false &&
+      isString(request.resource.data.packageName, 180) &&
+      isString(request.resource.data.customerName, 160) &&
+      isString(request.resource.data.customerPhone, 60) &&
+      isOptionalEmail(request.resource.data.customerEmail) &&
+      (request.resource.data.customerAge == null || request.resource.data.customerAge is int) &&
+      (request.resource.data.sessionsLeft == null || request.resource.data.sessionsLeft is int) &&
+      (request.resource.data.basePriceJod == null || request.resource.data.basePriceJod is number) &&
+      (request.resource.data.discountValue == null || request.resource.data.discountValue is number) &&
+      (request.resource.data.discountReason == null || isOptionalString(request.resource.data.discountReason, 240)) &&
+      (request.resource.data.finalPriceJod == null || request.resource.data.finalPriceJod is number) &&
+      (request.resource.data.nextPaymentDateIso == null || isOptionalString(request.resource.data.nextPaymentDateIso, 40)) &&
+      isOptionalTimestamp(request.resource.data.nextPaymentDate) &&
+      (request.resource.data.planLabel == null || isOptionalString(request.resource.data.planLabel, 180)) &&
+      (request.resource.data.periodStartsAtIso == null || isOptionalString(request.resource.data.periodStartsAtIso, 40)) &&
+      isOptionalTimestamp(request.resource.data.periodStartsAt) &&
+      (request.resource.data.periodEndsAtIso == null || isOptionalString(request.resource.data.periodEndsAtIso, 40)) &&
+      isOptionalTimestamp(request.resource.data.periodEndsAt) &&
+      (request.resource.data.isFrozen == null || request.resource.data.isFrozen is bool) &&
+      isOptionalTimestamp(request.resource.data.frozenAt) &&
+      (request.resource.data.frozenAtIso == null || isOptionalString(request.resource.data.frozenAtIso, 40)) &&
+      (request.resource.data.sessionsBonus == null || request.resource.data.sessionsBonus is int) &&
+      (request.resource.data.collected == null || request.resource.data.collected is number) &&
+      isOptionalTimestamp(request.resource.data.periodStartsAt) &&
+      isOptionalTimestamp(request.resource.data.createdAt) &&
+      isOptionalTimestamp(request.resource.data.updatedAt) &&
+      isString(request.resource.data.createdAtIso, 40) &&
+      isString(request.resource.data.updatedAtIso, 40);
+    }
+
+    function isBookingActionInboxCreate() {
+      return request.resource.data.keys().hasOnly([
+        'id',
+        'bookingId',
+        'actionType',
+        'confirmBooking',
+        'paymentAmount',
+        'paymentMethod',
+        'source',
+        'status',
+        'dbImported',
+        'createdAt',
+        'createdAtIso',
+        'updatedAt',
+        'updatedAtIso'
+      ]) &&
+      request.resource.data.id == request.resource.id &&
+      isString(request.resource.data.bookingId, 120) &&
+      request.resource.data.actionType in ['CONFIRM_BOOKING', 'COLLECT_PAYMENT'] &&
+      request.resource.data.confirmBooking is bool &&
+      request.resource.data.source == 'APP' &&
+      request.resource.data.status == 'PENDING' &&
+      request.resource.data.dbImported == false &&
+      isOptionalNumber(request.resource.data.paymentAmount) &&
+      isOptionalString(request.resource.data.paymentMethod, 20) &&
+      (
+        (request.resource.data.actionType == 'CONFIRM_BOOKING' &&
+          request.resource.data.confirmBooking == true &&
+          request.resource.data.paymentAmount == null &&
+          request.resource.data.paymentMethod == null) ||
+        (request.resource.data.actionType == 'COLLECT_PAYMENT' &&
+          request.resource.data.paymentAmount is number &&
+          request.resource.data.paymentAmount > 0 &&
+          request.resource.data.paymentMethod in ['CASH', 'CARD', 'ONLINE', 'TRANSFER', 'OTHER'])
+      ) &&
+      isString(request.resource.data.createdAtIso, 40) &&
+      isString(request.resource.data.updatedAtIso, 40) &&
+      isOptionalTimestamp(request.resource.data.createdAt) &&
+      isOptionalTimestamp(request.resource.data.updatedAt);
+    }
+
+    match /portalBookings/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /portalBookingConfig/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /portalBookingAvailability/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /portalRegistrations/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /portalRegistrationConfig/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /portalBookingInbox/{documentId} {
+      allow read: if true;
+      allow create: if isBookingInboxCreate();
+      allow update, delete: if false;
+    }
+
+    match /portalBookingActionInbox/{documentId} {
+      allow create: if isBookingActionInboxCreate();
+      allow read, update, delete: if false;
+    }
+
+    match /portalRegistrationInbox/{documentId} {
+      allow read: if true;
+      allow create: if isRegistrationInboxCreate();
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

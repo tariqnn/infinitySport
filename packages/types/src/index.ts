@@ -182,6 +182,8 @@ export const landingProgramSchema = z.object({
   mediaUrl: z.string().url().optional(),
   isFeatured: z.boolean().optional(),
   isActive: z.boolean().optional(),
+  schedule: z.string().optional(),
+  priceLabel: z.string().optional(),
 });
 export type LandingProgram = z.infer<typeof landingProgramSchema>;
 

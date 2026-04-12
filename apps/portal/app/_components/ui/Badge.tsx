@@ -15,18 +15,18 @@ export function Badge({
   return (
     <span
       className={clsx(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold",
-        variant === "success" && "border-[#bde8ce] bg-[#ecfff3] text-[#17834a]",
-        variant === "warning" && "border-[#ffdba8] bg-[#fff8ea] text-[#a16207]",
-        variant === "danger" && "border-[#fecaca] bg-[#fff1f2] text-[#b91c1c]",
-        variant === "neutral" && "border-[#d8e0ec] bg-[#f8fafc] text-ui-textMuted",
-        variant === "info" && "border-[#c7d7ff] bg-[#f0f5ff] text-[#1e40af]",
+        "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-bold",
+        variant === "success" && "border-[#bde8ce] bg-[#ecfff3] text-[#15703e]",
+        variant === "warning" && "border-[#ffdba8] bg-[#fff8ea] text-[#92400e]",
+        variant === "danger" && "border-[#fecaca] bg-[#fff1f2] text-[#991b1b]",
+        variant === "neutral" && "border-[#d8e0ec] bg-[#f8fafc] text-[#475569]",
+        variant === "info" && "border-[#c7d7ff] bg-[#f0f5ff] text-[#1e3a8a]",
         className
       )}
     >
       <span
         className={clsx(
-          "h-1.5 w-1.5 rounded-full",
+          "h-2 w-2 rounded-full",
           variant === "success" && "bg-[#1fb261]",
           variant === "warning" && "bg-[#d97706]",
           variant === "danger" && "bg-[#dc2626]",

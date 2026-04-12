@@ -9,7 +9,7 @@ export const revalidate = 0;
 
 type PackageItem = Awaited<ReturnType<typeof fetchPackages>>[number];
 
-const SPORT_ORDER = ['BASKETBALL', 'GYMNASTICS', 'VOLLEYBALL'];
+const SPORT_ORDER = ['VOLLEYBALL', 'BOXING', 'BASKETBALL', 'GYMNASTICS'];
 
 function normalizeSport(value: string): string {
   return (value || 'OTHER').trim().toUpperCase();
@@ -18,6 +18,7 @@ function normalizeSport(value: string): string {
 function displaySport(value: string): string {
   const normalized = normalizeSport(value);
   if (normalized === 'BASKETBALL') return 'Basketball';
+  if (normalized === 'BOXING') return 'Boxing';
   if (normalized === 'GYMNASTICS') return 'Gymnastics';
   if (normalized === 'VOLLEYBALL') return 'Volleyball';
   return value || 'Other';

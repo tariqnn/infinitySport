@@ -39,7 +39,7 @@ export function ExportCsvButton({
   return (
     <Button
       type="button"
-      variant="outline"
+      variant="secondary"
       onClick={() => {
         const csv = toCsv(rows, columns, prefixLines);
         const bom = '\uFEFF'; // Excel UTF-8

@@ -12,10 +12,10 @@ export function PageHeader({
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <h1 className="text-[36px] font-bold leading-tight text-ui-textPrimary">{title}</h1>
-        {subtitle ? <p className="mt-1 text-sm text-ui-textMuted">{subtitle}</p> : null}
+        <h1 className="text-3xl font-extrabold leading-tight text-ui-textPrimary sm:text-4xl">{title}</h1>
+        {subtitle ? <p className="mt-2 text-base text-ui-textMuted">{subtitle}</p> : null}
       </div>
-      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+      {actions ? <div className="flex flex-wrap items-center gap-3">{actions}</div> : null}
     </div>
   );
 }

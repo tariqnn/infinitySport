@@ -417,7 +417,7 @@ export function HomeContent({ content }: HomeContentProps) {
                 <p className="max-w-2xl mx-auto text-base text-gray-600 leading-relaxed sm:text-lg">
                   {tr(language, 'home_volleyball_desc')}
                 </p>
-                <p className="text-sm text-gray-500">Sat 3–5 PM • Tue & Sun 7–9 PM</p>
+                <p className="text-sm text-gray-500">Sun, Tue, Sat 7–9 PM</p>
                 <div className="mt-6 flex items-center justify-center gap-2 text-brand-green-primary font-semibold group-hover:gap-4 transition-all">
                   <span>View Details</span>
                   <ArrowRightIcon className="w-5 h-5" />
@@ -456,6 +456,12 @@ export function HomeContent({ content }: HomeContentProps) {
                   </div>
                   <h3 className="mt-3 text-xl font-black text-brand-black">{program.title}</h3>
                   <p className="mt-2 text-sm text-gray-600 line-clamp-3 leading-relaxed">{program.description}</p>
+                  {program.schedule && (
+                    <p className="mt-2 text-xs font-semibold text-brand-blue-primary">{program.schedule}</p>
+                  )}
+                  {program.priceLabel && (
+                    <p className="mt-1 text-sm font-bold text-brand-green-primary">{program.priceLabel}</p>
+                  )}
                   <Link
                     href={program.link || "/sports"}
                     className="group/link mt-4 inline-flex items-center gap-2 text-sm font-bold text-brand-blue-primary transition-colors duration-300 hover:text-brand-green-primary"

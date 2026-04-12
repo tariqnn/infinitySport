@@ -1,6 +1,11 @@
 import type {
+  LandingAnnouncement,
   LandingContent,
+  LandingEvent,
   LandingFacilityHighlight,
+  LandingFooter,
+  LandingHero,
+  LandingOffer,
   LandingProgram,
 } from '@infinity/types';
 import { canAttemptDatabaseQuery, noteDatabaseFailure } from './dbGuard';
@@ -89,187 +94,194 @@ const FALLBACK_FACILITIES: { id: string; name: string; description: string }[] =
 ];
 
 const FALLBACK_PACKAGES: PackageResponse[] = [
+  // --- Volleyball ---
   {
-    id: 'fallback-package-little-kobes',
-    sportType: 'BASKETBALL',
-    name: 'Basketball - Little Kobes U10',
-    description: 'U10 foundational basketball program focused on fun, movement skills, and core fundamentals.',
-    descriptionBullets: [
-      'Have fun and support healthy growth.',
-      'Ball handling and dribbling fundamentals.',
-      'Basic shooting skills and passing types.',
-    ],
-    sessionsCount: 0,
-    trackingType: 'SESSIONS',
-    pricingType: 'FIXED',
-    currentPriceJod: 120,
-    timeSlots: null,
-    isActive: true,
-    sortOrder: 0,
-  },
-  {
-    id: 'fallback-package-volleyball',
+    id: 'fallback-volleyball',
     sportType: 'VOLLEYBALL',
     name: 'Volleyball',
-    description: 'Volleyball program for ages 7+ with weekday and weekend training slots.',
+    description: 'Volleyball training programme open to all ages.',
     descriptionBullets: [
-      'Starting age: 7 years and up.',
-      '10% discount for siblings.',
-      'Special rate for groups.',
-      'Training schedule: Saturday 3:00-5:00 PM, Tuesday & Sunday 7:00-9:00 PM.',
+      'Sunday, Tuesday, Saturday 7–9 PM.',
     ],
     sessionsCount: 0,
-    trackingType: 'SESSIONS',
+    trackingType: 'DAYS',
     pricingType: 'FIXED',
-    currentPriceJod: 120,
-    timeSlots: null,
+    currentPriceJod: 100,
+    timeSlots: [{ label: 'Sunday, Tuesday, Saturday 7–9 PM' }],
     isActive: true,
     sortOrder: 0,
   },
+  // --- Boxing ---
   {
-    id: 'fallback-package-ballers-hoopers',
-    sportType: 'BASKETBALL',
-    name: 'Basketball - Ballers & Hoopers U12–U14',
-    description: 'U12-U14 development track that builds confidence, court movement, and strong finishing basics.',
+    id: 'fallback-boxing-juniors',
+    sportType: 'BOXING',
+    name: 'Boxing - Juniors (Age 6–11)',
+    description: 'Boxing fundamentals for ages 6–11.',
     descriptionBullets: [
-      'U12 Ballers: stay confident and improve shooting with footwork.',
-      'U12 Ballers: different types of finishing.',
-      'U14 Hoopers: basic court movement and teamwork habits.',
-      'U14 Hoopers: introduce form-shooting fundamentals.',
+      'Age group: 6–11 years.',
+      'Sunday, Tuesday, Thursday 6–7 PM.',
     ],
-    sessionsCount: 12,
-    trackingType: 'SESSIONS',
+    sessionsCount: 0,
+    trackingType: 'DAYS',
     pricingType: 'FIXED',
-    currentPriceJod: 120,
-    timeSlots: null,
+    currentPriceJod: 80,
+    timeSlots: [{ label: 'Sunday, Tuesday, Thursday 6–7 PM' }],
     isActive: true,
-    sortOrder: 1,
+    sortOrder: 10,
   },
   {
-    id: 'fallback-package-warriors',
-    sportType: 'BASKETBALL',
-    name: 'Basketball - Warriors',
-    description: 'U16+ skilled group focused on game IQ, team culture, and two-way performance.',
+    id: 'fallback-boxing-youth',
+    sportType: 'BOXING',
+    name: 'Boxing - Youth (Age 12–18)',
+    description: 'Boxing training for ages 12–18.',
     descriptionBullets: [
-      'Read game situations and make better decisions.',
-      'Be a good teammate and lead by example.',
-      'Refine offensive and defensive skills.',
+      'Age group: 12–18 years.',
+      'Sunday, Tuesday, Thursday 7–8 PM.',
     ],
-    sessionsCount: 12,
-    trackingType: 'SESSIONS',
+    sessionsCount: 0,
+    trackingType: 'DAYS',
+    pricingType: 'FIXED',
+    currentPriceJod: 80,
+    timeSlots: [{ label: 'Sunday, Tuesday, Thursday 7–8 PM' }],
+    isActive: true,
+    sortOrder: 11,
+  },
+  // --- Basketball ---
+  {
+    id: 'fallback-basketball-academy',
+    sportType: 'BASKETBALL',
+    name: 'Basketball Academy (Age 8–11)',
+    description: 'Group academy programme for ages 8–11.',
+    descriptionBullets: [
+      'Age group: 8–11 years.',
+      'Monday, Wednesday, Saturday 5–6 PM.',
+    ],
+    sessionsCount: 0,
+    trackingType: 'DAYS',
     pricingType: 'FIXED',
     currentPriceJod: 120,
-    timeSlots: null,
+    timeSlots: [{ label: 'Monday, Wednesday, Saturday 5–6 PM' }],
+    isActive: true,
+    sortOrder: 20,
+  },
+  {
+    id: 'fallback-basketball-private',
+    sportType: 'BASKETBALL',
+    name: 'Basketball - Private Lessons',
+    description: 'One-on-one private basketball coaching.',
+    descriptionBullets: [
+      'Monday, Wednesday, Saturday 6–7 PM.',
+    ],
+    sessionsCount: 0,
+    trackingType: 'DAYS',
+    pricingType: 'MANUAL',
+    currentPriceJod: null,
+    timeSlots: [{ label: 'Monday, Wednesday, Saturday 6–7 PM' }],
+    isActive: true,
+    sortOrder: 21,
+  },
+  {
+    id: 'fallback-basketball-small-group-u16',
+    sportType: 'BASKETBALL',
+    name: 'Basketball - Small Group U16',
+    description: 'Small-group training for U16 players.',
+    descriptionBullets: [
+      'Monday, Wednesday 7–8 PM.',
+      'Friday 11 AM–12 PM.',
+    ],
+    sessionsCount: 0,
+    trackingType: 'DAYS',
+    pricingType: 'MANUAL',
+    currentPriceJod: null,
+    timeSlots: [{ label: 'Monday, Wednesday 7–8 PM' }, { label: 'Friday 11 AM–12 PM' }],
+    isActive: true,
+    sortOrder: 22,
+  },
+  {
+    id: 'fallback-basketball-women',
+    sportType: 'BASKETBALL',
+    name: 'Basketball - Women',
+    description: 'Basketball sessions for women.',
+    descriptionBullets: [
+      'Monday, Wednesday 8–9 PM.',
+      'Saturday 4–5 PM.',
+    ],
+    sessionsCount: 0,
+    trackingType: 'DAYS',
+    pricingType: 'MANUAL',
+    currentPriceJod: null,
+    timeSlots: [{ label: 'Monday, Wednesday 8–9 PM' }, { label: 'Saturday 4–5 PM' }],
+    isActive: true,
+    sortOrder: 23,
+  },
+  {
+    id: 'fallback-basketball-young-men',
+    sportType: 'BASKETBALL',
+    name: 'Basketball - Young Men',
+    description: 'Basketball sessions for young men.',
+    descriptionBullets: [
+      'Tuesday, Sunday 9–10 PM.',
+      'Thursday 6–7 PM.',
+    ],
+    sessionsCount: 0,
+    trackingType: 'DAYS',
+    pricingType: 'MANUAL',
+    currentPriceJod: null,
+    timeSlots: [{ label: 'Tuesday, Sunday 9–10 PM' }, { label: 'Thursday 6–7 PM' }],
+    isActive: true,
+    sortOrder: 24,
+  },
+  {
+    id: 'fallback-basketball-girls-u16',
+    sportType: 'BASKETBALL',
+    name: 'Basketball - Girls U16',
+    description: 'Basketball sessions for girls under 16.',
+    descriptionBullets: [
+      'Friday, Saturday 12–1 PM.',
+      'Sunday 4–5 PM.',
+    ],
+    sessionsCount: 0,
+    trackingType: 'DAYS',
+    pricingType: 'MANUAL',
+    currentPriceJod: null,
+    timeSlots: [{ label: 'Friday, Saturday 12–1 PM' }, { label: 'Sunday 4–5 PM' }],
+    isActive: true,
+    sortOrder: 25,
+  },
+  // --- Gymnastics ---
+  {
+    id: 'fallback-gymnastics-beginners',
+    sportType: 'GYMNASTICS',
+    name: 'Gymnastics - Beginners',
+    description: 'Beginner gymnastics programme for new athletes.',
+    descriptionBullets: [
+      'Sunday, Tuesday, Friday 4:30–5:30 PM.',
+      'Foundational body control and flexibility.',
+    ],
+    sessionsCount: 0,
+    trackingType: 'DAYS',
+    pricingType: 'FIXED',
+    currentPriceJod: 120,
+    timeSlots: [{ label: 'Sunday, Tuesday, Friday 4:30–5:30 PM' }],
     isActive: true,
     sortOrder: 30,
   },
   {
-    id: 'fallback-package-private-1v1',
-    sportType: 'BASKETBALL',
-    name: 'Basketball - Private 1v1 Sessions',
-    description: 'One-on-one personalized basketball training with focused technical correction and progression.',
+    id: 'fallback-gymnastics-advance',
+    sportType: 'GYMNASTICS',
+    name: 'Gymnastics - Advance',
+    description: 'Advanced gymnastics training for experienced athletes.',
     descriptionBullets: [
-      'Individual skill assessment and customized plan.',
-      'Focused shooting, footwork, and ball-handling correction.',
-      'Flexible scheduling based on coach availability.',
+      'Sunday, Tuesday, Friday 5:30–7:00 PM.',
+      'Advanced movement combinations and technique refinement.',
     ],
     sessionsCount: 0,
-    trackingType: 'SESSIONS',
-    pricingType: 'MANUAL',
-    currentPriceJod: null,
-    timeSlots: null,
-    isActive: true,
-    sortOrder: 40,
-  },
-  {
-    id: 'fallback-package-small-groups',
-    sportType: 'BASKETBALL',
-    name: 'Basketball - Small Groups',
-    description: 'Small-group basketball sessions designed for faster development with close coach attention.',
-    descriptionBullets: [
-      'Low player-to-coach ratio.',
-      'Game-like drills and competitive reps.',
-      'Built for friends, siblings, and team clusters.',
-    ],
-    sessionsCount: 0,
-    trackingType: 'SESSIONS',
-    pricingType: 'MANUAL',
-    currentPriceJod: null,
-    timeSlots: null,
-    isActive: true,
-    sortOrder: 50,
-  },
-  {
-    id: 'fallback-package-gym-a',
-    sportType: 'GYMNASTICS',
-    name: 'Gymnastics Package A',
-    description: 'Beginner gymnastics package focused on mobility, balance, and confidence.',
-    descriptionBullets: [
-      'Foundational body control and flexibility.',
-      'Safe progressions for basic gymnastics skills.',
-      'Great entry point for new athletes.',
-    ],
-    sessionsCount: 12,
-    trackingType: 'SESSIONS',
-    pricingType: 'FIXED',
-    currentPriceJod: 120,
-    timeSlots: null,
-    isActive: true,
-    sortOrder: 60,
-  },
-  {
-    id: 'fallback-package-gym-b',
-    sportType: 'GYMNASTICS',
-    name: 'Gymnastics Package B',
-    description: 'Early-intermediate gymnastics package for strength, posture, and coordination.',
-    descriptionBullets: [
-      'Technique refinement with structured drills.',
-      'Improved core stability and movement quality.',
-      'Progress tracking through coached milestones.',
-    ],
-    sessionsCount: 8,
-    trackingType: 'SESSIONS',
-    pricingType: 'FIXED',
-    currentPriceJod: 100,
-    timeSlots: null,
-    isActive: true,
-    sortOrder: 70,
-  },
-  {
-    id: 'fallback-package-gym-c',
-    sportType: 'GYMNASTICS',
-    name: 'Gymnastics Package C',
-    description: 'Extended gymnastics package with higher volume for faster technical development.',
-    descriptionBullets: [
-      'More sessions for accelerated progress.',
-      'Advanced movement combinations.',
-      'Consistency-focused development cycle.',
-    ],
-    sessionsCount: 18,
-    trackingType: 'SESSIONS',
+    trackingType: 'DAYS',
     pricingType: 'FIXED',
     currentPriceJod: 140,
-    timeSlots: null,
+    timeSlots: [{ label: 'Sunday, Tuesday, Friday 5:30–7:00 PM' }],
     isActive: true,
-    sortOrder: 80,
-  },
-  {
-    id: 'fallback-package-gym-d',
-    sportType: 'GYMNASTICS',
-    name: 'Gymnastics Package D',
-    description: 'Performance-oriented gymnastics package balancing skill work and conditioning.',
-    descriptionBullets: [
-      'Balanced technical and physical development.',
-      'Coach-guided progression and corrections.',
-      'Suitable for athletes preparing for higher levels.',
-    ],
-    sessionsCount: 12,
-    trackingType: 'SESSIONS',
-    pricingType: 'FIXED',
-    currentPriceJod: 120,
-    timeSlots: null,
-    isActive: true,
-    sortOrder: 90,
+    sortOrder: 31,
   },
 ];
 
@@ -577,42 +589,13 @@ export async function fetchPackages(): Promise<PackageResponse[]> {
 
   const stale = getStaleCache<PackageResponse[]>('packages');
   if (!canUseDb()) return stale || FALLBACK_PACKAGES;
+  if (!(await canAttemptDatabaseQuery())) return stale || FALLBACK_PACKAGES;
   try {
-    const pool = getServerPgPool();
-    const result = await pool.query<{
-      id: string;
-      sportType: string;
-      name: string;
-      description: string | null;
-      descriptionBullets: unknown;
-      sessionsCount: number;
-      trackingType: string;
-      pricingType: string;
-      currentPriceJod: number | null;
-      timeSlots: unknown;
-      isActive: boolean;
-      sortOrder: number;
-    }>(
-      `
-      SELECT
-        "id",
-        "sportType",
-        "name",
-        "description",
-        "descriptionBullets",
-        "sessionsCount",
-        "trackingType",
-        "pricingType",
-        "currentPriceJod",
-        "timeSlots",
-        "isActive",
-        "sortOrder"
-      FROM "Package"
-      WHERE "isActive" = true
-      ORDER BY "sortOrder" ASC, "name" ASC
-      `,
-    );
-    const rows = result.rows;
+    const prisma = await getPrisma();
+    const rows = await prisma.package.findMany({
+      where: { isActive: true },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    });
     if (!rows.length) {
       writeCache('packages', FALLBACK_PACKAGES);
       return FALLBACK_PACKAGES;
@@ -690,36 +673,13 @@ export async function fetchCoaches(): Promise<CoachResponse[]> {
 
   const stale = getStaleCache<CoachResponse[]>('coaches');
   if (!canUseDb()) return stale || FALLBACK_COACHES;
+  if (!(await canAttemptDatabaseQuery())) return stale || FALLBACK_COACHES;
   try {
-    const pool = getServerPgPool();
-    const landingResult = await pool.query<{
-      id: string;
-      name: string;
-      sport: string;
-      description: string;
-      quote: string | null;
-      achievements: unknown;
-      imageUrl: string;
-      isActive: boolean;
-      order: number;
-    }>(
-      `
-      SELECT
-        "id",
-        "name",
-        "sport",
-        "description",
-        "quote",
-        "achievements",
-        "imageUrl",
-        "isActive",
-        "order"
-      FROM "LandingCoach"
-      WHERE "isActive" = true
-      ORDER BY "order" ASC, "createdAt" ASC
-      `,
-    );
-    const landingRows = landingResult.rows;
+    const prisma = await getPrisma();
+    const landingRows = await prisma.landingCoach.findMany({
+      where: { isActive: true },
+      orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+    });
     if (landingRows.length) {
       const mapped = landingRows.map((row) => ({
         id: row.id,
@@ -736,23 +696,11 @@ export async function fetchCoaches(): Promise<CoachResponse[]> {
       return mapped;
     }
 
-    // Secondary source: portal coaches table (firstName/lastName) when landingCoach is empty.
-    const portalResult = await pool.query<{
-      id: string;
-      firstName: string;
-      lastName: string;
-      specialty: string | null;
-      bio: string | null;
-      status: string;
-    }>(
-      `
-      SELECT "id", "firstName", "lastName", "specialty", "bio", "status"
-      FROM "Coach"
-      WHERE "status" = 'ACTIVE'
-      ORDER BY "createdAt" ASC
-      `,
-    );
-    const portalRows = portalResult.rows;
+    // Secondary source: portal coaches table when landingCoach is empty.
+    const portalRows = await prisma.coach.findMany({
+      where: { status: 'ACTIVE' },
+      orderBy: { createdAt: 'asc' },
+    });
     if (portalRows.length) {
       const mappedFromPortal = portalRows.map((row, index) => ({
         id: row.id,
@@ -760,7 +708,7 @@ export async function fetchCoaches(): Promise<CoachResponse[]> {
         sport: row.specialty || 'Multi-Sport',
         description: row.bio || `${[row.firstName, row.lastName].filter(Boolean).join(' ').trim()} coaching profile.`,
         quote: undefined,
-        achievements: [],
+        achievements: [] as string[],
         imageUrl: '',
         isActive: true,
         order: index + 1,
@@ -838,18 +786,82 @@ export async function fetchAnnouncements(): Promise<AnnouncementResponse[]> {
   }
 }
 
+export async function fetchHero(): Promise<LandingHero | null> {
+  if (!canUseDb()) return null;
+  if (!(await canAttemptDatabaseQuery())) return null;
+  try {
+    const prisma = await getPrisma();
+    const row = await prisma.heroSection.findFirst({ orderBy: { updatedAt: 'desc' } });
+    if (!row) return null;
+    return {
+      title: row.title,
+      subtitle: row.subtitle,
+      primaryCtaLabel: row.primaryCta,
+      primaryCtaLink: row.primaryUrl,
+      secondaryCtaLabel: row.secondaryCta ?? undefined,
+      secondaryCtaLink: row.secondaryUrl ?? undefined,
+      backgroundImageUrl: row.backgroundImageUrl ?? undefined,
+      backgroundVideoUrl: row.backgroundVideoUrl ?? undefined,
+    };
+  } catch (error) {
+    noteDatabaseFailure('fetchHero', error);
+    return null;
+  }
+}
+
+export async function fetchFooter(): Promise<LandingFooter | null> {
+  if (!canUseDb()) return null;
+  if (!(await canAttemptDatabaseQuery())) return null;
+  try {
+    const prisma = await getPrisma();
+    const row = await prisma.footerSettings.findFirst({ orderBy: { updatedAt: 'desc' } });
+    if (!row) return null;
+    const socialLinks = Array.isArray(row.socialLinks)
+      ? (row.socialLinks as { id?: string; label?: string; href?: string }[]).map((l) => ({
+          id: l.id ?? '',
+          label: l.label ?? '',
+          href: l.href ?? '',
+        }))
+      : [];
+    return {
+      address: row.address,
+      phone: row.phone,
+      email: row.email,
+      contactRecipientEmail: row.contactRecipientEmail ?? undefined,
+      socialLinks,
+    };
+  } catch (error) {
+    noteDatabaseFailure('fetchFooter', error);
+    return null;
+  }
+}
+
 export function getLandingFallback(): LandingContent {
-  const fallbackPrograms: LandingProgram[] = FALLBACK_PACKAGES.map((program) => ({
-    id: program.id,
-    title: program.name,
-    description: program.description?.trim() || 'Program details available on the sports page.',
-    sportType: program.sportType || 'multi',
-    badge: program.sportType || undefined,
-    link: `/sports#${(program.sportType || 'other').toLowerCase().replace(/\s+/g, '-')}`,
-    mediaUrl: undefined,
-    isFeatured: false,
-    isActive: true,
-  }));
+  const fallbackPrograms: LandingProgram[] = FALLBACK_PACKAGES.map((program) => {
+    const slots = Array.isArray(program.timeSlots)
+      ? (program.timeSlots as { label?: string }[])
+          .map((s) => (typeof s === 'string' ? s : s?.label ?? ''))
+          .filter(Boolean)
+          .join(' · ')
+      : undefined;
+    const priceLabel =
+      program.pricingType === 'MANUAL' || program.currentPriceJod == null
+        ? 'Contact for pricing'
+        : `${program.currentPriceJod} JOD`;
+    return {
+      id: program.id,
+      title: program.name,
+      description: program.description?.trim() || 'Program details available on the sports page.',
+      sportType: program.sportType || 'multi',
+      badge: program.sportType || undefined,
+      link: `/sports#${(program.sportType || 'other').toLowerCase().replace(/\s+/g, '-')}`,
+      mediaUrl: undefined,
+      isFeatured: false,
+      isActive: true,
+      schedule: slots || undefined,
+      priceLabel,
+    };
+  });
 
   return {
     hero: {
@@ -886,6 +898,71 @@ export function getLandingFallback(): LandingContent {
   };
 }
 
+function mapPackageToProgram(program: PackageResponse): LandingProgram {
+  const slots = Array.isArray(program.timeSlots)
+    ? (program.timeSlots as { label?: string }[]).map((s) => (typeof s === 'string' ? s : s?.label ?? '')).filter(Boolean).join(' · ')
+    : undefined;
+  return {
+    id: program.id,
+    title: program.name,
+    description: program.description?.trim() || 'Program details available on the sports page.',
+    sportType: program.sportType || 'multi',
+    badge: program.sportType || undefined,
+    link: `/sports#${(program.sportType || 'other').toLowerCase().replace(/\s+/g, '-')}`,
+    mediaUrl: undefined,
+    isFeatured: false,
+    isActive: program.isActive,
+    schedule: slots || undefined,
+    priceLabel: program.pricingType === 'MANUAL' || program.currentPriceJod == null ? 'Contact for pricing' : `${program.currentPriceJod} JOD`,
+  };
+}
+
+function mapOfferToLanding(offer: OfferResponse): LandingOffer {
+  return {
+    id: offer.id,
+    name: offer.name,
+    price: offer.badge || `${offer.pricePerMonth} JOD/month`,
+    description: offer.description || '',
+    features: Array.isArray(offer.features) ? offer.features : [],
+    badge: offer.badge,
+    isFeatured: offer.isFeatured,
+    isActive: offer.isActive,
+    link: offer.link,
+  };
+}
+
+function mapEventToLanding(event: EventResponse): LandingEvent {
+  return {
+    id: event.id,
+    title: event.title,
+    date: event.date,
+    location: event.location,
+    description: event.description,
+    link: event.link,
+    isActive: true,
+    imageUrl: event.imageUrl,
+  };
+}
+
+function mapAnnouncementToLanding(a: AnnouncementResponse): LandingAnnouncement {
+  return {
+    id: a.id,
+    title: a.title,
+    message: a.body,
+    isPinned: a.isPinned,
+  };
+}
+
+function mapFacilityToLanding(f: FacilityResponse): LandingFacilityHighlight {
+  return {
+    id: f.id,
+    name: f.name,
+    description: f.description || '',
+    mediaUrl: undefined,
+    badge: undefined,
+  };
+}
+
 async function _fetchLandingContent(): Promise<LandingContent> {
   const fresh = getFreshCache<LandingContent>('landingContent');
   if (fresh) return fresh;
@@ -894,25 +971,28 @@ async function _fetchLandingContent(): Promise<LandingContent> {
   if (!canUseDb()) return stale || getLandingFallback();
 
   try {
-    const programs = await fetchPackages();
     const fallback = getLandingFallback();
 
+    const [programs, hero, coaches, offers, events, announcements, facilities, footer] = await Promise.all([
+      fetchPackages(),
+      fetchHero(),
+      fetchCoaches(),
+      fetchOffers(),
+      fetchEvents(),
+      fetchAnnouncements(),
+      fetchFacilities(),
+      fetchFooter(),
+    ]);
+
     const result: LandingContent = {
-      ...fallback,
-      programs:
-        programs.length > 0
-          ? programs.map((program): LandingProgram => ({
-              id: program.id,
-              title: program.name,
-              description: program.description?.trim() || 'Program details available on the sports page.',
-              sportType: program.sportType || 'multi',
-              badge: program.sportType || undefined,
-              link: `/sports#${(program.sportType || 'other').toLowerCase().replace(/\s+/g, '-')}`,
-              mediaUrl: undefined,
-              isFeatured: false,
-              isActive: program.isActive,
-            }))
-          : fallback.programs,
+      hero: hero || fallback.hero,
+      highlights: fallback.highlights,
+      programs: programs.length > 0 ? programs.map(mapPackageToProgram) : fallback.programs,
+      offers: offers.length > 0 ? offers.map(mapOfferToLanding) : fallback.offers,
+      events: events.map(mapEventToLanding),
+      announcements: announcements.map(mapAnnouncementToLanding),
+      facilityHighlights: facilities.length > 0 ? facilities.map(mapFacilityToLanding) : fallback.facilityHighlights,
+      footer: footer || fallback.footer,
       updatedAt: new Date().toISOString(),
       updatedBy: 'System',
     };
@@ -920,23 +1000,7 @@ async function _fetchLandingContent(): Promise<LandingContent> {
     return result;
   } catch (error) {
     if (stale) return stale;
-    const fallback = getLandingFallback();
-    const livePrograms = await fetchPackages();
-    if (!livePrograms.length) return fallback;
-    return {
-      ...fallback,
-      programs: livePrograms.map((program): LandingProgram => ({
-        id: program.id,
-        title: program.name,
-        description: program.description?.trim() || 'Program details available on the sports page.',
-        sportType: program.sportType || 'multi',
-        badge: program.sportType || undefined,
-        link: `/sports#${(program.sportType || 'other').toLowerCase().replace(/\s+/g, '-')}`,
-        mediaUrl: undefined,
-        isFeatured: false,
-        isActive: program.isActive,
-      })),
-    };
+    return getLandingFallback();
   }
 }
 

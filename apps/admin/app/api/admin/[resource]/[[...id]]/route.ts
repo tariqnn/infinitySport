@@ -613,7 +613,24 @@ async function handlePatch(resource: string, id: string | null, body: JsonBody) 
     if (hasOwn(body, 'isActive')) data.isActive = toBoolean(body.isActive, true);
     if (hasOwn(body, 'sortOrder')) data.sortOrder = Math.max(0, toInteger(body.sortOrder, 0));
 
+    // If name changed, cascade to PackageRegistration records
+    const newName = hasOwn(body, 'name') ? toTrimmedString(body.name) : null;
+    let oldName: string | null = null;
+    if (newName) {
+      const existing = await prisma.package.findUnique({ where: { id }, select: { name: true } });
+      oldName = existing?.name ?? null;
+    }
+
     const row = await prisma.package.update({ where: { id }, data: data as never });
+
+    // Cascade: update packageName on all registrations that had the old name
+    if (newName && oldName && newName !== oldName) {
+      await prisma.packageRegistration.updateMany({
+        where: { packageName: oldName },
+        data: { packageName: newName },
+      });
+    }
+
     return NextResponse.json(row);
   }
 

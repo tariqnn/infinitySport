@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { ArrowUpRight, ExternalLink, Search } from 'lucide-react';
+import { ArrowUpRight, ExternalLink, Menu, Search } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
 const marketingUrl = process.env.NEXT_PUBLIC_MARKETING_ORIGIN ?? 'http://localhost:3000';
@@ -12,37 +12,50 @@ function formatPageTitle(pathname: string): string {
   return segment.charAt(0).toUpperCase() + segment.slice(1);
 }
 
-export function AdminTopbar() {
+function getPageHint(pathname: string): string {
+  if (pathname === '/') return 'Overview of your website and quick actions';
+  if (pathname.startsWith('/hero')) return 'Edit the main banner visitors see first';
+  if (pathname.startsWith('/packages')) return 'Programs and prices shown on your website';
+  if (pathname.startsWith('/coaches')) return 'Coach profiles shown on the website';
+  if (pathname.startsWith('/landing-content')) return 'Map of all website sections you can edit';
+  if (pathname.startsWith('/offers')) return 'Membership plans and seasonal promotions';
+  if (pathname.startsWith('/events')) return 'Upcoming events and schedules';
+  if (pathname.startsWith('/announcements')) return 'Banner alerts at top of the website';
+  if (pathname.startsWith('/facilities')) return 'Facility highlights shown on the website';
+  if (pathname.startsWith('/footer')) return 'Contact info and social links in the footer';
+  if (pathname.startsWith('/bookings')) return 'Incoming booking requests';
+  if (pathname.startsWith('/booking-availability')) return 'Block or open time slots for bookings';
+  return 'Manage content and settings';
+}
+
+export function AdminTopbar({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
   const pathname = usePathname();
   const pageTitle = formatPageTitle(pathname);
+  const pageHint = getPageHint(pathname);
 
   return (
-    <header className="sticky top-0 z-30 flex h-[72px] items-center justify-between gap-4 border-b border-[var(--border-muted)] bg-white px-4 sm:px-6">
+    <header className="sticky top-0 z-30 flex h-[80px] items-center justify-between gap-4 border-b-2 border-[var(--border-muted)] bg-white px-5 sm:px-7">
       <div className="flex min-w-0 flex-1 items-center gap-4">
+        {/* Mobile menu button */}
+        <button
+          type="button"
+          onClick={onOpenSidebar}
+          className="inline-flex items-center justify-center rounded-xl border-2 border-[var(--border-muted)] bg-white p-2.5 text-[var(--text-primary)] lg:hidden"
+          aria-label="Open menu"
+        >
+          <Menu className="h-6 w-6" />
+        </button>
+
         <div className="min-w-0">
-          <h1 className="truncate font-display text-xl font-bold text-[var(--text-primary)]">
+          <h1 className="truncate font-display text-2xl font-bold text-[var(--text-primary)]">
             {pageTitle}
           </h1>
-          <p className="text-xs text-[var(--text-muted)]">
-            {pathname === '/' ? 'Overview and quick actions' : 'Manage content and settings'}
-          </p>
-        </div>
-        <div className="relative hidden w-72 lg:block xl:w-96">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
-          <input
-            type="search"
-            placeholder="Search programs, events, content..."
-            className="h-10 w-full rounded-full border border-[var(--border-muted)] bg-[var(--bg-card-muted)] pl-9 pr-14 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--primary)]/30"
-            aria-label="Search admin content"
-          />
-          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-md border border-[var(--border-muted)] bg-white px-2 py-1 text-[10px] font-semibold text-[var(--text-muted)]">
-            Ctrl K
-          </span>
+          <p className="text-sm text-[var(--text-muted)]">{pageHint}</p>
         </div>
       </div>
-      <div className="flex flex-shrink-0 items-center gap-2">
-        <div className="hidden items-center gap-2 rounded-lg border border-[var(--border-muted)] bg-white px-3 py-1 text-xs font-semibold text-[var(--text-muted)] md:flex">
-          <span className="h-2 w-2 rounded-full bg-[var(--accent-green)]" />
+      <div className="flex flex-shrink-0 items-center gap-3">
+        <div className="hidden items-center gap-2 rounded-xl border-2 border-[var(--border-muted)] bg-white px-4 py-2 text-sm font-bold text-[var(--text-muted)] md:flex">
+          <span className="h-2.5 w-2.5 rounded-full bg-[var(--accent-green)]" />
           Live
         </div>
         <Link
@@ -51,15 +64,8 @@ export function AdminTopbar() {
           rel="noreferrer"
           className="btn-secondary inline-flex items-center gap-2"
         >
-          <span className="hidden sm:inline">Preview site</span>
-          <ExternalLink className="h-4 w-4" />
-        </Link>
-        <Link
-          href="/portal-link"
-          className="btn-primary inline-flex items-center gap-2"
-        >
-          <span className="hidden sm:inline">Portal</span>
-          <ArrowUpRight className="h-4 w-4" />
+          <span className="hidden sm:inline">View Website</span>
+          <ExternalLink className="h-5 w-5" />
         </Link>
       </div>
     </header>

@@ -63,26 +63,26 @@ export function Modal({ title, description, open, onClose, children, footer, siz
             >
               <Dialog.Panel
                 className={clsx(
-                  'relative z-[10001] transform overflow-hidden rounded-[26px] border border-ui-border bg-white/95 p-6 text-left align-middle shadow-[0_24px_60px_rgba(7,16,35,0.34)] transition-all backdrop-blur',
+                  'relative z-[10001] transform overflow-hidden rounded-2xl border-2 border-ui-border bg-white p-7 text-left align-middle shadow-[0_24px_60px_rgba(7,16,35,0.34)] transition-all',
                   sizeClasses[size]
                 )}
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="mb-6 flex items-start justify-between gap-6">
                   <div>
-                    {title && <Dialog.Title className="text-xl font-semibold text-ui-textPrimary">{title}</Dialog.Title>}
-                    {description && <Dialog.Description className="mt-2 text-sm text-ui-textMuted">{description}</Dialog.Description>}
+                    {title && <Dialog.Title className="text-2xl font-bold text-ui-textPrimary">{title}</Dialog.Title>}
+                    {description && <Dialog.Description className="mt-2 text-base text-ui-textMuted">{description}</Dialog.Description>}
                   </div>
                   <button
                     aria-label="Close modal"
-                    className="rounded-full border border-ui-border p-2 text-ui-textMuted transition hover:bg-ui-softBg hover:text-ui-textPrimary"
+                    className="rounded-xl border-2 border-ui-border p-2.5 text-ui-textMuted transition hover:bg-ui-softBg hover:text-ui-textPrimary"
                     onClick={onClose}
                   >
-                    <XMarkIcon className="h-5 w-5" />
+                    <XMarkIcon className="h-6 w-6" />
                   </button>
                 </div>
                 <div className="max-h-[calc(100vh-200px)] overflow-y-auto">{children}</div>
-                {footer && <div className="mt-6 flex justify-end gap-3 border-t border-ui-border pt-4">{footer}</div>}
+                {footer && <div className="mt-6 flex justify-end gap-3 border-t-2 border-ui-border pt-5">{footer}</div>}
               </Dialog.Panel>
             </Transition.Child>
           </div>

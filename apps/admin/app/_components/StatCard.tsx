@@ -13,16 +13,16 @@ const accentStyles = {
 
 export function StatCard({ label, value, delta, accent = 'blue' }: StatCardProps) {
   return (
-    <div className={`glass-card border ${accentStyles[accent]} p-5`}>
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">{label}</p>
+    <div className={`glass-card border-2 ${accentStyles[accent]} p-6`}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">{label}</p>
         {delta ? (
-          <span className="rounded-full border border-[var(--border-muted)] bg-[var(--bg-card-muted)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-muted)]">
+          <span className="rounded-full border-2 border-[var(--border-muted)] bg-[var(--bg-card-muted)] px-3 py-1 text-sm font-bold text-[var(--text-muted)]">
             {delta}
           </span>
         ) : null}
       </div>
-      <p className="mt-3 font-display text-3xl font-semibold text-[var(--text-primary)] sm:text-4xl">{value}</p>
+      <p className="mt-3 font-display text-4xl font-bold text-[var(--text-primary)]">{value}</p>
     </div>
   );
 }

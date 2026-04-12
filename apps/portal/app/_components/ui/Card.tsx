@@ -13,8 +13,8 @@ export function Card({
   return (
     <div
       className={clsx(
-        "rounded-2xl border border-ui-border bg-white shadow-[0_1px_2px_rgba(15,23,42,0.03)]",
-        hover && "transition hover:-translate-y-[1px] hover:shadow-[0_8px_24px_rgba(15,23,42,0.08)]",
+        "rounded-2xl border-2 border-ui-border bg-white shadow-[0_2px_6px_rgba(15,23,42,0.04)]",
+        hover && "transition hover:-translate-y-[2px] hover:shadow-[0_10px_28px_rgba(15,23,42,0.10)]",
         className
       )}
     >
@@ -30,7 +30,7 @@ export function CardHeader({
   children: ReactNode;
   className?: string;
 }) {
-  return <div className={clsx("border-b border-ui-border px-5 py-4", className)}>{children}</div>;
+  return <div className={clsx("border-b-2 border-ui-border px-6 py-5", className)}>{children}</div>;
 }
 
 export function CardBody({
@@ -40,7 +40,7 @@ export function CardBody({
   children: ReactNode;
   className?: string;
 }) {
-  return <div className={clsx("p-5", className)}>{children}</div>;
+  return <div className={clsx("p-6", className)}>{children}</div>;
 }
 
 export function CardFooter({
@@ -50,5 +50,5 @@ export function CardFooter({
   children: ReactNode;
   className?: string;
 }) {
-  return <div className={clsx("border-t border-ui-border px-5 py-4", className)}>{children}</div>;
+  return <div className={clsx("border-t-2 border-ui-border px-6 py-5", className)}>{children}</div>;
 }

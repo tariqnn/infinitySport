@@ -38,8 +38,8 @@ export function Input({
         )}
         {...props}
       />
-      {error ? <p className="mt-1.5 text-sm text-ui-danger">{error}</p> : null}
-      {hint && !error ? <p className="mt-1.5 text-sm text-ui-textMuted">{hint}</p> : null}
+      {error ? <p className="mt-2 text-base font-medium text-ui-danger">{error}</p> : null}
+      {hint && !error ? <p className="mt-2 text-base text-ui-textMuted">{hint}</p> : null}
     </div>
   );
 }
@@ -69,14 +69,14 @@ export function Textarea({
       <textarea
         id={id}
         className={clsx(
-          "control-field min-h-24 resize-none py-2",
+          "control-field min-h-28 resize-none py-3",
           error ? "border-ui-danger bg-red-50" : "border-ui-border bg-white text-ui-textPrimary",
           className
         )}
         {...props}
       />
-      {error ? <p className="mt-1.5 text-sm text-ui-danger">{error}</p> : null}
-      {hint && !error ? <p className="mt-1.5 text-sm text-ui-textMuted">{hint}</p> : null}
+      {error ? <p className="mt-2 text-base font-medium text-ui-danger">{error}</p> : null}
+      {hint && !error ? <p className="mt-2 text-base text-ui-textMuted">{hint}</p> : null}
     </div>
   );
 }
@@ -124,8 +124,8 @@ export function Select({
             ))
           : children}
       </select>
-      {error ? <p className="mt-1.5 text-sm text-ui-danger">{error}</p> : null}
-      {hint && !error ? <p className="mt-1.5 text-sm text-ui-textMuted">{hint}</p> : null}
+      {error ? <p className="mt-2 text-base font-medium text-ui-danger">{error}</p> : null}
+      {hint && !error ? <p className="mt-2 text-base text-ui-textMuted">{hint}</p> : null}
     </div>
   );
 }

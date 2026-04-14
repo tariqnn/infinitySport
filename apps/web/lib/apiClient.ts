@@ -1,3 +1,4 @@
+import { neon } from '@neondatabase/serverless';
 import type {
   LandingAnnouncement,
   LandingContent,
@@ -544,6 +545,14 @@ async function getPrisma() {
   return mod.prisma;
 }
 
+function getNeonSql() {
+  const url = process.env.DATABASE_URL?.trim();
+  if (!url) throw new Error('DATABASE_URL is missing');
+  // Neon serverless needs the non-pooler endpoint — replace -pooler if present
+  const httpUrl = url.replace('-pooler.', '.');
+  return neon(httpUrl);
+}
+
 function getServerPgPool() {
   if (typeof window !== 'undefined') {
     throw new Error('getServerPgPool must run on the server');
@@ -942,91 +951,92 @@ async function _fetchLandingContent(): Promise<LandingContent> {
 
   try {
     const fallback = getLandingFallback();
-    const prisma = await getPrisma();
+    const sql = getNeonSql();
 
-    // Fetch only packages first (most critical), then other sections
-    const packageRows = await prisma.package.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] });
+    // Single HTTP request to Neon — no native binaries, no pg module needed
+    const rows = await sql`
+      SELECT
+        (SELECT COALESCE(json_agg(r ORDER BY r."sortOrder" ASC, r."name" ASC), '[]'::json) FROM (SELECT * FROM "Package" WHERE "isActive" = true) r) AS packages,
+        (SELECT row_to_json(h) FROM (SELECT * FROM "HeroSection" ORDER BY "updatedAt" DESC LIMIT 1) h) AS hero,
+        (SELECT COALESCE(json_agg(c ORDER BY c."order" ASC, c."createdAt" ASC), '[]'::json) FROM (SELECT * FROM "LandingCoach" WHERE "isActive" = true) c) AS coaches,
+        (SELECT COALESCE(json_agg(o ORDER BY o."order" ASC, o."createdAt" ASC), '[]'::json) FROM (SELECT * FROM "Offer") o) AS offers,
+        (SELECT COALESCE(json_agg(e ORDER BY e."date" ASC), '[]'::json) FROM (SELECT * FROM "Event") e) AS events,
+        (SELECT COALESCE(json_agg(a ORDER BY a."isPinned" DESC, a."publishedAt" DESC), '[]'::json) FROM (SELECT * FROM "Announcement") a) AS announcements,
+        (SELECT COALESCE(json_agg(f ORDER BY f."order" ASC, f."createdAt" ASC), '[]'::json) FROM (SELECT * FROM "FacilityHighlight") f) AS facilities,
+        (SELECT row_to_json(fs) FROM (SELECT * FROM "FooterSettings" ORDER BY "updatedAt" DESC LIMIT 1) fs) AS footer
+    `;
+
+    const data = rows[0] as Record<string, unknown>;
 
     // Map packages
-    const programs = packageRows.length > 0
-      ? packageRows.map((row) => mapPackageToProgram({
-          id: row.id, sportType: row.sportType, name: row.name,
-          description: row.description, descriptionBullets: Array.isArray(row.descriptionBullets) ? row.descriptionBullets as string[] : null,
-          sessionsCount: row.sessionsCount, trackingType: row.trackingType,
-          pricingType: row.pricingType, currentPriceJod: row.currentPriceJod,
-          timeSlots: row.timeSlots, isActive: row.isActive, sortOrder: row.sortOrder,
+    const pkgs = Array.isArray(data.packages) ? data.packages as Record<string, unknown>[] : [];
+    const programs = pkgs.length > 0
+      ? pkgs.map((row) => mapPackageToProgram({
+          id: row.id as string, sportType: row.sportType as string, name: row.name as string,
+          description: row.description as string | null,
+          descriptionBullets: Array.isArray(row.descriptionBullets) ? row.descriptionBullets as string[] : null,
+          sessionsCount: row.sessionsCount as number, trackingType: row.trackingType as string,
+          pricingType: row.pricingType as string, currentPriceJod: row.currentPriceJod as number | null,
+          timeSlots: row.timeSlots as unknown, isActive: row.isActive as boolean, sortOrder: row.sortOrder as number,
         }))
       : fallback.programs;
 
-    // Fetch remaining sections — each one is optional, failures don't block
-    let hero: LandingHero | null = null;
-    let offers: LandingOffer[] = [];
-    let events: LandingEvent[] = [];
-    let announcements: LandingAnnouncement[] = [];
-    let facilityHighlights = fallback.facilityHighlights;
-    let footer: LandingFooter | null = null;
+    // Map hero
+    const heroData = data.hero as Record<string, unknown> | null;
+    const hero: LandingHero | null = heroData ? {
+      title: heroData.title as string, subtitle: heroData.subtitle as string,
+      primaryCtaLabel: heroData.primaryCta as string, primaryCtaLink: heroData.primaryUrl as string,
+      secondaryCtaLabel: (heroData.secondaryCta as string) ?? undefined,
+      secondaryCtaLink: (heroData.secondaryUrl as string) ?? undefined,
+      backgroundImageUrl: (heroData.backgroundImageUrl as string) ?? undefined,
+      backgroundVideoUrl: (heroData.backgroundVideoUrl as string) ?? undefined,
+    } : null;
 
-    try {
-      const heroRow = await prisma.heroSection.findFirst({ orderBy: { updatedAt: 'desc' } });
-      if (heroRow) {
-        hero = {
-          title: heroRow.title, subtitle: heroRow.subtitle,
-          primaryCtaLabel: heroRow.primaryCta, primaryCtaLink: heroRow.primaryUrl,
-          secondaryCtaLabel: heroRow.secondaryCta ?? undefined, secondaryCtaLink: heroRow.secondaryUrl ?? undefined,
-          backgroundImageUrl: heroRow.backgroundImageUrl ?? undefined, backgroundVideoUrl: heroRow.backgroundVideoUrl ?? undefined,
-        };
-      }
-    } catch { /* use fallback */ }
+    // Map offers
+    const offerData = Array.isArray(data.offers) ? data.offers as Record<string, unknown>[] : [];
+    const offers = offerData.map((row): LandingOffer => ({
+      id: row.id as string, name: row.name as string,
+      price: (row.badge as string) || `${row.pricePerMonth} JOD/month`,
+      description: (row.description as string) ?? '',
+      features: Array.isArray(row.features) ? row.features as string[] : [],
+      badge: (row.badge as string) ?? undefined, isFeatured: false, isActive: true, link: undefined,
+    }));
 
-    try {
-      const offerRows = await prisma.offer.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] });
-      offers = offerRows.map((row): LandingOffer => ({
-        id: row.id, name: row.name, price: row.badge || `${row.pricePerMonth} JOD/month`,
-        description: row.description ?? '', features: Array.isArray(row.features) ? row.features as string[] : [],
-        badge: row.badge ?? undefined, isFeatured: false, isActive: true, link: undefined,
-      }));
-    } catch { /* use empty */ }
+    // Map events
+    const eventData = Array.isArray(data.events) ? data.events as Record<string, unknown>[] : [];
+    const events = eventData.map((row): LandingEvent => ({
+      id: row.id as string, title: row.title as string,
+      date: typeof row.date === 'string' ? row.date : String(row.date),
+      location: (row.location as string) ?? undefined, description: (row.description as string) ?? undefined,
+      link: undefined, isActive: true, imageUrl: (row.imageUrl as string) ?? undefined,
+    }));
 
-    try {
-      const eventRows = await prisma.event.findMany({ orderBy: { date: 'asc' } });
-      events = eventRows.map((row): LandingEvent => ({
-        id: row.id, title: row.title, date: row.date.toISOString(),
-        location: row.location ?? undefined, description: row.description ?? undefined,
-        link: undefined, isActive: true, imageUrl: row.imageUrl ?? undefined,
-      }));
-    } catch { /* use empty */ }
+    // Map announcements
+    const annData = Array.isArray(data.announcements) ? data.announcements as Record<string, unknown>[] : [];
+    const announcements = annData.map((row): LandingAnnouncement => ({
+      id: row.id as string, title: row.title as string, message: row.body as string, isPinned: row.isPinned as boolean,
+    }));
 
-    try {
-      const announcementRows = await prisma.announcement.findMany({ orderBy: [{ isPinned: 'desc' }, { publishedAt: 'desc' }] });
-      announcements = announcementRows.map((row): LandingAnnouncement => ({
-        id: row.id, title: row.title, message: row.body, isPinned: row.isPinned,
-      }));
-    } catch { /* use empty */ }
-
-    try {
-      const facilityRows = await prisma.facilityHighlight.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] });
-      if (facilityRows.length > 0) {
-        facilityHighlights = facilityRows.map((row): LandingFacilityHighlight => ({
-          id: row.id, name: row.name, description: row.description ?? '',
+    // Map facilities
+    const facData = Array.isArray(data.facilities) ? data.facilities as Record<string, unknown>[] : [];
+    const facilityHighlights = facData.length > 0
+      ? facData.map((row): LandingFacilityHighlight => ({
+          id: row.id as string, name: row.name as string, description: (row.description as string) ?? '',
           mediaUrl: undefined, badge: undefined,
-        }));
-      }
-    } catch { /* use fallback */ }
+        }))
+      : fallback.facilityHighlights;
 
-    try {
-      const footerRow = await prisma.footerSettings.findFirst({ orderBy: { updatedAt: 'desc' } });
-      if (footerRow) {
-        footer = {
-          address: footerRow.address, phone: footerRow.phone, email: footerRow.email,
-          contactRecipientEmail: footerRow.contactRecipientEmail ?? undefined,
-          socialLinks: Array.isArray(footerRow.socialLinks)
-            ? (footerRow.socialLinks as { id?: string; label?: string; href?: string }[]).map((l) => ({
-                id: l.id ?? '', label: l.label ?? '', href: l.href ?? '',
-              }))
-            : [],
-        };
-      }
-    } catch { /* use fallback */ }
+    // Map footer
+    const footerData = data.footer as Record<string, unknown> | null;
+    const footer: LandingFooter | null = footerData ? {
+      address: footerData.address as string, phone: footerData.phone as string, email: footerData.email as string,
+      contactRecipientEmail: (footerData.contactRecipientEmail as string) ?? undefined,
+      socialLinks: Array.isArray(footerData.socialLinks)
+        ? (footerData.socialLinks as { id?: string; label?: string; href?: string }[]).map((l) => ({
+            id: l.id ?? '', label: l.label ?? '', href: l.href ?? '',
+          }))
+        : [],
+    } : null;
 
     const result: LandingContent = {
       hero: hero || fallback.hero,

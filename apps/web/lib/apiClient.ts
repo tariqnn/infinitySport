@@ -561,9 +561,9 @@ function getServerPgPool() {
     throw new Error('DATABASE_URL is missing');
   }
 
-  // pg is marked as serverExternalPackages in next.config.ts so require works in standalone
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { Pool } = require('pg') as { Pool: new (config: object) => unknown };
+  // Use eval('require') to hide pg from webpack bundling — it's server-only
+  const req = (0, eval)('require') as (id: string) => { Pool: new (config: object) => unknown };
+  const { Pool } = req('pg');
   const pool = new Pool({
     connectionString,
     max: Number.parseInt(process.env.PG_POOL_MAX || '1', 10) || 1,

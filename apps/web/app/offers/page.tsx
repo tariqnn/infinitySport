@@ -5,6 +5,8 @@ export const metadata = {
   title: 'Offers & Memberships'
 };
 
+export const dynamic = 'force-dynamic';
+
 type OfferCard = {
   id: string;
   title: string;

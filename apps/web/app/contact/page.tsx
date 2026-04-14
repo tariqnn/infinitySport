@@ -6,6 +6,8 @@ export const metadata = {
   title: 'Contact'
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function ContactPage() {
   const content = await fetchLandingContent();
   const footer = content.footer;

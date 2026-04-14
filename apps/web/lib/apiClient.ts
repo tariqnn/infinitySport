@@ -553,54 +553,17 @@ function getNeonSql() {
   return neon(httpUrl);
 }
 
-function getServerPgPool() {
-  if (typeof window !== 'undefined') {
-    throw new Error('getServerPgPool must run on the server');
-  }
-
-  const globalPg = globalThis as unknown as {
-    __webApiPgPool?: {
-      query: <T = unknown>(text: string, values?: unknown[]) => Promise<{ rows: T[] }>;
-    };
-  };
-  if (globalPg.__webApiPgPool) return globalPg.__webApiPgPool;
-
-  const connectionString = process.env.DATABASE_URL?.trim();
-  if (!connectionString) {
-    throw new Error('DATABASE_URL is missing');
-  }
-
-  // Use eval('require') to hide pg from webpack bundling — it's server-only
-  const req = (0, eval)('require') as (id: string) => { Pool: new (config: object) => unknown };
-  const { Pool } = req('pg');
-  const pool = new Pool({
-    connectionString,
-    max: Number.parseInt(process.env.PG_POOL_MAX || '1', 10) || 1,
-    idleTimeoutMillis: 10_000,
-    connectionTimeoutMillis: 10_000,
-    ssl: shouldUseSsl(connectionString)
-      ? { rejectUnauthorized: process.env.PG_SSL_REJECT_UNAUTHORIZED === 'true' }
-      : undefined,
-  }) as {
-    query: <T = unknown>(text: string, values?: unknown[]) => Promise<{ rows: T[] }>;
-  };
-  globalPg.__webApiPgPool = pool;
-  return pool;
-}
+// All individual fetch functions use Neon serverless (pure HTTP, no native deps)
 
 export async function fetchPrograms(): Promise<ProgramResponse[]> {
   if (!canUseDb()) return [];
   if (!(await canAttemptDatabaseQuery())) return [];
   try {
-    const prisma = await getPrisma();
-    const rows = await prisma.program.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] });
+    const sql = getNeonSql();
+    const rows = await sql`SELECT "id","name","description","slug","highlight","level" FROM "Program" ORDER BY "order" ASC, "createdAt" ASC`;
     return rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      description: row.description ?? '',
-      slug: row.slug ?? undefined,
-      highlight: row.highlight,
-      level: row.level ?? undefined,
+      id: row.id as string, name: row.name as string, description: (row.description as string) ?? '',
+      slug: (row.slug as string) ?? undefined, highlight: row.highlight as boolean, level: (row.level as string) ?? undefined,
     }));
   } catch (error) {
     noteDatabaseFailure('fetchPrograms', error);
@@ -616,23 +579,19 @@ export async function fetchPackages(): Promise<PackageResponse[]> {
   if (!canUseDb()) return stale || FALLBACK_PACKAGES;
   if (!(await canAttemptDatabaseQuery())) return stale || FALLBACK_PACKAGES;
   try {
-    const pool = getServerPgPool();
-    const result = await pool.query<{
-      id: string; sportType: string; name: string; description: string | null;
-      descriptionBullets: unknown; sessionsCount: number; trackingType: string;
-      pricingType: string; currentPriceJod: number | null; timeSlots: unknown;
-      isActive: boolean; sortOrder: number;
-    }>(`SELECT "id","sportType","name","description","descriptionBullets","sessionsCount","trackingType","pricingType","currentPriceJod","timeSlots","isActive","sortOrder" FROM "Package" WHERE "isActive" = true ORDER BY "sortOrder" ASC, "name" ASC`);
-    const rows = result.rows;
+    const sql = getNeonSql();
+    const rows = await sql`SELECT "id","sportType","name","description","descriptionBullets","sessionsCount","trackingType","pricingType","currentPriceJod","timeSlots","isActive","sortOrder" FROM "Package" WHERE "isActive" = true ORDER BY "sortOrder" ASC, "name" ASC`;
     if (!rows.length) {
       writeCache('packages', FALLBACK_PACKAGES);
       return FALLBACK_PACKAGES;
     }
     const mapped = rows.map((row) => ({
-      id: row.id, sportType: row.sportType, name: row.name, description: row.description,
+      id: row.id as string, sportType: row.sportType as string, name: row.name as string,
+      description: row.description as string | null,
       descriptionBullets: Array.isArray(row.descriptionBullets) ? (row.descriptionBullets as string[]) : null,
-      sessionsCount: row.sessionsCount, trackingType: row.trackingType, pricingType: row.pricingType,
-      currentPriceJod: row.currentPriceJod, timeSlots: row.timeSlots, isActive: row.isActive, sortOrder: row.sortOrder,
+      sessionsCount: row.sessionsCount as number, trackingType: row.trackingType as string,
+      pricingType: row.pricingType as string, currentPriceJod: row.currentPriceJod as number | null,
+      timeSlots: row.timeSlots as unknown, isActive: row.isActive as boolean, sortOrder: row.sortOrder as number,
     }));
     writeCache('packages', mapped);
     return mapped;
@@ -646,15 +605,12 @@ export async function fetchOffers(): Promise<OfferResponse[]> {
   if (!canUseDb()) return [];
   if (!(await canAttemptDatabaseQuery())) return [];
   try {
-    const pool = getServerPgPool();
-    const result = await pool.query<{
-      id: string; name: string; pricePerMonth: number; description: string | null;
-      features: unknown; badge: string | null;
-    }>(`SELECT "id","name","pricePerMonth","description","features","badge" FROM "Offer" ORDER BY "order" ASC, "createdAt" ASC`);
-    return result.rows.map((row) => ({
-      id: row.id, name: row.name, pricePerMonth: row.pricePerMonth,
-      description: row.description ?? '', features: Array.isArray(row.features) ? row.features as string[] : [],
-      badge: row.badge ?? undefined, isFeatured: false, isActive: true, link: undefined,
+    const sql = getNeonSql();
+    const rows = await sql`SELECT "id","name","pricePerMonth","description","features","badge" FROM "Offer" ORDER BY "order" ASC, "createdAt" ASC`;
+    return rows.map((row) => ({
+      id: row.id as string, name: row.name as string, pricePerMonth: row.pricePerMonth as number,
+      description: (row.description as string) ?? '', features: Array.isArray(row.features) ? row.features as string[] : [],
+      badge: (row.badge as string) ?? undefined, isFeatured: false, isActive: true, link: undefined,
     }));
   } catch (error) {
     noteDatabaseFailure('fetchOffers', error);
@@ -666,15 +622,13 @@ export async function fetchEvents(): Promise<EventResponse[]> {
   if (!canUseDb()) return [];
   if (!(await canAttemptDatabaseQuery())) return [];
   try {
-    const pool = getServerPgPool();
-    const result = await pool.query<{
-      id: string; title: string; date: string; location: string | null;
-      description: string | null; imageUrl: string | null; highlight: boolean;
-    }>(`SELECT "id","title","date","location","description","imageUrl","highlight" FROM "Event" ORDER BY "date" ASC`);
-    return result.rows.map((row) => ({
-      id: row.id, title: row.title, date: typeof row.date === 'string' ? row.date : new Date(row.date).toISOString(),
-      location: row.location ?? undefined, description: row.description ?? undefined,
-      imageUrl: row.imageUrl ?? undefined, link: undefined, highlight: row.highlight,
+    const sql = getNeonSql();
+    const rows = await sql`SELECT "id","title","date","location","description","imageUrl","highlight" FROM "Event" ORDER BY "date" ASC`;
+    return rows.map((row) => ({
+      id: row.id as string, title: row.title as string,
+      date: typeof row.date === 'string' ? row.date : String(row.date),
+      location: (row.location as string) ?? undefined, description: (row.description as string) ?? undefined,
+      imageUrl: (row.imageUrl as string) ?? undefined, link: undefined, highlight: row.highlight as boolean,
     }));
   } catch (error) {
     noteDatabaseFailure('fetchEvents', error);
@@ -690,30 +644,26 @@ export async function fetchCoaches(): Promise<CoachResponse[]> {
   if (!canUseDb()) return stale || FALLBACK_COACHES;
   if (!(await canAttemptDatabaseQuery())) return stale || FALLBACK_COACHES;
   try {
-    const pool = getServerPgPool();
-    const landingResult = await pool.query<{
-      id: string; name: string; sport: string; description: string; quote: string | null;
-      achievements: unknown; imageUrl: string; isActive: boolean; order: number;
-    }>(`SELECT "id","name","sport","description","quote","achievements","imageUrl","isActive","order" FROM "LandingCoach" WHERE "isActive" = true ORDER BY "order" ASC, "createdAt" ASC`);
-    if (landingResult.rows.length) {
-      const mapped = landingResult.rows.map((row) => ({
-        id: row.id, name: row.name, sport: row.sport, description: row.description,
-        quote: row.quote ?? undefined, achievements: Array.isArray(row.achievements) ? (row.achievements as string[]) : [],
-        imageUrl: row.imageUrl, isActive: row.isActive, order: row.order,
+    const sql = getNeonSql();
+    const landingRows = await sql`SELECT "id","name","sport","description","quote","achievements","imageUrl","isActive","order" FROM "LandingCoach" WHERE "isActive" = true ORDER BY "order" ASC, "createdAt" ASC`;
+    if (landingRows.length) {
+      const mapped = landingRows.map((row) => ({
+        id: row.id as string, name: row.name as string, sport: row.sport as string,
+        description: row.description as string, quote: (row.quote as string) ?? undefined,
+        achievements: Array.isArray(row.achievements) ? (row.achievements as string[]) : [],
+        imageUrl: row.imageUrl as string, isActive: row.isActive as boolean, order: row.order as number,
       }));
       writeCache('coaches', mapped);
       return mapped;
     }
 
-    // Secondary source: portal coaches table when landingCoach is empty.
-    const portalResult = await pool.query<{
-      id: string; firstName: string; lastName: string; specialty: string | null; bio: string | null;
-    }>(`SELECT "id","firstName","lastName","specialty","bio" FROM "Coach" WHERE "status" = 'ACTIVE' ORDER BY "createdAt" ASC`);
-    if (portalResult.rows.length) {
-      const mappedFromPortal = portalResult.rows.map((row, index) => ({
-        id: row.id, name: [row.firstName, row.lastName].filter(Boolean).join(' ').trim(),
-        sport: row.specialty || 'Multi-Sport',
-        description: row.bio || `${[row.firstName, row.lastName].filter(Boolean).join(' ').trim()} coaching profile.`,
+    const portalRows = await sql`SELECT "id","firstName","lastName","specialty","bio" FROM "Coach" WHERE "status" = 'ACTIVE' ORDER BY "createdAt" ASC`;
+    if (portalRows.length) {
+      const mappedFromPortal = portalRows.map((row, index) => ({
+        id: row.id as string,
+        name: [row.firstName, row.lastName].filter(Boolean).join(' ').trim(),
+        sport: (row.specialty as string) || 'Multi-Sport',
+        description: (row.bio as string) || `${[row.firstName, row.lastName].filter(Boolean).join(' ').trim()} coaching profile.`,
         quote: undefined, achievements: [] as string[], imageUrl: '', isActive: true, order: index + 1,
       }));
       writeCache('coaches', mappedFromPortal);
@@ -733,14 +683,12 @@ export async function fetchFacilities(): Promise<FacilityResponse[]> {
   if (!canUseDb()) return fallbackFacilities;
   if (!(await canAttemptDatabaseQuery())) return fallbackFacilities;
   try {
-    const pool = getServerPgPool();
-    const result = await pool.query<{
-      id: string; name: string; description: string | null; imageUrl: string | null;
-    }>(`SELECT "id","name","description","imageUrl" FROM "FacilityHighlight" ORDER BY "order" ASC, "createdAt" ASC`);
-    if (result.rows.length === 0) return fallbackFacilities;
-    return result.rows.map((row) => ({
-      id: row.id, name: row.name, description: row.description ?? '',
-      imageUrl: row.imageUrl ?? undefined, specs: undefined,
+    const sql = getNeonSql();
+    const rows = await sql`SELECT "id","name","description","imageUrl" FROM "FacilityHighlight" ORDER BY "order" ASC, "createdAt" ASC`;
+    if (rows.length === 0) return fallbackFacilities;
+    return rows.map((row) => ({
+      id: row.id as string, name: row.name as string, description: (row.description as string) ?? '',
+      imageUrl: (row.imageUrl as string) ?? undefined, specs: undefined,
     }));
   } catch (error) {
     noteDatabaseFailure('fetchFacilities', error);
@@ -752,12 +700,10 @@ export async function fetchAnnouncements(): Promise<AnnouncementResponse[]> {
   if (!canUseDb()) return [];
   if (!(await canAttemptDatabaseQuery())) return [];
   try {
-    const pool = getServerPgPool();
-    const result = await pool.query<{
-      id: string; title: string; body: string; isPinned: boolean;
-    }>(`SELECT "id","title","body","isPinned" FROM "Announcement" ORDER BY "isPinned" DESC, "publishedAt" DESC`);
-    return result.rows.map((row) => ({
-      id: row.id, title: row.title, body: row.body, isPinned: row.isPinned,
+    const sql = getNeonSql();
+    const rows = await sql`SELECT "id","title","body","isPinned" FROM "Announcement" ORDER BY "isPinned" DESC, "publishedAt" DESC`;
+    return rows.map((row) => ({
+      id: row.id as string, title: row.title as string, body: row.body as string, isPinned: row.isPinned as boolean,
     }));
   } catch (error) {
     noteDatabaseFailure('fetchAnnouncements', error);
@@ -769,19 +715,15 @@ export async function fetchHero(): Promise<LandingHero | null> {
   if (!canUseDb()) return null;
   if (!(await canAttemptDatabaseQuery())) return null;
   try {
-    const pool = getServerPgPool();
-    const result = await pool.query<{
-      title: string; subtitle: string; primaryCta: string; primaryUrl: string;
-      secondaryCta: string | null; secondaryUrl: string | null;
-      backgroundImageUrl: string | null; backgroundVideoUrl: string | null;
-    }>(`SELECT "title","subtitle","primaryCta","primaryUrl","secondaryCta","secondaryUrl","backgroundImageUrl","backgroundVideoUrl" FROM "HeroSection" ORDER BY "updatedAt" DESC LIMIT 1`);
-    const row = result.rows[0];
+    const sql = getNeonSql();
+    const rows = await sql`SELECT "title","subtitle","primaryCta","primaryUrl","secondaryCta","secondaryUrl","backgroundImageUrl","backgroundVideoUrl" FROM "HeroSection" ORDER BY "updatedAt" DESC LIMIT 1`;
+    const row = rows[0];
     if (!row) return null;
     return {
-      title: row.title, subtitle: row.subtitle,
-      primaryCtaLabel: row.primaryCta, primaryCtaLink: row.primaryUrl,
-      secondaryCtaLabel: row.secondaryCta ?? undefined, secondaryCtaLink: row.secondaryUrl ?? undefined,
-      backgroundImageUrl: row.backgroundImageUrl ?? undefined, backgroundVideoUrl: row.backgroundVideoUrl ?? undefined,
+      title: row.title as string, subtitle: row.subtitle as string,
+      primaryCtaLabel: row.primaryCta as string, primaryCtaLink: row.primaryUrl as string,
+      secondaryCtaLabel: (row.secondaryCta as string) ?? undefined, secondaryCtaLink: (row.secondaryUrl as string) ?? undefined,
+      backgroundImageUrl: (row.backgroundImageUrl as string) ?? undefined, backgroundVideoUrl: (row.backgroundVideoUrl as string) ?? undefined,
     };
   } catch (error) {
     noteDatabaseFailure('fetchHero', error);
@@ -793,11 +735,9 @@ export async function fetchFooter(): Promise<LandingFooter | null> {
   if (!canUseDb()) return null;
   if (!(await canAttemptDatabaseQuery())) return null;
   try {
-    const pool = getServerPgPool();
-    const result = await pool.query<{
-      address: string; phone: string; email: string; contactRecipientEmail: string | null; socialLinks: unknown;
-    }>(`SELECT "address","phone","email","contactRecipientEmail","socialLinks" FROM "FooterSettings" ORDER BY "updatedAt" DESC LIMIT 1`);
-    const row = result.rows[0];
+    const sql = getNeonSql();
+    const rows = await sql`SELECT "address","phone","email","contactRecipientEmail","socialLinks" FROM "FooterSettings" ORDER BY "updatedAt" DESC LIMIT 1`;
+    const row = rows[0];
     if (!row) return null;
     const socialLinks = Array.isArray(row.socialLinks)
       ? (row.socialLinks as { id?: string; label?: string; href?: string }[]).map((l) => ({
@@ -805,8 +745,8 @@ export async function fetchFooter(): Promise<LandingFooter | null> {
         }))
       : [];
     return {
-      address: row.address, phone: row.phone, email: row.email,
-      contactRecipientEmail: row.contactRecipientEmail ?? undefined, socialLinks,
+      address: row.address as string, phone: row.phone as string, email: row.email as string,
+      contactRecipientEmail: (row.contactRecipientEmail as string) ?? undefined, socialLinks,
     };
   } catch (error) {
     noteDatabaseFailure('fetchFooter', error);

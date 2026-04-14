@@ -51,6 +51,23 @@ copyIfExists(path.join(rootNextDir, "static"), path.join(hostingerOutputDir, ".n
 copyIfExists(path.join(webDir, "public"), path.join(hostingerOutputDir, "public"));
 copyIfExists(path.join(rootDir, "node_modules", ".prisma"), path.join(hostingerOutputDir, "node_modules", ".prisma"));
 copyIfExists(path.join(rootDir, "node_modules", "@prisma"), path.join(hostingerOutputDir, "node_modules", "@prisma"));
+// pg pool is used by the landing page for lightweight DB queries
+copyIfExists(path.join(rootDir, "node_modules", "pg"), path.join(hostingerOutputDir, "node_modules", "pg"));
+copyIfExists(path.join(rootDir, "node_modules", "pg-pool"), path.join(hostingerOutputDir, "node_modules", "pg-pool"));
+copyIfExists(path.join(rootDir, "node_modules", "pg-protocol"), path.join(hostingerOutputDir, "node_modules", "pg-protocol"));
+copyIfExists(path.join(rootDir, "node_modules", "pg-types"), path.join(hostingerOutputDir, "node_modules", "pg-types"));
+copyIfExists(path.join(rootDir, "node_modules", "pg-connection-string"), path.join(hostingerOutputDir, "node_modules", "pg-connection-string"));
+copyIfExists(path.join(rootDir, "node_modules", "pgpass"), path.join(hostingerOutputDir, "node_modules", "pgpass"));
+copyIfExists(path.join(rootDir, "node_modules", "pg-cloudflare"), path.join(hostingerOutputDir, "node_modules", "pg-cloudflare"));
+copyIfExists(path.join(rootDir, "node_modules", "pg-int8"), path.join(hostingerOutputDir, "node_modules", "pg-int8"));
+copyIfExists(path.join(rootDir, "node_modules", "postgres-array"), path.join(hostingerOutputDir, "node_modules", "postgres-array"));
+copyIfExists(path.join(rootDir, "node_modules", "postgres-bytea"), path.join(hostingerOutputDir, "node_modules", "postgres-bytea"));
+copyIfExists(path.join(rootDir, "node_modules", "postgres-date"), path.join(hostingerOutputDir, "node_modules", "postgres-date"));
+copyIfExists(path.join(rootDir, "node_modules", "postgres-interval"), path.join(hostingerOutputDir, "node_modules", "postgres-interval"));
+copyIfExists(path.join(rootDir, "node_modules", "postgres-range"), path.join(hostingerOutputDir, "node_modules", "postgres-range"));
+copyIfExists(path.join(rootDir, "node_modules", "split2"), path.join(hostingerOutputDir, "node_modules", "split2"));
+copyIfExists(path.join(rootDir, "node_modules", "obuf"), path.join(hostingerOutputDir, "node_modules", "obuf"));
+copyIfExists(path.join(rootDir, "node_modules", "packet-reader"), path.join(hostingerOutputDir, "node_modules", "packet-reader"));
 
 const buildDbUrl =
   process.env.DATABASE_URL ||

@@ -7,7 +7,6 @@ interface WebpackConfigWithResolve {
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  serverExternalPackages: ['pg', 'pg-pool', 'pg-protocol', 'pg-types', 'pg-connection-string', 'pgpass'],
   experimental: {
     externalDir: true,
   },

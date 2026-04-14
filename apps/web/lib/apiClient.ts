@@ -942,91 +942,91 @@ async function _fetchLandingContent(): Promise<LandingContent> {
 
   try {
     const fallback = getLandingFallback();
-    const pool = getServerPgPool();
+    const prisma = await getPrisma();
 
-    // Single raw SQL query that fetches all sections as JSON — one connection, one round-trip
-    const sql = `
-      SELECT
-        (SELECT COALESCE(json_agg(r ORDER BY r."sortOrder" ASC, r."name" ASC), '[]') FROM (SELECT * FROM "Package" WHERE "isActive" = true) r) AS packages,
-        (SELECT row_to_json(h) FROM (SELECT * FROM "HeroSection" ORDER BY "updatedAt" DESC LIMIT 1) h) AS hero,
-        (SELECT COALESCE(json_agg(c ORDER BY c."order" ASC, c."createdAt" ASC), '[]') FROM (SELECT * FROM "LandingCoach" WHERE "isActive" = true) c) AS coaches,
-        (SELECT COALESCE(json_agg(o ORDER BY o."order" ASC, o."createdAt" ASC), '[]') FROM (SELECT * FROM "Offer") o) AS offers,
-        (SELECT COALESCE(json_agg(e ORDER BY e."date" ASC), '[]') FROM (SELECT * FROM "Event") e) AS events,
-        (SELECT COALESCE(json_agg(a ORDER BY a."isPinned" DESC, a."publishedAt" DESC), '[]') FROM (SELECT * FROM "Announcement") a) AS announcements,
-        (SELECT COALESCE(json_agg(f ORDER BY f."order" ASC, f."createdAt" ASC), '[]') FROM (SELECT * FROM "FacilityHighlight") f) AS facilities,
-        (SELECT row_to_json(fs) FROM (SELECT * FROM "FooterSettings" ORDER BY "updatedAt" DESC LIMIT 1) fs) AS footer
-    `;
-    const { rows } = await pool.query<{
-      packages: unknown[];
-      hero: { title: string; subtitle: string; primaryCta: string; primaryUrl: string; secondaryCta?: string; secondaryUrl?: string; backgroundImageUrl?: string; backgroundVideoUrl?: string } | null;
-      coaches: { id: string; name: string; sport: string; description: string; quote?: string; achievements?: unknown; imageUrl: string; isActive: boolean; order: number }[];
-      offers: { id: string; name: string; pricePerMonth: number; description?: string; features?: unknown; badge?: string }[];
-      events: { id: string; title: string; date: string; location?: string; description?: string; imageUrl?: string }[];
-      announcements: { id: string; title: string; body: string; isPinned: boolean }[];
-      facilities: { id: string; name: string; description?: string }[];
-      footer: { address: string; phone: string; email: string; contactRecipientEmail?: string; socialLinks?: unknown } | null;
-    }>(sql);
-
-    const data = rows[0];
+    // Fetch only packages first (most critical), then other sections
+    const packageRows = await prisma.package.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] });
 
     // Map packages
-    const pkgs = Array.isArray(data.packages) ? data.packages as Record<string, unknown>[] : [];
-    const programs = pkgs.length > 0
-      ? pkgs.map((row) => mapPackageToProgram({
-          id: row.id as string, sportType: row.sportType as string, name: row.name as string,
-          description: row.description as string | null, descriptionBullets: Array.isArray(row.descriptionBullets) ? row.descriptionBullets as string[] : null,
-          sessionsCount: row.sessionsCount as number, trackingType: row.trackingType as string,
-          pricingType: row.pricingType as string, currentPriceJod: row.currentPriceJod as number | null,
-          timeSlots: row.timeSlots as unknown, isActive: row.isActive as boolean, sortOrder: row.sortOrder as number,
+    const programs = packageRows.length > 0
+      ? packageRows.map((row) => mapPackageToProgram({
+          id: row.id, sportType: row.sportType, name: row.name,
+          description: row.description, descriptionBullets: Array.isArray(row.descriptionBullets) ? row.descriptionBullets as string[] : null,
+          sessionsCount: row.sessionsCount, trackingType: row.trackingType,
+          pricingType: row.pricingType, currentPriceJod: row.currentPriceJod,
+          timeSlots: row.timeSlots, isActive: row.isActive, sortOrder: row.sortOrder,
         }))
       : fallback.programs;
 
-    // Map hero
-    const hero: LandingHero | null = data.hero ? {
-      title: data.hero.title, subtitle: data.hero.subtitle,
-      primaryCtaLabel: data.hero.primaryCta, primaryCtaLink: data.hero.primaryUrl,
-      secondaryCtaLabel: data.hero.secondaryCta ?? undefined, secondaryCtaLink: data.hero.secondaryUrl ?? undefined,
-      backgroundImageUrl: data.hero.backgroundImageUrl ?? undefined, backgroundVideoUrl: data.hero.backgroundVideoUrl ?? undefined,
-    } : null;
+    // Fetch remaining sections — each one is optional, failures don't block
+    let hero: LandingHero | null = null;
+    let offers: LandingOffer[] = [];
+    let events: LandingEvent[] = [];
+    let announcements: LandingAnnouncement[] = [];
+    let facilityHighlights = fallback.facilityHighlights;
+    let footer: LandingFooter | null = null;
 
-    // Map offers
-    const offers = (data.offers || []).map((row): LandingOffer => ({
-      id: row.id, name: row.name, price: row.badge || `${row.pricePerMonth} JOD/month`,
-      description: row.description ?? '', features: Array.isArray(row.features) ? row.features as string[] : [],
-      badge: row.badge ?? undefined, isFeatured: false, isActive: true, link: undefined,
-    }));
+    try {
+      const heroRow = await prisma.heroSection.findFirst({ orderBy: { updatedAt: 'desc' } });
+      if (heroRow) {
+        hero = {
+          title: heroRow.title, subtitle: heroRow.subtitle,
+          primaryCtaLabel: heroRow.primaryCta, primaryCtaLink: heroRow.primaryUrl,
+          secondaryCtaLabel: heroRow.secondaryCta ?? undefined, secondaryCtaLink: heroRow.secondaryUrl ?? undefined,
+          backgroundImageUrl: heroRow.backgroundImageUrl ?? undefined, backgroundVideoUrl: heroRow.backgroundVideoUrl ?? undefined,
+        };
+      }
+    } catch { /* use fallback */ }
 
-    // Map events
-    const events = (data.events || []).map((row): LandingEvent => ({
-      id: row.id, title: row.title, date: typeof row.date === 'string' ? row.date : new Date(row.date as unknown as string).toISOString(),
-      location: row.location ?? undefined, description: row.description ?? undefined,
-      link: undefined, isActive: true, imageUrl: row.imageUrl ?? undefined,
-    }));
+    try {
+      const offerRows = await prisma.offer.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] });
+      offers = offerRows.map((row): LandingOffer => ({
+        id: row.id, name: row.name, price: row.badge || `${row.pricePerMonth} JOD/month`,
+        description: row.description ?? '', features: Array.isArray(row.features) ? row.features as string[] : [],
+        badge: row.badge ?? undefined, isFeatured: false, isActive: true, link: undefined,
+      }));
+    } catch { /* use empty */ }
 
-    // Map announcements
-    const announcements = (data.announcements || []).map((row): LandingAnnouncement => ({
-      id: row.id, title: row.title, message: row.body, isPinned: row.isPinned,
-    }));
+    try {
+      const eventRows = await prisma.event.findMany({ orderBy: { date: 'asc' } });
+      events = eventRows.map((row): LandingEvent => ({
+        id: row.id, title: row.title, date: row.date.toISOString(),
+        location: row.location ?? undefined, description: row.description ?? undefined,
+        link: undefined, isActive: true, imageUrl: row.imageUrl ?? undefined,
+      }));
+    } catch { /* use empty */ }
 
-    // Map facilities
-    const facilityHighlights = (data.facilities || []).length > 0
-      ? data.facilities.map((row): LandingFacilityHighlight => ({
+    try {
+      const announcementRows = await prisma.announcement.findMany({ orderBy: [{ isPinned: 'desc' }, { publishedAt: 'desc' }] });
+      announcements = announcementRows.map((row): LandingAnnouncement => ({
+        id: row.id, title: row.title, message: row.body, isPinned: row.isPinned,
+      }));
+    } catch { /* use empty */ }
+
+    try {
+      const facilityRows = await prisma.facilityHighlight.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] });
+      if (facilityRows.length > 0) {
+        facilityHighlights = facilityRows.map((row): LandingFacilityHighlight => ({
           id: row.id, name: row.name, description: row.description ?? '',
           mediaUrl: undefined, badge: undefined,
-        }))
-      : fallback.facilityHighlights;
+        }));
+      }
+    } catch { /* use fallback */ }
 
-    // Map footer
-    const footerData = data.footer;
-    const footer: LandingFooter | null = footerData ? {
-      address: footerData.address, phone: footerData.phone, email: footerData.email,
-      contactRecipientEmail: footerData.contactRecipientEmail ?? undefined,
-      socialLinks: Array.isArray(footerData.socialLinks)
-        ? (footerData.socialLinks as { id?: string; label?: string; href?: string }[]).map((l) => ({
-            id: l.id ?? '', label: l.label ?? '', href: l.href ?? '',
-          }))
-        : [],
-    } : null;
+    try {
+      const footerRow = await prisma.footerSettings.findFirst({ orderBy: { updatedAt: 'desc' } });
+      if (footerRow) {
+        footer = {
+          address: footerRow.address, phone: footerRow.phone, email: footerRow.email,
+          contactRecipientEmail: footerRow.contactRecipientEmail ?? undefined,
+          socialLinks: Array.isArray(footerRow.socialLinks)
+            ? (footerRow.socialLinks as { id?: string; label?: string; href?: string }[]).map((l) => ({
+                id: l.id ?? '', label: l.label ?? '', href: l.href ?? '',
+              }))
+            : [],
+        };
+      }
+    } catch { /* use fallback */ }
 
     const result: LandingContent = {
       hero: hero || fallback.hero,

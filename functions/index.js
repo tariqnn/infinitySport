@@ -2,12 +2,18 @@ const { Buffer } = require("node:buffer");
 const admin = require("firebase-admin");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
+const {
+  syncBookingInboxEntry,
+  syncBookingActionInboxEntry,
+  syncRegistrationInboxEntry
+} = require("./directPortalSync");
 
 const TWILIO_ACCOUNT_SID = defineSecret("TWILIO_ACCOUNT_SID");
 const TWILIO_AUTH_TOKEN = defineSecret("TWILIO_AUTH_TOKEN");
 const TWILIO_WHATSAPP_FROM = defineSecret("TWILIO_WHATSAPP_FROM");
 /** Owner WhatsApp in E.164, e.g. +962791234567 */
 const OWNER_WHATSAPP = defineSecret("OWNER_WHATSAPP");
+const DATABASE_URL_SECRET = defineSecret("DATABASE_URL");
 
 const bookingSecrets = [
   TWILIO_ACCOUNT_SID,
@@ -15,6 +21,8 @@ const bookingSecrets = [
   TWILIO_WHATSAPP_FROM,
   OWNER_WHATSAPP
 ];
+const databaseSecrets = [DATABASE_URL_SECRET];
+const bookingInboxSecrets = [...bookingSecrets, ...databaseSecrets];
 
 const APP_NOTIFICATION_TOPIC = "infinity_portal_all";
 const APP_NOTIFICATION_CHANNEL_ID = "infinity_portal_high_priority";
@@ -238,9 +246,10 @@ exports.onPortalBookingCreated = onDocumentCreated(
   async (event) => {
     if (!event.data) return;
     const data = event.data.data() || {};
+    const appSource = isAppSource(data);
     await Promise.allSettled([
-      notifyBookingCreated(event.data, "portalBookings"),
-      isAppSource(data) ? Promise.resolve() : sendBookingPushNotification(data)
+      appSource ? Promise.resolve() : notifyBookingCreated(event.data, "portalBookings"),
+      appSource ? Promise.resolve() : sendBookingPushNotification(data)
     ]);
   }
 );
@@ -249,15 +258,38 @@ exports.onPortalBookingInboxCreated = onDocumentCreated(
   {
     document: "portalBookingInbox/{bookingId}",
     region: "us-central1",
-    secrets: bookingSecrets
+    secrets: bookingInboxSecrets
   },
   async (event) => {
     if (!event.data) return;
     const data = event.data.data() || {};
     await Promise.allSettled([
       notifyBookingCreated(event.data, "portalBookingInbox"),
-      isAppSource(data) ? sendBookingPushNotification(data) : Promise.resolve()
+      isAppSource(data) ? sendBookingPushNotification(data) : Promise.resolve(),
+      syncBookingInboxEntry({
+        firestore: admin.firestore(),
+        databaseUrl: DATABASE_URL_SECRET.value(),
+        snapshotId: event.data.id,
+        payload: data
+      })
     ]);
+  }
+);
+
+exports.onPortalBookingActionInboxCreated = onDocumentCreated(
+  {
+    document: "portalBookingActionInbox/{actionId}",
+    region: "us-central1",
+    secrets: databaseSecrets
+  },
+  async (event) => {
+    if (!event.data) return;
+    await syncBookingActionInboxEntry({
+      firestore: admin.firestore(),
+      databaseUrl: DATABASE_URL_SECRET.value(),
+      snapshotId: event.data.id,
+      payload: event.data.data() || {}
+    });
   }
 );
 
@@ -277,12 +309,20 @@ exports.onPortalRegistrationCreated = onDocumentCreated(
 exports.onPortalRegistrationInboxCreated = onDocumentCreated(
   {
     document: "portalRegistrationInbox/{registrationId}",
-    region: "us-central1"
+    region: "us-central1",
+    secrets: databaseSecrets
   },
   async (event) => {
     if (!event.data) return;
     const data = event.data.data() || {};
-    if (!isAppSource(data)) return;
-    await sendRegistrationPushNotification(data);
+    await Promise.allSettled([
+      isAppSource(data) ? sendRegistrationPushNotification(data) : Promise.resolve(),
+      syncRegistrationInboxEntry({
+        firestore: admin.firestore(),
+        databaseUrl: DATABASE_URL_SECRET.value(),
+        snapshotId: event.data.id,
+        payload: data
+      })
+    ]);
   }
 );

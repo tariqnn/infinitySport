@@ -96,6 +96,7 @@ export async function runRegistrationDbSync(): Promise<RegistrationSyncRunResult
     const firestore = getFirestore();
     const cursorRef = firestore.collection("bookingNotifierSync").doc("registrationDbCursor");
     const cursorSnap = await cursorRef.get();
+    const appImportedRegistrationIds = new Set<string>();
 
     const inboxEntries = await listMobileRegistrationInboxEntries({
       firestore,
@@ -220,6 +221,7 @@ export async function runRegistrationDbSync(): Promise<RegistrationSyncRunResult
             syncError: null,
           },
         });
+        appImportedRegistrationIds.add(row.id);
       } catch (error) {
         await updateMobileRegistrationInboxEntry({
           firestore,
@@ -325,7 +327,7 @@ export async function runRegistrationDbSync(): Promise<RegistrationSyncRunResult
             sessionsBonus: row.sessionsBonus,
             collected,
             status: row.status,
-            source: "PORTAL_DB",
+            source: appImportedRegistrationIds.has(row.id) ? "APP" : "PORTAL_DB",
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
             deleted: false,

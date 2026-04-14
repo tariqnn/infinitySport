@@ -4,6 +4,14 @@ This document defines the Firebase collections used by the Flutter app (`Infinit
 
 The mobile app reads Firebase directly. The website/portal continues to use Neon/Postgres. Sync jobs mirror portal data into Firebase so both databases carry the same business data.
 
+Recommended production flow:
+
+1. Mobile app writes to Firestore inbox collections.
+2. Firebase Functions send push notifications immediately from Firestore events.
+3. Firebase Functions import app-origin inbox records directly into Postgres.
+4. Firebase Functions write canonical `portalBookings` / `portalRegistrations` documents back to Firestore.
+5. Portal sync routes remain useful for mirroring portal-origin database changes back into Firebase.
+
 ## Collections
 
 - `portalBookings`: canonical booking feed for mobile read.
@@ -154,6 +162,10 @@ The mobile app reads Firebase directly. The website/portal continues to use Neon
 - `GET /api/cron/sync-db-registrations?secret=...`
 
 Both use `CRON_SYNC_BOOKINGS_SECRET` in portal environment.
+
+For direct Firestore-to-Postgres sync, set this Firebase Functions secret:
+
+- `DATABASE_URL`: the Neon/Postgres connection string reachable by Firebase Functions
 
 ## Backfill Commands
 

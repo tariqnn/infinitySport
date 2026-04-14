@@ -1,3 +1,6 @@
+import 'dart:developer' as developer;
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 Future<FirebaseApp> ensureFirebaseInitialized() async {
@@ -5,7 +8,24 @@ Future<FirebaseApp> ensureFirebaseInitialized() async {
     return Firebase.app();
   }
 
-  return Firebase.initializeApp(options: kInfinityFirebaseOptions);
+  final app = await Firebase.initializeApp(options: kInfinityFirebaseOptions);
+  await _ensureAnonymousAuth();
+  return app;
+}
+
+Future<void> _ensureAnonymousAuth() async {
+  final auth = FirebaseAuth.instance;
+  if (auth.currentUser != null) return;
+
+  try {
+    await auth.signInAnonymously();
+  } on FirebaseAuthException catch (error) {
+    developer.log(
+      'Anonymous auth failed (${error.code}). Enable Anonymous sign-in in Firebase Console.',
+      name: 'firebase_bootstrap',
+    );
+    rethrow;
+  }
 }
 
 const FirebaseOptions kInfinityFirebaseOptions = FirebaseOptions(

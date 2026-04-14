@@ -14,6 +14,8 @@ The mobile app now connects directly to Firebase. It does not require the portal
 
 The website/portal can keep using Neon/Postgres. Firebase acts as the mobile database, and the portal sync jobs keep both stores aligned.
 
+For app-origin bookings, booking actions, and registrations, Firebase Functions can also import Firestore inbox data directly into Postgres. That removes the dependency on the portal site's in-process sync loop.
+
 ## Data migration
 
 From the repo root, backfill existing portal data into Firebase:
@@ -28,6 +30,10 @@ Keep the mirror fresh by calling:
 
 Both routes use `CRON_SYNC_BOOKINGS_SECRET`.
 
+If you want Firebase Functions to import app-origin mobile writes directly into Postgres, set this Firebase Functions secret and deploy:
+
+- `DATABASE_URL`
+
 ## Setup
 
 1. Install Flutter SDK.
@@ -39,5 +45,6 @@ Both routes use `CRON_SYNC_BOOKINGS_SECRET`.
 ## Notifications
 
 - The app subscribes devices to `infinity_portal_all`.
-- Firebase Functions can broadcast booking and registration updates to that topic.
+- Firebase Functions can broadcast booking and registration updates to that topic immediately when Firestore inbox records are created.
+- The same Firebase Functions can also write those app-origin records directly into Postgres, so the data shows in the portal even when the portal site is not running.
 - No login is required.

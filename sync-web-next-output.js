@@ -49,8 +49,7 @@ if (!copyIfExists(rootStandaloneDir, hostingerOutputDir)) {
 
 copyIfExists(path.join(rootNextDir, "static"), path.join(hostingerOutputDir, ".next", "static"));
 copyIfExists(path.join(webDir, "public"), path.join(hostingerOutputDir, "public"));
-copyIfExists(path.join(rootDir, "node_modules", ".prisma"), path.join(hostingerOutputDir, "node_modules", ".prisma"));
-copyIfExists(path.join(rootDir, "node_modules", "@prisma"), path.join(hostingerOutputDir, "node_modules", "@prisma"));
+// Prisma removed — using @neondatabase/serverless (pure HTTP, no binary engine)
 // pg pool is used by the landing page for lightweight DB queries
 copyIfExists(path.join(rootDir, "node_modules", "pg"), path.join(hostingerOutputDir, "node_modules", "pg"));
 copyIfExists(path.join(rootDir, "node_modules", "pg-pool"), path.join(hostingerOutputDir, "node_modules", "pg-pool"));
@@ -96,10 +95,13 @@ if (path.basename(publicHtmlDir) === "public_html") {
     "const fs=require('fs');\n" +
     "const path=require('path');\n" +
     "process.env.TOKIO_WORKER_THREADS=process.env.TOKIO_WORKER_THREADS||'1';\n" +
-    "process.env.UV_THREADPOOL_SIZE=process.env.UV_THREADPOOL_SIZE||'1';\n" +
+    "process.env.UV_THREADPOOL_SIZE=process.env.UV_THREADPOOL_SIZE||'2';\n" +
+    "process.env.NODE_OPTIONS=process.env.NODE_OPTIONS||'--max-old-space-size=256';\n" +
     "process.env.DB_GUARD_COOLDOWN_MS=process.env.DB_GUARD_COOLDOWN_MS||'15000';\n" +
     "process.env.DB_GUARD_PANIC_COOLDOWN_MS=process.env.DB_GUARD_PANIC_COOLDOWN_MS||'30000';\n" +
-    "process.env.PRISMA_CLIENT_ENGINE_TYPE=process.env.PRISMA_CLIENT_ENGINE_TYPE||'library';\n" +
+    "process.env.PRISMA_ENGINES_MIRROR='none';\n" +
+    "process.env.PRISMA_QUERY_ENGINE_BINARY='none';\n" +
+    "process.env.PRISMA_CLIENT_ENGINE_TYPE='library';\n" +
     "const envCandidates=[\n" +
     "path.join(__dirname,'hostinger-output','runtime-env.json'),\n" +
     "path.join(__dirname,'.builds','source','repository','hostinger-output','runtime-env.json'),\n" +

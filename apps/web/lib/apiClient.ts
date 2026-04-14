@@ -540,11 +540,6 @@ function canUseDb() {
   return Boolean(process.env.DATABASE_URL?.trim());
 }
 
-async function getPrisma() {
-  const mod = await import('./db');
-  return mod.prisma;
-}
-
 function getNeonSql() {
   const url = process.env.DATABASE_URL?.trim();
   if (!url) throw new Error('DATABASE_URL is missing');

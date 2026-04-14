@@ -1,6 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 
+// Resource limits for shared hosting
+process.env.UV_THREADPOOL_SIZE = process.env.UV_THREADPOOL_SIZE || '2';
+process.env.PRISMA_ENGINES_MIRROR = 'none';
+process.env.PRISMA_QUERY_ENGINE_BINARY = 'none';
+
 const nodejsDir = path.join(__dirname, '..', 'nodejs');
 const runtimeEnvCandidates = [
   path.join(nodejsDir, 'hostinger-output', 'runtime-env.json'),

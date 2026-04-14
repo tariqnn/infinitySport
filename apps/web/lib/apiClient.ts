@@ -561,8 +561,9 @@ function getServerPgPool() {
     throw new Error('DATABASE_URL is missing');
   }
 
-  const req = (0, eval)('require') as (id: string) => { Pool: new (config: object) => unknown };
-  const { Pool } = req('pg');
+  // pg is marked as serverExternalPackages in next.config.ts so require works in standalone
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { Pool } = require('pg') as { Pool: new (config: object) => unknown };
   const pool = new Pool({
     connectionString,
     max: Number.parseInt(process.env.PG_POOL_MAX || '1', 10) || 1,

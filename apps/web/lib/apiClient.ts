@@ -250,16 +250,16 @@ const FALLBACK_PACKAGES: PackageResponse[] = [
   },
   // --- Gymnastics ---
   {
-    id: 'fallback-gymnastics-beginners',
+    id: 'fallback-gymnastics-1hr',
     sportType: 'GYMNASTICS',
-    name: 'Gymnastics - Beginners',
-    description: 'Beginner gymnastics programme for new athletes.',
+    name: 'Gymnastics - 1 Hour Package',
+    description: '10-session gymnastics package (1 hour per session). Focused on mobility, balance, and confidence.',
     descriptionBullets: [
-      'Sunday, Tuesday, Friday 4:30–5:30 PM.',
+      '10 sessions, 1 hour each.',
       'Foundational body control and flexibility.',
     ],
-    sessionsCount: 0,
-    trackingType: 'DAYS',
+    sessionsCount: 10,
+    trackingType: 'SESSIONS',
     pricingType: 'FIXED',
     currentPriceJod: 120,
     timeSlots: [{ label: 'Sunday, Tuesday, Friday 4:30–5:30 PM' }],
@@ -267,21 +267,35 @@ const FALLBACK_PACKAGES: PackageResponse[] = [
     sortOrder: 30,
   },
   {
-    id: 'fallback-gymnastics-advance',
+    id: 'fallback-gymnastics-1-5hr',
     sportType: 'GYMNASTICS',
-    name: 'Gymnastics - Advance',
-    description: 'Advanced gymnastics training for experienced athletes.',
+    name: 'Gymnastics - 1.5 Hour Package',
+    description: '10-session gymnastics package (1.5 hours per session). Extended training for faster technical development.',
     descriptionBullets: [
-      'Sunday, Tuesday, Friday 5:30–7:00 PM.',
+      '10 sessions, 1.5 hours each.',
       'Advanced movement combinations and technique refinement.',
     ],
-    sessionsCount: 0,
-    trackingType: 'DAYS',
+    sessionsCount: 10,
+    trackingType: 'SESSIONS',
     pricingType: 'FIXED',
     currentPriceJod: 140,
     timeSlots: [{ label: 'Sunday, Tuesday, Friday 5:30–7:00 PM' }],
     isActive: true,
     sortOrder: 31,
+  },
+  {
+    id: 'fallback-gymnastics-private',
+    sportType: 'GYMNASTICS',
+    name: 'Gymnastics - Private Session',
+    description: 'Private one-on-one gymnastics training session. Contact us for scheduling.',
+    descriptionBullets: ['Private 1-on-1 coaching.'],
+    sessionsCount: 1,
+    trackingType: 'SESSIONS',
+    pricingType: 'MANUAL',
+    currentPriceJod: null,
+    timeSlots: [],
+    isActive: true,
+    sortOrder: 32,
   },
 ];
 
@@ -421,8 +435,9 @@ function readMsFromEnv(name: string, fallback: number): number {
   return parsed;
 }
 
-// Default to immediate freshness so Admin edits appear on Landing without delay.
-const WEB_CACHE_TTL_MS = readMsFromEnv('WEB_API_CACHE_TTL_MS', 0);
+// Cache for 60s so the DB isn't hit on every single page load.
+// Admin edits appear on the landing page within ~1 minute.
+const WEB_CACHE_TTL_MS = readMsFromEnv('WEB_API_CACHE_TTL_MS', 60_000);
 const WEB_STALE_TTL_MS = readMsFromEnv('WEB_API_STALE_TTL_MS', 15 * 60_000);
 
 function shouldUseSsl(connectionString: string): boolean {
@@ -969,29 +984,97 @@ async function _fetchLandingContent(): Promise<LandingContent> {
 
   const stale = getStaleCache<LandingContent>('landingContent');
   if (!canUseDb()) return stale || getLandingFallback();
+  if (!(await canAttemptDatabaseQuery())) return stale || getLandingFallback();
 
   try {
     const fallback = getLandingFallback();
+    const prisma = await getPrisma();
 
-    const [programs, hero, coaches, offers, events, announcements, facilities, footer] = await Promise.all([
-      fetchPackages(),
-      fetchHero(),
-      fetchCoaches(),
-      fetchOffers(),
-      fetchEvents(),
-      fetchAnnouncements(),
-      fetchFacilities(),
-      fetchFooter(),
-    ]);
+    // Single Prisma client, one round-trip via $transaction for all queries
+    const [packageRows, heroRow, coachRows, offerRows, eventRows, announcementRows, facilityRows, footerRow] =
+      await prisma.$transaction([
+        prisma.package.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] }),
+        prisma.heroSection.findFirst({ orderBy: { updatedAt: 'desc' } }),
+        prisma.landingCoach.findMany({ where: { isActive: true }, orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }),
+        prisma.offer.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }),
+        prisma.event.findMany({ orderBy: { date: 'asc' } }),
+        prisma.announcement.findMany({ orderBy: [{ isPinned: 'desc' }, { publishedAt: 'desc' }] }),
+        prisma.facilityHighlight.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }),
+        prisma.footerSettings.findFirst({ orderBy: { updatedAt: 'desc' } }),
+      ]);
+
+    // Map packages
+    const programs = packageRows.length > 0
+      ? packageRows.map((row) => mapPackageToProgram({
+          id: row.id, sportType: row.sportType, name: row.name,
+          description: row.description, descriptionBullets: Array.isArray(row.descriptionBullets) ? row.descriptionBullets as string[] : null,
+          sessionsCount: row.sessionsCount, trackingType: row.trackingType,
+          pricingType: row.pricingType, currentPriceJod: row.currentPriceJod,
+          timeSlots: row.timeSlots, isActive: row.isActive, sortOrder: row.sortOrder,
+        }))
+      : fallback.programs;
+
+    // Map hero
+    const hero: LandingHero | null = heroRow ? {
+      title: heroRow.title, subtitle: heroRow.subtitle,
+      primaryCtaLabel: heroRow.primaryCta, primaryCtaLink: heroRow.primaryUrl,
+      secondaryCtaLabel: heroRow.secondaryCta ?? undefined, secondaryCtaLink: heroRow.secondaryUrl ?? undefined,
+      backgroundImageUrl: heroRow.backgroundImageUrl ?? undefined, backgroundVideoUrl: heroRow.backgroundVideoUrl ?? undefined,
+    } : null;
+
+    // Map coaches
+    const coaches = coachRows.map((row) => ({
+      id: row.id, name: row.name, sport: row.sport, description: row.description,
+      quote: row.quote ?? undefined, achievements: Array.isArray(row.achievements) ? row.achievements as string[] : [],
+      imageUrl: row.imageUrl, isActive: row.isActive, order: row.order,
+    }));
+
+    // Map offers
+    const offers = offerRows.map((row): LandingOffer => ({
+      id: row.id, name: row.name, price: row.badge || `${row.pricePerMonth} JOD/month`,
+      description: row.description ?? '', features: Array.isArray(row.features) ? row.features as string[] : [],
+      badge: row.badge ?? undefined, isFeatured: false, isActive: true, link: undefined,
+    }));
+
+    // Map events
+    const events = eventRows.map((row): LandingEvent => ({
+      id: row.id, title: row.title, date: row.date.toISOString(),
+      location: row.location ?? undefined, description: row.description ?? undefined,
+      link: undefined, isActive: true, imageUrl: row.imageUrl ?? undefined,
+    }));
+
+    // Map announcements
+    const announcements = announcementRows.map((row): LandingAnnouncement => ({
+      id: row.id, title: row.title, message: row.body, isPinned: row.isPinned,
+    }));
+
+    // Map facilities
+    const facilityHighlights = facilityRows.length > 0
+      ? facilityRows.map((row): LandingFacilityHighlight => ({
+          id: row.id, name: row.name, description: row.description ?? '',
+          mediaUrl: undefined, badge: undefined,
+        }))
+      : fallback.facilityHighlights;
+
+    // Map footer
+    const footer: LandingFooter | null = footerRow ? {
+      address: footerRow.address, phone: footerRow.phone, email: footerRow.email,
+      contactRecipientEmail: footerRow.contactRecipientEmail ?? undefined,
+      socialLinks: Array.isArray(footerRow.socialLinks)
+        ? (footerRow.socialLinks as { id?: string; label?: string; href?: string }[]).map((l) => ({
+            id: l.id ?? '', label: l.label ?? '', href: l.href ?? '',
+          }))
+        : [],
+    } : null;
 
     const result: LandingContent = {
       hero: hero || fallback.hero,
       highlights: fallback.highlights,
-      programs: programs.length > 0 ? programs.map(mapPackageToProgram) : fallback.programs,
-      offers: offers.length > 0 ? offers.map(mapOfferToLanding) : fallback.offers,
-      events: events.map(mapEventToLanding),
-      announcements: announcements.map(mapAnnouncementToLanding),
-      facilityHighlights: facilities.length > 0 ? facilities.map(mapFacilityToLanding) : fallback.facilityHighlights,
+      programs,
+      offers: offers.length > 0 ? offers : fallback.offers,
+      events,
+      announcements,
+      facilityHighlights,
       footer: footer || fallback.footer,
       updatedAt: new Date().toISOString(),
       updatedBy: 'System',
@@ -999,6 +1082,7 @@ async function _fetchLandingContent(): Promise<LandingContent> {
     writeCache('landingContent', result);
     return result;
   } catch (error) {
+    noteDatabaseFailure('fetchLandingContent', error);
     if (stale) return stale;
     return getLandingFallback();
   }

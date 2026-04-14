@@ -137,4 +137,15 @@ if (path.basename(publicHtmlDir) === "public_html") {
   } catch (error) {
     console.warn(`[sync-web-next-output] Failed writing host bootstrap: ${error}`);
   }
+
+  // Touch tmp/restart.txt to signal Hostinger Passenger/lsnode to restart Node.js
+  const tmpDir = path.join(publicHtmlDir, "tmp");
+  const restartFile = path.join(tmpDir, "restart.txt");
+  try {
+    fs.mkdirSync(tmpDir, { recursive: true });
+    fs.writeFileSync(restartFile, `restart-${Date.now()}\n`, "utf8");
+    console.log(`[sync-web-next-output] Touched restart file: ${restartFile}`);
+  } catch (error) {
+    console.warn(`[sync-web-next-output] Failed touching restart file: ${error}`);
+  }
 }

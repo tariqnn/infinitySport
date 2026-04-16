@@ -1,23 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal, Input, Select, Button } from '../../_components/ui';
-import { packageRegistrationsApi, packagePricingApi } from '../../../lib/portalApi';
-import type { PackageRegistrationRow } from '../../../lib/portalApi';
+import { packageRegistrationsApi, type PackageRegistrationRow } from '../../../lib/portalApi';
+import {
+  addOneMonthToDateInput,
+  getPackageDefaultPrice,
+  getPackageDefaultSessions,
+  hasPackageDefaultPrice,
+} from './packageDefaults';
 
 function computeFinalPrice(base: number, discountType: string, discountValue: number): number {
-  const b = Math.max(0, base);
-  if (!discountType || discountType === 'NONE') return b;
-  if (discountType === 'PERCENT') return Math.max(0, b - Math.round((b * discountValue) / 100));
-  return Math.max(0, b - discountValue);
-}
-
-function addDaysToDateInput(value: string, days: number): string {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
+  const safeBase = Math.max(0, base);
+  if (!discountType || discountType === 'NONE') return safeBase;
+  if (discountType === 'PERCENT') return Math.max(0, safeBase - Math.round((safeBase * discountValue) / 100));
+  return Math.max(0, safeBase - discountValue);
 }
 
 export function RegisterInAnotherPackageModal({
@@ -38,70 +35,61 @@ export function RegisterInAnotherPackageModal({
   defaultSessionsByPackage?: Record<string, number>;
 }) {
   const [packageName, setPackageName] = useState('');
-  const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState('');
   const [sessionsLeft, setSessionsLeft] = useState('');
   const [nextPaymentDate, setNextPaymentDate] = useState('');
-  const [planLabel, setPlanLabel] = useState('');
-  const [basePriceJod, setBasePriceJod] = useState<string>('');
+  const [basePriceJod, setBasePriceJod] = useState('');
   const [discountOpen, setDiscountOpen] = useState(false);
   const [discountType, setDiscountType] = useState<'NONE' | 'PERCENT' | 'AMOUNT'>('NONE');
-  const [discountValue, setDiscountValue] = useState<string>('');
+  const [discountValue, setDiscountValue] = useState('');
   const [discountReason, setDiscountReason] = useState('');
-  const [pricing, setPricing] = useState<Array<{ packageName: string; basePriceJod: number | null }>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open) {
-      packagePricingApi.list().then(setPricing).catch(() => setPricing([]));
-      setStartDate(new Date().toISOString().split('T')[0]);
-      setSessionsLeft('');
-      setNextPaymentDate('');
-      setPlanLabel('');
-    }
+    if (!open) return;
+    const today = new Date().toISOString().split('T')[0];
+    setPackageName('');
+    setStartDate(today);
+    setSessionsLeft('');
+    setNextPaymentDate(addOneMonthToDateInput(today));
+    setBasePriceJod('');
+    setDiscountOpen(false);
+    setDiscountType('NONE');
+    setDiscountValue('');
+    setDiscountReason('');
+    setError(null);
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
-    const defaultPrice = defaultPricesByPackage?.[packageName];
-    if (defaultPrice != null) setBasePriceJod(String(defaultPrice));
-    else {
-      const p = pricing.find((x) => x.packageName === packageName);
-      if (p?.basePriceJod != null) setBasePriceJod(String(p.basePriceJod));
-      else if (packageName) setBasePriceJod('');
+    const defaultPrice = getPackageDefaultPrice(packageName, defaultPricesByPackage);
+    if (defaultPrice != null) {
+      setBasePriceJod(String(defaultPrice));
+      return;
     }
-  }, [packageName, pricing, open, defaultPricesByPackage]);
+    if (packageName) setBasePriceJod('');
+  }, [packageName, defaultPricesByPackage, open]);
 
   useEffect(() => {
     if (!open) return;
-    const defaultSessions = defaultSessionsByPackage?.[packageName];
-    if (defaultSessions != null && !sessionsLeft.trim()) {
-      setSessionsLeft(String(defaultSessions));
-    }
-    if (packageName && !planLabel.trim()) {
-      setPlanLabel(packageName);
-    }
-  }, [defaultSessionsByPackage, open, packageName, planLabel, sessionsLeft]);
-
-  useEffect(() => {
-    if (!open || !packageName) return;
-    const defaultSessions = defaultSessionsByPackage?.[packageName];
+    const defaultSessions = getPackageDefaultSessions(packageName, defaultSessionsByPackage);
     if (defaultSessions != null) {
       setSessionsLeft(String(defaultSessions));
     }
-    setPlanLabel(packageName);
   }, [defaultSessionsByPackage, open, packageName]);
 
   useEffect(() => {
     if (!open) return;
-    if (startDate.trim() && !nextPaymentDate.trim()) {
-      setNextPaymentDate(addDaysToDateInput(startDate, 30));
+    if (startDate.trim()) {
+      setNextPaymentDate(addOneMonthToDateInput(startDate));
     }
-  }, [nextPaymentDate, open, startDate]);
+  }, [open, startDate]);
 
-  const baseNum = basePriceJod.trim() === '' ? 0 : parseInt(basePriceJod, 10) || 0;
-  const discountVal = discountType === 'NONE' ? 0 : parseFloat(discountValue) || 0;
-  const finalPrice = computeFinalPrice(baseNum, discountType, discountVal);
+  const baseNumber = basePriceJod.trim() === '' ? 0 : parseInt(basePriceJod, 10) || 0;
+  const discountNumber = discountType === 'NONE' ? 0 : parseFloat(discountValue) || 0;
+  const finalPrice = computeFinalPrice(baseNumber, discountType, discountNumber);
+  const isManualPricing = !hasPackageDefaultPrice(packageName, defaultPricesByPackage) && !!packageName;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -119,8 +107,9 @@ export function RegisterInAnotherPackageModal({
       setError('Next payment date is required.');
       return;
     }
-    const base = Math.max(0, baseNum);
-    const hasDefaultPrice = (defaultPricesByPackage?.[packageName.trim()] ?? pricing.find((x) => x.packageName === packageName)?.basePriceJod) != null;
+
+    const base = Math.max(0, baseNumber);
+    const hasDefaultPrice = hasPackageDefaultPrice(packageName.trim(), defaultPricesByPackage);
     if (base === 0 && !hasDefaultPrice) {
       setError('Enter base price (manual package).');
       return;
@@ -129,7 +118,6 @@ export function RegisterInAnotherPackageModal({
       setError('Discount reason is required when applying a discount.');
       return;
     }
-    const basePricePayload = hasDefaultPrice && base === 0 ? undefined : base;
 
     setLoading(true);
     try {
@@ -141,10 +129,9 @@ export function RegisterInAnotherPackageModal({
         customerAge: registration.customerAge ?? undefined,
         sessionsLeft: Math.max(0, parseInt(sessionsLeft, 10) || 0),
         nextPaymentDate: nextPaymentDate.trim(),
-        planLabel: planLabel.trim() || packageName.trim(),
-        basePriceJod: basePricePayload,
+        basePriceJod: hasDefaultPrice && base === 0 ? undefined : base,
         discountType,
-        discountValue: discountType === 'NONE' ? null : discountVal,
+        discountValue: discountType === 'NONE' ? null : discountNumber,
         discountReason: discountType === 'NONE' ? undefined : discountReason.trim(),
         periodStartsAt: startDate.trim() || undefined,
       });
@@ -156,8 +143,6 @@ export function RegisterInAnotherPackageModal({
       setLoading(false);
     }
   }
-
-  const isManualPricing = (defaultPricesByPackage?.[packageName] ?? pricing.find((x) => x.packageName === packageName)?.basePriceJod) == null && !!packageName;
 
   if (!registration) return null;
 
@@ -171,17 +156,18 @@ export function RegisterInAnotherPackageModal({
 
         <Select label="Package" value={packageName} onChange={(e) => setPackageName(e.target.value)} required>
           <option value="">Select package</option>
-          {packageOptions.map((p) => (
-            <option key={p} value={p}>{p}</option>
+          {packageOptions.map((pkg) => (
+            <option key={pkg} value={pkg}>{pkg}</option>
           ))}
         </Select>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium text-ui-textMuted">Start date</label>
-          <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-          <p className="mt-0.5 text-xs text-ui-textMuted">For reference; registration is created with today’s date.</p>
-        </div>
-
+        <Input
+          label="Start date"
+          type="date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+          hint="Registration will use this start date for the next payment default."
+        />
         <Input
           label="Sessions left"
           type="number"
@@ -197,12 +183,6 @@ export function RegisterInAnotherPackageModal({
           onChange={(e) => setNextPaymentDate(e.target.value)}
           required
         />
-        <Input
-          label="Plan label"
-          value={planLabel}
-          onChange={(e) => setPlanLabel(e.target.value)}
-          placeholder="Optional; defaults to package name"
-        />
 
         <div>
           <label className="mb-1 block text-sm font-medium text-ui-textMuted">Base price (JOD)</label>
@@ -216,21 +196,22 @@ export function RegisterInAnotherPackageModal({
             />
           ) : (
             <div className="rounded-xl border border-ui-border bg-ui-softBg/50 px-3 py-2.5 text-sm text-ui-textPrimary">
-              {packageName && basePriceJod !== '' ? `${basePriceJod} JOD` : '—'}
+              {packageName && basePriceJod !== '' ? `${basePriceJod} JOD` : '-'}
             </div>
           )}
+          {!isManualPricing && packageName && <p className="mt-0.5 text-xs text-ui-textMuted">Set automatically from the selected package.</p>}
         </div>
 
         <div className="rounded-lg border border-ui-border">
           <button
             type="button"
-            onClick={() => setDiscountOpen((o) => !o)}
+            onClick={() => setDiscountOpen((openState) => !openState)}
             className="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium text-ui-textPrimary"
           >
-            Discount {discountOpen ? '▼' : '▶'}
+            Discount {discountOpen ? 'v' : '>'}
           </button>
           {discountOpen && (
-            <div className="border-t border-ui-border p-3 space-y-2">
+            <div className="space-y-2 border-t border-ui-border p-3">
               <Select
                 label="Type"
                 value={discountType}

@@ -26,7 +26,7 @@ type PackageSeed = {
 };
 
 const PACKAGES: PackageSeed[] = [
-  { name: 'Basketball - Little Kobes U10', sportType: 'BASKETBALL', sessionsCount: 12, trackingType: 'SESSIONS', pricingType: 'FIXED', currentPriceJod: 120, sortOrder: 10 },
+  { name: 'Basketball - Little Kobes U12-U10', sportType: 'BASKETBALL', sessionsCount: 10, trackingType: 'SESSIONS', pricingType: 'FIXED', currentPriceJod: 120, sortOrder: 10 },
   { name: 'Basketball - Ballers & Hoopers U12–U14', sportType: 'BASKETBALL', sessionsCount: 12, trackingType: 'SESSIONS', pricingType: 'FIXED', currentPriceJod: 120, sortOrder: 20 },
   { name: 'Basketball - Warriors', sportType: 'BASKETBALL', sessionsCount: 12, trackingType: 'SESSIONS', pricingType: 'FIXED', currentPriceJod: 120, sortOrder: 30 },
   { name: 'Basketball - Private 1v1 Sessions', sportType: 'BASKETBALL', sessionsCount: 0, trackingType: 'SESSIONS', pricingType: 'MANUAL', currentPriceJod: null, sortOrder: 40 },

@@ -40,6 +40,20 @@ class _BootstrapGate extends StatelessWidget {
     return FutureBuilder<PortalRepository>(
       future: bootstrap,
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  'Firebase setup failed.\n${snapshot.error}',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          );
+        }
+
         final repository = snapshot.data;
         if (repository == null) {
           return const LaunchExperienceScreen();

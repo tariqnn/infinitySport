@@ -22,6 +22,7 @@ import { PersonDetailsModal } from './_components/PersonDetailsModal';
 import { EditRegistrationModal } from './_components/EditRegistrationModal';
 import { CreateTrackerAccountModal } from './_components/CreateTrackerAccountModal';
 import { CreatePlayerAccountModal } from './_components/CreatePlayerAccountModal';
+import { ManagePackageSessionsModal } from './_components/ManagePackageSessionsModal';
 
 type Registration = PackageRegistrationRow;
 
@@ -47,6 +48,7 @@ export default function RegistrationsPage() {
   const [addPointsRegistration, setAddPointsRegistration] = useState<Registration | null>(null);
   const [cancelSessionDayOpen, setCancelSessionDayOpen] = useState(false);
   const [addRegistrationOpen, setAddRegistrationOpen] = useState(false);
+  const [managePackageSessionsOpen, setManagePackageSessionsOpen] = useState(false);
   const [detailsModalRow, setDetailsModalRow] = useState<Registration | null>(null);
   const [editRegistrationRow, setEditRegistrationRow] = useState<Registration | null>(null);
   const [registerInAnotherPackageRow, setRegisterInAnotherPackageRow] = useState<Registration | null>(null);
@@ -67,26 +69,31 @@ export default function RegistrationsPage() {
    * Source-of-truth for days/sessions is the public landing page (apps/web sports cards).
    * We duplicate a minimal mapping here so "days remaining" decreases by each scheduled session day.
    */
-  function getPackageSchedule(packageName: string): { totalSessions: number; daysOfWeek: number[] } | null {
+  function getPackageSchedule(packageName: string): { daysOfWeek: number[] } | null {
     const name = (packageName ?? '').trim();
     if (!name) return null;
 
     // Basketball academy packages (12 sessions; scheduled on Sat/Mon/Wed/Fri)
     if (name.startsWith('Basketball - ')) {
       if (name.includes('Private') || name.includes('Small Groups')) return null; // flexible scheduling
-      return { totalSessions: 12, daysOfWeek: [6, 1, 3, 5] }; // Sat, Mon, Wed, Fri
+      return { daysOfWeek: [6, 1, 3, 5] }; // Sat, Mon, Wed, Fri
     }
 
     // Gymnastics (sessions per month & days shown on landing)
-    if (name === 'Gymnastics Package A') return { totalSessions: 12, daysOfWeek: [0, 2, 4] }; // Sun, Tue, Thu
+    if (name === 'Gymnastics Package A') return { daysOfWeek: [0, 2, 4] }; // Sun, Tue, Thu
     // Package B is "2 Days / Week" (landing shows Sun • Tue • Thu time window); we count 2 weekly session-days.
-    if (name === 'Gymnastics Package B') return { totalSessions: 8, daysOfWeek: [0, 2] }; // Sun, Tue
-    if (name === 'Gymnastics Package C') return { totalSessions: 18, daysOfWeek: [0, 2, 4] };
+    if (name === 'Gymnastics Package B') return { daysOfWeek: [0, 2] }; // Sun, Tue
+    if (name === 'Gymnastics Package C') return { daysOfWeek: [0, 2, 4] };
     // Package D is "2 Days / Week" (landing shows Sun • Tue • Thu time window); we count 2 weekly session-days.
-    if (name === 'Gymnastics Package D') return { totalSessions: 12, daysOfWeek: [0, 2] }; // Sun, Tue
+    if (name === 'Gymnastics Package D') return { daysOfWeek: [0, 2] }; // Sun, Tue
 
     // Volleyball (10 sessions; Sat, Tue, Sun)
-    if (name === 'Volleyball') return { totalSessions: 10, daysOfWeek: [6, 2, 0] }; // Sat, Tue, Sun
+    if (name.includes('Gymnastics')) {
+      if (name.includes('Private')) return null;
+      return { daysOfWeek: [0, 2, 4] };
+    }
+
+    if (name === 'Volleyball') return { daysOfWeek: [6, 2, 0] }; // Sat, Tue, Sun
 
     return null;
   }
@@ -183,7 +190,11 @@ export default function RegistrationsPage() {
    */
   function getSessionsRemaining(r: Registration): { remaining: number; total: number; used: number } | null {
     const schedule = getPackageSchedule(r.packageName);
-    if (!schedule) return null;
+    const baseSessions =
+      r.sessionsLeft != null
+        ? Math.max(0, Number(r.sessionsLeft) || 0)
+        : Math.max(0, Number(defaultSessionsByPackage[r.packageName] ?? 0) || 0);
+    if (!baseSessions) return null;
     const start = getCycleStart(r);
     const end = getPeriodEnd(r);
     if (!start || !end) return null;
@@ -191,19 +202,19 @@ export default function RegistrationsPage() {
     const effectiveNow =
       r.isFrozen && r.frozenAt ? new Date(r.frozenAt) : new Date();
 
-    const total = schedule.totalSessions;
-    const scheduledCount = countScheduledSessions(start, effectiveNow, schedule.daysOfWeek);
+    const scheduledCount = schedule ? countScheduledSessions(start, effectiveNow, schedule.daysOfWeek) : 0;
     const canceledSet = canceledDatesByPackage[r.packageName];
     let canceledInRange = 0;
-    if (canceledSet) {
+    if (canceledSet && schedule) {
       for (let d = new Date(start); d.getTime() <= effectiveNow.getTime(); d = addDays(d, 1)) {
         const key = d.toISOString().split('T')[0];
         if (canceledSet.has(key)) canceledInRange += 1;
       }
     }
-    const used = Math.min(total, Math.max(0, scheduledCount - canceledInRange));
     const bonus = Number(r.sessionsBonus) || 0;
-    const remaining = Math.max(0, total - used + bonus);
+    const total = Math.max(0, baseSessions + bonus);
+    const used = schedule ? Math.min(total, Math.max(0, scheduledCount - canceledInRange)) : 0;
+    const remaining = Math.max(0, total - used);
     return { remaining, total, used };
   }
 
@@ -271,9 +282,18 @@ export default function RegistrationsPage() {
     load();
   }, [load]);
 
-  useEffect(() => {
-    packagesApi.list().then(setApiPackages).catch(() => setApiPackages([]));
+  const loadPackages = useCallback(async () => {
+    try {
+      const packages = await packagesApi.list();
+      setApiPackages(packages);
+    } catch {
+      setApiPackages([]);
+    }
   }, []);
+
+  useEffect(() => {
+    loadPackages();
+  }, [loadPackages]);
 
   useEffect(() => {
     if (bulkCreatedCount == null) return;
@@ -384,9 +404,13 @@ export default function RegistrationsPage() {
   }
 
   // Package list: from API when available, else from rows (so filter dropdown and modals have full list)
-  const packageOpts = apiPackages.length > 0
-    ? apiPackages.map((p) => p.name)
-    : Array.from(new Set([...rows.map((r) => r.packageName), packageFilter].filter(Boolean))).sort();
+  const packageOpts = Array.from(
+    new Set([
+      ...apiPackages.map((p) => p.name),
+      ...rows.map((r) => r.packageName),
+      packageFilter,
+    ].filter(Boolean)),
+  ).sort();
   // Default price per package (from Package.currentPriceJod) for modals
   const defaultPricesByPackage: Record<string, number> = Object.fromEntries(
     apiPackages.filter((p) => p.currentPriceJod != null).map((p) => [p.name, p.currentPriceJod as number]),
@@ -395,6 +419,10 @@ export default function RegistrationsPage() {
     apiPackages
       .filter((p) => Number.isFinite(p.sessionsCount) && p.sessionsCount > 0)
       .map((p) => [p.name, p.sessionsCount]),
+  );
+  const editRegistrationSessionSummary = useMemo(
+    () => (editRegistrationRow ? getSessionsRemaining(editRegistrationRow) : null),
+    [editRegistrationRow, canceledDatesByPackage, defaultSessionsByPackage],
   );
 
   if (loading && rows.length === 0) {
@@ -408,6 +436,12 @@ export default function RegistrationsPage() {
         subtitle="Registrations from Basketball, Gymnastics, and Volleyball packages"
         actions={
           <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setManagePackageSessionsOpen(true)}
+            >
+              Package sessions
+            </Button>
             <Button
               variant="secondary"
               onClick={() => setTrackerCoachOnlyOpen(true)}
@@ -914,6 +948,17 @@ export default function RegistrationsPage() {
         initialPerson={addRegistrationInitialPerson}
       />
 
+      <ManagePackageSessionsModal
+        open={managePackageSessionsOpen}
+        onClose={() => setManagePackageSessionsOpen(false)}
+        packages={apiPackages}
+        onSaved={() => {
+          setManagePackageSessionsOpen(false);
+          loadPackages();
+          load();
+        }}
+      />
+
       <RegistrationDetailsModal
         open={!!detailsModalRow}
         onClose={() => setDetailsModalRow(null)}
@@ -929,6 +974,9 @@ export default function RegistrationsPage() {
         onClose={() => setEditRegistrationRow(null)}
         registration={editRegistrationRow}
         packageOptions={packageOpts}
+        defaultPricesByPackage={defaultPricesByPackage}
+        defaultSessionsByPackage={defaultSessionsByPackage}
+        currentSessionSummary={editRegistrationSessionSummary}
         onSuccess={() => {
           setEditRegistrationRow(null);
           load();
@@ -984,6 +1032,7 @@ export default function RegistrationsPage() {
         rows={rows}
         packageOptions={packageOpts}
         defaultPricesByPackage={defaultPricesByPackage}
+        defaultSessionsByPackage={defaultSessionsByPackage}
         initialPerson={registerPersonMultiInitialPerson}
       />
 

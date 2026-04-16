@@ -31,6 +31,7 @@ import {
 } from "../../../../lib/registrationPoints";
 import {
   markRegistrationDeletedInFirestore,
+  syncPackagesToFirestore,
   syncRegistrationRecordToFirestore,
 } from "../../../../lib/registrationRealtimeSync";
 import {
@@ -454,6 +455,41 @@ async function getDefaultSessionsLeft(packageName: string): Promise<number | nul
   const sessionsCount = Number(pkg?.sessionsCount ?? 0);
   if (!Number.isFinite(sessionsCount) || sessionsCount <= 0) return null;
   return Math.round(sessionsCount);
+}
+
+function addCalendarMonths(date: Date, months: number): Date {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + months);
+  return next;
+}
+
+async function syncActivePackagesToFirestore() {
+  try {
+    const firestore = getFirestore();
+    const packages = await prisma.package.findMany({
+      where: { isActive: true },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      select: {
+        id: true,
+        sportType: true,
+        name: true,
+        description: true,
+        sessionsCount: true,
+        trackingType: true,
+        pricingType: true,
+        currentPriceJod: true,
+        isActive: true,
+        sortOrder: true,
+      },
+    });
+
+    await syncPackagesToFirestore({
+      firestore,
+      packages,
+    });
+  } catch (error) {
+    console.warn("[portal-db-api] package config sync skipped", error);
+  }
 }
 
 function parseOptionalMembershipDate(
@@ -2689,6 +2725,556 @@ async function generateInvoiceNumber(): Promise<string> {
   return `${prefix}${String(nextNumber).padStart(4, "0")}`;
 }
 
+type CashBookTransactionTypeValue = "INCOME" | "EXPENSE";
+
+const DEFAULT_CASH_BOOK_CATEGORIES: Array<{
+  type: CashBookTransactionTypeValue;
+  name: string;
+}> = [
+  { type: "INCOME", name: "Salary" },
+  { type: "INCOME", name: "Business" },
+  { type: "INCOME", name: "Other" },
+  { type: "EXPENSE", name: "Food" },
+  { type: "EXPENSE", name: "Transport" },
+  { type: "EXPENSE", name: "Bills" },
+  { type: "EXPENSE", name: "Shopping" },
+  { type: "EXPENSE", name: "Other" },
+];
+
+function normalizeCashBookType(
+  value: unknown,
+): CashBookTransactionTypeValue | null {
+  const normalized = String(value || "").trim().toUpperCase();
+  if (normalized === "INCOME" || normalized === "EXPENSE") {
+    return normalized as CashBookTransactionTypeValue;
+  }
+  return null;
+}
+
+function resolveCompanyIdFromRequest(
+  request: NextRequest,
+  body?: unknown,
+): string | null {
+  return (
+    (body
+      ? extractConnectId(body, "company") ||
+        extractConnectId(body, "companyId")
+      : null) ||
+    request.nextUrl.searchParams.get("companyId") ||
+    request.headers.get("x-company-id") ||
+    null
+  );
+}
+
+async function ensureCashBookDefaultCategories(companyId: string) {
+  const existingCount = await prisma.cashBookCategory.count({
+    where: { companyId },
+  });
+  if (existingCount > 0) return;
+
+  await prisma.cashBookCategory.createMany({
+    data: DEFAULT_CASH_BOOK_CATEGORIES.map((row) => ({
+      companyId,
+      type: row.type,
+      name: row.name,
+      isDefault: true,
+    })),
+    skipDuplicates: true,
+  });
+}
+
+async function getCashBookCategoryById(id: string) {
+  return prisma.cashBookCategory.findUnique({
+    where: { id },
+    include: {
+      _count: {
+        select: { transactions: true },
+      },
+    },
+  });
+}
+
+async function listCashBookCategories(request: NextRequest) {
+  const companyId = resolveCompanyIdFromRequest(request);
+  if (!companyId) return jsonError("companyId is required");
+
+  await ensureCashBookDefaultCategories(companyId);
+
+  const type = normalizeCashBookType(request.nextUrl.searchParams.get("type"));
+  const rows = await prisma.cashBookCategory.findMany({
+    where: {
+      companyId,
+      ...(type ? { type } : {}),
+    },
+    include: {
+      _count: {
+        select: { transactions: true },
+      },
+    },
+    orderBy: [{ type: "asc" }, { name: "asc" }],
+  });
+
+  return NextResponse.json(rows);
+}
+
+async function getCashBookCategory(id: string) {
+  const row = await getCashBookCategoryById(id);
+  if (!row) return jsonError("Cash book category not found", 404);
+  return NextResponse.json(row);
+}
+
+async function createCashBookCategory(request: NextRequest) {
+  const body = (await request.json().catch(() => ({}))) as {
+    companyId?: string;
+    company?: { connect?: { id?: string } };
+    type?: string;
+    name?: string;
+  };
+
+  const companyId = resolveCompanyIdFromRequest(request, body);
+  if (!companyId) return jsonError("companyId is required");
+
+  const type = normalizeCashBookType(body.type);
+  if (!type) return jsonError("type must be INCOME or EXPENSE");
+
+  const name = normalizeText(body.name);
+  if (!name) return jsonError("Category name is required");
+
+  await ensureCashBookDefaultCategories(companyId);
+
+  const existing = await prisma.cashBookCategory.findFirst({
+    where: {
+      companyId,
+      type,
+      name: {
+        equals: name,
+        mode: "insensitive",
+      },
+    },
+    include: {
+      _count: {
+        select: { transactions: true },
+      },
+    },
+  });
+  if (existing) return NextResponse.json(existing);
+
+  const row = await prisma.cashBookCategory.create({
+    data: {
+      companyId,
+      type,
+      name,
+      isDefault: false,
+    },
+    include: {
+      _count: {
+        select: { transactions: true },
+      },
+    },
+  });
+
+  return NextResponse.json(row);
+}
+
+async function updateCashBookCategory(id: string, request: NextRequest) {
+  const body = (await request.json().catch(() => ({}))) as {
+    name?: string;
+    type?: string;
+  };
+
+  const existing = await getCashBookCategoryById(id);
+  if (!existing) return jsonError("Cash book category not found", 404);
+
+  const nextName =
+    body.name === undefined ? existing.name : normalizeText(body.name);
+  const nextType =
+    body.type === undefined
+      ? existing.type
+      : normalizeCashBookType(body.type);
+
+  if (!nextName) return jsonError("Category name is required");
+  if (!nextType) return jsonError("type must be INCOME or EXPENSE");
+  if (
+    nextType !== existing.type &&
+    Number(existing._count?.transactions || 0) > 0
+  ) {
+    return jsonError(
+      "You cannot change the type of a category that already has transactions.",
+      409,
+    );
+  }
+
+  const duplicate = await prisma.cashBookCategory.findFirst({
+    where: {
+      id: { not: id },
+      companyId: existing.companyId,
+      type: nextType,
+      name: {
+        equals: nextName,
+        mode: "insensitive",
+      },
+    },
+    select: { id: true },
+  });
+  if (duplicate) {
+    return jsonError("A category with that name already exists.", 409);
+  }
+
+  const row = await prisma.cashBookCategory.update({
+    where: { id },
+    data: {
+      name: nextName,
+      type: nextType,
+    },
+    include: {
+      _count: {
+        select: { transactions: true },
+      },
+    },
+  });
+
+  if (nextName !== existing.name) {
+    await prisma.cashBookTransaction.updateMany({
+      where: { categoryId: id },
+      data: { categoryName: nextName },
+    });
+  }
+
+  return NextResponse.json(row);
+}
+
+async function deleteCashBookCategory(id: string, request: NextRequest) {
+  const existing = await getCashBookCategoryById(id);
+  if (!existing) return jsonError("Cash book category not found", 404);
+
+  const force = request.nextUrl.searchParams.get("force") === "1";
+  const transactionCount = Number(existing._count?.transactions || 0);
+  if (transactionCount > 0 && !force) {
+    return jsonError(
+      "This category is already used by transactions. Confirm delete to remove it from future use.",
+      409,
+    );
+  }
+
+  await prisma.cashBookCategory.delete({ where: { id } });
+  return NextResponse.json({ success: true });
+}
+
+async function getCashBookTransactionById(id: string) {
+  return prisma.cashBookTransaction.findUnique({
+    where: { id },
+    include: {
+      category: {
+        include: {
+          _count: {
+            select: { transactions: true },
+          },
+        },
+      },
+    },
+  });
+}
+
+async function listCashBookTransactions(request: NextRequest) {
+  const companyId = resolveCompanyIdFromRequest(request);
+  if (!companyId) return jsonError("companyId is required");
+
+  await ensureCashBookDefaultCategories(companyId);
+
+  const type = normalizeCashBookType(request.nextUrl.searchParams.get("type"));
+  const startDate = request.nextUrl.searchParams.get("startDate");
+  const endDate = request.nextUrl.searchParams.get("endDate");
+  const search = normalizeText(request.nextUrl.searchParams.get("search"));
+
+  const where: Record<string, unknown> = { companyId };
+  if (type) where.type = type;
+  if (startDate || endDate) {
+    const dateFilter: Record<string, Date> = {};
+    if (startDate) {
+      const parsedStart = parseDate(startDate);
+      if (!parsedStart) return jsonError("Invalid startDate");
+      dateFilter.gte = parsedStart;
+    }
+    if (endDate) {
+      const parsedEnd = parseDate(endDate);
+      if (!parsedEnd) return jsonError("Invalid endDate");
+      parsedEnd.setHours(23, 59, 59, 999);
+      dateFilter.lte = parsedEnd;
+    }
+    where.date = dateFilter;
+  }
+  if (search) {
+    where.OR = [
+      {
+        note: {
+          contains: search,
+          mode: "insensitive",
+        },
+      },
+      {
+        categoryName: {
+          contains: search,
+          mode: "insensitive",
+        },
+      },
+    ];
+  }
+
+  const rows = await prisma.cashBookTransaction.findMany({
+    where,
+    include: {
+      category: {
+        include: {
+          _count: {
+            select: { transactions: true },
+          },
+        },
+      },
+    },
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+  });
+
+  return NextResponse.json(rows);
+}
+
+async function getCashBookTransaction(id: string) {
+  const row = await getCashBookTransactionById(id);
+  if (!row) return jsonError("Cash book transaction not found", 404);
+  return NextResponse.json(row);
+}
+
+async function resolveCashBookCategory(params: {
+  companyId: string;
+  categoryId?: string | null;
+  type: CashBookTransactionTypeValue;
+}) {
+  const { companyId, categoryId, type } = params;
+  if (!categoryId) return null;
+
+  const category = await prisma.cashBookCategory.findUnique({
+    where: { id: categoryId },
+  });
+  if (!category || category.companyId !== companyId) {
+    throw new Error("Selected category was not found.");
+  }
+  if (category.type !== type) {
+    throw new Error("Selected category does not match the transaction type.");
+  }
+  return category;
+}
+
+async function createCashBookTransaction(request: NextRequest) {
+  const body = (await request.json().catch(() => ({}))) as {
+    companyId?: string;
+    company?: { connect?: { id?: string } };
+    type?: string;
+    amount?: number | string;
+    categoryId?: string | null;
+    categoryName?: string | null;
+    note?: string | null;
+    date?: string;
+    attachmentUrl?: string | null;
+    attachmentName?: string | null;
+    attachmentType?: string | null;
+    attachmentSize?: number | string | null;
+  };
+
+  const companyId = resolveCompanyIdFromRequest(request, body);
+  if (!companyId) return jsonError("companyId is required");
+
+  const type = normalizeCashBookType(body.type);
+  if (!type) return jsonError("type must be INCOME or EXPENSE");
+
+  const amount = coerceOptionalInteger(body.amount);
+  if (amount == null || amount <= 0) {
+    return jsonError("Amount must be greater than 0");
+  }
+
+  const date = parseDate(String(body.date || ""));
+  if (!date) return jsonError("Valid date is required");
+
+  let category = null as Awaited<ReturnType<typeof resolveCashBookCategory>>;
+  try {
+    category = await resolveCashBookCategory({
+      companyId,
+      categoryId: body.categoryId ?? null,
+      type,
+    });
+  } catch (error) {
+    return jsonError(getErrorMessage(error), 404);
+  }
+
+  const categoryName = category?.name || normalizeText(body.categoryName);
+  if (!categoryName) return jsonError("Category is required");
+
+  const attachmentSize =
+    body.attachmentSize == null
+      ? null
+      : coerceOptionalInteger(body.attachmentSize);
+  if (body.attachmentSize != null && attachmentSize == null) {
+    return jsonError("attachmentSize must be a number");
+  }
+
+  const row = await prisma.cashBookTransaction.create({
+    data: {
+      companyId,
+      type,
+      amount,
+      categoryId: category?.id ?? null,
+      categoryName,
+      note: normalizeText(body.note) || null,
+      date,
+      attachmentUrl: normalizeText(body.attachmentUrl) || null,
+      attachmentName: normalizeText(body.attachmentName) || null,
+      attachmentType: normalizeText(body.attachmentType) || null,
+      attachmentSize,
+    },
+    include: {
+      category: {
+        include: {
+          _count: {
+            select: { transactions: true },
+          },
+        },
+      },
+    },
+  });
+
+  return NextResponse.json(row);
+}
+
+async function updateCashBookTransaction(id: string, request: NextRequest) {
+  const body = (await request.json().catch(() => ({}))) as {
+    type?: string;
+    amount?: number | string;
+    categoryId?: string | null;
+    categoryName?: string | null;
+    note?: string | null;
+    date?: string;
+    attachmentUrl?: string | null;
+    attachmentName?: string | null;
+    attachmentType?: string | null;
+    attachmentSize?: number | string | null;
+  };
+
+  const existing = await prisma.cashBookTransaction.findUnique({
+    where: { id },
+  });
+  if (!existing) return jsonError("Cash book transaction not found", 404);
+
+  const type =
+    body.type === undefined
+      ? existing.type
+      : normalizeCashBookType(body.type);
+  if (!type) return jsonError("type must be INCOME or EXPENSE");
+
+  const amount =
+    body.amount === undefined
+      ? existing.amount
+      : coerceOptionalInteger(body.amount);
+  if (amount == null || amount <= 0) {
+    return jsonError("Amount must be greater than 0");
+  }
+
+  const date =
+    body.date === undefined ? existing.date : parseDate(String(body.date || ""));
+  if (!date) return jsonError("Valid date is required");
+
+  let nextCategoryId: string | null = existing.categoryId;
+  let nextCategoryName = existing.categoryName;
+
+  if (body.categoryId !== undefined) {
+    if (body.categoryId) {
+      try {
+        const category = await resolveCashBookCategory({
+          companyId: existing.companyId,
+          categoryId: body.categoryId,
+          type,
+        });
+        nextCategoryId = category?.id ?? null;
+        nextCategoryName = category?.name || "";
+      } catch (error) {
+        return jsonError(getErrorMessage(error), 404);
+      }
+    } else {
+      nextCategoryId = null;
+      nextCategoryName = normalizeText(body.categoryName);
+    }
+  } else if (body.type !== undefined && type !== existing.type) {
+    nextCategoryId = null;
+    nextCategoryName = normalizeText(body.categoryName);
+  } else if (body.categoryName !== undefined && !nextCategoryId) {
+    nextCategoryName = normalizeText(body.categoryName);
+  }
+
+  if (!nextCategoryName) return jsonError("Category is required");
+
+  const attachmentSize =
+    body.attachmentSize === undefined
+      ? existing.attachmentSize
+      : body.attachmentSize == null
+        ? null
+        : coerceOptionalInteger(body.attachmentSize);
+  if (
+    body.attachmentSize !== undefined &&
+    body.attachmentSize != null &&
+    attachmentSize == null
+  ) {
+    return jsonError("attachmentSize must be a number");
+  }
+
+  const row = await prisma.cashBookTransaction.update({
+    where: { id },
+    data: {
+      type,
+      amount,
+      categoryId: nextCategoryId,
+      categoryName: nextCategoryName,
+      note:
+        body.note === undefined
+          ? existing.note
+          : normalizeText(body.note) || null,
+      date,
+      attachmentUrl:
+        body.attachmentUrl === undefined
+          ? existing.attachmentUrl
+          : normalizeText(body.attachmentUrl) || null,
+      attachmentName:
+        body.attachmentName === undefined
+          ? existing.attachmentName
+          : normalizeText(body.attachmentName) || null,
+      attachmentType:
+        body.attachmentType === undefined
+          ? existing.attachmentType
+          : normalizeText(body.attachmentType) || null,
+      attachmentSize,
+    },
+    include: {
+      category: {
+        include: {
+          _count: {
+            select: { transactions: true },
+          },
+        },
+      },
+    },
+  });
+
+  return NextResponse.json(row);
+}
+
+async function deleteCashBookTransaction(id: string) {
+  try {
+    await prisma.cashBookTransaction.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    if (error?.code === "P2025") {
+      return jsonError("Cash book transaction not found", 404);
+    }
+    return jsonError("Failed to delete cash book transaction", 500);
+  }
+}
+
 async function listInvoices(request: NextRequest) {
   const companyId = request.nextUrl.searchParams.get("companyId") || undefined;
   const status = request.nextUrl.searchParams.get("status") || undefined;
@@ -3186,12 +3772,11 @@ async function createPackageRegistration(payload: RegistrationInput) {
   const periodStartsAt = payload.periodStartsAt
     ? new Date(payload.periodStartsAt)
     : null;
-  const periodEndsAt = periodStartsAt
-    ? new Date(periodStartsAt.getTime() + 30 * 24 * 60 * 60 * 1000)
-    : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const cycleAnchor = periodStartsAt ?? now;
+  const periodEndsAt = addCalendarMonths(cycleAnchor, 1);
   const nextPaymentDate = payload.nextPaymentDate
     ? parseOptionalMembershipDate(payload.nextPaymentDate)
-    : periodEndsAt;
+    : addCalendarMonths(cycleAnchor, 1);
   if (payload.nextPaymentDate && !nextPaymentDate) {
     throw new Error("Invalid next payment date");
   }
@@ -4121,6 +4706,9 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
     const packageName = String(body.packageName || "").trim();
     if (!packageName) return jsonError("Package is required");
     updateData.packageName = packageName;
+    if (body.planLabel === undefined) {
+      updateData.planLabel = packageName;
+    }
   }
   if (body.customerName !== undefined) {
     const customerName = String(body.customerName || "").trim();
@@ -4259,9 +4847,10 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
       }
       updateData.periodStartsAt = periodStartsAt;
       if (body.periodEndsAt === undefined) {
-        updateData.periodEndsAt = new Date(
-          periodStartsAt.getTime() + 30 * 24 * 60 * 60 * 1000,
-        );
+        updateData.periodEndsAt = addCalendarMonths(periodStartsAt, 1);
+      }
+      if (body.nextPaymentDate === undefined) {
+        updateData.nextPaymentDate = addCalendarMonths(periodStartsAt, 1);
       }
     } else {
       updateData.periodStartsAt = null;
@@ -4360,7 +4949,7 @@ async function reregisterPackage(id: string) {
 
   const now = new Date();
   const periodStartsAt = now;
-  const periodEndsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const periodEndsAt = addCalendarMonths(now, 1);
   const sessionsLeft =
     existing.sessionsLeft ?? (await getDefaultSessionsLeft(existing.packageName));
   const { billingPeriodKey, priceLockedUntil } = billingPeriodFromDate(now);
@@ -4373,13 +4962,13 @@ async function reregisterPackage(id: string) {
       priceLockedUntil,
       periodStartsAt,
       periodEndsAt,
-      nextPaymentDate: periodEndsAt,
+      nextPaymentDate: addCalendarMonths(now, 1),
       sessionsLeft,
       sessionsBonus: 0,
       isFrozen: false,
       frozenAt: null,
       status: "ACTIVE",
-      planLabel: existing.planLabel ?? existing.packageName,
+      planLabel: existing.packageName,
     },
     include: { receipts: { where: ACTIVE_RECEIPT_WHERE } },
   });
@@ -4617,7 +5206,7 @@ async function addPointAdjustment(id: string, request: NextRequest) {
   await addRegistrationPointAdjustment(prisma, {
     registrationId: id,
     change: points,
-    reason: body.reason.trim(),
+    reason: String(body.reason || "").trim(),
     createdBy: typeof body.createdBy === "string" ? body.createdBy : null,
   });
 
@@ -5874,6 +6463,22 @@ async function dispatchGet(request: NextRequest, params: Params) {
     return NextResponse.json(rows);
   }
 
+  if (resource === "cash-book-categories" && !id) {
+    return listCashBookCategories(request);
+  }
+
+  if (resource === "cash-book-categories" && id && !action) {
+    return getCashBookCategory(id);
+  }
+
+  if (resource === "cash-book-transactions" && !id) {
+    return listCashBookTransactions(request);
+  }
+
+  if (resource === "cash-book-transactions" && id && !action) {
+    return getCashBookTransaction(id);
+  }
+
   if (resource === "invoices" && !id) {
     return listInvoices(request);
   }
@@ -6176,6 +6781,14 @@ async function dispatchPost(request: NextRequest, params: Params) {
     });
 
     return NextResponse.json(company);
+  }
+
+  if (resource === "cash-book-categories" && !id) {
+    return createCashBookCategory(request);
+  }
+
+  if (resource === "cash-book-transactions" && !id) {
+    return createCashBookTransaction(request);
   }
 
   if (resource === "invoices" && !id) {
@@ -6541,6 +7154,103 @@ async function dispatchPatch(request: NextRequest, params: Params) {
     }
   }
 
+  if (resource === "packages" && !action) {
+    const body = (await request.json()) as {
+      name?: string;
+      sportType?: string;
+      description?: string | null;
+      sessionsCount?: number;
+      trackingType?: string;
+      pricingType?: string;
+      currentPriceJod?: number | null;
+      isActive?: boolean;
+      sortOrder?: number;
+    };
+
+    const existingPackage = await prisma.package.findUnique({
+      where: { id },
+      select: { name: true, sessionsCount: true },
+    });
+    if (!existingPackage) return jsonError("Package not found", 404);
+
+    const data: Record<string, unknown> = {};
+    if (body.name !== undefined) {
+      const name = String(body.name || "").trim();
+      if (!name) return jsonError("Package name is required");
+      data.name = name;
+    }
+    if (body.sportType !== undefined) data.sportType = String(body.sportType || "").trim() || "Other";
+    if (body.description !== undefined) data.description = body.description == null ? null : String(body.description).trim() || null;
+    if (body.sessionsCount !== undefined) {
+      const sessionsCount = Number(body.sessionsCount);
+      if (!Number.isFinite(sessionsCount) || sessionsCount < 0) {
+        return jsonError("sessionsCount must be 0 or greater");
+      }
+      data.sessionsCount = Math.round(sessionsCount);
+    }
+    if (body.trackingType !== undefined) data.trackingType = String(body.trackingType || "SESSIONS").trim().toUpperCase() || "SESSIONS";
+    if (body.pricingType !== undefined) data.pricingType = String(body.pricingType || "FIXED").trim().toUpperCase() || "FIXED";
+    if (body.currentPriceJod !== undefined) {
+      if (body.currentPriceJod == null) {
+        data.currentPriceJod = null;
+      } else {
+        const currentPriceJod = Number(body.currentPriceJod);
+        if (!Number.isFinite(currentPriceJod) || currentPriceJod < 0) {
+          return jsonError("currentPriceJod must be 0 or greater");
+        }
+        data.currentPriceJod = Math.round(currentPriceJod);
+      }
+    }
+    if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
+    if (body.sortOrder !== undefined) {
+      const sortOrder = Number(body.sortOrder);
+      if (!Number.isFinite(sortOrder) || sortOrder < 0) {
+        return jsonError("sortOrder must be 0 or greater");
+      }
+      data.sortOrder = Math.round(sortOrder);
+    }
+
+    const nextName = String(data.name ?? existingPackage.name);
+    const nextSessionsCount =
+      data.sessionsCount === undefined ? existingPackage.sessionsCount : Number(data.sessionsCount);
+
+    const row = await prisma.package.update({
+      where: { id },
+      data: data as never,
+    });
+
+    if (nextName !== existingPackage.name) {
+      await prisma.packageRegistration.updateMany({
+        where: { packageName: existingPackage.name },
+        data: { packageName: nextName },
+      });
+    }
+
+    if (data.sessionsCount !== undefined && nextSessionsCount !== existingPackage.sessionsCount) {
+      await prisma.packageRegistration.updateMany({
+        where: {
+          packageName: nextName,
+          OR: [
+            { sessionsLeft: null },
+            { sessionsLeft: existingPackage.sessionsCount },
+          ],
+        },
+        data: { sessionsLeft: nextSessionsCount > 0 ? nextSessionsCount : null },
+      });
+    }
+
+    await syncActivePackagesToFirestore();
+    return NextResponse.json(row);
+  }
+
+  if (resource === "cash-book-categories" && !action) {
+    return updateCashBookCategory(id, request);
+  }
+
+  if (resource === "cash-book-transactions" && !action) {
+    return updateCashBookTransaction(id, request);
+  }
+
   if (resource === "package-registrations" && !action) {
     return updatePackageRegistration(id, request);
   }
@@ -6579,6 +7289,14 @@ async function dispatchDelete(_request: NextRequest, params: Params) {
       if (error?.code === "P2025") return jsonError("Booking not found", 404);
       return jsonError("Failed to delete booking", 500);
     }
+  }
+
+  if (resource === "cash-book-categories") {
+    return deleteCashBookCategory(id, _request);
+  }
+
+  if (resource === "cash-book-transactions") {
+    return deleteCashBookTransaction(id);
   }
 
   if (resource === "shop-items") {

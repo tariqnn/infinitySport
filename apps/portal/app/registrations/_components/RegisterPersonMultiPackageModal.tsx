@@ -1,42 +1,30 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Modal, Input, Select, Button } from '../../_components/ui';
-import { packageRegistrationsApi, packagePricingApi } from '../../../lib/portalApi';
-import type { PackageRegistrationRow } from '../../../lib/portalApi';
+import { packageRegistrationsApi, type PackageRegistrationRow } from '../../../lib/portalApi';
 import type { InitialPerson } from './AddRegistrationModal';
-
-function getSessionsForPackage(packageName: string): number | null {
-  const name = (packageName ?? '').trim();
-  if (!name) return null;
-  if (name.startsWith('Basketball - ') && !name.includes('Private') && !name.includes('Small Groups')) return 12;
-  if (name === 'Gymnastics Package A') return 12;
-  if (name === 'Gymnastics Package B') return 8;
-  if (name === 'Gymnastics Package C') return 18;
-  if (name === 'Gymnastics Package D') return 12;
-  if (name === 'Volleyball') return 10;
-  return null;
-}
+import { getPackageDefaultPrice, getPackageDefaultSessions, hasPackageDefaultPrice } from './packageDefaults';
 
 function computeFinalPrice(base: number, discountType: string, discountValue: number): number {
-  const b = Math.max(0, base);
-  if (!discountType || discountType === 'NONE') return b;
-  if (discountType === 'PERCENT') return Math.max(0, b - Math.round((b * discountValue) / 100));
-  return Math.max(0, b - discountValue);
+  const safeBase = Math.max(0, base);
+  if (!discountType || discountType === 'NONE') return safeBase;
+  if (discountType === 'PERCENT') return Math.max(0, safeBase - Math.round((safeBase * discountValue) / 100));
+  return Math.max(0, safeBase - discountValue);
 }
 
-function personKey(r: PackageRegistrationRow): string {
-  return `${(r.customerPhone || '').trim().toLowerCase()}`;
+function personKey(registration: PackageRegistrationRow): string {
+  return `${(registration.customerPhone || '').trim().toLowerCase()}`;
 }
 
 function toUniquePersons(rows: PackageRegistrationRow[]): PackageRegistrationRow[] {
   const seen = new Set<string>();
   const out: PackageRegistrationRow[] = [];
-  for (const r of rows) {
-    const key = personKey(r);
+  for (const row of rows) {
+    const key = personKey(row);
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push(r);
+    out.push(row);
   }
   return out;
 }
@@ -58,6 +46,7 @@ export function RegisterPersonMultiPackageModal({
   rows,
   packageOptions,
   defaultPricesByPackage,
+  defaultSessionsByPackage,
   initialPerson,
 }: {
   open: boolean;
@@ -66,6 +55,7 @@ export function RegisterPersonMultiPackageModal({
   rows: PackageRegistrationRow[];
   packageOptions: string[];
   defaultPricesByPackage?: Record<string, number>;
+  defaultSessionsByPackage?: Record<string, number>;
   initialPerson?: InitialPerson | null;
 }) {
   const [step, setStep] = useState<Step>(1);
@@ -78,89 +68,101 @@ export function RegisterPersonMultiPackageModal({
   const [newAge, setNewAge] = useState('');
   const [selectedPackages, setSelectedPackages] = useState<Set<string>>(new Set());
   const [packageConfigs, setPackageConfigs] = useState<Record<string, PackageConfig>>({});
-  const [periodStartsAt, setPeriodStartsAt] = useState(''); // when they will start (optional)
-  const [pricing, setPricing] = useState<Array<{ packageName: string; basePriceJod: number | null }>>([]);
+  const [periodStartsAt, setPeriodStartsAt] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const persons = useMemo(() => toUniquePersons(rows), [rows]);
   const filteredPersons = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return persons;
+    const query = search.trim().toLowerCase();
+    if (!query) return persons;
     return persons.filter(
-      (r) =>
-        (r.customerName || '').toLowerCase().includes(q) ||
-        (r.customerPhone || '').toLowerCase().includes(q) ||
-        (r.customerEmail || '').toLowerCase().includes(q),
+      (row) =>
+        (row.customerName || '').toLowerCase().includes(query) ||
+        (row.customerPhone || '').toLowerCase().includes(query) ||
+        (row.customerEmail || '').toLowerCase().includes(query),
     );
   }, [persons, search]);
 
   useEffect(() => {
-    if (open) {
-      packagePricingApi.list().then(setPricing).catch(() => setPricing([]));
-      setSelectedPerson(initialPerson ?? null);
-      setCreateNew(false);
-      setSearch('');
-      setNewName('');
-      setNewPhone('');
-      setNewEmail('');
-      setNewAge('');
-      setSelectedPackages(new Set());
-      setPackageConfigs({});
-      setError(null);
-      setStep(initialPerson ? 2 : 1);
-    }
-  }, [open, initialPerson]);
+    if (!open) return;
+    setSelectedPerson(initialPerson ?? null);
+    setCreateNew(false);
+    setSearch('');
+    setNewName('');
+    setNewPhone('');
+    setNewEmail('');
+    setNewAge('');
+    setSelectedPackages(new Set());
+    setPackageConfigs({});
+    setPeriodStartsAt('');
+    setError(null);
+    setStep(initialPerson ? 2 : 1);
+  }, [initialPerson, open]);
 
   useEffect(() => {
     if (!open) return;
-    const next: Record<string, PackageConfig> = {};
-    selectedPackages.forEach((pkg) => {
-      if (packageConfigs[pkg]) next[pkg] = packageConfigs[pkg];
-      else {
-        const defaultPrice = defaultPricesByPackage?.[pkg];
-        const p = pricing.find((x) => x.packageName === pkg);
-        const baseJod = defaultPrice ?? p?.basePriceJod;
-        next[pkg] = {
-          packageName: pkg,
-          basePriceJod: baseJod != null ? String(baseJod) : '',
+    setPackageConfigs((prev) => {
+      const nextConfigs: Record<string, PackageConfig> = {};
+      selectedPackages.forEach((packageName) => {
+        if (prev[packageName]) {
+          nextConfigs[packageName] = prev[packageName];
+          return;
+        }
+        const defaultPrice = getPackageDefaultPrice(packageName, defaultPricesByPackage);
+        nextConfigs[packageName] = {
+          packageName,
+          basePriceJod: defaultPrice != null ? String(defaultPrice) : '',
           discountType: 'NONE',
           discountValue: '',
           discountReason: '',
         };
-      }
+      });
+      return nextConfigs;
     });
-    setPackageConfigs(next);
-  }, [open, selectedPackages, pricing, defaultPricesByPackage]);
+  }, [defaultPricesByPackage, open, selectedPackages]);
 
   const currentPerson = selectedPerson
-    ? { customerName: selectedPerson.customerName, customerPhone: selectedPerson.customerPhone, customerEmail: selectedPerson.customerEmail ?? null, customerAge: selectedPerson.customerAge ?? null }
+    ? {
+        customerName: selectedPerson.customerName,
+        customerPhone: selectedPerson.customerPhone,
+        customerEmail: selectedPerson.customerEmail ?? null,
+        customerAge: selectedPerson.customerAge ?? null,
+      }
     : createNew
-      ? { customerName: newName.trim(), customerPhone: newPhone.trim(), customerEmail: newEmail.trim() || null, customerAge: newAge.trim() ? parseInt(newAge, 10) : null }
+      ? {
+          customerName: newName.trim(),
+          customerPhone: newPhone.trim(),
+          customerEmail: newEmail.trim() || null,
+          customerAge: newAge.trim() ? parseInt(newAge, 10) : null,
+        }
       : null;
 
-  function togglePackage(pkg: string) {
+  function togglePackage(packageName: string) {
     setSelectedPackages((prev) => {
       const next = new Set(prev);
-      if (next.has(pkg)) next.delete(pkg);
-      else next.add(pkg);
+      if (next.has(packageName)) next.delete(packageName);
+      else next.add(packageName);
       return next;
     });
   }
 
-  function updateConfig(pkg: string, upd: Partial<PackageConfig>) {
-    setPackageConfigs((prev) => ({ ...prev, [pkg]: { ...prev[pkg], ...upd } }));
+  function updateConfig(packageName: string, patch: Partial<PackageConfig>) {
+    setPackageConfigs((prev) => ({
+      ...prev,
+      [packageName]: { ...prev[packageName], ...patch },
+    }));
   }
 
   const canGoStep2 = currentPerson && currentPerson.customerName && currentPerson.customerPhone;
   const canGoStep3 = selectedPackages.size >= 1;
-  const configsValid = Array.from(selectedPackages).every((pkg) => {
-    const c = packageConfigs[pkg];
-    if (!c) return false;
-    const base = c.basePriceJod.trim() === '' ? 0 : parseInt(c.basePriceJod, 10) || 0;
-    const isManual = pricing.find((x) => x.packageName === pkg)?.basePriceJod == null;
+  const configsValid = Array.from(selectedPackages).every((packageName) => {
+    const config = packageConfigs[packageName];
+    if (!config) return false;
+    const base = config.basePriceJod.trim() === '' ? 0 : parseInt(config.basePriceJod, 10) || 0;
+    const isManual = !hasPackageDefaultPrice(packageName, defaultPricesByPackage);
     if (isManual && base === 0) return false;
-    if (c.discountType !== 'NONE' && !c.discountReason.trim()) return false;
+    if (config.discountType !== 'NONE' && !config.discountReason.trim()) return false;
     return true;
   });
 
@@ -169,41 +171,36 @@ export function RegisterPersonMultiPackageModal({
     setError(null);
     setLoading(true);
     try {
-      const registrations = Array.from(selectedPackages).map((pkg) => {
-        const c = packageConfigs[pkg];
-        const base = Math.max(0, c?.basePriceJod?.trim() === '' ? 0 : parseInt(c?.basePriceJod ?? '0', 10) || 0);
-        const hasDefaultPrice = (defaultPricesByPackage?.[pkg] ?? pricing.find((x) => x.packageName === pkg)?.basePriceJod) != null;
-        const discountType = (c?.discountType ?? 'NONE').toUpperCase();
-        const discountVal = discountType === 'NONE' ? 0 : parseFloat(c?.discountValue ?? '0') || 0;
+      const registrations = Array.from(selectedPackages).map((packageName) => {
+        const config = packageConfigs[packageName];
+        const base = Math.max(0, config?.basePriceJod?.trim() === '' ? 0 : parseInt(config?.basePriceJod ?? '0', 10) || 0);
+        const hasDefault = hasPackageDefaultPrice(packageName, defaultPricesByPackage);
+        const nextDiscountType = (config?.discountType ?? 'NONE').toUpperCase();
+        const nextDiscountValue = nextDiscountType === 'NONE' ? 0 : parseFloat(config?.discountValue ?? '0') || 0;
         return {
-          packageName: pkg,
-          basePriceJod: hasDefaultPrice && base === 0 ? undefined : base,
-          discountType,
-          discountValue: discountType === 'NONE' ? null : discountVal,
-          discountReason: discountType === 'NONE' ? undefined : (c?.discountReason ?? '').trim(),
+          packageName,
+          basePriceJod: hasDefault && base === 0 ? undefined : base,
+          discountType: nextDiscountType,
+          discountValue: nextDiscountType === 'NONE' ? null : nextDiscountValue,
+          discountReason: nextDiscountType === 'NONE' ? undefined : (config?.discountReason ?? '').trim(),
           periodStartsAt: periodStartsAt.trim() || undefined,
         };
       });
-      const res = await packageRegistrationsApi.bulkCreateForPerson({
+      const response = await packageRegistrationsApi.bulkCreateForPerson({
         person: currentPerson,
         periodStartsAt: periodStartsAt.trim() || undefined,
         registrations,
       });
-      onSuccess(res.created);
+      onSuccess(response.created);
       onClose();
-    } catch (e: any) {
-      setError(e?.message || 'Failed to create registrations');
+    } catch (err: any) {
+      setError(err?.message || 'Failed to create registrations');
     } finally {
       setLoading(false);
     }
   }
 
-  const packageList = packageOptions.length ? packageOptions : [
-    'Basketball - Little Kobes U10', 'Basketball - Ballers & Hoopers U12–U14', 'Basketball - Warriors',
-    'Basketball - Private 1v1 Sessions', 'Basketball - Small Groups',
-    'Gymnastics Package A', 'Gymnastics Package B', 'Gymnastics Package C', 'Gymnastics Package D',
-    'Volleyball',
-  ];
+  const packageList = Array.from(new Set((packageOptions || []).filter(Boolean))).sort((left, right) => left.localeCompare(right));
 
   return (
     <Modal open={open} onClose={onClose} title="Register person in multiple packages" size="xl">
@@ -231,21 +228,28 @@ export function RegisterPersonMultiPackageModal({
           ) : (
             <div className="max-h-[40vh] overflow-y-auto rounded-lg border border-ui-border">
               {filteredPersons.length === 0 ? (
-                <div className="p-4 text-center text-ui-textMuted text-sm">No match. Use “Create new person” or adjust search.</div>
+                <div className="p-4 text-center text-sm text-ui-textMuted">No match. Use "Create new person" or adjust search.</div>
               ) : (
                 <ul className="divide-y divide-ui-border">
-                  {filteredPersons.map((r) => (
-                    <li key={r.id}>
+                  {filteredPersons.map((row) => (
+                    <li key={row.id}>
                       <button
                         type="button"
                         onClick={() => {
-                          setSelectedPerson({ customerName: r.customerName, customerPhone: r.customerPhone, customerEmail: r.customerEmail ?? undefined, customerAge: r.customerAge ?? undefined });
+                          setSelectedPerson({
+                            customerName: row.customerName,
+                            customerPhone: row.customerPhone,
+                            customerEmail: row.customerEmail ?? undefined,
+                            customerAge: row.customerAge ?? undefined,
+                          });
                           setCreateNew(false);
                         }}
-                        className={`w-full px-4 py-3 text-left hover:bg-ui-softBg transition ${selectedPerson?.customerPhone === r.customerPhone ? 'bg-brand-blue-primary/10' : ''}`}
+                        className={`w-full px-4 py-3 text-left transition hover:bg-ui-softBg ${
+                          selectedPerson?.customerPhone === row.customerPhone ? 'bg-brand-blue-primary/10' : ''
+                        }`}
                       >
-                        <span className="font-medium text-ui-textPrimary">{r.customerName}</span>
-                        <span className="ml-2 text-ui-textMuted">{r.customerPhone}</span>
+                        <span className="font-medium text-ui-textPrimary">{row.customerName}</span>
+                        <span className="ml-2 text-ui-textMuted">{row.customerPhone}</span>
                       </button>
                     </li>
                   ))}
@@ -271,21 +275,22 @@ export function RegisterPersonMultiPackageModal({
               type="date"
               value={periodStartsAt}
               onChange={(e) => setPeriodStartsAt(e.target.value)}
+              hint="When they start or started. Leave empty for today."
             />
-            <p className="mt-0.5 text-xs text-ui-textMuted">When they start/started. Leave empty for today.</p>
           </div>
           <div className="max-h-[40vh] overflow-y-auto rounded-lg border border-ui-border p-3">
-            {packageList.map((pkg) => (
-              <label key={pkg} className="flex items-center gap-3 py-2 hover:bg-ui-softBg/50 rounded px-2">
+            {packageList.map((packageName) => (
+              <label key={packageName} className="flex items-center gap-3 rounded px-2 py-2 hover:bg-ui-softBg/50">
                 <input
                   type="checkbox"
-                  checked={selectedPackages.has(pkg)}
-                  onChange={() => togglePackage(pkg)}
+                  checked={selectedPackages.has(packageName)}
+                  onChange={() => togglePackage(packageName)}
                   className="rounded border-ui-border"
                 />
-                <span className="text-ui-textPrimary">{pkg}</span>
+                <span className="text-ui-textPrimary">{packageName}</span>
               </label>
             ))}
+            {packageList.length === 0 && <p className="text-sm text-ui-textMuted">No packages are available yet.</p>}
           </div>
           <div className="mt-6 flex justify-between">
             <Button variant="secondary" onClick={() => setStep(1)}>Back</Button>
@@ -297,39 +302,68 @@ export function RegisterPersonMultiPackageModal({
       {step === 3 && (
         <>
           <p className="mb-4 text-sm text-ui-textMuted">Set price and optional discount for each package.</p>
-          <div className="space-y-4 max-h-[45vh] overflow-y-auto">
-            {Array.from(selectedPackages).map((pkg) => {
-              const c = packageConfigs[pkg] ?? { packageName: pkg, basePriceJod: '', discountType: 'NONE' as const, discountValue: '', discountReason: '' };
-              const isManual = pricing.find((x) => x.packageName === pkg)?.basePriceJod == null;
-              const baseNum = c.basePriceJod.trim() === '' ? 0 : parseInt(c.basePriceJod, 10) || 0;
-              const discountVal = c.discountType === 'NONE' ? 0 : parseFloat(c.discountValue) || 0;
-              const finalPrice = computeFinalPrice(baseNum, c.discountType, discountVal);
-              const sessions = getSessionsForPackage(pkg);
+          <div className="max-h-[45vh] space-y-4 overflow-y-auto">
+            {Array.from(selectedPackages).map((packageName) => {
+              const config = packageConfigs[packageName] ?? {
+                packageName,
+                basePriceJod: '',
+                discountType: 'NONE' as const,
+                discountValue: '',
+                discountReason: '',
+              };
+              const isManual = !hasPackageDefaultPrice(packageName, defaultPricesByPackage);
+              const base = config.basePriceJod.trim() === '' ? 0 : parseInt(config.basePriceJod, 10) || 0;
+              const discountNumber = config.discountType === 'NONE' ? 0 : parseFloat(config.discountValue) || 0;
+              const finalPrice = computeFinalPrice(base, config.discountType, discountNumber);
+              const sessions = getPackageDefaultSessions(packageName, defaultSessionsByPackage);
+
               return (
-                <div key={pkg} className="rounded-lg border border-ui-border p-4 bg-ui-softBg/30">
-                  <p className="font-semibold text-ui-textPrimary mb-3">{pkg}</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                <div key={packageName} className="rounded-lg border border-ui-border bg-ui-softBg/30 p-4">
+                  <p className="mb-3 font-semibold text-ui-textPrimary">{packageName}</p>
+                  <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="block text-xs text-ui-textMuted mb-1">Base price (JOD)</label>
+                      <label className="mb-1 block text-xs text-ui-textMuted">Base price (JOD)</label>
                       {isManual ? (
-                        <Input type="number" min={0} value={c.basePriceJod} onChange={(e) => updateConfig(pkg, { basePriceJod: e.target.value })} placeholder="Enter price" />
+                        <Input
+                          type="number"
+                          min={0}
+                          value={config.basePriceJod}
+                          onChange={(e) => updateConfig(packageName, { basePriceJod: e.target.value })}
+                          placeholder="Enter price"
+                        />
                       ) : (
-                        <Input type="number" min={0} value={c.basePriceJod} onChange={(e) => updateConfig(pkg, { basePriceJod: e.target.value })} placeholder="Auto" />
+                        <div className="rounded-xl border border-ui-border bg-white px-3 py-2.5 text-sm text-ui-textPrimary">
+                          {config.basePriceJod !== '' ? `${config.basePriceJod} JOD` : '-'}
+                        </div>
                       )}
                     </div>
                     <div>
-                      <label className="block text-xs text-ui-textMuted mb-1">Discount</label>
-                      <Select value={c.discountType} onChange={(e) => updateConfig(pkg, { discountType: e.target.value as 'NONE' | 'PERCENT' | 'AMOUNT' })}>
+                      <label className="mb-1 block text-xs text-ui-textMuted">Discount</label>
+                      <Select
+                        value={config.discountType}
+                        onChange={(e) => updateConfig(packageName, { discountType: e.target.value as 'NONE' | 'PERCENT' | 'AMOUNT' })}
+                      >
                         <option value="NONE">None</option>
                         <option value="PERCENT">Percent (%)</option>
                         <option value="AMOUNT">Amount (JOD)</option>
                       </Select>
                     </div>
                   </div>
-                  {c.discountType !== 'NONE' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                      <Input label={c.discountType === 'PERCENT' ? 'Value %' : 'Value (JOD)'} type="number" min={0} value={c.discountValue} onChange={(e) => updateConfig(pkg, { discountValue: e.target.value })} />
-                      <Input label="Reason" value={c.discountReason} onChange={(e) => updateConfig(pkg, { discountReason: e.target.value })} placeholder="Required" />
+                  {config.discountType !== 'NONE' && (
+                    <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <Input
+                        label={config.discountType === 'PERCENT' ? 'Value %' : 'Value (JOD)'}
+                        type="number"
+                        min={0}
+                        value={config.discountValue}
+                        onChange={(e) => updateConfig(packageName, { discountValue: e.target.value })}
+                      />
+                      <Input
+                        label="Reason"
+                        value={config.discountReason}
+                        onChange={(e) => updateConfig(packageName, { discountReason: e.target.value })}
+                        placeholder="Required"
+                      />
                     </div>
                   )}
                   <div className="flex flex-wrap items-center gap-4 text-sm">

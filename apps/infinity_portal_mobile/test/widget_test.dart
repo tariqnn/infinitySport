@@ -129,7 +129,7 @@ class _FakePortalRepository implements PortalRepository {
       const PackageOption(
         id: 'pkg-1',
         sportType: 'Basketball',
-        name: 'Basketball - Little Kobes U10',
+        name: 'Basketball - Little Kobes U12-U10',
         description: 'Foundation sessions',
         sessionsCount: 12,
         trackingType: 'SESSIONS',

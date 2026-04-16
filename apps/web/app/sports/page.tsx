@@ -11,71 +11,77 @@ type PackageItem = Awaited<ReturnType<typeof fetchPackages>>[number];
 
 const SPORT_ORDER = ['VOLLEYBALL', 'BOXING', 'BASKETBALL', 'GYMNASTICS'];
 
-/* Sport-specific SVG icons (athletic silhouettes), accent colors, taglines */
+/* ── Sport-specific config ── */
 const SPORT_META: Record<string, {
   tagline: string;
   accent: string;
-  accentLight: string;
-  accentDark: string;
+  accentSecondary: string;
   iconSvg: React.ReactNode;
 }> = {
   VOLLEYBALL: {
     tagline: 'Powered by Spikers Academy',
     accent: '#141AFF',
-    accentLight: '#141AFF',
-    accentDark: '#0A1F8C',
+    accentSecondary: '#6BA5E8',
     iconSvg: (
-      <svg viewBox="0 0 64 64" fill="none" className="h-full w-full">
-        <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="3" opacity="0.9"/>
-        <path d="M32 4C32 4 20 20 20 32C20 44 32 60 32 60" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" opacity="0.7"/>
-        <path d="M4 32C4 32 20 20 32 20C44 20 60 32 60 32" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" opacity="0.7"/>
-        <path d="M8 16C8 16 24 28 32 32C40 36 56 48 56 48" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" opacity="0.5"/>
+      <svg viewBox="0 0 48 48" fill="none" className="h-full w-full" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="2.5"/>
+        <path d="M24 4c-4 8-4 16 0 20s4 12 0 20" stroke="currentColor" strokeWidth="2" opacity="0.6"/>
+        <path d="M6 16c8 2 14 6 18 8s10 2 18-2" stroke="currentColor" strokeWidth="2" opacity="0.6"/>
+        <path d="M6 32c8-4 12-6 18-8s12-2 18 2" stroke="currentColor" strokeWidth="2" opacity="0.6"/>
       </svg>
     ),
   },
   BASKETBALL: {
     tagline: 'Infinity Sports Basketball Academy',
     accent: '#141AFF',
-    accentLight: '#4A7FFF',
-    accentDark: '#0A1F8C',
+    accentSecondary: '#4A7FFF',
     iconSvg: (
-      <svg viewBox="0 0 64 64" fill="none" className="h-full w-full">
-        <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="3" opacity="0.9"/>
-        <path d="M32 4V60" stroke="currentColor" strokeWidth="2.5" opacity="0.7"/>
-        <path d="M4 32H60" stroke="currentColor" strokeWidth="2.5" opacity="0.7"/>
-        <path d="M10 10C20 20 28 28 28 32C28 36 20 44 10 54" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" opacity="0.5"/>
-        <path d="M54 10C44 20 36 28 36 32C36 36 44 44 54 54" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" opacity="0.5"/>
+      <svg viewBox="0 0 48 48" fill="none" className="h-full w-full" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="2.5"/>
+        <line x1="24" y1="4" x2="24" y2="44" stroke="currentColor" strokeWidth="2"/>
+        <line x1="4" y1="24" x2="44" y2="24" stroke="currentColor" strokeWidth="2"/>
+        <path d="M8 8c6 6 10 12 10 16s-4 10-10 16" stroke="currentColor" strokeWidth="2" opacity="0.5"/>
+        <path d="M40 8c-6 6-10 12-10 16s4 10 10 16" stroke="currentColor" strokeWidth="2" opacity="0.5"/>
       </svg>
     ),
   },
   GYMNASTICS: {
     tagline: 'Powered by Phoenix Academy',
     accent: '#60D066',
-    accentLight: '#60D066',
-    accentDark: '#1A4D3A',
+    accentSecondary: '#4DD4C4',
     iconSvg: (
-      <svg viewBox="0 0 64 64" fill="none" className="h-full w-full">
-        <circle cx="32" cy="12" r="6" stroke="currentColor" strokeWidth="2.5" opacity="0.9"/>
-        <path d="M32 18V36" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
-        <path d="M32 36L20 52" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-        <path d="M32 36L44 52" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-        <path d="M18 24L32 28L46 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" opacity="0.8"/>
+      <svg viewBox="0 0 48 48" fill="none" className="h-full w-full" strokeLinecap="round" strokeLinejoin="round">
+        {/* Head */}
+        <circle cx="24" cy="8" r="4.5" stroke="currentColor" strokeWidth="2.5"/>
+        {/* Body doing a Y-pose / star pose */}
+        <path d="M24 12.5V26" stroke="currentColor" strokeWidth="2.5"/>
+        {/* Arms reaching up and out like a gymnastics pose */}
+        <path d="M24 18L14 10" stroke="currentColor" strokeWidth="2.5"/>
+        <path d="M24 18L34 10" stroke="currentColor" strokeWidth="2.5"/>
+        {/* Legs in a split / dynamic pose */}
+        <path d="M24 26L16 40" stroke="currentColor" strokeWidth="2.5"/>
+        <path d="M24 26L32 40" stroke="currentColor" strokeWidth="2.5"/>
+        {/* Balance beam */}
+        <line x1="10" y1="42" x2="38" y2="42" stroke="currentColor" strokeWidth="2" opacity="0.4"/>
       </svg>
     ),
   },
   BOXING: {
     tagline: 'Train like a champion',
     accent: '#141AFF',
-    accentLight: '#141AFF',
-    accentDark: '#0A1F8C',
+    accentSecondary: '#0A1F8C',
     iconSvg: (
-      <svg viewBox="0 0 64 64" fill="none" className="h-full w-full">
-        <path d="M16 20C16 14 20 10 28 10H36C42 10 48 14 48 22V34C48 40 44 44 38 44H26C20 44 16 40 16 34V20Z" stroke="currentColor" strokeWidth="3" strokeLinecap="round" opacity="0.9"/>
-        <path d="M24 44V54" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
-        <path d="M40 44V54" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
-        <path d="M20 54H44" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
-        <path d="M28 22V32" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.5"/>
-        <path d="M36 22V32" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.5"/>
+      <svg viewBox="0 0 48 48" fill="none" className="h-full w-full" strokeLinecap="round" strokeLinejoin="round">
+        {/* Boxing glove shape */}
+        <path d="M14 14c0-4 3-7 8-7h4c5 0 9 3 9 9v10c0 5-3 8-7 8H20c-4 0-6-3-6-6V14z" stroke="currentColor" strokeWidth="2.5"/>
+        {/* Thumb */}
+        <path d="M14 18c-3 0-5 2-5 5v3c0 3 2 5 5 5" stroke="currentColor" strokeWidth="2.5"/>
+        {/* Wrist wrap */}
+        <path d="M17 34v6h14v-6" stroke="currentColor" strokeWidth="2.5"/>
+        {/* Knuckle lines */}
+        <line x1="20" y1="16" x2="20" y2="22" stroke="currentColor" strokeWidth="1.5" opacity="0.4"/>
+        <line x1="25" y1="15" x2="25" y2="21" stroke="currentColor" strokeWidth="1.5" opacity="0.4"/>
+        <line x1="30" y1="16" x2="30" y2="22" stroke="currentColor" strokeWidth="1.5" opacity="0.4"/>
       </svg>
     ),
   },
@@ -150,14 +156,14 @@ export default async function SportsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Hero */}
+      {/* ════════════════════ HERO ════════════════════ */}
       <section className="relative overflow-hidden bg-brand-black">
-        {/* Dynamic background shapes */}
-        <div className="absolute inset-0">
-          <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-[#141AFF]/20 blur-[120px]" />
-          <div className="absolute -right-32 top-1/2 h-80 w-80 rounded-full bg-[#60D066]/15 blur-[100px]" />
-          <div className="absolute bottom-0 left-1/2 h-64 w-[500px] -translate-x-1/2 rounded-full bg-[#6BA5E8]/10 blur-[80px]" />
-          {/* Diagonal grid lines */}
+        {/* Animated glow orbs */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="animate-glow-1 absolute -left-32 -top-32 h-[500px] w-[500px] rounded-full bg-[#141AFF]/20 blur-[120px]" />
+          <div className="animate-glow-2 absolute -right-20 top-1/3 h-[400px] w-[400px] rounded-full bg-[#60D066]/15 blur-[100px]" />
+          <div className="animate-glow-3 absolute bottom-0 left-1/3 h-[350px] w-[350px] rounded-full bg-[#6BA5E8]/10 blur-[90px]" />
+          {/* Diagonal grid */}
           <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: 'repeating-linear-gradient(45deg, white 0px, white 1px, transparent 1px, transparent 60px)' }} />
         </div>
 
@@ -176,7 +182,7 @@ export default async function SportsPage() {
             Elite training programs designed by certified coaches. Pick your sport, choose your level, and start your journey.
           </p>
 
-          {/* Sport Quick Nav Pills */}
+          {/* Sport Quick Nav */}
           {orderedSports.length > 1 && (
             <div className="mt-12 flex flex-wrap items-center justify-center gap-3">
               {orderedSports.map((sport) => {
@@ -187,11 +193,16 @@ export default async function SportsPage() {
                     href={`#${sport.toLowerCase()}`}
                     className="group inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm font-bold text-white backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/10"
                   >
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full text-white/80" style={{ backgroundColor: `${meta?.accent || '#141AFF'}20` }}>
-                      <span className="h-5 w-5">{meta?.iconSvg}</span>
+                    <span
+                      className="flex h-8 w-8 items-center justify-center rounded-full p-1.5"
+                      style={{ backgroundColor: `${meta?.accent || '#141AFF'}25`, color: meta?.accent || '#fff' }}
+                    >
+                      {meta?.iconSvg}
                     </span>
                     {displaySport(sport)}
-                    <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-white/60">{groups.get(sport)?.length || 0}</span>
+                    <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-white/60">
+                      {groups.get(sport)?.length || 0}
+                    </span>
                   </a>
                 );
               })}
@@ -199,34 +210,54 @@ export default async function SportsPage() {
           )}
         </div>
 
-        {/* Angled bottom edge */}
+        {/* Angled bottom */}
         <div className="absolute bottom-0 left-0 right-0 h-10 bg-gray-50 sm:h-12" style={{ clipPath: 'polygon(0 60%, 100% 100%, 100% 100%, 0 100%)' }} />
       </section>
 
-      {/* Sports Sections */}
+      {/* ════════════════════ SPORTS ════════════════════ */}
       {orderedSports.length > 0 ? (
         <div className="mx-auto max-w-7xl px-6 py-12 lg:px-8 lg:py-20">
           <div className="space-y-16 lg:space-y-24">
             {orderedSports.map((sport, sportIndex) => {
               const sportPrograms = groups.get(sport) || [];
               const meta = SPORT_META[sport] || {
-                tagline: '', accent: '#141AFF', accentLight: '#141AFF', accentDark: '#0A1F8C',
-                iconSvg: <svg viewBox="0 0 64 64" fill="none" className="h-full w-full"><circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="3"/></svg>,
+                tagline: '', accent: '#141AFF', accentSecondary: '#6BA5E8',
+                iconSvg: <svg viewBox="0 0 48 48" fill="none" className="h-full w-full"><circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="2.5"/></svg>,
               };
               const isEven = sportIndex % 2 === 0;
 
               return (
                 <section key={sport} id={sport.toLowerCase()} className="scroll-mt-24">
-                  {/* Sport Banner */}
-                  <div className="relative mb-10 overflow-hidden rounded-3xl bg-brand-black" style={{ minHeight: '180px' }}>
-                    {/* Background glow */}
-                    <div className="absolute inset-0">
+                  {/* ── Sport Banner ── */}
+                  <div className="relative mb-10 overflow-hidden rounded-3xl bg-brand-black" style={{ minHeight: '160px' }}>
+                    {/* Animated glow */}
+                    <div className="absolute inset-0 overflow-hidden">
                       <div
-                        className="absolute h-full w-1/2 rounded-full blur-[80px] opacity-30"
+                        className={isEven ? 'animate-glow-1' : 'animate-glow-2'}
                         style={{
+                          position: 'absolute',
+                          width: '300px', height: '300px',
+                          borderRadius: '50%',
                           backgroundColor: meta.accent,
-                          [isEven ? 'right' : 'left']: '-10%',
-                          top: '-30%',
+                          opacity: 0.15,
+                          filter: 'blur(80px)',
+                          right: isEven ? '-5%' : undefined,
+                          left: isEven ? undefined : '-5%',
+                          top: '-20%',
+                        }}
+                      />
+                      <div
+                        className={isEven ? 'animate-glow-3' : 'animate-glow-1'}
+                        style={{
+                          position: 'absolute',
+                          width: '200px', height: '200px',
+                          borderRadius: '50%',
+                          backgroundColor: meta.accentSecondary,
+                          opacity: 0.1,
+                          filter: 'blur(60px)',
+                          left: isEven ? '10%' : undefined,
+                          right: isEven ? undefined : '10%',
+                          bottom: '-10%',
                         }}
                       />
                       {/* Diagonal lines */}
@@ -236,7 +267,7 @@ export default async function SportsPage() {
                     <div className="relative flex flex-col gap-6 p-8 sm:flex-row sm:items-center sm:p-10 lg:p-12">
                       {/* Sport Icon */}
                       <div
-                        className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-2xl border border-white/10 p-4 backdrop-blur-sm sm:h-24 sm:w-24"
+                        className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-2xl border border-white/10 p-4 backdrop-blur-sm sm:h-24 sm:w-24 sm:p-5"
                         style={{ backgroundColor: `${meta.accent}15`, color: meta.accent }}
                       >
                         {meta.iconSvg}
@@ -265,7 +296,7 @@ export default async function SportsPage() {
                     </div>
                   </div>
 
-                  {/* Program Cards Grid */}
+                  {/* ── Cards Grid ── */}
                   <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {sportPrograms.map((program) => {
                       const bullets = getBullets(program);
@@ -277,18 +308,21 @@ export default async function SportsPage() {
                           className="group relative flex flex-col overflow-hidden rounded-2xl border border-gray-200/80 bg-white transition-all duration-500 hover:-translate-y-2 hover:shadow-card-hover"
                           style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}
                         >
-                          {/* Top accent */}
-                          <div className="h-1.5 w-full transition-all duration-500 group-hover:h-2" style={{ background: `linear-gradient(90deg, ${meta.accent}, ${meta.accentLight}, ${meta.accent})`, backgroundSize: '200% 100%' }} />
+                          {/* Animated accent bar */}
+                          <div
+                            className="animate-accent-bar h-1.5 w-full transition-all duration-500 group-hover:h-2"
+                            style={{ backgroundImage: `linear-gradient(90deg, ${meta.accent}, ${meta.accentSecondary}, ${meta.accent})`, backgroundSize: '200% 100%' }}
+                          />
 
                           <div className="flex flex-1 flex-col p-6">
-                            {/* Header row: title + sport badge */}
+                            {/* Header */}
                             <div className="flex items-start justify-between gap-3">
                               <h3 className="text-lg font-extrabold text-brand-black transition-colors duration-300 group-hover:text-[#141AFF] sm:text-xl">
                                 {cleanProgramTitle(program.name, program.sportType)}
                               </h3>
                               <div
-                                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg p-1.5"
-                                style={{ backgroundColor: `${meta.accent}10`, color: meta.accent }}
+                                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl p-2 transition-transform duration-300 group-hover:scale-110"
+                                style={{ backgroundColor: `${meta.accent}0D`, color: meta.accent }}
                               >
                                 {meta.iconSvg}
                               </div>
@@ -335,14 +369,13 @@ export default async function SportsPage() {
                               </div>
                             )}
 
-                            {/* Spacer */}
                             <div className="flex-1" />
 
                             {/* Price + CTA */}
                             <div className="mt-6 flex items-end justify-between gap-4 border-t border-gray-100 pt-5">
                               <div>
                                 {contactOnly ? (
-                                  <p className="text-sm font-bold text-gray-400 italic">Contact for pricing</p>
+                                  <p className="text-sm font-bold italic text-gray-400">Contact for pricing</p>
                                 ) : (
                                   <>
                                     <div className="flex items-baseline gap-1">
@@ -385,11 +418,11 @@ export default async function SportsPage() {
         </div>
       )}
 
-      {/* Bottom CTA */}
+      {/* ════════════════════ BOTTOM CTA ════════════════════ */}
       <section className="relative overflow-hidden bg-brand-black">
-        <div className="absolute inset-0">
-          <div className="absolute -right-20 top-0 h-64 w-64 rounded-full bg-[#141AFF]/20 blur-[80px]" />
-          <div className="absolute -left-20 bottom-0 h-48 w-48 rounded-full bg-[#60D066]/15 blur-[60px]" />
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="animate-glow-2 absolute -right-20 top-0 h-64 w-64 rounded-full bg-[#141AFF]/20 blur-[80px]" />
+          <div className="animate-glow-1 absolute -left-20 bottom-0 h-48 w-48 rounded-full bg-[#60D066]/15 blur-[60px]" />
           <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: 'repeating-linear-gradient(45deg, white 0px, white 1px, transparent 1px, transparent 60px)' }} />
         </div>
         <div className="relative mx-auto max-w-4xl px-6 py-20 text-center lg:px-8">

@@ -4,11 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 Future<FirebaseApp> ensureFirebaseInitialized() async {
-  if (Firebase.apps.isNotEmpty) {
-    return Firebase.app();
-  }
-
-  final app = await Firebase.initializeApp(options: kInfinityFirebaseOptions);
+  final app = Firebase.apps.isNotEmpty
+      ? Firebase.app()
+      : await Firebase.initializeApp(options: kInfinityFirebaseOptions);
   await _ensureAnonymousAuth();
   return app;
 }

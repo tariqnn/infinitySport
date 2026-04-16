@@ -440,6 +440,101 @@ export const financeApi = {
     update: (id: string, data: unknown) => portalFetch<unknown>(`/portal/petty-cash/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: (id: string) => portalFetch<void>(`/portal/petty-cash/${id}`, { method: 'DELETE' }),
   },
+  cashBookCategories: {
+    list: (companyId?: string, type?: CashBookTransactionType) => {
+      const params = new URLSearchParams();
+      if (companyId) params.append('companyId', companyId);
+      if (type) params.append('type', type);
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return portalFetch<CashBookCategoryRow[]>(`/portal/cash-book-categories${query}`);
+    },
+    create: (data: {
+      companyId?: string;
+      company?: { connect: { id: string } };
+      type: CashBookTransactionType;
+      name: string;
+    }) => portalFetch<CashBookCategoryRow>('/portal/cash-book-categories', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: { name?: string; type?: CashBookTransactionType }) =>
+      portalFetch<CashBookCategoryRow>(`/portal/cash-book-categories/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: (id: string, force = false) =>
+      portalFetch<void>(`/portal/cash-book-categories/${id}${force ? '?force=1' : ''}`, { method: 'DELETE' }),
+  },
+  cashBookTransactions: {
+    list: (filters?: {
+      companyId?: string;
+      type?: CashBookTransactionType | 'ALL';
+      startDate?: string;
+      endDate?: string;
+      search?: string;
+    }) => {
+      const params = new URLSearchParams();
+      if (filters?.companyId) params.append('companyId', filters.companyId);
+      if (filters?.type && filters.type !== 'ALL') params.append('type', filters.type);
+      if (filters?.startDate) params.append('startDate', filters.startDate);
+      if (filters?.endDate) params.append('endDate', filters.endDate);
+      if (filters?.search) params.append('search', filters.search);
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return portalFetch<CashBookTransactionRow[]>(`/portal/cash-book-transactions${query}`);
+    },
+    create: (data: {
+      companyId?: string;
+      company?: { connect: { id: string } };
+      type: CashBookTransactionType;
+      amount: number;
+      categoryId?: string | null;
+      note?: string | null;
+      date: string;
+      attachmentUrl?: string | null;
+      attachmentName?: string | null;
+      attachmentType?: string | null;
+      attachmentSize?: number | null;
+    }) => portalFetch<CashBookTransactionRow>('/portal/cash-book-transactions', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: {
+      type?: CashBookTransactionType;
+      amount?: number;
+      categoryId?: string | null;
+      note?: string | null;
+      date?: string;
+      attachmentUrl?: string | null;
+      attachmentName?: string | null;
+      attachmentType?: string | null;
+      attachmentSize?: number | null;
+    }) => portalFetch<CashBookTransactionRow>(`/portal/cash-book-transactions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: (id: string) => portalFetch<void>(`/portal/cash-book-transactions/${id}`, { method: 'DELETE' }),
+  },
+};
+
+export type CashBookTransactionType = 'INCOME' | 'EXPENSE';
+
+export type CashBookCategoryRow = {
+  id: string;
+  companyId: string;
+  name: string;
+  type: CashBookTransactionType;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+  _count?: {
+    transactions: number;
+  };
+};
+
+export type CashBookTransactionRow = {
+  id: string;
+  companyId: string;
+  type: CashBookTransactionType;
+  categoryId: string | null;
+  categoryName: string;
+  amount: number;
+  note: string | null;
+  date: string;
+  attachmentUrl: string | null;
+  attachmentName: string | null;
+  attachmentType: string | null;
+  attachmentSize: number | null;
+  createdAt: string;
+  updatedAt: string;
+  category?: CashBookCategoryRow | null;
 };
 
 export const inventoryApi = {
@@ -788,6 +883,20 @@ export const packagePricingApi = {
 
 export const packagesApi = {
   list: () => portalDbFetch<PackageOption[]>('/portal/packages'),
+  update: (
+    id: string,
+    data: Partial<{
+      name: string;
+      sportType: string;
+      description: string | null;
+      sessionsCount: number;
+      trackingType: string;
+      pricingType: string;
+      currentPriceJod: number | null;
+      isActive: boolean;
+      sortOrder: number;
+    }>
+  ) => portalDbFetch<PackageOption>(`/portal/packages/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 };
 
 export const receiptsApi = {
@@ -898,4 +1007,3 @@ export async function getFirstCompany(): Promise<CompanyLite | null> {
     return null;
   }
 }
-

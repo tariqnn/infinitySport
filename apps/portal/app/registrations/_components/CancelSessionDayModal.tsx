@@ -4,19 +4,6 @@ import { useState } from 'react';
 import { Modal, Input, Select, Button } from '../../_components/ui';
 import { packageSessionCanceledApi } from '../../../lib/portalApi';
 
-const DEFAULT_PACKAGES = [
-  'Basketball - Little Kobes U10',
-  'Basketball - Ballers & Hoopers U12–U14',
-  'Basketball - Warriors',
-  'Basketball - Private 1v1 Sessions',
-  'Basketball - Small Groups',
-  'Gymnastics Package A',
-  'Gymnastics Package B',
-  'Gymnastics Package C',
-  'Gymnastics Package D',
-  'Volleyball',
-];
-
 const REASONS = [
   { value: 'HOLIDAY', label: 'Holiday' },
   { value: 'BAD_WEATHER', label: 'Bad weather' },
@@ -35,7 +22,7 @@ export function CancelSessionDayModal({
   packageOptions?: string[];
   onSuccess: () => void;
 }) {
-  const packageList = packageOptions?.length ? packageOptions : DEFAULT_PACKAGES;
+  const packageList = packageOptions ?? [];
   const [packageName, setPackageName] = useState('');
   const [sessionDate, setSessionDate] = useState('');
   const [reason, setReason] = useState('OTHER');
@@ -85,8 +72,8 @@ export function CancelSessionDayModal({
           required
         >
           <option value="">Select package</option>
-          {packageList.map((p) => (
-            <option key={p} value={p}>{p}</option>
+          {packageList.map((pkg) => (
+            <option key={pkg} value={pkg}>{pkg}</option>
           ))}
         </Select>
         <Input
@@ -101,8 +88,8 @@ export function CancelSessionDayModal({
           value={reason}
           onChange={(e) => setReason(e.target.value)}
         >
-          {REASONS.map((r) => (
-            <option key={r.value} value={r.value}>{r.label}</option>
+          {REASONS.map((item) => (
+            <option key={item.value} value={item.value}>{item.label}</option>
           ))}
         </Select>
         <Input

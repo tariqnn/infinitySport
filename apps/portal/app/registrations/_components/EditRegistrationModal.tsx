@@ -3,6 +3,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Modal, Input, Select, Button } from '../../_components/ui';
 import { packageRegistrationsApi, type PackageRegistrationRow } from '../../../lib/portalApi';
+import {
+  addOneMonthToDateInput,
+  getPackageDefaultPrice,
+  getPackageDefaultSessions,
+  hasPackageDefaultPrice,
+} from './packageDefaults';
 
 function computeFinalPrice(base: number, discountType: string, discountValue: number): number {
   const safeBase = Math.max(0, base);
@@ -22,12 +28,18 @@ export function EditRegistrationModal({
   onSuccess,
   registration,
   packageOptions,
+  defaultPricesByPackage,
+  defaultSessionsByPackage,
+  currentSessionSummary,
 }: {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
   registration: PackageRegistrationRow | null;
   packageOptions: string[];
+  defaultPricesByPackage?: Record<string, number>;
+  defaultSessionsByPackage?: Record<string, number>;
+  currentSessionSummary?: { remaining: number; total: number; used: number } | null;
 }) {
   const [packageName, setPackageName] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -35,8 +47,8 @@ export function EditRegistrationModal({
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerAge, setCustomerAge] = useState('');
   const [sessionsLeft, setSessionsLeft] = useState('');
+  const [sessionsInputMode, setSessionsInputMode] = useState<'remaining' | 'base'>('base');
   const [nextPaymentDate, setNextPaymentDate] = useState('');
-  const [planLabel, setPlanLabel] = useState('');
   const [periodStartsAt, setPeriodStartsAt] = useState('');
   const [basePriceJod, setBasePriceJod] = useState('');
   const [discountOpen, setDiscountOpen] = useState(false);
@@ -48,14 +60,20 @@ export function EditRegistrationModal({
 
   useEffect(() => {
     if (!open || !registration) return;
+
     setPackageName(registration.packageName || '');
     setCustomerName(registration.customerName || '');
     setCustomerPhone(registration.customerPhone || '');
     setCustomerEmail(registration.customerEmail || '');
     setCustomerAge(registration.customerAge != null ? String(registration.customerAge) : '');
-    setSessionsLeft(registration.sessionsLeft != null ? String(registration.sessionsLeft) : '');
+    const initialSessionsLeft =
+      currentSessionSummary?.remaining ??
+      registration.sessionsLeft ??
+      getPackageDefaultSessions(registration.packageName, defaultSessionsByPackage) ??
+      null;
+    setSessionsLeft(initialSessionsLeft != null ? String(initialSessionsLeft) : '');
+    setSessionsInputMode(currentSessionSummary ? 'remaining' : 'base');
     setNextPaymentDate(toDateInputValue(registration.nextPaymentDate));
-    setPlanLabel(registration.planLabel || registration.packageName || '');
     setPeriodStartsAt(toDateInputValue(registration.periodStartsAt));
     setBasePriceJod(String(Math.max(0, Number(registration.basePriceJod) || 0)));
 
@@ -71,13 +89,61 @@ export function EditRegistrationModal({
       setDiscountReason('');
       setDiscountOpen(false);
     }
+
     setError(null);
-  }, [open, registration]);
+  }, [currentSessionSummary, defaultSessionsByPackage, open, registration]);
+
+  useEffect(() => {
+    if (!open || !registration) return;
+    if (!packageName) return;
+
+    const originalPackageName = registration.packageName || '';
+    const originalPeriodStart = toDateInputValue(registration.periodStartsAt);
+    const periodChanged = periodStartsAt.trim() !== originalPeriodStart;
+
+    if (packageName === originalPackageName && !periodChanged) {
+      const initialSessionsLeft =
+        currentSessionSummary?.remaining ??
+        registration.sessionsLeft ??
+        getPackageDefaultSessions(registration.packageName, defaultSessionsByPackage) ??
+        null;
+      if (initialSessionsLeft != null) {
+        setSessionsLeft(String(initialSessionsLeft));
+      }
+      setSessionsInputMode(currentSessionSummary ? 'remaining' : 'base');
+      return;
+    }
+
+    const defaultPrice = getPackageDefaultPrice(packageName, defaultPricesByPackage);
+    setBasePriceJod(defaultPrice != null ? String(defaultPrice) : '');
+
+    const defaultSessions = getPackageDefaultSessions(packageName, defaultSessionsByPackage);
+    if (defaultSessions != null) {
+      setSessionsLeft(String(defaultSessions));
+    }
+    setSessionsInputMode('base');
+  }, [
+    currentSessionSummary,
+    defaultPricesByPackage,
+    defaultSessionsByPackage,
+    open,
+    packageName,
+    periodStartsAt,
+    registration,
+  ]);
+
+  useEffect(() => {
+    if (!open || !registration) return;
+    const originalStart = toDateInputValue(registration.periodStartsAt);
+    if (!periodStartsAt.trim() || periodStartsAt === originalStart) return;
+    setSessionsInputMode('base');
+    setNextPaymentDate(addOneMonthToDateInput(periodStartsAt));
+  }, [open, periodStartsAt, registration]);
 
   const packageList = useMemo(() => {
     const names = new Set(packageOptions);
     if (registration?.packageName) names.add(registration.packageName);
-    return Array.from(names).sort((a, b) => a.localeCompare(b));
+    return Array.from(names).sort((left, right) => left.localeCompare(right));
   }, [packageOptions, registration?.packageName]);
 
   const baseNumber = useMemo(() => {
@@ -90,7 +156,7 @@ export function EditRegistrationModal({
   }, [discountType, discountValue]);
   const finalPrice = useMemo(
     () => computeFinalPrice(baseNumber, discountType, discountNumber),
-    [baseNumber, discountType, discountNumber],
+    [baseNumber, discountNumber, discountType],
   );
 
   async function handleSubmit(e: React.FormEvent) {
@@ -106,20 +172,21 @@ export function EditRegistrationModal({
     if (!nextPackageName) return setError('Package is required.');
     if (!nextCustomerName) return setError('Name is required.');
     if (!nextCustomerPhone) return setError('Phone is required.');
-
-    if (!Number.isFinite(baseNumber) || baseNumber < 0) {
-      return setError('Base price must be 0 or greater.');
-    }
-    if (!sessionsLeft.trim()) {
-      return setError('Sessions left is required.');
-    }
+    if (!Number.isFinite(baseNumber) || baseNumber < 0) return setError('Base price must be 0 or greater.');
+    if (!sessionsLeft.trim()) return setError('Sessions left is required.');
     const parsedSessionsLeft = Number(sessionsLeft);
     if (!Number.isFinite(parsedSessionsLeft) || parsedSessionsLeft < 0) {
       return setError('Sessions left must be 0 or greater.');
     }
-    if (!nextPaymentDate.trim()) {
-      return setError('Next payment date is required.');
-    }
+    const samePackage = nextPackageName === registration.packageName;
+    const samePeriodStart = periodStartsAt.trim() === toDateInputValue(registration.periodStartsAt);
+    const nextSessionsLeft =
+      sessionsInputMode === 'remaining' && currentSessionSummary && samePackage && samePeriodStart
+        ? Math.max(
+            0,
+            Math.round(parsedSessionsLeft + currentSessionSummary.used - (Number(registration.sessionsBonus) || 0)),
+          )
+        : Math.round(parsedSessionsLeft);
 
     if (discountType !== 'NONE') {
       if (discountType === 'PERCENT' && (discountNumber < 0 || discountNumber > 100)) {
@@ -150,9 +217,8 @@ export function EditRegistrationModal({
         customerPhone: nextCustomerPhone,
         customerEmail: nextCustomerEmail || null,
         customerAge: agePayload,
-        sessionsLeft: Math.round(parsedSessionsLeft),
+        sessionsLeft: nextSessionsLeft,
         nextPaymentDate: nextPaymentDate.trim() || null,
-        planLabel: planLabel.trim() || nextPackageName,
         basePriceJod: baseNumber,
         discountType,
         discountValue: discountType === 'NONE' ? null : discountNumber,
@@ -170,6 +236,8 @@ export function EditRegistrationModal({
 
   if (!registration) return null;
 
+  const isManualPricing = !hasPackageDefaultPrice(packageName, defaultPricesByPackage) && !!packageName;
+
   return (
     <Modal open={open} onClose={onClose} title="Edit registration" size="md">
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -177,8 +245,8 @@ export function EditRegistrationModal({
 
         <Select label="Package" value={packageName} onChange={(e) => setPackageName(e.target.value)} required>
           <option value="">Select package</option>
-          {packageList.map((p) => (
-            <option key={p} value={p}>{p}</option>
+          {packageList.map((pkg) => (
+            <option key={pkg} value={pkg}>{pkg}</option>
           ))}
         </Select>
 
@@ -195,33 +263,35 @@ export function EditRegistrationModal({
           required
         />
         <Input
-          label="Next payment date"
-          type="date"
-          value={nextPaymentDate}
-          onChange={(e) => setNextPaymentDate(e.target.value)}
-          required
-        />
-        <Input
-          label="Plan label"
-          value={planLabel}
-          onChange={(e) => setPlanLabel(e.target.value)}
-          placeholder="Optional; defaults to package name"
-        />
-        <Input
           label="When they will start"
           type="date"
           value={periodStartsAt}
           onChange={(e) => setPeriodStartsAt(e.target.value)}
         />
-
         <Input
-          label="Base price (JOD)"
-          type="number"
-          min={0}
-          value={basePriceJod}
-          onChange={(e) => setBasePriceJod(e.target.value)}
-          required
+          label="Next payment date"
+          type="date"
+          value={nextPaymentDate}
+          onChange={(e) => setNextPaymentDate(e.target.value)}
         />
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-ui-textMuted">Base price (JOD)</label>
+          {isManualPricing ? (
+            <Input
+              type="number"
+              min={0}
+              value={basePriceJod}
+              onChange={(e) => setBasePriceJod(e.target.value)}
+              required
+            />
+          ) : (
+            <div className="rounded-xl border border-ui-border bg-ui-softBg/50 px-3 py-2.5 text-sm text-ui-textPrimary">
+              {packageName && basePriceJod !== '' ? `${basePriceJod} JOD` : '-'}
+            </div>
+          )}
+          {!isManualPricing && <p className="mt-0.5 text-xs text-ui-textMuted">This updates automatically if you switch the package.</p>}
+        </div>
 
         <div className="rounded-lg border border-ui-border">
           <button

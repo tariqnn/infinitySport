@@ -194,6 +194,11 @@ enum PettyCashType {
   REPLENISH
 }
 
+enum CashBookTransactionType {
+  INCOME
+  EXPENSE
+}
+
 model Company {
   id            String         @id @default(cuid())
   name          String
@@ -216,6 +221,8 @@ model Company {
   budgetEntries   BudgetEntry[]
   cashFlowEntries CashFlowEntry[]
   pettyCashTransactions PettyCashTransaction[]
+  cashBookCategories    CashBookCategory[]
+  cashBookTransactions  CashBookTransaction[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -450,6 +457,46 @@ model PettyCashTransaction {
   @@index([companyId])
   @@index([date])
   @@index([type])
+}
+
+model CashBookCategory {
+  id           String                  @id @default(cuid())
+  companyId    String
+  company      Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name         String
+  type         CashBookTransactionType
+  isDefault    Boolean                 @default(false)
+  transactions CashBookTransaction[]
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  @@unique([companyId, type, name])
+  @@index([companyId])
+  @@index([type])
+}
+
+model CashBookTransaction {
+  id             String                  @id @default(cuid())
+  companyId      String
+  company        Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  type           CashBookTransactionType
+  categoryId     String?
+  category       CashBookCategory?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryName   String
+  amount         Int
+  note           String?                 @db.Text
+  date           DateTime
+  attachmentUrl  String?
+  attachmentName String?
+  attachmentType String?
+  attachmentSize Int?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  @@index([companyId])
+  @@index([type])
+  @@index([categoryId])
+  @@index([date])
 }
 
 model Coach {

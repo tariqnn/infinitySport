@@ -123,10 +123,6 @@ export function RegistrationDetailsModal({
             <p className="font-medium text-ui-textPrimary">{registration.packageName}</p>
           </div>
           <div>
-            <p className="text-ui-textMuted">Plan label</p>
-            <p className="text-ui-textPrimary">{registration.planLabel || registration.packageName}</p>
-          </div>
-          <div>
             <p className="text-ui-textMuted">Player name</p>
             <p className="text-ui-textPrimary">{registration.customerName}</p>
           </div>

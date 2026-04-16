@@ -5,25 +5,27 @@ import { PageHeader } from '../_components/ui';
 import { BudgetPlanning } from './_components/BudgetPlanning';
 import { InvoiceManagement } from './_components/InvoiceManagement';
 import { CashFlow } from './_components/CashFlow';
+import { CashBook } from './_components/CashBook';
 import { PettyCash } from './_components/PettyCash';
-import { ChartBarIcon, DocumentTextIcon, ArrowPathIcon, WalletIcon } from '@heroicons/react/24/outline';
+import { ChartBarIcon, DocumentTextIcon, ArrowPathIcon, WalletIcon, BanknotesIcon } from '@heroicons/react/24/outline';
 import clsx from 'clsx';
 
 const tabs = [
   { id: 'budget', label: 'Budget Planning', icon: ChartBarIcon },
   { id: 'invoices', label: 'Invoice Management', icon: DocumentTextIcon },
   { id: 'cashflow', label: 'Cash Flow', icon: ArrowPathIcon },
+  { id: 'cashbook', label: 'Cash Book', icon: BanknotesIcon },
   { id: 'pettycash', label: 'Petty Cash', icon: WalletIcon },
 ];
 
 export default function FinancialsPage() {
-  const [activeTab, setActiveTab] = useState('budget');
+  const [activeTab, setActiveTab] = useState('cashbook');
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Financial Management"
-        subtitle="Manage budgets, invoices, cash flow, and petty cash"
+        subtitle="Manage budgets, invoices, cash flow, cash book, and petty cash"
       />
 
       {/* Tabs */}
@@ -56,6 +58,7 @@ export default function FinancialsPage() {
         {activeTab === 'budget' && <BudgetPlanning />}
         {activeTab === 'invoices' && <InvoiceManagement />}
         {activeTab === 'cashflow' && <CashFlow />}
+        {activeTab === 'cashbook' && <CashBook />}
         {activeTab === 'pettycash' && <PettyCash />}
       </div>
     </div>

@@ -21,9 +21,15 @@ Future<PortalRepository> _bootstrapRepository() async {
 
   try {
     await ensureFirebaseInitialized();
+  } catch (error) {
+    debugPrint('Firebase bootstrap failed: $error');
+    rethrow;
+  }
+
+  try {
     await PortalNotifications.instance.initialize();
   } catch (error) {
-    debugPrint('Firebase bootstrap skipped: $error');
+    debugPrint('Portal notifications skipped: $error');
   }
 
   const minimumSplash = Duration(milliseconds: 900);

@@ -446,6 +446,7 @@ class FirebasePortalRepository implements PortalRepository {
     final payload = <String, Object>{
       'id': inboxRef.id,
       'bookingId': inboxRef.id,
+      'courtId': courtName,
       'facilityArea': courtName,
       'courtName': courtName,
       'status': 'PENDING',
@@ -453,6 +454,7 @@ class FirebasePortalRepository implements PortalRepository {
       'isPaid': false,
       'customerName': customerName.trim(),
       'customerPhone': customerPhone.trim(),
+      'customerEmail': (customerEmail ?? '').trim(),
       'notes': 'Mobile app booking',
       'startTime': Timestamp.fromDate(startTime.toUtc()),
       'startTimeIso': startTime.toUtc().toIso8601String(),
@@ -464,10 +466,6 @@ class FirebasePortalRepository implements PortalRepository {
       'updatedAt': timestamp,
       'updatedAtIso': now.toIso8601String(),
     };
-    final normalizedEmail = (customerEmail ?? '').trim();
-    if (normalizedEmail.isNotEmpty) {
-      payload['customerEmail'] = normalizedEmail;
-    }
     await inboxRef.set(payload);
   }
 
@@ -735,21 +733,19 @@ class FirebasePortalRepository implements PortalRepository {
     required String successMessage,
   }) async {
     try {
-      final snapshot = await actionRef
-          .snapshots()
-          .firstWhere((snapshot) {
-            final data = snapshot.data();
-            final status = readString(
-              data?['status'],
-              fallback: 'PENDING',
-            ).toUpperCase();
-            return const {'SYNCED', 'ERROR', 'CONFLICT', 'CANCELLED'}
-                .contains(status);
-          })
-          .timeout(const Duration(seconds: 12));
+      final snapshot = await actionRef.snapshots().firstWhere((snapshot) {
+        final data = snapshot.data();
+        final status = readString(
+          data?['status'],
+          fallback: 'PENDING',
+        ).toUpperCase();
+        return const {'SYNCED', 'ERROR', 'CONFLICT', 'CANCELLED'}
+            .contains(status);
+      }).timeout(const Duration(seconds: 12));
 
       final data = snapshot.data() ?? const <String, dynamic>{};
-      final status = readString(data['status'], fallback: 'PENDING').toUpperCase();
+      final status =
+          readString(data['status'], fallback: 'PENDING').toUpperCase();
       if (status == 'SYNCED') {
         final syncNote = readNullableString(data['syncNote']);
         if (syncNote != null && syncNote.trim().isNotEmpty) {

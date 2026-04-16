@@ -6,7 +6,7 @@ import { packageRegistrationsApi, packagePricingApi } from '../../../lib/portalA
 import { TrashIcon } from '@heroicons/react/24/outline';
 
 const PACKAGE_OPTIONS = [
-  'Basketball - Little Kobes U10',
+  'Basketball - Little Kobes U12-U10',
   'Basketball - Ballers & Hoopers U12–U14',
   'Basketball - Warriors',
   'Basketball - Private 1v1 Sessions',
@@ -411,7 +411,7 @@ export function BulkAddPeopleModal({
               Example:
             </p>
             <pre className="rounded-lg border border-ui-border bg-ui-softBg/50 p-3 text-xs text-ui-textMuted overflow-x-auto">
-              {`Basketball - Little Kobes U10\tAhmad Ali\t0791234567\tahmad@example.com\t10\nGymnastics Package A\tSara Mohammad\t0789876543\tsara@example.com\t8`}
+              {`Basketball - Little Kobes U12-U10\tAhmad Ali\t0791234567\tahmad@example.com\t10\nGymnastics Package A\tSara Mohammad\t0789876543\tsara@example.com\t8`}
             </pre>
             <div className="flex gap-2">
               <Button type="button" variant="secondary" size="sm" onClick={runPastePreview}>

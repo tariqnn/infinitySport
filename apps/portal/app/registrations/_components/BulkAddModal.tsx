@@ -5,7 +5,7 @@ import { Modal, Input, Button } from '../../_components/ui';
 import { packageRegistrationsApi } from '../../../lib/portalApi';
 
 const PACKAGE_OPTIONS = [
-  'Basketball - Little Kobes U10',
+  'Basketball - Little Kobes U12-U10',
   'Basketball - Ballers & Hoopers U12–U14',
   'Basketball - Warriors',
   'Basketball - Private 1v1 Sessions',
@@ -115,7 +115,7 @@ export function BulkAddModal({
             rows={10}
             value={pasteText}
             onChange={(e) => setPasteText(e.target.value)}
-            placeholder="Basketball - Little Kobes U10	John Doe	0791234567	john@example.com	10"
+            placeholder="Basketball - Little Kobes U12-U10	John Doe	0791234567	john@example.com	10"
           />
         ) : (
           <div className="space-y-2">

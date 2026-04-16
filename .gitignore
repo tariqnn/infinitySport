@@ -31,6 +31,8 @@ Screenshot*.png
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+apps/portal/portal-*.log
+apps/portal/portal-*.err.log
 
 # local env files
 .env
@@ -59,3 +61,7 @@ hostinger-output/
 
 # Flutter mobile app (do not push to GitHub)
 mobile-app/
+
+# local tooling and screenshots
+.claude/
+apps/infinity_portal_mobile/emulator_*.png

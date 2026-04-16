@@ -3,7 +3,7 @@
  * Run: npm run prisma:seed-package-pricing
  *
  * Recheck list (must match portal + Add registration):
- *   Basketball - Little Kobes U10            120 JOD
+ *   Basketball - Little Kobes U12-U10        120 JOD
  *   Basketball - Ballers & Hoopers U12–U14  120 JOD
  *   Basketball - Warriors                   120 JOD
  *   Basketball - Private 1v1 Sessions        Contact for pricing (manual)
@@ -23,7 +23,7 @@ config({ path: resolve(__dirname, '../.env') });
 const prisma = new PrismaClient();
 
 const PACKAGES: { packageName: string; basePriceJod: number | null }[] = [
-  { packageName: 'Basketball - Little Kobes U10', basePriceJod: 120 },
+  { packageName: 'Basketball - Little Kobes U12-U10', basePriceJod: 120 },
   { packageName: 'Basketball - Ballers & Hoopers U12–U14', basePriceJod: 120 },
   { packageName: 'Basketball - Warriors', basePriceJod: 120 },
   { packageName: 'Basketball - Private 1v1 Sessions', basePriceJod: null },

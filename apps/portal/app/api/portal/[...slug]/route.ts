@@ -2126,6 +2126,8 @@ async function findOrCreateUserFromRegistration(reg: {
 }): Promise<{ id: string } | null> {
   const email = (reg.customerEmail ?? "").trim().toLowerCase();
   if (!email) return null;
+  const customerName = reg.customerName.trim();
+  const customerPhone = reg.customerPhone.trim();
   try {
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -2133,21 +2135,23 @@ async function findOrCreateUserFromRegistration(reg: {
         where: { id: existing.id },
         data: {
           isActive: true,
-          ...(existing.name ? {} : { name: reg.customerName.trim() || null }),
-          ...(existing.phone
-            ? {}
-            : { phone: reg.customerPhone.trim() || null }),
+          ...(existing.name ? {} : { name: customerName || null }),
+          ...(existing.phone ? {} : { phone: customerPhone || null }),
         },
       });
       return { id: existing.id };
     }
 
     try {
+      const companyId = await resolveActiveCompanyId();
       const created = await prisma.user.create({
         data: {
+          companyId,
+          fullName: customerName || email,
           email,
-          name: reg.customerName.trim() || null,
-          phone: reg.customerPhone.trim() || null,
+          name: customerName || null,
+          phone: customerPhone || null,
+          password: crypto.randomBytes(24).toString("hex"),
           role: "MEMBER",
           isActive: true,
         },
@@ -2176,7 +2180,7 @@ async function findOrCreateUserFromRegistration(reg: {
 async function getActiveMemberByEmail(email: string) {
   const normalized = normalizeEmail(email);
   if (!normalized) return null;
-  return prisma.user.findUnique({
+  const user = await prisma.user.findUnique({
     where: { email: normalized },
     select: {
       id: true,
@@ -2188,6 +2192,8 @@ async function getActiveMemberByEmail(email: string) {
       passwordHash: true,
     },
   });
+  if (!user?.email) return null;
+  return { ...user, email: user.email };
 }
 
 async function ensureMemberUserByRegistrationEmail(email: string) {

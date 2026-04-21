@@ -32,8 +32,19 @@ type RegistrationLike = {
 
 type PrismaMembershipSource = Pick<
   PrismaClient,
-  "package" | "classSession" | "$queryRawUnsafe" | "$executeRawUnsafe"
->;
+  "package" | "$queryRawUnsafe" | "$executeRawUnsafe"
+> & {
+  classSession?: {
+    groupBy: (args: {
+      by: ["packageName"];
+      where: {
+        packageName: { in: string[] };
+        status: "HELD";
+      };
+      _count: { _all: true };
+    }) => Promise<Array<{ packageName: string; _count: { _all: number } }>>;
+  };
+};
 
 type PackageMeta = {
   durationMonths: number;
@@ -163,18 +174,21 @@ export async function buildRegistrationMembershipSummaries(
             trackingType: string;
           }>,
       ),
-    prisma.classSession
-      .groupBy({
+    (
+      prisma.classSession?.groupBy({
         by: ["packageName"],
         where: {
           packageName: { in: packageNames },
           status: "HELD",
         },
         _count: { _all: true },
-      })
-      .catch(
-        () => [] as Array<{ packageName: string; _count: { _all: number } }>,
-      ),
+      }) ??
+      Promise.resolve(
+        [] as Array<{ packageName: string; _count: { _all: number } }>,
+      )
+    ).catch(
+      () => [] as Array<{ packageName: string; _count: { _all: number } }>,
+    ),
     loadPointsByRegistrationId(prisma, registrationIds).catch(
       () => new Map<string, number>(),
     ),

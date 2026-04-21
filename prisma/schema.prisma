@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,17 +8,17 @@ datasource db {
 }
 
 model HeroSection {
-  id                String   @id @default(cuid())
-  title             String
-  subtitle          String
-  primaryCta        String
-  primaryUrl        String
-  secondaryCta      String?
-  secondaryUrl      String?
+  id                 String   @id @default(cuid())
+  title              String
+  subtitle           String
+  primaryCta         String
+  primaryUrl         String
+  secondaryCta       String?
+  secondaryUrl       String?
   backgroundImageUrl String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
   backgroundVideoUrl String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
 }
 
 model Program {
@@ -32,9 +29,9 @@ model Program {
   slug        String    @unique
   highlight   Boolean   @default(false)
   order       Int       @default(0)
-  bookings    Booking[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  bookings    Booking[]
 }
 
 model LandingCoach {
@@ -62,32 +59,32 @@ model Offer {
   description   String
   features      String[]
   order         Int            @default(0)
-  subscriptions Subscription[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+  subscriptions Subscription[]
 }
 
 model Event {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   title       String
   description String?
   date        DateTime
   location    String
+  highlight   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
   imageUrl    String?
-  highlight   Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
 }
 
 model Announcement {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   title       String
   body        String
+  publishedAt DateTime @default(now())
+  isPinned    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
   imageUrl    String?
-  publishedAt DateTime  @default(now())
-  isPinned    Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
 }
 
 model FacilityHighlight {
@@ -95,10 +92,10 @@ model FacilityHighlight {
   name        String
   description String
   imageUrl    String?
-  order       Int       @default(0)
-  bookings    Booking[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  order       Int       @default(0)
+  bookings    Booking[]
 }
 
 model FooterLink {
@@ -112,22 +109,721 @@ model FooterLink {
 }
 
 model FooterSettings {
-  id                  String   @id @default(cuid())
-  address             String
-  phone               String
-  email               String
+  id                    String   @id @default(cuid())
+  address               String
+  phone                 String
+  email                 String
   contactRecipientEmail String?
-  socialLinks         Json?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  socialLinks           Json?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
-// Portal Models
+model Company {
+  id                    String                 @id @default(cuid())
+  name                  String
+  contactName           String
+  contactEmail          String
+  phone                 String?
+  industry              String?
+  size                  String?
+  status                CompanyStatus          @default(ACTIVE)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  bookings              Booking[]
+  budgetCategories      BudgetCategory[]
+  budgetEntries         BudgetEntry[]
+  cashBookCategories    CashBookCategory[]
+  cashBookTransactions  CashBookTransaction[]
+  cashFlowEntries       CashFlowEntry[]
+  classes               Class[]
+  coaches               Coach[]
+  settings              CompanySettings?
+  inventory             InventoryItem[]
+  invoices              Invoice[]
+  members               Member[]
+  pettyCashTransactions PettyCashTransaction[]
+  PortalShopItem        PortalShopItem[]
+  staffTasks            StaffTask[]
+  subscriptions         Subscription[]
+  User                  User[]
+}
+
+model Member {
+  id            String            @id @default(cuid())
+  companyId     String
+  email         String?
+  phone         String?
+  status        MemberStatus      @default(ACTIVE)
+  guardianName  String?
+  guardianPhone String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  dateOfBirth   DateTime?
+  firstName     String
+  lastName      String
+  notes         String?
+  bookings      Booking[]
+  enrollments   ClassEnrollment[]
+  invoices      Invoice[]
+  company       Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  subscriptions Subscription[]
+  User          User?
+
+  @@index([companyId])
+  @@index([email])
+}
+
+model Booking {
+  id                           String                        @id @default(cuid())
+  companyId                    String
+  programId                    String?
+  facilityId                   String?
+  memberId                     String?
+  startTime                    DateTime
+  endTime                      DateTime
+  status                       BookingStatus                 @default(PENDING)
+  notes                        String?
+  createdAt                    DateTime                      @default(now())
+  updatedAt                    DateTime                      @updatedAt
+  classId                      String?
+  coachId                      String?
+  facilityArea                 String?
+  isPaid                       Boolean                       @default(false)
+  customerName                 String?
+  customerPhone                String?
+  customerEmail                String?
+  class                        Class?                        @relation(fields: [classId], references: [id])
+  coach                        Coach?                        @relation(fields: [coachId], references: [id])
+  company                      Company                       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  facility                     FacilityHighlight?            @relation(fields: [facilityId], references: [id])
+  member                       Member?                       @relation(fields: [memberId], references: [id])
+  program                      Program?                      @relation(fields: [programId], references: [id])
+  BookingPayment               BookingPayment[]
+  BookingRewardPointAdjustment BookingRewardPointAdjustment?
+
+  @@index([companyId])
+  @@index([startTime])
+  @@index([status])
+  @@index([classId])
+  @@index([coachId])
+}
+
+model User {
+  id           String    @id @default(cuid())
+  companyId    String
+  memberId     String?   @unique
+  fullName     String
+  email        String?   @unique
+  phone        String?
+  password     String
+  role         UserRole  @default(MEMBER)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now()) @updatedAt
+  name         String?
+  isActive     Boolean   @default(true)
+  passwordHash String?
+  receipts     Receipt[]
+  Company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Member       Member?   @relation(fields: [memberId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([email])
+  @@index([isActive])
+  @@index([companyId])
+}
+
+model BlockedSlot {
+  id        String    @id @default(cuid())
+  dayOfWeek String
+  courtType String
+  time      String
+  isBlocked Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  label     String?
+  startDate DateTime?
+  endDate   DateTime?
+
+  @@unique([dayOfWeek, courtType, time])
+  @@index([dayOfWeek])
+  @@index([courtType])
+  @@index([label])
+}
+
+model Subscription {
+  id        String             @id @default(cuid())
+  companyId String
+  offerId   String
+  memberId  String?
+  startDate DateTime
+  endDate   DateTime?
+  status    SubscriptionStatus @default(ACTIVE)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  invoices  Invoice[]
+  company   Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  member    Member?            @relation(fields: [memberId], references: [id])
+  offer     Offer              @relation(fields: [offerId], references: [id])
+
+  @@index([companyId])
+  @@index([memberId])
+  @@index([status])
+}
+
+model Invoice {
+  id              String          @id @default(cuid())
+  companyId       String
+  subscriptionId  String?
+  number          String          @unique
+  amount          Int
+  currency        String          @default("JOD")
+  status          InvoiceStatus   @default(DRAFT)
+  dueDate         DateTime?
+  issuedAt        DateTime        @default(now())
+  paidAt          DateTime?
+  description     String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  memberId        String?
+  amountPaid      Int             @default(0)
+  companyEmail    String?
+  companyPhone    String?
+  note            String?
+  companyName     String?
+  companyAddress  String?
+  logoPath        String?
+  clientName      String?
+  clientEmail     String?
+  clientAddress   String?
+  lineItems       Json?
+  subtotal        Int?
+  tax             Int?
+  discount        Int?
+  notes           String?
+  pdfPath         String?
+  cashFlowEntries CashFlowEntry[]
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  member          Member?         @relation(fields: [memberId], references: [id])
+  subscription    Subscription?   @relation(fields: [subscriptionId], references: [id])
+
+  @@index([companyId])
+  @@index([memberId])
+  @@index([status])
+  @@index([number])
+}
+
+model BudgetCategory {
+  id          String        @id @default(cuid())
+  companyId   String
+  name        String
+  description String?
+  order       Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  budgets     BudgetEntry[]
+
+  @@index([companyId])
+  @@index([order])
+}
+
+model BudgetEntry {
+  id            String         @id @default(cuid())
+  companyId     String
+  categoryId    String
+  periodStart   DateTime
+  periodEnd     DateTime
+  plannedAmount Int
+  actualAmount  Int            @default(0)
+  currency      String         @default("JOD")
+  notes         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  category      BudgetCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([categoryId])
+  @@index([periodStart])
+  @@index([periodEnd])
+}
+
+model CashFlowEntry {
+  id               String       @id @default(cuid())
+  companyId        String
+  date             DateTime
+  type             CashFlowType
+  category         String?
+  amount           Int
+  currency         String       @default("JOD")
+  relatedInvoiceId String?
+  description      String?
+  createdAt        DateTime     @default(now())
+  company          Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  relatedInvoice   Invoice?     @relation(fields: [relatedInvoiceId], references: [id])
+
+  @@index([companyId])
+  @@index([date])
+  @@index([type])
+  @@index([relatedInvoiceId])
+}
+
+model PettyCashTransaction {
+  id           String        @id @default(cuid())
+  companyId    String
+  date         DateTime
+  item         String
+  staff        String?
+  amount       Int
+  currency     String        @default("JOD")
+  type         PettyCashType
+  balanceAfter Int
+  reference    String?
+  description  String?
+  createdAt    DateTime      @default(now())
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([date])
+  @@index([type])
+}
+
+model CashBookCategory {
+  id           String                  @id @default(cuid())
+  companyId    String
+  name         String
+  type         CashBookTransactionType
+  isDefault    Boolean                 @default(false)
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @default(now()) @updatedAt
+  company      Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  transactions CashBookTransaction[]
+
+  @@unique([companyId, type, name])
+  @@index([companyId])
+  @@index([type])
+}
+
+model CashBookTransaction {
+  id             String                  @id @default(cuid())
+  companyId      String
+  type           CashBookTransactionType
+  categoryId     String?
+  categoryName   String
+  amount         Int
+  note           String?
+  date           DateTime
+  attachmentUrl  String?
+  attachmentName String?
+  attachmentType String?
+  attachmentSize Int?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @default(now()) @updatedAt
+  category       CashBookCategory?       @relation(fields: [categoryId], references: [id])
+  company        Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([type])
+  @@index([categoryId])
+  @@index([date])
+}
+
+model Coach {
+  id        String      @id @default(cuid())
+  companyId String
+  firstName String
+  lastName  String
+  email     String?
+  phone     String?
+  specialty String?
+  bio       String?
+  status    CoachStatus @default(ACTIVE)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  bookings  Booking[]
+  classes   Class[]
+  company   Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([status])
+}
+
+model Class {
+  id          String            @id @default(cuid())
+  companyId   String
+  name        String
+  description String?
+  coachId     String?
+  startTime   DateTime
+  endTime     DateTime
+  capacity    Int
+  status      ClassStatus       @default(SCHEDULED)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  bookings    Booking[]
+  coach       Coach?            @relation(fields: [coachId], references: [id])
+  company     Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  enrollments ClassEnrollment[]
+
+  @@index([companyId])
+  @@index([coachId])
+  @@index([startTime])
+  @@index([status])
+}
+
+model ClassEnrollment {
+  id        String   @id @default(cuid())
+  classId   String
+  memberId  String
+  createdAt DateTime @default(now())
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([classId, memberId])
+  @@index([classId])
+  @@index([memberId])
+}
+
+model InventoryItem {
+  id        String          @id @default(cuid())
+  companyId String
+  name      String
+  category  String?
+  quantity  Int
+  location  String?
+  status    InventoryStatus @default(AVAILABLE)
+  notes     String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  company   Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([status])
+  @@index([category])
+}
+
+model StaffTask {
+  id          String     @id @default(cuid())
+  companyId   String
+  title       String
+  description String?
+  assignedTo  String?
+  dueDate     DateTime?
+  status      TaskStatus @default(OPEN)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  company     Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([status])
+  @@index([assignedTo])
+}
+
+model CompanySettings {
+  id                String   @id @default(cuid())
+  companyId         String   @unique
+  timezone          String?
+  bookingWindowDays Int?
+  notifyEmail       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  company           Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+}
+
+model PackagePricing {
+  id           String   @id @default(cuid())
+  packageName  String   @unique
+  basePriceJod Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([packageName])
+}
+
+model Package {
+  id                 String   @id @default(cuid())
+  sportType          String
+  name               String   @unique
+  description        String?
+  descriptionBullets Json?
+  sessionsCount      Int      @default(0)
+  trackingType       String   @default("SESSIONS")
+  pricingType        String   @default("FIXED")
+  currentPriceJod    Int?
+  timeSlots          Json?
+  isActive           Boolean  @default(true)
+  sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @default(now()) @updatedAt
+  durationMonths     Int      @default(1)
+  showOnWebsite      Boolean  @default(true)
+
+  @@index([sportType])
+  @@index([isActive])
+  @@index([sortOrder])
+}
+
+model PackageRegistration {
+  id                          String                        @id @default(cuid())
+  packageName                 String
+  customerName                String
+  customerPhone               String
+  customerEmail               String?
+  isPaid                      Boolean                       @default(false)
+  createdAt                   DateTime                      @default(now())
+  updatedAt                   DateTime                      @updatedAt
+  customerAge                 Int?
+  periodEndsAt                DateTime?
+  isFrozen                    Boolean                       @default(false)
+  frozenAt                    DateTime?
+  sessionsBonus               Int                           @default(0)
+  basePriceJod                Int
+  discountType                String                        @default("NONE")
+  discountValue               Int?
+  discountReason              String?
+  finalPriceJod               Int
+  discountAppliedBy           String?
+  discountAppliedAt           DateTime?
+  billingPeriodKey            String?
+  priceLockedUntil            DateTime?
+  status                      String                        @default("ACTIVE")
+  periodStartsAt              DateTime?
+  sessionsLeft                Int?
+  nextPaymentDate             DateTime?                     @db.Timestamptz(6)
+  planLabel                   String?
+  durationMonths              Int                           @default(1)
+  receipts                    Receipt[]
+  RegistrationPointAdjustment RegistrationPointAdjustment[]
+  RegistrationProfile         RegistrationProfile?
+  RegistrationRenewalHistory  RegistrationRenewalHistory[]
+  sessionAdjustments          SessionAdjustment[]
+
+  @@index([packageName])
+  @@index([isPaid])
+  @@index([periodEndsAt])
+  @@index([status])
+}
+
+model Receipt {
+  id             String              @id @default(cuid())
+  receiptId      String              @unique
+  registrationId String
+  personName     String
+  personPhone    String
+  packageName    String
+  dateTimeIssued DateTime            @default(now())
+  amountPaid     Int
+  paymentMethod  String
+  privateNote    String
+  createdBy      String?
+  voidedAt       DateTime?
+  voidReason     String?
+  createdAt      DateTime            @default(now())
+  status         String              @default("ACTIVE")
+  userId         String?
+  cycleNumber    Int                 @default(1)
+  registration   PackageRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  user           User?               @relation(fields: [userId], references: [id])
+
+  @@index([registrationId])
+  @@index([receiptId])
+  @@index([status])
+  @@index([userId])
+  @@index([registrationId, cycleNumber], map: "Receipt_registration_cycle_idx")
+}
+
+model SessionAdjustment {
+  id             String              @id @default(cuid())
+  registrationId String
+  change         Int
+  reason         String
+  createdBy      String?
+  createdAt      DateTime            @default(now())
+  cycleNumber    Int                 @default(1)
+  registration   PackageRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@index([registrationId])
+  @@index([registrationId, cycleNumber], map: "SessionAdjustment_registration_cycle_idx")
+}
+
+model PackageSessionCanceled {
+  id           String   @id @default(cuid())
+  packageName  String
+  sessionDate  DateTime @db.Date
+  reason       String
+  reasonDetail String?
+  createdAt    DateTime @default(now())
+
+  @@index([packageName])
+  @@index([sessionDate])
+}
+
+model AvailabilityException {
+  id        String   @id
+  courtType String
+  date      DateTime @db.Date
+  openTime  String?
+  closeTime String?
+  isClosed  Boolean  @default(false)
+  reason    String?
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([courtType, date], map: "AvailabilityException_court_date_idx")
+}
+
+model BookingAuditLog {
+  id               String   @id
+  bookingId        String?
+  action           String
+  payload          Json?
+  createdByAdminId String?
+  createdAt        DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([bookingId])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model BookingPayment {
+  id               String   @id
+  bookingId        String
+  customerId       String?
+  amount           Int
+  method           String
+  status           String   @default("PAID")
+  transactionRef   String?
+  createdByAdminId String?
+  createdAt        DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime @default(now()) @db.Timestamptz(6)
+  Booking          Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([bookingId])
+  @@index([createdAt])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model BookingRewardPointAdjustment {
+  id            String   @id
+  bookingId     String   @unique
+  customerEmail String
+  change        Int
+  reason        String
+  source        String
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  Booking       Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([createdAt])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model CourtRate {
+  courtType           String   @id
+  hourlyRate          Int
+  createdAt           DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime @default(now()) @db.Timestamptz(6)
+  rewardPointsPerHour Int      @default(10)
+}
+
+model GuestAccountDeletion {
+  customerEmail String   @id
+  deletedAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([deletedAt])
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model GuestPointAdjustment {
+  id            String   @id
+  customerEmail String
+  change        Int
+  reason        String
+  createdBy     String?
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([createdAt])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model PortalShopItem {
+  id                String   @id
+  companyId         String
+  name              String
+  category          String?
+  description       String?
+  imageUrl          String?
+  pointsCost        Int
+  quantityAvailable Int?
+  status            String   @default("ACTIVE")
+  isFeatured        Boolean  @default(false)
+  redemptionNote    String?
+  sortOrder         Int      @default(0)
+  createdAt         DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime @default(now()) @db.Timestamptz(6)
+  Company           Company  @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([companyId])
+  @@index([sortOrder])
+  @@index([status])
+}
+
+model RegistrationPointAdjustment {
+  id                  String              @id
+  registrationId      String
+  change              Int
+  reason              String
+  createdBy           String?
+  createdAt           DateTime            @default(now()) @db.Timestamptz(6)
+  PackageRegistration PackageRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([createdAt])
+  @@index([registrationId])
+}
+
+model RegistrationProfile {
+  registrationId      String              @id
+  playerCode          String              @unique
+  currentCycle        Int                 @default(1)
+  createdAt           DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime            @default(now()) @db.Timestamptz(6)
+  PackageRegistration PackageRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([playerCode])
+}
+
+model RegistrationRenewalHistory {
+  id                  String              @id
+  registrationId      String
+  playerCode          String
+  cycleNumber         Int
+  action              String              @default("REREGISTERED")
+  snapshot            Json?
+  createdAt           DateTime            @default(now()) @db.Timestamptz(6)
+  PackageRegistration PackageRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([registrationId])
+}
+
+model WorkingHours {
+  id        String   @id
+  courtType String
+  dayOfWeek Int
+  openTime  String   @default("07:00")
+  closeTime String   @default("23:59")
+  isClosed  Boolean  @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([courtType, dayOfWeek])
+}
+
 enum CompanyStatus {
   ACTIVE
-  TRIAL
-  SUSPENDED
   INACTIVE
+  SUSPENDED
+  TRIAL
 }
 
 enum MemberStatus {
@@ -166,9 +862,9 @@ enum InvoiceStatus {
   DRAFT
   SENT
   PAID
-  PARTIALLY_PAID
   OVERDUE
   CANCELLED
+  PARTIALLY_PAID
 }
 
 enum InventoryStatus {
@@ -199,587 +895,7 @@ enum CashBookTransactionType {
   EXPENSE
 }
 
-model Company {
-  id            String         @id @default(cuid())
-  name          String
-  contactName   String
-  contactEmail  String
-  phone         String?
-  industry      String?
-  size          String?
-  status        CompanyStatus  @default(ACTIVE)
-  members       Member[]
-  coaches       Coach[]
-  classes       Class[]
-  bookings      Booking[]
-  subscriptions Subscription[]
-  invoices      Invoice[]
-  inventory     InventoryItem[]
-  staffTasks    StaffTask[]
-  settings      CompanySettings?
-  budgetCategories BudgetCategory[]
-  budgetEntries   BudgetEntry[]
-  cashFlowEntries CashFlowEntry[]
-  pettyCashTransactions PettyCashTransaction[]
-  cashBookCategories    CashBookCategory[]
-  cashBookTransactions  CashBookTransaction[]
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-}
-
-model Member {
-  id            String         @id @default(cuid())
-  companyId     String
-  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  firstName     String
-  lastName      String
-  email         String?
-  phone         String?
-  dateOfBirth   DateTime?
-  status        MemberStatus   @default(ACTIVE)
-  notes         String?
-  guardianName  String?
-  guardianPhone String?
-  enrollments   ClassEnrollment[]
-  bookings      Booking[]
-  subscriptions Subscription[]
-  invoices      Invoice[]
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-
-  @@index([companyId])
-  @@index([email])
-}
-
-model Booking {
-  id          String        @id @default(cuid())
-  companyId   String
-  company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  classId     String?
-  class       Class?        @relation(fields: [classId], references: [id], onDelete: SetNull)
-  coachId     String?
-  coach       Coach?        @relation(fields: [coachId], references: [id], onDelete: SetNull)
-  programId   String?
-  program     Program?      @relation(fields: [programId], references: [id], onDelete: SetNull)
-  facilityId  String?
-  facility    FacilityHighlight? @relation(fields: [facilityId], references: [id], onDelete: SetNull)
-  memberId    String?
-  member      Member?       @relation(fields: [memberId], references: [id], onDelete: SetNull)
-  facilityArea String?      // e.g. Court 1, Padel Court B
-  startTime   DateTime
-  endTime     DateTime
-  status      BookingStatus @default(PENDING)
-  isPaid      Boolean       @default(false)
-  customerName String?      // For public bookings from landing page
-  customerPhone String?     // For public bookings from landing page
-  customerEmail String?     // For public bookings from landing page
-  notes       String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-
-  @@index([companyId])
-  @@index([startTime])
-  @@index([status])
-  @@index([classId])
-  @@index([coachId])
-}
-
-// Member account (login): created/activated when registration is marked paid. Email = unique link.
-model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  name         String?
-  phone        String?
-  role         String    @default("MEMBER") // MEMBER | STAFF
-  isActive     Boolean   @default(true)
-  passwordHash String?   // null = must set password or use OTP
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  receipts     Receipt[]
-
-  @@index([email])
-  @@index([isActive])
-}
-
-// Recurring blocked time slots (e.g. static team bookings, club bookings). isBlocked=false means the slot is free for public booking.
-// label = club/booking name for grouping (e.g. "Little Kobes"). startDate/endDate = optional date range for the block.
-model BlockedSlot {
-  id         String    @id @default(cuid())
-  dayOfWeek  String    // MONDAY, TUESDAY, ... SUNDAY
-  courtType  String    // Basketball AC, Basketball 3x3, Padel, Volleyball
-  time       String    // HH:MM e.g. 17:00
-  isBlocked  Boolean   @default(true) // true = unavailable, false = free for booking
-  label      String?   // Club/booking name (e.g. "Little Kobes") for grouping multiple days
-  startDate  DateTime? // Optional: block only from this date
-  endDate    DateTime? // Optional: block only until this date
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-
-  @@unique([dayOfWeek, courtType, time])
-  @@index([dayOfWeek])
-  @@index([courtType])
-  @@index([label])
-}
-
-model Subscription {
-  id          String             @id @default(cuid())
-  companyId   String
-  company     Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  offerId     String
-  offer       Offer              @relation(fields: [offerId], references: [id], onDelete: Restrict)
-  memberId    String?
-  member      Member?            @relation(fields: [memberId], references: [id], onDelete: SetNull)
-  startDate   DateTime
-  endDate     DateTime?
-  status      SubscriptionStatus @default(ACTIVE)
-  invoices    Invoice[]
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-
-  @@index([companyId])
-  @@index([memberId])
-  @@index([status])
-}
-
-model Invoice {
-  id          String        @id @default(cuid())
-  companyId   String
-  company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  memberId    String?
-  member      Member?       @relation(fields: [memberId], references: [id], onDelete: SetNull)
-  subscriptionId String?
-  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
-  number      String        @unique
-  amount      Int
-  amountPaid  Int           @default(0)
-  currency    String        @default("JOD")
-  status      InvoiceStatus @default(DRAFT)
-  dueDate     DateTime?
-  issuedAt    DateTime      @default(now())
-  paidAt      DateTime?
-  description String?
-  companyName String?
-  companyAddress String?
-  logoPath    String?
-  clientName  String?
-  clientEmail String?
-  clientAddress String?
-  lineItems   Json?
-  subtotal    Int?
-  tax         Int?
-  discount    Int?
-  notes       String?
-  pdfPath     String?
-  companyEmail String?
-  companyPhone String?
-  note        String?       @db.Text
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-
-  cashFlowEntries CashFlowEntry[]
-  @@index([companyId])
-  @@index([memberId])
-  @@index([status])
-  @@index([number])
-}
-
-model BudgetCategory {
-  id          String        @id @default(cuid())
-  companyId   String
-  company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  name        String
-  description String?
-  order       Int           @default(0)
-  budgets     BudgetEntry[]
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-
-  @@index([companyId])
-  @@index([order])
-}
-
-model BudgetEntry {
-  id            String          @id @default(cuid())
-  companyId     String
-  company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  categoryId    String
-  category      BudgetCategory  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  periodStart   DateTime
-  periodEnd     DateTime
-  plannedAmount Int
-  actualAmount  Int             @default(0)
-  currency      String          @default("JOD")
-  notes         String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-
-  @@index([companyId])
-  @@index([categoryId])
-  @@index([periodStart])
-  @@index([periodEnd])
-}
-
-model CashFlowEntry {
-  id              String        @id @default(cuid())
-  companyId       String
-  company         Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  date            DateTime
-  type            CashFlowType
-  category        String?       // e.g. "Memberships", "Salaries"
-  amount          Int
-  currency        String        @default("JOD")
-  relatedInvoiceId String?
-  relatedInvoice  Invoice?      @relation(fields: [relatedInvoiceId], references: [id], onDelete: SetNull)
-  description     String?
-  createdAt       DateTime      @default(now())
-
-  @@index([companyId])
-  @@index([date])
-  @@index([type])
-  @@index([relatedInvoiceId])
-}
-
-model PettyCashTransaction {
-  id            String          @id @default(cuid())
-  companyId     String
-  company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  date          DateTime
-  item          String
-  staff         String?
-  amount        Int
-  currency      String          @default("JOD")
-  type          PettyCashType
-  balanceAfter  Int             // balance after this transaction
-  reference     String?         // receipt #, note
-  description   String?
-  createdAt     DateTime        @default(now())
-
-  @@index([companyId])
-  @@index([date])
-  @@index([type])
-}
-
-model CashBookCategory {
-  id           String                  @id @default(cuid())
-  companyId    String
-  company      Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  name         String
-  type         CashBookTransactionType
-  isDefault    Boolean                 @default(false)
-  transactions CashBookTransaction[]
-  createdAt    DateTime                @default(now())
-  updatedAt    DateTime                @updatedAt
-
-  @@unique([companyId, type, name])
-  @@index([companyId])
-  @@index([type])
-}
-
-model CashBookTransaction {
-  id             String                  @id @default(cuid())
-  companyId      String
-  company        Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  type           CashBookTransactionType
-  categoryId     String?
-  category       CashBookCategory?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  categoryName   String
-  amount         Int
-  note           String?                 @db.Text
-  date           DateTime
-  attachmentUrl  String?
-  attachmentName String?
-  attachmentType String?
-  attachmentSize Int?
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
-
-  @@index([companyId])
-  @@index([type])
-  @@index([categoryId])
-  @@index([date])
-}
-
-model Coach {
-  id         String   @id @default(cuid())
-  companyId String
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  firstName String
-  lastName  String
-  email     String?
-  phone     String?
-  specialty String?  // e.g. Basketball / Padel etc.
-  bio       String?
-  status    CoachStatus @default(ACTIVE)
-  classes   Class[]
-  bookings  Booking[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([companyId])
-  @@index([status])
-}
-
-model Class {
-  id          String   @id @default(cuid())
-  companyId   String
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  name        String
-  description String?
-  coachId     String?
-  coach       Coach?   @relation(fields: [coachId], references: [id], onDelete: SetNull)
-  startTime   DateTime
-  endTime     DateTime
-  capacity    Int
-  status      ClassStatus @default(SCHEDULED)
-  enrollments ClassEnrollment[]
-  bookings    Booking[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([companyId])
-  @@index([coachId])
-  @@index([startTime])
-  @@index([status])
-}
-
-model ClassEnrollment {
-  id        String   @id @default(cuid())
-  classId   String
-  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
-  memberId  String
-  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-
-  @@index([classId])
-  @@index([memberId])
-  @@unique([classId, memberId])
-}
-
-model InventoryItem {
-  id         String   @id @default(cuid())
-  companyId  String
-  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  name       String
-  category   String?
-  quantity   Int
-  location   String?  // e.g. Equipment room, Court 1
-  status     InventoryStatus @default(AVAILABLE)
-  notes      String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@index([companyId])
-  @@index([status])
-  @@index([category])
-}
-
-model StaffTask {
-  id          String   @id @default(cuid())
-  companyId   String
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  title       String
-  description String?
-  assignedTo  String?  // free-text or later link to staff user
-  dueDate     DateTime?
-  status      TaskStatus @default(OPEN)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([companyId])
-  @@index([status])
-  @@index([assignedTo])
-}
-
-model CompanySettings {
-  id              String   @id @default(cuid())
-  companyId       String   @unique
-  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  timezone        String?  // e.g. "Asia/Amman"
-  bookingWindowDays Int?   // how far in advance bookings allowed
-  notifyEmail     String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([companyId])
-}
-
-// Base price per package (FIXED). Null basePriceJod = manual / "Contact for pricing".
-// Kept for backward compatibility; Package is the single source of truth going forward.
-model PackagePricing {
-  id            String   @id @default(cuid())
-  packageName   String   @unique
-  basePriceJod  Int?     // null = manual pricing at registration time
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([packageName])
-}
-
-// Single source of truth for sellable packages (Landing + Portal). Admin CRUD.
-model Package {
-  id               String   @id @default(cuid())
-  sportType        String   // e.g. Basketball, Gymnastics, Volleyball
-  name             String   @unique // e.g. "Gymnastics Package A"
-  description      String?  @db.Text
-  descriptionBullets Json?  // array of strings for bullet points
-  durationMonths   Int      @default(1)
-  sessionsCount    Int     @default(0) // 0 = not session-based (e.g. DAYS only)
-  trackingType     String  @default("SESSIONS") // SESSIONS | DAYS | BOTH
-  pricingType      String  @default("FIXED") // FIXED | MANUAL (MANUAL => "Contact for pricing")
-  currentPriceJod  Int?    // null when pricingType = MANUAL
-  timeSlots        Json?   // e.g. [{ "daysOfWeek": [0,2,4], "label": "Sun Tue Thu" }]
-  isActive         Boolean @default(true)
-  showOnWebsite    Boolean @default(true)
-  sortOrder        Int     @default(0)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  @@index([sportType])
-  @@index([isActive])
-  @@index([sortOrder])
-}
-
-// Public package registrations (Basketball, Gymnastics, Volleyball, etc.)
-// Period length is snapshotted from Package.durationMonths; freeze pauses the countdown.
-// Price locking: snapshot fields; package price changes do not affect existing registrations.
-model PackageRegistration {
-  id               String    @id @default(cuid())
-  packageName      String
-  customerName     String
-  customerPhone    String
-  customerEmail    String?
-  customerAge      Int?
-  isPaid           Boolean   @default(false) // true when collected >= finalPriceJod
-  basePriceJod     Int       // snapshot at creation (from Package or manual)
-  discountType     String    @default("NONE") // NONE | PERCENT | AMOUNT (manual only)
-  discountValue    Int?      // required if discountType != NONE
-  discountReason   String?   @db.Text // required if discountType != NONE
-  discountAppliedBy String?  // audit: who applied discount
-  discountAppliedAt DateTime? // audit: when
-  finalPriceJod    Int       // snapshot: base - discount, clamped >= 0
-  billingPeriodKey String?   // e.g. "YYYY-MM" for price lock scope
-  priceLockedUntil DateTime? // optional end of billing period
-  durationMonths   Int       @default(1)
-  periodStartsAt   DateTime? // when they will start (optional; used for periodEndsAt = periodStartsAt + durationMonths)
-  periodEndsAt     DateTime?
-  sessionsLeft     Int?
-  nextPaymentDate  DateTime?
-  planLabel        String?
-  isFrozen         Boolean   @default(false)
-  frozenAt         DateTime?
-  sessionsBonus    Int       @default(0)
-  status           String    @default("ACTIVE") // ACTIVE | TRANSFERRED | EXPIRED
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  receipts          Receipt[]
-  sessionAdjustments SessionAdjustment[]
-  freezes           Freeze[]
-
-  @@index([packageName])
-  @@index([isPaid])
-  @@index([periodEndsAt])
-  @@index([customerPhone])
-  @@index([status])
-}
-
-// Receipts for registration payments (separate from Invoices). Created when marking as Paid.
-// Linked to User so member can view all their invoices in app/portal.
-// status ACTIVE = counts toward collected; VOIDED = does not (voidReason required).
-model Receipt {
-  id              String    @id @default(cuid())
-  receiptId       String    @unique // human-readable e.g. RCP-2025-0001
-  registrationId  String
-  registration    PackageRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-  userId          String?   // set when mark-paid; links receipt to member account
-  user            User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  personName      String
-  personPhone     String
-  packageName     String
-  dateTimeIssued  DateTime  @default(now())
-  amountPaid      Int       // in JOD (integer)
-  paymentMethod   String    // CASH | CARD | TRANSFER | OTHER
-  privateNote     String    @db.Text // required on create
-  status          String    @default("ACTIVE") // ACTIVE | VOIDED (voidReason required if VOIDED)
-  createdBy       String?
-  voidedAt        DateTime?
-  voidReason      String?   @db.Text // required when status = VOIDED
-  createdAt       DateTime  @default(now())
-
-  @@index([registrationId])
-  @@index([receiptId])
-  @@index([status])
-  @@index([userId])
-}
-
-// Manual session adjustments (+1 excuse, etc.). Logged for auditing.
-model SessionAdjustment {
-  id             String   @id @default(cuid())
-  registrationId String
-  registration   PackageRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-  change         Int      // +1 or -1 (only +1 used for "excuse")
-  reason         String   @db.Text // required
-  createdBy      String?
-  createdAt      DateTime @default(now())
-
-  @@index([registrationId])
-}
-
-// Canceled session days (holiday, bad weather, etc.) — do NOT decrement sessions for these days.
-model PackageSessionCanceled {
-  id          String   @id @default(cuid())
-  packageName String
-  sessionDate DateTime @db.Date // the calendar day of the canceled session
-  reason      String   // HOLIDAY | BAD_WEATHER | TEACHER_UNAVAILABLE | OTHER
-  reasonDetail String? @db.Text // for OTHER
-  createdAt   DateTime @default(now())
-
-  @@index([packageName])
-  @@index([sessionDate])
-}
-
-// Class session: HELD = consumes 1 session for everyone in package; CANCELED = does not.
-model ClassSession {
-  id           String   @id @default(cuid())
-  packageName  String   // package identifier (or packageId when Package FK added)
-  sessionDate  DateTime @db.Date
-  status       String   @default("HELD") // HELD | CANCELED
-  cancelReason String?  // required if status = CANCELED (HOLIDAY | BAD_WEATHER | OTHER)
-  cancelDetail String?  @db.Text
-  createdBy    String?
-  createdAt    DateTime @default(now())
-
-  @@index([packageName])
-  @@index([sessionDate])
-  @@index([status])
-}
-
-// Freeze window: pauses DAYS-based expiry for a registration. Multiple freezes allowed (log).
-model Freeze {
-  id             String   @id @default(cuid())
-  registrationId String
-  registration   PackageRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-  freezeFrom     DateTime
-  freezeTo       DateTime
-  reason         String   @db.Text // required
-  createdBy      String?
-  createdAt      DateTime @default(now())
-
-  @@index([registrationId])
-}
-
-// Audit log for key actions (receipt create/void, discount, session adjustment, freeze, transfer, price change, bulk import).
-model AuditLog {
-  id          String   @id @default(cuid())
-  actorUserId String?
-  actionType  String   // RECEIPT_CREATED | RECEIPT_VOIDED | DISCOUNT_APPLIED | SESSION_ADJUSTED | FREEZE_CREATED | TRANSFER_DONE | PRICE_CHANGED | BULK_IMPORT | etc.
-  entityType  String   // Registration | Receipt | Package | etc.
-  entityId    String?
-  metadata    Json?    // action-specific payload
-  createdAt   DateTime @default(now())
-
-  @@index([actionType])
-  @@index([entityType])
-  @@index([entityId])
-  @@index([createdAt])
+enum UserRole {
+  MEMBER
+  BOOKING
 }

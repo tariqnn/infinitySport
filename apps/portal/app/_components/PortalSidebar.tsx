@@ -1,6 +1,7 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useMemo } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ChartBarIcon,
@@ -14,6 +15,7 @@ import {
   GiftTopIcon,
 } from "@heroicons/react/24/outline";
 import clsx from "clsx";
+import { prefetchPortalRouteData } from "../../lib/portalApi";
 
 const NAV_SECTIONS = [
   {
@@ -51,7 +53,37 @@ export function PortalSidebar({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const isDesktop = variant === "desktop";
+  const navHrefs = useMemo(
+    () => NAV_SECTIONS.flatMap((section) => section.items.map((item) => item.href)),
+    [],
+  );
+
+  const prefetchItem = useCallback(
+    (href: string) => {
+      router.prefetch(href);
+      void prefetchPortalRouteData(href);
+    },
+    [router],
+  );
+
+  useEffect(() => {
+    const timeouts: number[] = [];
+    const bootstrap = window.setTimeout(() => {
+      navHrefs
+        .filter((href) => href !== pathname)
+        .forEach((href, index) => {
+          const timer = window.setTimeout(() => prefetchItem(href), 120 * index);
+          timeouts.push(timer);
+        });
+    }, 150);
+
+    return () => {
+      window.clearTimeout(bootstrap);
+      timeouts.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [navHrefs, pathname, prefetchItem]);
 
   return (
     <aside
@@ -81,7 +113,10 @@ export function PortalSidebar({
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch
                   onClick={() => onNavigate?.()}
+                  onMouseEnter={() => prefetchItem(item.href)}
+                  onFocus={() => prefetchItem(item.href)}
                   className={clsx(
                     "group flex items-center gap-3.5 rounded-xl px-4 py-3 text-base font-semibold transition",
                     active

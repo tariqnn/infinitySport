@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { Modal, Input, Select, Button } from '../../_components/ui';
 import { packageRegistrationsApi, type PackageRegistrationRow } from '../../../lib/portalApi';
 import {
-  addOneMonthToDateInput,
+  addDurationMonthsToDateInput,
+  getPackageDefaultDurationMonths,
   getPackageDefaultPrice,
   getPackageDefaultSessions,
   hasPackageDefaultPrice,
@@ -25,6 +26,7 @@ export function RegisterInAnotherPackageModal({
   packageOptions,
   defaultPricesByPackage,
   defaultSessionsByPackage,
+  defaultDurationMonthsByPackage,
 }: {
   open: boolean;
   onClose: () => void;
@@ -33,6 +35,7 @@ export function RegisterInAnotherPackageModal({
   packageOptions: string[];
   defaultPricesByPackage?: Record<string, number>;
   defaultSessionsByPackage?: Record<string, number>;
+  defaultDurationMonthsByPackage?: Record<string, number>;
 }) {
   const [packageName, setPackageName] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -52,7 +55,7 @@ export function RegisterInAnotherPackageModal({
     setPackageName('');
     setStartDate(today);
     setSessionsLeft('');
-    setNextPaymentDate(addOneMonthToDateInput(today));
+    setNextPaymentDate(addDurationMonthsToDateInput(today, 1));
     setBasePriceJod('');
     setDiscountOpen(false);
     setDiscountType('NONE');
@@ -82,9 +85,13 @@ export function RegisterInAnotherPackageModal({
   useEffect(() => {
     if (!open) return;
     if (startDate.trim()) {
-      setNextPaymentDate(addOneMonthToDateInput(startDate));
+      const durationMonths = getPackageDefaultDurationMonths(
+        packageName,
+        defaultDurationMonthsByPackage,
+      );
+      setNextPaymentDate(addDurationMonthsToDateInput(startDate, durationMonths));
     }
-  }, [open, startDate]);
+  }, [defaultDurationMonthsByPackage, open, packageName, startDate]);
 
   const baseNumber = basePriceJod.trim() === '' ? 0 : parseInt(basePriceJod, 10) || 0;
   const discountNumber = discountType === 'NONE' ? 0 : parseFloat(discountValue) || 0;

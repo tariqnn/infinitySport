@@ -68,19 +68,23 @@ function ensureDatabaseUrl(): boolean {
   return false;
 }
 
-async function getBasePriceJod(packageName: string): Promise<number> {
+type PackageDefaults = {
+  basePriceJod: number;
+  durationMonths: number;
+};
+
+async function getPackageDefaults(packageName: string): Promise<PackageDefaults> {
   const { prisma } = await import("../../../lib/db");
 
   const pkg = await prisma.package
     .findUnique({
       where: { name: packageName },
-      select: { currentPriceJod: true },
+      select: { currentPriceJod: true, durationMonths: true },
     })
     .catch((error: unknown) => {
       console.warn("[package-registrations] package lookup skipped", error);
       return null;
     });
-  if (pkg?.currentPriceJod != null) return Math.max(0, pkg.currentPriceJod);
 
   const pricing = await prisma.packagePricing
     .findUnique({
@@ -91,7 +95,19 @@ async function getBasePriceJod(packageName: string): Promise<number> {
       console.warn("[package-registrations] pricing lookup skipped", error);
       return null;
     });
-  return Math.max(0, pricing?.basePriceJod ?? 0);
+  if (pkg) {
+    return {
+      basePriceJod:
+        pkg.currentPriceJod != null
+          ? Math.max(0, pkg.currentPriceJod)
+          : Math.max(0, pricing?.basePriceJod ?? 0),
+      durationMonths: Math.max(1, pkg.durationMonths ?? 1),
+    };
+  }
+  return {
+    basePriceJod: Math.max(0, pricing?.basePriceJod ?? 0),
+    durationMonths: 1,
+  };
 }
 
 async function ensureMemberAccount(params: {
@@ -158,6 +174,7 @@ async function syncLandingRegistrationToFirestore(input: {
   customerAge: number | null;
   basePriceJod: number;
   finalPriceJod: number;
+  durationMonths: number;
 }) {
   try {
     const now = new Date();
@@ -178,6 +195,7 @@ async function syncLandingRegistrationToFirestore(input: {
         basePriceJod: input.basePriceJod,
         discountType: "NONE",
         finalPriceJod: input.finalPriceJod,
+        durationMonths: input.durationMonths,
         periodStartsAt: null,
         periodEndsAt: null,
         isFrozen: false,
@@ -247,6 +265,16 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+    if (
+      !customerEmail ||
+      typeof customerEmail !== "string" ||
+      !customerEmail.trim()
+    ) {
+      return NextResponse.json(
+        { error: "Email is required." },
+        { status: 400 },
+      );
+    }
 
     const phoneValidation = isValidPhoneNumber(customerPhone);
     if (!phoneValidation.valid) {
@@ -261,7 +289,8 @@ export async function POST(request: Request) {
     }
 
     const cleanPackage = packageName.trim();
-    const basePriceJod = await getBasePriceJod(cleanPackage);
+    const cleanEmail = customerEmail.trim();
+    const { basePriceJod, durationMonths } = await getPackageDefaults(cleanPackage);
 
     const { prisma } = await import("../../../lib/db");
     const row = await prisma.packageRegistration.create({
@@ -269,10 +298,7 @@ export async function POST(request: Request) {
         packageName: cleanPackage,
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
-        customerEmail:
-          typeof customerEmail === "string" && customerEmail.trim()
-            ? customerEmail.trim()
-            : null,
+        customerEmail: cleanEmail,
         customerAge:
           typeof customerAge === "number" && customerAge > 0
             ? customerAge
@@ -282,12 +308,13 @@ export async function POST(request: Request) {
         discountValue: null,
         discountReason: null,
         finalPriceJod: basePriceJod,
+        durationMonths,
       },
       select: { id: true },
     });
 
     await ensureMemberAccount({
-      customerEmail: typeof customerEmail === "string" ? customerEmail : null,
+      customerEmail: cleanEmail,
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
     });
@@ -297,14 +324,12 @@ export async function POST(request: Request) {
       packageName: cleanPackage,
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
-      customerEmail:
-        typeof customerEmail === "string" && customerEmail.trim()
-          ? customerEmail.trim()
-          : null,
+      customerEmail: cleanEmail,
       customerAge:
         typeof customerAge === "number" && customerAge > 0 ? customerAge : null,
       basePriceJod,
       finalPriceJod: basePriceJod,
+      durationMonths,
     });
 
     return NextResponse.json({ success: true, id: row.id });

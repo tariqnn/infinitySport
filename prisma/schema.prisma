@@ -622,12 +622,14 @@ model Package {
   name             String   @unique // e.g. "Gymnastics Package A"
   description      String?  @db.Text
   descriptionBullets Json?  // array of strings for bullet points
+  durationMonths   Int      @default(1)
   sessionsCount    Int     @default(0) // 0 = not session-based (e.g. DAYS only)
   trackingType     String  @default("SESSIONS") // SESSIONS | DAYS | BOTH
   pricingType      String  @default("FIXED") // FIXED | MANUAL (MANUAL => "Contact for pricing")
   currentPriceJod  Int?    // null when pricingType = MANUAL
   timeSlots        Json?   // e.g. [{ "daysOfWeek": [0,2,4], "label": "Sun Tue Thu" }]
   isActive         Boolean @default(true)
+  showOnWebsite    Boolean @default(true)
   sortOrder        Int     @default(0)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -638,7 +640,7 @@ model Package {
 }
 
 // Public package registrations (Basketball, Gymnastics, Volleyball, etc.)
-// 30-day period from registration; freeze pauses the countdown.
+// Period length is snapshotted from Package.durationMonths; freeze pauses the countdown.
 // Price locking: snapshot fields; package price changes do not affect existing registrations.
 model PackageRegistration {
   id               String    @id @default(cuid())
@@ -657,7 +659,8 @@ model PackageRegistration {
   finalPriceJod    Int       // snapshot: base - discount, clamped >= 0
   billingPeriodKey String?   // e.g. "YYYY-MM" for price lock scope
   priceLockedUntil DateTime? // optional end of billing period
-  periodStartsAt   DateTime? // when they will start (optional; used for periodEndsAt = periodStartsAt + 30d)
+  durationMonths   Int       @default(1)
+  periodStartsAt   DateTime? // when they will start (optional; used for periodEndsAt = periodStartsAt + durationMonths)
   periodEndsAt     DateTime?
   sessionsLeft     Int?
   nextPaymentDate  DateTime?

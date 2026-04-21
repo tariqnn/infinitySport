@@ -7,6 +7,41 @@ const getApiBaseUrl = () => {
 
 const ROUTE_BASE_URL = getApiBaseUrl();
 const REQUEST_TIMEOUT_MS = 12000;
+const GET_CACHE_TTL_MS = 30_000;
+
+type ClientCacheEntry = {
+  data: unknown;
+  expiresAt: number;
+};
+
+const clientGetCache = new Map<string, ClientCacheEntry>();
+const clientGetInflight = new Map<string, Promise<unknown>>();
+
+function canUseClientGetCache(method: string): boolean {
+  return typeof window !== 'undefined' && method === 'GET';
+}
+
+function readClientGetCache<T>(cacheKey: string): T | null {
+  const cached = clientGetCache.get(cacheKey);
+  if (!cached) return null;
+  if (cached.expiresAt <= Date.now()) {
+    clientGetCache.delete(cacheKey);
+    return null;
+  }
+  return cached.data as T;
+}
+
+function writeClientGetCache(cacheKey: string, data: unknown): void {
+  clientGetCache.set(cacheKey, {
+    data,
+    expiresAt: Date.now() + GET_CACHE_TTL_MS,
+  });
+}
+
+function clearClientGetCache(): void {
+  clientGetCache.clear();
+  clientGetInflight.clear();
+}
 
 class ApiClient {
   private baseUrl: string;
@@ -27,43 +62,76 @@ class ApiClient {
     const baseUrl = this.baseUrl.replace(/\/$/, '');
     const endpointPath = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     const url = `${baseUrl}${endpointPath}`;
-    
+    const method = (options.method || 'GET').toUpperCase();
+    const cacheKey = `${method}:${url}`;
+    const useClientCache = canUseClientGetCache(method);
+
+    if (useClientCache) {
+      const cached = readClientGetCache<T>(cacheKey);
+      if (cached !== null) {
+        return cached;
+      }
+
+      const inflight = clientGetInflight.get(cacheKey);
+      if (inflight) {
+        return inflight as Promise<T>;
+      }
+    }
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const requestPromise = (async () => {
+      try {
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            ...options.headers,
+          },
+        });
 
-    try {
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
-      });
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => response.statusText);
+          throw new Error(`API error: ${response.status} ${errorText}`);
+        }
 
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => response.statusText);
-        throw new Error(`API error: ${response.status} ${errorText}`);
-      }
+        if (response.status === 204) {
+          if (!useClientCache) clearClientGetCache();
+          return null as T;
+        }
 
-      if (response.status === 204) {
-        return null as T;
-      }
+        const data = await response.json();
+        if (useClientCache) {
+          writeClientGetCache(cacheKey, data);
+        } else {
+          clearClientGetCache();
+        }
 
-      return response.json();
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new Error(`Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s. Please try again.`);
+        return data as T;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          throw new Error(`Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s. Please try again.`);
+        }
+        if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+          throw new Error(
+            `Cannot connect to route handler at ${url}. Make sure the admin app is running.`
+          );
+        }
+        throw error;
+      } finally {
+        clearTimeout(timeout);
+        if (useClientCache) {
+          clientGetInflight.delete(cacheKey);
+        }
       }
-      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        throw new Error(
-          `Cannot connect to route handler at ${url}. Make sure the admin app is running.`
-        );
-      }
-      throw error;
-    } finally {
-      clearTimeout(timeout);
+    })();
+
+    if (useClientCache) {
+      clientGetInflight.set(cacheKey, requestPromise as Promise<unknown>);
     }
+
+    return requestPromise;
   }
 
   // Hero
@@ -324,3 +392,52 @@ class ApiClient {
 }
 
 export const apiClient = new ApiClient();
+
+export async function prefetchAdminRouteData(href: string): Promise<void> {
+  const tasks: Array<Promise<unknown>> = [];
+
+  switch (href) {
+    case '/landing-content':
+      tasks.push(
+        apiClient.getHero(),
+        apiClient.getCoaches(),
+        apiClient.getPackages(),
+        apiClient.getOffers(),
+        apiClient.getEvents(),
+        apiClient.getAnnouncements(),
+        apiClient.getFacilities(),
+        apiClient.getFooterSettings(),
+        apiClient.getFooterLinks(),
+      );
+      break;
+    case '/hero':
+      tasks.push(apiClient.getHero());
+      break;
+    case '/coaches':
+      tasks.push(apiClient.getCoaches());
+      break;
+    case '/packages':
+      tasks.push(apiClient.getPackages());
+      break;
+    case '/offers':
+      tasks.push(apiClient.getOffers());
+      break;
+    case '/events':
+      tasks.push(apiClient.getEvents());
+      break;
+    case '/announcements':
+      tasks.push(apiClient.getAnnouncements());
+      break;
+    case '/facilities':
+      tasks.push(apiClient.getFacilities());
+      break;
+    case '/footer':
+      tasks.push(apiClient.getFooterSettings(), apiClient.getFooterLinks());
+      break;
+    default:
+      break;
+  }
+
+  if (!tasks.length) return;
+  await Promise.allSettled(tasks);
+}

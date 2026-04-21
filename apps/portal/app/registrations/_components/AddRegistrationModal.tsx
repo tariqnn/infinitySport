@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { Modal, Input, Select, Button } from '../../_components/ui';
 import { packageRegistrationsApi } from '../../../lib/portalApi';
 import {
-  addOneMonthToDateInput,
+  addDurationMonthsToDateInput,
+  getPackageDefaultDurationMonths,
   getPackageDefaultPrice,
   getPackageDefaultSessions,
   hasPackageDefaultPrice,
@@ -31,6 +32,7 @@ export function AddRegistrationModal({
   packageOptions,
   defaultPricesByPackage,
   defaultSessionsByPackage,
+  defaultDurationMonthsByPackage,
   initialPerson,
 }: {
   open: boolean;
@@ -39,6 +41,7 @@ export function AddRegistrationModal({
   packageOptions?: string[];
   defaultPricesByPackage?: Record<string, number>;
   defaultSessionsByPackage?: Record<string, number>;
+  defaultDurationMonthsByPackage?: Record<string, number>;
   initialPerson?: InitialPerson | null;
 }) {
   const packageList = packageOptions ?? [];
@@ -64,7 +67,7 @@ export function AddRegistrationModal({
 
     setPackageName('');
     setSessionsLeft('');
-    setNextPaymentDate(addOneMonthToDateInput(today));
+    setNextPaymentDate(addDurationMonthsToDateInput(today, 1));
     setBasePriceJod('');
     setDiscountOpen(false);
     setDiscountType('NONE');
@@ -107,9 +110,13 @@ export function AddRegistrationModal({
   useEffect(() => {
     if (!open) return;
     if (periodStartsAt.trim()) {
-      setNextPaymentDate(addOneMonthToDateInput(periodStartsAt));
+      const durationMonths = getPackageDefaultDurationMonths(
+        packageName,
+        defaultDurationMonthsByPackage,
+      );
+      setNextPaymentDate(addDurationMonthsToDateInput(periodStartsAt, durationMonths));
     }
-  }, [open, periodStartsAt]);
+  }, [defaultDurationMonthsByPackage, open, packageName, periodStartsAt]);
 
   const baseNumber = basePriceJod.trim() === '' ? 0 : parseInt(basePriceJod, 10) || 0;
   const discountNumber = discountType === 'NONE' ? 0 : parseFloat(discountValue) || 0;

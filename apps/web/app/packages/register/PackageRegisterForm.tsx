@@ -52,22 +52,26 @@ export function PackageRegisterForm() {
   }, []);
 
   const options = useMemo(() => {
-    const list = packagesFromApi.map((p) => p.name);
-    if (decodedPackage && !list.includes(decodedPackage)) list.unshift(decodedPackage);
-    return list;
+    return packagesFromApi.map((p) => p.name);
   }, [packagesFromApi, decodedPackage]);
 
-  const defaultPackage = decodedPackage || options[0] || '';
+  const defaultPackage = options.includes(decodedPackage) ? decodedPackage : (options[0] || '');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setStatus('submitting');
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
+      setError('Email is required.');
+      setStatus('error');
+      return;
+    }
     const payload = {
       packageName: packageName || defaultPackage,
       customerName: name.trim(),
       customerPhone: phone.trim(),
-      customerEmail: email.trim() || undefined,
+      customerEmail: normalizedEmail,
       customerAge: age.trim() ? parseInt(age.trim(), 10) : undefined,
     };
 
@@ -187,13 +191,15 @@ export function PackageRegisterForm() {
       </div>
 
       <div>
-        <label className="block text-sm font-semibold text-gray-700 mb-1">Email (optional)</label>
+        <label className="block text-sm font-semibold text-gray-700 mb-1">Email *</label>
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-gray-900 focus:border-brand-green-primary focus:outline-none focus:ring-1 focus:ring-brand-green-primary"
           placeholder="your@email.com"
+          autoComplete="email"
+          required
         />
       </div>
 

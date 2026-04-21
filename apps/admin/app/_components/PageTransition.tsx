@@ -20,14 +20,14 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
       };
 
   return (
-    <AnimatePresence initial={false} mode="wait">
+    <AnimatePresence initial={false} mode="sync">
       <motion.div
         key={pathname}
         variants={variants}
         initial="initial"
         animate="animate"
         exit="exit"
-        transition={{ duration: 0.25, ease: "easeOut" }}
+        transition={{ duration: 0.14, ease: "easeOut" }}
         className="h-full"
       >
         {children}

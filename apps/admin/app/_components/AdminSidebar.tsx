@@ -1,7 +1,8 @@
 "use client";
 
+import { useCallback, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Home,
   LayoutDashboard,
@@ -18,6 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import clsx from 'clsx';
+import { prefetchAdminRouteData } from '../../lib/apiClient';
 
 const navGroups = [
   {
@@ -60,7 +62,37 @@ export function AdminSidebar({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const isDesktop = variant === "desktop";
+  const navHrefs = useMemo(
+    () => navGroups.flatMap((group) => group.items.map((item) => item.href)),
+    [],
+  );
+
+  const prefetchItem = useCallback(
+    (href: string) => {
+      router.prefetch(href);
+      void prefetchAdminRouteData(href);
+    },
+    [router],
+  );
+
+  useEffect(() => {
+    const timeouts: number[] = [];
+    const bootstrap = window.setTimeout(() => {
+      navHrefs
+        .filter((href) => href !== pathname)
+        .forEach((href, index) => {
+          const timer = window.setTimeout(() => prefetchItem(href), 120 * index);
+          timeouts.push(timer);
+        });
+    }, 150);
+
+    return () => {
+      window.clearTimeout(bootstrap);
+      timeouts.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [navHrefs, pathname, prefetchItem]);
 
   return (
     <aside
@@ -106,7 +138,10 @@ export function AdminSidebar({
                   <li key={item.href}>
                     <Link
                       href={item.href}
+                      prefetch
                       onClick={() => onNavigate?.()}
+                      onMouseEnter={() => prefetchItem(item.href)}
+                      onFocus={() => prefetchItem(item.href)}
                       className={clsx(
                         'group flex items-center gap-3.5 rounded-xl px-4 py-3 text-base font-medium transition',
                         active

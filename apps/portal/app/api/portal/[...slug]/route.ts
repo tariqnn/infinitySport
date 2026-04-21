@@ -431,36 +431,115 @@ async function updatePackageRegistrationCompat(args: {
   }
 }
 
-async function getBasePriceJod(packageName: string): Promise<number> {
-  const pkg = await prisma.package
-    .findUnique({ where: { name: packageName } })
-    .catch(() => null);
-  if (pkg?.currentPriceJod != null)
-    return clampNonNegative(pkg.currentPriceJod);
+type PackageConfig = {
+  id: string;
+  sportType: string;
+  name: string;
+  description: string | null;
+  durationMonths: number;
+  sessionsCount: number;
+  trackingType: string;
+  pricingType: string;
+  currentPriceJod: number | null;
+  isActive: boolean;
+  showOnWebsite: boolean;
+  sortOrder: number;
+};
 
-  const pricing = await prisma.packagePricing
-    .findUnique({ where: { packageName } })
-    .catch(() => null);
-  return clampNonNegative(pricing?.basePriceJod ?? 0);
+type PackageDefaults = {
+  basePriceJod: number;
+  defaultSessionsLeft: number | null;
+  durationMonths: number;
+  packageConfig: PackageConfig | null;
+};
+
+function normalizeDurationMonths(value: unknown, fallback = 1): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return Math.max(1, fallback);
+  return Math.max(1, Math.round(parsed));
 }
 
-async function getDefaultSessionsLeft(packageName: string): Promise<number | null> {
+async function getPackageConfigByName(packageName: string): Promise<PackageConfig | null> {
   const pkg = await prisma.package
     .findUnique({
       where: { name: packageName },
-      select: { sessionsCount: true },
+      select: {
+        id: true,
+        sportType: true,
+        name: true,
+        description: true,
+        durationMonths: true,
+        sessionsCount: true,
+        trackingType: true,
+        pricingType: true,
+        currentPriceJod: true,
+        isActive: true,
+        showOnWebsite: true,
+        sortOrder: true,
+      },
     })
     .catch(() => null);
+  if (!pkg) return null;
+  return {
+    ...pkg,
+    durationMonths: normalizeDurationMonths(pkg.durationMonths, 1),
+    sessionsCount: Math.max(0, Math.round(Number(pkg.sessionsCount || 0))),
+  };
+}
 
-  const sessionsCount = Number(pkg?.sessionsCount ?? 0);
-  if (!Number.isFinite(sessionsCount) || sessionsCount <= 0) return null;
-  return Math.round(sessionsCount);
+async function getPackageDefaults(packageName: string): Promise<PackageDefaults> {
+  const pkg = await getPackageConfigByName(packageName);
+  const pricing = await prisma.packagePricing
+    .findUnique({ where: { packageName } })
+    .catch(() => null);
+  if (pkg) {
+    return {
+      basePriceJod:
+        pkg.currentPriceJod != null
+          ? clampNonNegative(pkg.currentPriceJod)
+          : clampNonNegative(pricing?.basePriceJod ?? 0),
+      defaultSessionsLeft: pkg.sessionsCount > 0 ? pkg.sessionsCount : null,
+      durationMonths: pkg.durationMonths,
+      packageConfig: pkg,
+    };
+  }
+  return {
+    basePriceJod: clampNonNegative(pricing?.basePriceJod ?? 0),
+    defaultSessionsLeft: null,
+    durationMonths: 1,
+    packageConfig: null,
+  };
 }
 
 function addCalendarMonths(date: Date, months: number): Date {
   const next = new Date(date);
-  next.setMonth(next.getMonth() + months);
+  next.setMonth(next.getMonth() + normalizeDurationMonths(months, 1));
   return next;
+}
+
+function computeCyclePeriodEnd(
+  cycleAnchor: Date,
+  durationMonths: number,
+): Date {
+  return addCalendarMonths(cycleAnchor, durationMonths);
+}
+
+function getCycleAnchorDate(params: {
+  periodStartsAt?: string | Date | null;
+  createdAt?: string | Date | null;
+  fallback?: Date;
+}): Date {
+  const periodStart = params.periodStartsAt
+    ? new Date(params.periodStartsAt)
+    : null;
+  if (periodStart && !Number.isNaN(periodStart.getTime())) {
+    return periodStart;
+  }
+  const createdAt = params.createdAt ? new Date(params.createdAt) : null;
+  if (createdAt && !Number.isNaN(createdAt.getTime())) {
+    return createdAt;
+  }
+  return params.fallback ? new Date(params.fallback) : new Date();
 }
 
 async function syncActivePackagesToFirestore() {
@@ -474,11 +553,13 @@ async function syncActivePackagesToFirestore() {
         sportType: true,
         name: true,
         description: true,
+        durationMonths: true,
         sessionsCount: true,
         trackingType: true,
         pricingType: true,
         currentPriceJod: true,
         isActive: true,
+        showOnWebsite: true,
         sortOrder: true,
       },
     });
@@ -529,6 +610,7 @@ function mapRegistrationRow(row: any) {
     discountValue: row.discountValue ?? null,
     discountReason: row.discountReason ?? null,
     finalPriceJod,
+    durationMonths: normalizeDurationMonths(row.durationMonths, 1),
     collected,
     periodStartsAt: row.periodStartsAt ?? null,
     periodEndsAt: row.periodEndsAt ?? null,
@@ -632,6 +714,7 @@ async function syncRegistrationRealtimeById(
         discountValue: serialized.discountValue,
         discountReason: serialized.discountReason,
         finalPriceJod: serialized.finalPriceJod,
+        durationMonths: serialized.durationMonths,
         periodStartsAt: serialized.periodStartsAt,
         periodEndsAt: serialized.periodEndsAt,
         isFrozen: serialized.isFrozen,
@@ -3741,12 +3824,13 @@ async function createPackageRegistration(payload: RegistrationInput) {
   if (!customerName) throw new Error("Customer name is required");
   if (!customerPhone) throw new Error("Customer phone is required");
 
-  const [basePriceJod, defaultSessionsLeft] = await Promise.all([
+  const packageDefaults = await getPackageDefaults(packageName);
+  const basePriceJod =
     payload.basePriceJod != null
-      ? Promise.resolve(clampNonNegative(Number(payload.basePriceJod)))
-      : getBasePriceJod(packageName),
-    getDefaultSessionsLeft(packageName),
-  ]);
+      ? clampNonNegative(Number(payload.basePriceJod))
+      : packageDefaults.basePriceJod;
+  const defaultSessionsLeft = packageDefaults.defaultSessionsLeft;
+  const durationMonths = packageDefaults.durationMonths;
 
   const discountType = (payload.discountType || "NONE").toUpperCase();
   const discountValue =
@@ -3773,10 +3857,10 @@ async function createPackageRegistration(payload: RegistrationInput) {
     ? new Date(payload.periodStartsAt)
     : null;
   const cycleAnchor = periodStartsAt ?? now;
-  const periodEndsAt = addCalendarMonths(cycleAnchor, 1);
+  const periodEndsAt = computeCyclePeriodEnd(cycleAnchor, durationMonths);
   const nextPaymentDate = payload.nextPaymentDate
     ? parseOptionalMembershipDate(payload.nextPaymentDate)
-    : addCalendarMonths(cycleAnchor, 1);
+    : computeCyclePeriodEnd(cycleAnchor, durationMonths);
   if (payload.nextPaymentDate && !nextPaymentDate) {
     throw new Error("Invalid next payment date");
   }
@@ -3807,6 +3891,7 @@ async function createPackageRegistration(payload: RegistrationInput) {
     finalPriceJod,
     billingPeriodKey,
     priceLockedUntil,
+    durationMonths,
     periodEndsAt,
     sessionsLeft,
     nextPaymentDate,
@@ -4561,12 +4646,13 @@ async function bulkCreateForPerson(request: NextRequest) {
 
       for (const entry of body.registrations) {
         const packageName = (entry.packageName || "").trim();
-        const [basePriceJod, defaultSessionsLeft] = await Promise.all([
+        const packageDefaults = await getPackageDefaults(packageName);
+        const basePriceJod =
           entry.basePriceJod != null
-            ? Promise.resolve(clampNonNegative(Number(entry.basePriceJod)))
-            : getBasePriceJod(packageName),
-          getDefaultSessionsLeft(packageName),
-        ]);
+            ? clampNonNegative(Number(entry.basePriceJod))
+            : packageDefaults.basePriceJod;
+        const defaultSessionsLeft = packageDefaults.defaultSessionsLeft;
+        const durationMonths = packageDefaults.durationMonths;
         const discountType = (entry.discountType || "NONE").toUpperCase();
         const discountValue =
           discountType === "NONE" ? null : Number(entry.discountValue ?? 0);
@@ -4582,9 +4668,8 @@ async function bulkCreateForPerson(request: NextRequest) {
           : body.periodStartsAt
             ? new Date(body.periodStartsAt)
             : null;
-        const periodEndsAt = periodStartsAt
-          ? new Date(periodStartsAt.getTime() + 30 * 24 * 60 * 60 * 1000)
-          : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+        const cycleAnchor = periodStartsAt ?? now;
+        const periodEndsAt = computeCyclePeriodEnd(cycleAnchor, durationMonths);
         const nextPaymentDate = entry.nextPaymentDate
           ? parseOptionalMembershipDate(entry.nextPaymentDate)
           : periodEndsAt;
@@ -4618,6 +4703,7 @@ async function bulkCreateForPerson(request: NextRequest) {
           finalPriceJod,
           billingPeriodKey,
           priceLockedUntil,
+          durationMonths,
           periodEndsAt,
           sessionsLeft,
           nextPaymentDate,
@@ -4782,6 +4868,18 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
     }
   }
 
+  const packageChanged = nextPackageName !== existing.packageName;
+  const nextPackageDefaults = packageChanged
+    ? await getPackageDefaults(nextPackageName)
+    : null;
+  if (packageChanged) {
+    updateData.durationMonths = nextPackageDefaults?.durationMonths ?? 1;
+  }
+  const nextDurationMonths = normalizeDurationMonths(
+    updateData.durationMonths ?? existing.durationMonths,
+    nextPackageDefaults?.durationMonths ?? 1,
+  );
+
   if (
     body.basePriceJod !== undefined ||
     body.discountType !== undefined ||
@@ -4847,10 +4945,10 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
       }
       updateData.periodStartsAt = periodStartsAt;
       if (body.periodEndsAt === undefined) {
-        updateData.periodEndsAt = addCalendarMonths(periodStartsAt, 1);
+        updateData.periodEndsAt = computeCyclePeriodEnd(periodStartsAt, nextDurationMonths);
       }
       if (body.nextPaymentDate === undefined) {
-        updateData.nextPaymentDate = addCalendarMonths(periodStartsAt, 1);
+        updateData.nextPaymentDate = computeCyclePeriodEnd(periodStartsAt, nextDurationMonths);
       }
     } else {
       updateData.periodStartsAt = null;
@@ -4868,6 +4966,25 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
     }
   }
 
+  if (
+    packageChanged &&
+    body.periodStartsAt === undefined &&
+    body.periodEndsAt === undefined
+  ) {
+    const cycleAnchor = getCycleAnchorDate({
+      periodStartsAt: existing.periodStartsAt,
+      createdAt: existing.createdAt,
+    });
+    updateData.periodEndsAt = computeCyclePeriodEnd(cycleAnchor, nextDurationMonths);
+  }
+  if (
+    packageChanged &&
+    body.nextPaymentDate === undefined &&
+    updateData.periodEndsAt instanceof Date
+  ) {
+    updateData.nextPaymentDate = updateData.periodEndsAt;
+  }
+
   if (body.isFrozen !== undefined) {
     updateData.isFrozen = Boolean(body.isFrozen);
     if (body.isFrozen) {
@@ -4876,9 +4993,23 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
       if (existing.frozenAt) {
         const now = new Date();
         const frozenMs = now.getTime() - existing.frozenAt.getTime();
-        const currentEnd = existing.periodEndsAt
-          ? new Date(existing.periodEndsAt)
-          : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+        const currentEndBase =
+          updateData.periodEndsAt instanceof Date
+            ? updateData.periodEndsAt
+            : existing.periodEndsAt
+              ? new Date(existing.periodEndsAt)
+              : computeCyclePeriodEnd(
+                  getCycleAnchorDate({
+                    periodStartsAt:
+                      updateData.periodStartsAt instanceof Date
+                        ? updateData.periodStartsAt
+                        : existing.periodStartsAt,
+                    createdAt: existing.createdAt,
+                    fallback: now,
+                  }),
+                  nextDurationMonths,
+                );
+        const currentEnd = new Date(currentEndBase);
         updateData.periodEndsAt = new Date(currentEnd.getTime() + frozenMs);
       }
       updateData.frozenAt = null;
@@ -4933,6 +5064,7 @@ async function reregisterPackage(id: string) {
     snapshot: {
       packageName: existing.packageName,
       customerName: existing.customerName,
+      durationMonths: existing.durationMonths,
       periodStartsAt: existing.periodStartsAt,
       periodEndsAt: existing.periodEndsAt,
       nextPaymentDate: existing.nextPaymentDate,
@@ -4949,9 +5081,11 @@ async function reregisterPackage(id: string) {
 
   const now = new Date();
   const periodStartsAt = now;
-  const periodEndsAt = addCalendarMonths(now, 1);
+  const packageDefaults = await getPackageDefaults(existing.packageName);
+  const durationMonths = packageDefaults.durationMonths;
+  const periodEndsAt = computeCyclePeriodEnd(now, durationMonths);
   const sessionsLeft =
-    existing.sessionsLeft ?? (await getDefaultSessionsLeft(existing.packageName));
+    existing.sessionsLeft ?? packageDefaults.defaultSessionsLeft;
   const { billingPeriodKey, priceLockedUntil } = billingPeriodFromDate(now);
 
   const row = await updatePackageRegistrationCompat({
@@ -4960,9 +5094,10 @@ async function reregisterPackage(id: string) {
       isPaid: false,
       billingPeriodKey,
       priceLockedUntil,
+      durationMonths,
       periodStartsAt,
       periodEndsAt,
-      nextPaymentDate: addCalendarMonths(now, 1),
+      nextPaymentDate: computeCyclePeriodEnd(now, durationMonths),
       sessionsLeft,
       sessionsBonus: 0,
       isFrozen: false,
@@ -6659,19 +6794,23 @@ async function dispatchGet(request: NextRequest, params: Params) {
   }
 
   if (resource === "packages" && !id) {
+    const includeInactive =
+      request.nextUrl.searchParams.get("includeInactive") === "1";
     const rows = await prisma.package.findMany({
-      where: { isActive: true },
+      where: includeInactive ? undefined : { isActive: true },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       select: {
         id: true,
         sportType: true,
         name: true,
         description: true,
+        durationMonths: true,
         sessionsCount: true,
         trackingType: true,
         pricingType: true,
         currentPriceJod: true,
         isActive: true,
+        showOnWebsite: true,
         sortOrder: true,
       },
     });
@@ -6947,6 +7086,79 @@ async function dispatchPost(request: NextRequest, params: Params) {
     return bulkCreateForPerson(request);
   }
 
+  if (resource === "packages" && !id) {
+    const body = (await request.json()) as {
+      name?: string;
+      sportType?: string;
+      description?: string | null;
+      durationMonths?: number;
+      sessionsCount?: number;
+      trackingType?: string;
+      pricingType?: string;
+      currentPriceJod?: number | null;
+      isActive?: boolean;
+      showOnWebsite?: boolean;
+      sortOrder?: number;
+    };
+
+    const name = String(body.name || "").trim();
+    if (!name) return jsonError("Package name is required");
+
+    const durationMonths = normalizeDurationMonths(body.durationMonths, 1);
+    const sessionsCount = Number(body.sessionsCount ?? 0);
+    if (!Number.isFinite(sessionsCount) || sessionsCount < 0) {
+      return jsonError("sessionsCount must be 0 or greater");
+    }
+
+    let currentPriceJod: number | null = null;
+    if (body.currentPriceJod !== undefined) {
+      if (body.currentPriceJod == null) {
+        currentPriceJod = null;
+      } else {
+        const parsedCurrentPrice = Number(body.currentPriceJod);
+        if (!Number.isFinite(parsedCurrentPrice) || parsedCurrentPrice < 0) {
+          return jsonError("currentPriceJod must be 0 or greater");
+        }
+        currentPriceJod = Math.round(parsedCurrentPrice);
+      }
+    }
+
+    const sortOrder = Number(body.sortOrder ?? 0);
+    if (!Number.isFinite(sortOrder) || sortOrder < 0) {
+      return jsonError("sortOrder must be 0 or greater");
+    }
+
+    try {
+      const row = await prisma.package.create({
+        data: {
+          name,
+          sportType: String(body.sportType || "").trim() || "Other",
+          description:
+            body.description == null ? null : String(body.description).trim() || null,
+          durationMonths,
+          sessionsCount: Math.round(sessionsCount),
+          trackingType:
+            String(body.trackingType || "SESSIONS").trim().toUpperCase() ||
+            "SESSIONS",
+          pricingType:
+            String(body.pricingType || "FIXED").trim().toUpperCase() || "FIXED",
+          currentPriceJod,
+          isActive: Boolean(body.isActive ?? true),
+          showOnWebsite: Boolean(body.showOnWebsite ?? true),
+          sortOrder: Math.round(sortOrder),
+        },
+      });
+
+      await syncActivePackagesToFirestore();
+      return NextResponse.json(row);
+    } catch (error: any) {
+      if (error?.code === "P2002") {
+        return jsonError("Package name already exists", 409);
+      }
+      return jsonError("Failed to create package", 500);
+    }
+  }
+
   if (resource === "package-registrations" && !id) {
     const body = (await request.json()) as RegistrationInput;
     try {
@@ -7159,17 +7371,19 @@ async function dispatchPatch(request: NextRequest, params: Params) {
       name?: string;
       sportType?: string;
       description?: string | null;
+      durationMonths?: number;
       sessionsCount?: number;
       trackingType?: string;
       pricingType?: string;
       currentPriceJod?: number | null;
       isActive?: boolean;
+      showOnWebsite?: boolean;
       sortOrder?: number;
     };
 
     const existingPackage = await prisma.package.findUnique({
       where: { id },
-      select: { name: true, sessionsCount: true },
+      select: { name: true, sessionsCount: true, durationMonths: true },
     });
     if (!existingPackage) return jsonError("Package not found", 404);
 
@@ -7181,6 +7395,13 @@ async function dispatchPatch(request: NextRequest, params: Params) {
     }
     if (body.sportType !== undefined) data.sportType = String(body.sportType || "").trim() || "Other";
     if (body.description !== undefined) data.description = body.description == null ? null : String(body.description).trim() || null;
+    if (body.durationMonths !== undefined) {
+      const durationMonths = Number(body.durationMonths);
+      if (!Number.isFinite(durationMonths) || durationMonths < 1) {
+        return jsonError("durationMonths must be 1 or greater");
+      }
+      data.durationMonths = Math.round(durationMonths);
+    }
     if (body.sessionsCount !== undefined) {
       const sessionsCount = Number(body.sessionsCount);
       if (!Number.isFinite(sessionsCount) || sessionsCount < 0) {
@@ -7202,6 +7423,9 @@ async function dispatchPatch(request: NextRequest, params: Params) {
       }
     }
     if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
+    if (body.showOnWebsite !== undefined) {
+      data.showOnWebsite = Boolean(body.showOnWebsite);
+    }
     if (body.sortOrder !== undefined) {
       const sortOrder = Number(body.sortOrder);
       if (!Number.isFinite(sortOrder) || sortOrder < 0) {
@@ -7321,6 +7545,41 @@ async function dispatchDelete(_request: NextRequest, params: Params) {
       if (error?.code === "P2025")
         return jsonError("Registration not found", 404);
       return jsonError("Failed to delete registration", 500);
+    }
+  }
+
+  if (resource === "packages") {
+    const existingPackage = await prisma.package.findUnique({
+      where: { id },
+      select: { id: true, name: true },
+    });
+    if (!existingPackage) return jsonError("Package not found", 404);
+
+    const registrationsCount = await prisma.packageRegistration.count({
+      where: { packageName: existingPackage.name },
+    });
+    if (registrationsCount > 0) {
+      return jsonError(
+        "Cannot delete a package that already has registrations. Set it inactive instead.",
+        409,
+      );
+    }
+
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.packageSessionCanceled.deleteMany({
+          where: { packageName: existingPackage.name },
+        });
+        await tx.packagePricing.deleteMany({
+          where: { packageName: existingPackage.name },
+        });
+        await tx.package.delete({ where: { id } });
+      });
+      await syncActivePackagesToFirestore();
+      return NextResponse.json({ success: true });
+    } catch (error: any) {
+      if (error?.code === "P2025") return jsonError("Package not found", 404);
+      return jsonError("Failed to delete package", 500);
     }
   }
 

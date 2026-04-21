@@ -5,11 +5,13 @@ export type RegistrationPackageSyncInput = {
   sportType?: string | null;
   name: string;
   description?: string | null;
+  durationMonths?: number | null;
   sessionsCount?: number | null;
   trackingType?: string | null;
   pricingType?: string | null;
   currentPriceJod?: number | null;
   isActive?: boolean | null;
+  showOnWebsite?: boolean | null;
   sortOrder?: number | null;
 };
 
@@ -31,6 +33,7 @@ export type RegistrationRealtimeRecordInput = {
   discountValue?: number | null;
   discountReason?: string | null;
   finalPriceJod?: number | null;
+  durationMonths?: number | null;
   periodStartsAt?: string | Date | admin.firestore.Timestamp | null;
   periodEndsAt?: string | Date | admin.firestore.Timestamp | null;
   isFrozen?: boolean | null;
@@ -138,11 +141,13 @@ function serializePackage(input: RegistrationPackageSyncInput) {
     sportType: normalizeText(input.sportType),
     name: normalizeText(input.name),
     description: normalizeNullableText(input.description),
+    durationMonths: Math.max(1, normalizeInteger(input.durationMonths) ?? 1),
     sessionsCount: Math.max(0, normalizeInteger(input.sessionsCount) ?? 0),
     trackingType: normalizeText(input.trackingType || "SESSIONS"),
     pricingType: normalizeText(input.pricingType || "FIXED"),
     currentPriceJod: normalizeNumber(input.currentPriceJod),
     isActive: normalizeBoolean(input.isActive, true),
+    showOnWebsite: normalizeBoolean(input.showOnWebsite, true),
     sortOrder: normalizeInteger(input.sortOrder) ?? 0,
   };
 }
@@ -170,6 +175,7 @@ function serializeRegistration(input: RegistrationRealtimeRecordInput) {
     discountValue: normalizeNumber(input.discountValue),
     discountReason: normalizeNullableText(input.discountReason),
     finalPriceJod: normalizeNumber(input.finalPriceJod) ?? 0,
+    durationMonths: Math.max(1, normalizeInteger(input.durationMonths) ?? 1),
     periodStartsAt: toTimestamp(input.periodStartsAt),
     periodStartsAtIso: toIsoString(input.periodStartsAt),
     periodEndsAt: toTimestamp(input.periodEndsAt),

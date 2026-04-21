@@ -682,6 +682,7 @@ class FirebasePortalRepository implements PortalRepository {
     if (package.sessionsCount > 0) {
       payload['sessionsLeft'] = package.sessionsCount;
     }
+    payload['durationMonths'] = package.durationMonths;
     final currentPriceJod = package.currentPriceJod;
     if (currentPriceJod != null) {
       payload['basePriceJod'] = currentPriceJod;
@@ -690,7 +691,16 @@ class FirebasePortalRepository implements PortalRepository {
     if (periodStartsAt != null) {
       payload['periodStartsAt'] = Timestamp.fromDate(periodStartsAt.toUtc());
       payload['periodStartsAtIso'] = periodStartsAt.toUtc().toIso8601String();
-      final periodEndsAt = periodStartsAt.toUtc().add(const Duration(days: 30));
+      final periodEndsAt = DateTime(
+        periodStartsAt.toUtc().year,
+        periodStartsAt.toUtc().month + (package.durationMonths <= 0 ? 1 : package.durationMonths),
+        periodStartsAt.toUtc().day,
+        periodStartsAt.toUtc().hour,
+        periodStartsAt.toUtc().minute,
+        periodStartsAt.toUtc().second,
+        periodStartsAt.toUtc().millisecond,
+        periodStartsAt.toUtc().microsecond,
+      );
       payload['periodEndsAt'] = Timestamp.fromDate(periodEndsAt);
       payload['periodEndsAtIso'] = periodEndsAt.toIso8601String();
       payload['nextPaymentDate'] = Timestamp.fromDate(periodEndsAt);
@@ -998,6 +1008,9 @@ class FirebasePortalRepository implements PortalRepository {
           : readDouble(data['discountValue']),
       discountReason: readNullableString(data['discountReason']),
       finalPriceJod: readDouble(data['finalPriceJod']),
+      durationMonths: data['durationMonths'] == null
+          ? 1
+          : readInt(data['durationMonths']),
       periodStartsAt: _readNullableIso(data['periodStartsAt']) ??
           readNullableString(data['periodStartsAtIso']),
       periodEndsAt: _readNullableIso(data['periodEndsAt']) ??

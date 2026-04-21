@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Modal, Input, Select, Button } from '../../_components/ui';
 import { packageRegistrationsApi, type PackageRegistrationRow } from '../../../lib/portalApi';
 import {
-  addOneMonthToDateInput,
+  addDurationMonthsToDateInput,
+  getPackageDefaultDurationMonths,
   getPackageDefaultPrice,
   getPackageDefaultSessions,
   hasPackageDefaultPrice,
@@ -30,6 +31,7 @@ export function EditRegistrationModal({
   packageOptions,
   defaultPricesByPackage,
   defaultSessionsByPackage,
+  defaultDurationMonthsByPackage,
   currentSessionSummary,
 }: {
   open: boolean;
@@ -39,6 +41,7 @@ export function EditRegistrationModal({
   packageOptions: string[];
   defaultPricesByPackage?: Record<string, number>;
   defaultSessionsByPackage?: Record<string, number>;
+  defaultDurationMonthsByPackage?: Record<string, number>;
   currentSessionSummary?: { remaining: number; total: number; used: number } | null;
 }) {
   const [packageName, setPackageName] = useState('');
@@ -135,10 +138,16 @@ export function EditRegistrationModal({
   useEffect(() => {
     if (!open || !registration) return;
     const originalStart = toDateInputValue(registration.periodStartsAt);
-    if (!periodStartsAt.trim() || periodStartsAt === originalStart) return;
+    const packageChanged = packageName !== registration.packageName;
+    const startChanged = periodStartsAt.trim() && periodStartsAt !== originalStart;
+    if (!periodStartsAt.trim() || (!startChanged && !packageChanged)) return;
     setSessionsInputMode('base');
-    setNextPaymentDate(addOneMonthToDateInput(periodStartsAt));
-  }, [open, periodStartsAt, registration]);
+    const durationMonths =
+      !packageChanged
+        ? Math.max(1, registration.durationMonths || 1)
+        : getPackageDefaultDurationMonths(packageName, defaultDurationMonthsByPackage);
+    setNextPaymentDate(addDurationMonthsToDateInput(periodStartsAt, durationMonths));
+  }, [defaultDurationMonthsByPackage, open, packageName, periodStartsAt, registration]);
 
   const packageList = useMemo(() => {
     const names = new Set(packageOptions);

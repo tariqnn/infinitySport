@@ -16,6 +16,7 @@ type RegistrationLike = {
   customerEmail?: string | null;
   isPaid?: boolean | null;
   finalPriceJod?: number | null;
+  durationMonths?: number | null;
   sessionsLeft?: number | null;
   nextPaymentDate?: string | Date | null;
   planLabel?: string | null;
@@ -35,6 +36,7 @@ type PrismaMembershipSource = Pick<
 >;
 
 type PackageMeta = {
+  durationMonths: number;
   sessionsCount: number;
   trackingType: string;
 };
@@ -87,6 +89,12 @@ function toIsoDateString(value: string | Date | null | undefined): string | null
   return iso ? iso.slice(0, 10) : null;
 }
 
+function addCalendarMonths(date: Date, months: number): Date {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + Math.max(1, Math.round(months || 1)));
+  return next;
+}
+
 function computePaymentStatus(
   finalPriceJod: number,
   collectedJod: number,
@@ -98,8 +106,18 @@ function computePaymentStatus(
   return "UNPAID";
 }
 
-function computeDaysLeft(periodEndsAt: string | Date | null | undefined): number {
-  const endsAt = periodEndsAt ? new Date(periodEndsAt) : null;
+function computeDaysLeft(params: {
+  periodEndsAt: string | Date | null | undefined;
+  periodStartsAt: string | Date | null | undefined;
+  createdAt: string | Date;
+  durationMonths: number;
+}): number {
+  const endsAt = params.periodEndsAt
+    ? new Date(params.periodEndsAt)
+    : addCalendarMonths(
+        params.periodStartsAt ? new Date(params.periodStartsAt) : new Date(params.createdAt),
+        params.durationMonths,
+      );
   if (!endsAt || Number.isNaN(endsAt.getTime())) return 0;
   return Math.max(
     0,
@@ -134,12 +152,13 @@ export async function buildRegistrationMembershipSummaries(
     prisma.package
       .findMany({
         where: { name: { in: packageNames } },
-        select: { name: true, sessionsCount: true, trackingType: true },
+        select: { name: true, durationMonths: true, sessionsCount: true, trackingType: true },
       })
       .catch(
         () =>
           [] as Array<{
             name: string;
+            durationMonths: number;
             sessionsCount: number;
             trackingType: string;
           }>,
@@ -176,6 +195,7 @@ export async function buildRegistrationMembershipSummaries(
     packages.map((pkg) => [
       pkg.name,
       {
+        durationMonths: Math.max(1, toNumber(pkg.durationMonths, 1)),
         sessionsCount: toNumber(pkg.sessionsCount, 0),
         trackingType: String(pkg.trackingType || "").toUpperCase(),
       },
@@ -211,10 +231,18 @@ export async function buildRegistrationMembershipSummaries(
       Boolean(row.isPaid),
     );
     const remainingJod = Math.max(0, finalPriceJod - collectedJod);
-    const daysLeft = computeDaysLeft(row.periodEndsAt);
-    const displayStatus = computeDisplayStatus(row, daysLeft);
-
     const meta = packageMeta.get(String(row.packageName || "").trim());
+    const durationMonths = Math.max(
+      1,
+      Math.round(toNumber(row.durationMonths, meta?.durationMonths ?? 1)),
+    );
+    const daysLeft = computeDaysLeft({
+      periodEndsAt: row.periodEndsAt,
+      periodStartsAt: row.periodStartsAt,
+      createdAt: row.createdAt,
+      durationMonths,
+    });
+    const displayStatus = computeDisplayStatus(row, daysLeft);
     const trackingType = meta?.trackingType || "";
     const isSessionTracked =
       row.sessionsLeft != null ||

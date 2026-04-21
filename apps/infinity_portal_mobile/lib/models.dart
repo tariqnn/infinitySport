@@ -619,11 +619,13 @@ class PackageOption {
     required this.sportType,
     required this.name,
     required this.description,
+    required this.durationMonths,
     required this.sessionsCount,
     required this.trackingType,
     required this.pricingType,
     required this.currentPriceJod,
     required this.isActive,
+    required this.showOnWebsite,
     required this.sortOrder,
   });
 
@@ -633,6 +635,9 @@ class PackageOption {
       sportType: readString(json['sportType']),
       name: readString(json['name']),
       description: readNullableString(json['description']),
+      durationMonths: json['durationMonths'] == null
+          ? 1
+          : readInt(json['durationMonths']),
       sessionsCount: readInt(json['sessionsCount']),
       trackingType: readString(json['trackingType']),
       pricingType: readString(json['pricingType']),
@@ -640,6 +645,9 @@ class PackageOption {
           ? null
           : readDouble(json['currentPriceJod']),
       isActive: readBool(json['isActive']),
+      showOnWebsite: json['showOnWebsite'] == null
+          ? true
+          : readBool(json['showOnWebsite']),
       sortOrder: readInt(json['sortOrder']),
     );
   }
@@ -648,11 +656,13 @@ class PackageOption {
   final String sportType;
   final String name;
   final String? description;
+  final int durationMonths;
   final int sessionsCount;
   final String trackingType;
   final String pricingType;
   final double? currentPriceJod;
   final bool isActive;
+  final bool showOnWebsite;
   final int sortOrder;
 }
 
@@ -743,6 +753,7 @@ class PackageRegistrationRow {
     required this.discountValue,
     required this.discountReason,
     required this.finalPriceJod,
+    required this.durationMonths,
     required this.periodStartsAt,
     required this.periodEndsAt,
     required this.isFrozen,
@@ -777,6 +788,9 @@ class PackageRegistrationRow {
           : readDouble(json['discountValue']),
       discountReason: readNullableString(json['discountReason']),
       finalPriceJod: readDouble(json['finalPriceJod']),
+      durationMonths: json['durationMonths'] == null
+          ? 1
+          : readInt(json['durationMonths']),
       periodStartsAt: readNullableString(json['periodStartsAt']),
       periodEndsAt: readNullableString(json['periodEndsAt']),
       isFrozen: readBool(json['isFrozen']),
@@ -805,6 +819,7 @@ class PackageRegistrationRow {
   final double? discountValue;
   final String? discountReason;
   final double finalPriceJod;
+  final int durationMonths;
   final String? periodStartsAt;
   final String? periodEndsAt;
   final bool isFrozen;

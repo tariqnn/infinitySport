@@ -72,28 +72,29 @@ export default function RegistrationsPage() {
   function getPackageSchedule(packageName: string): { daysOfWeek: number[] } | null {
     const name = (packageName ?? '').trim();
     if (!name) return null;
+    const baseName = name.replace(/\s*-\s*\d+\s+Months?$/i, '').trim();
 
     // Basketball academy packages (12 sessions; scheduled on Sat/Mon/Wed/Fri)
-    if (name.startsWith('Basketball - ')) {
-      if (name.includes('Private') || name.includes('Small Groups')) return null; // flexible scheduling
+    if (baseName.startsWith('Basketball - ')) {
+      if (baseName.includes('Private') || baseName.includes('Small Groups')) return null; // flexible scheduling
       return { daysOfWeek: [6, 1, 3, 5] }; // Sat, Mon, Wed, Fri
     }
 
     // Gymnastics (sessions per month & days shown on landing)
-    if (name === 'Gymnastics Package A') return { daysOfWeek: [0, 2, 4] }; // Sun, Tue, Thu
+    if (baseName === 'Gymnastics Package A') return { daysOfWeek: [0, 2, 4] }; // Sun, Tue, Thu
     // Package B is "2 Days / Week" (landing shows Sun • Tue • Thu time window); we count 2 weekly session-days.
-    if (name === 'Gymnastics Package B') return { daysOfWeek: [0, 2] }; // Sun, Tue
-    if (name === 'Gymnastics Package C') return { daysOfWeek: [0, 2, 4] };
+    if (baseName === 'Gymnastics Package B') return { daysOfWeek: [0, 2] }; // Sun, Tue
+    if (baseName === 'Gymnastics Package C') return { daysOfWeek: [0, 2, 4] };
     // Package D is "2 Days / Week" (landing shows Sun • Tue • Thu time window); we count 2 weekly session-days.
-    if (name === 'Gymnastics Package D') return { daysOfWeek: [0, 2] }; // Sun, Tue
+    if (baseName === 'Gymnastics Package D') return { daysOfWeek: [0, 2] }; // Sun, Tue
 
     // Volleyball (10 sessions; Sat, Tue, Sun)
-    if (name.includes('Gymnastics')) {
-      if (name.includes('Private')) return null;
+    if (baseName.includes('Gymnastics')) {
+      if (baseName.includes('Private')) return null;
       return { daysOfWeek: [0, 2, 4] };
     }
 
-    if (name === 'Volleyball') return { daysOfWeek: [6, 2, 0] }; // Sat, Tue, Sun
+    if (baseName.startsWith('Volleyball')) return { daysOfWeek: [6, 2, 0] }; // Sat, Tue, Sun
 
     return null;
   }
@@ -155,12 +156,13 @@ export default function RegistrationsPage() {
     return count;
   }
 
-  /** Effective period end: periodEndsAt if set, else createdAt + 30 days (for display only). */
+  /** Effective period end: periodEndsAt if set, else cycle start + durationMonths. */
   function getPeriodEnd(r: Registration): Date | null {
     if (r.periodEndsAt) return new Date(r.periodEndsAt);
-    if (r.createdAt) {
-      const d = new Date(r.createdAt);
-      d.setDate(d.getDate() + 30);
+    const cycleStart = r.periodStartsAt || r.createdAt;
+    if (cycleStart) {
+      const d = new Date(cycleStart);
+      d.setMonth(d.getMonth() + Math.max(1, Number(r.durationMonths ?? 1) || 1));
       return d;
     }
     return null;
@@ -420,6 +422,9 @@ export default function RegistrationsPage() {
       .filter((p) => Number.isFinite(p.sessionsCount) && p.sessionsCount > 0)
       .map((p) => [p.name, p.sessionsCount]),
   );
+  const defaultDurationMonthsByPackage: Record<string, number> = Object.fromEntries(
+    apiPackages.map((p) => [p.name, Math.max(1, Number(p.durationMonths ?? 1) || 1)]),
+  );
   const editRegistrationSessionSummary = useMemo(
     () => (editRegistrationRow ? getSessionsRemaining(editRegistrationRow) : null),
     [editRegistrationRow, canceledDatesByPackage, defaultSessionsByPackage],
@@ -440,7 +445,7 @@ export default function RegistrationsPage() {
               variant="secondary"
               onClick={() => setManagePackageSessionsOpen(true)}
             >
-              Package sessions
+              Manage packages
             </Button>
             <Button
               variant="secondary"
@@ -606,6 +611,7 @@ export default function RegistrationsPage() {
                     customerAge: r.customerAge ? String(r.customerAge) : '',
                     playerCode: r.playerCode || '',
                     currentCycle: String(r.currentCycle ?? 1),
+                    durationMonths: String(r.durationMonths ?? 1),
                     basePriceJod: String(r.basePriceJod ?? 0),
                     finalPriceJod: String(finalPrice),
                     collectedJod: String(collected),
@@ -634,6 +640,7 @@ export default function RegistrationsPage() {
                   'customerAge',
                   'playerCode',
                   'currentCycle',
+                  'durationMonths',
                   'basePriceJod',
                   'finalPriceJod',
                   'collectedJod',
@@ -945,6 +952,7 @@ export default function RegistrationsPage() {
         packageOptions={packageOpts}
         defaultPricesByPackage={defaultPricesByPackage}
         defaultSessionsByPackage={defaultSessionsByPackage}
+        defaultDurationMonthsByPackage={defaultDurationMonthsByPackage}
         initialPerson={addRegistrationInitialPerson}
       />
 
@@ -976,6 +984,7 @@ export default function RegistrationsPage() {
         packageOptions={packageOpts}
         defaultPricesByPackage={defaultPricesByPackage}
         defaultSessionsByPackage={defaultSessionsByPackage}
+        defaultDurationMonthsByPackage={defaultDurationMonthsByPackage}
         currentSessionSummary={editRegistrationSessionSummary}
         onSuccess={() => {
           setEditRegistrationRow(null);
@@ -994,6 +1003,7 @@ export default function RegistrationsPage() {
         packageOptions={packageOpts}
         defaultPricesByPackage={defaultPricesByPackage}
         defaultSessionsByPackage={defaultSessionsByPackage}
+        defaultDurationMonthsByPackage={defaultDurationMonthsByPackage}
       />
 
       <RegisterExistingPersonModal

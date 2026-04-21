@@ -76,12 +76,14 @@ export type PackageResponse = {
   name: string;
   description: string | null;
   descriptionBullets: string[] | null;
+  durationMonths: number;
   sessionsCount: number;
   trackingType: string;
   pricingType: string;
   currentPriceJod: number | null;
   timeSlots: unknown;
   isActive: boolean;
+  showOnWebsite: boolean;
   sortOrder: number;
 };
 
@@ -94,7 +96,7 @@ const FALLBACK_FACILITIES: { id: string; name: string; description: string }[] =
   { id: 'gymnastics', name: 'Official Gymnastics Training Facility', description: 'Dedicated gymnastics training facility meeting official standards.' },
 ];
 
-const FALLBACK_PACKAGES: PackageResponse[] = [
+const FALLBACK_PACKAGES: PackageResponse[] = ([
   // --- Volleyball ---
   {
     id: 'fallback-volleyball',
@@ -298,7 +300,11 @@ const FALLBACK_PACKAGES: PackageResponse[] = [
     isActive: true,
     sortOrder: 32,
   },
-];
+]).map((pkg) => ({
+  ...pkg,
+  durationMonths: 1,
+  showOnWebsite: true,
+}));
 
 const FALLBACK_COACHES: CoachResponse[] = [
   {
@@ -575,7 +581,7 @@ export async function fetchPackages(): Promise<PackageResponse[]> {
   if (!(await canAttemptDatabaseQuery())) return stale || FALLBACK_PACKAGES;
   try {
     const sql = getNeonSql();
-    const rows = await sql`SELECT "id","sportType","name","description","descriptionBullets","sessionsCount","trackingType","pricingType","currentPriceJod","timeSlots","isActive","sortOrder" FROM "Package" WHERE "isActive" = true ORDER BY "sortOrder" ASC, "name" ASC`;
+    const rows = await sql`SELECT "id","sportType","name","description","descriptionBullets","durationMonths","sessionsCount","trackingType","pricingType","currentPriceJod","timeSlots","isActive","showOnWebsite","sortOrder" FROM "Package" WHERE "isActive" = true AND "showOnWebsite" = true ORDER BY "sortOrder" ASC, "name" ASC`;
     if (!rows.length) {
       writeCache('packages', FALLBACK_PACKAGES);
       return FALLBACK_PACKAGES;
@@ -584,9 +590,10 @@ export async function fetchPackages(): Promise<PackageResponse[]> {
       id: row.id as string, sportType: row.sportType as string, name: row.name as string,
       description: row.description as string | null,
       descriptionBullets: Array.isArray(row.descriptionBullets) ? (row.descriptionBullets as string[]) : null,
+      durationMonths: Math.max(1, Number(row.durationMonths ?? 1) || 1),
       sessionsCount: row.sessionsCount as number, trackingType: row.trackingType as string,
       pricingType: row.pricingType as string, currentPriceJod: row.currentPriceJod as number | null,
-      timeSlots: row.timeSlots as unknown, isActive: row.isActive as boolean, sortOrder: row.sortOrder as number,
+      timeSlots: row.timeSlots as unknown, isActive: row.isActive as boolean, showOnWebsite: Boolean(row.showOnWebsite ?? true), sortOrder: row.sortOrder as number,
     }));
     writeCache('packages', mapped);
     return mapped;
@@ -891,7 +898,7 @@ async function _fetchLandingContent(): Promise<LandingContent> {
     // Single HTTP request to Neon — no native binaries, no pg module needed
     const rows = await sql`
       SELECT
-        (SELECT COALESCE(json_agg(r ORDER BY r."sortOrder" ASC, r."name" ASC), '[]'::json) FROM (SELECT * FROM "Package" WHERE "isActive" = true) r) AS packages,
+        (SELECT COALESCE(json_agg(r ORDER BY r."sortOrder" ASC, r."name" ASC), '[]'::json) FROM (SELECT * FROM "Package" WHERE "isActive" = true AND "showOnWebsite" = true) r) AS packages,
         (SELECT row_to_json(h) FROM (SELECT * FROM "HeroSection" ORDER BY "updatedAt" DESC LIMIT 1) h) AS hero,
         (SELECT COALESCE(json_agg(c ORDER BY c."order" ASC, c."createdAt" ASC), '[]'::json) FROM (SELECT * FROM "LandingCoach" WHERE "isActive" = true) c) AS coaches,
         (SELECT COALESCE(json_agg(o ORDER BY o."order" ASC, o."createdAt" ASC), '[]'::json) FROM (SELECT * FROM "Offer") o) AS offers,
@@ -910,9 +917,10 @@ async function _fetchLandingContent(): Promise<LandingContent> {
           id: row.id as string, sportType: row.sportType as string, name: row.name as string,
           description: row.description as string | null,
           descriptionBullets: Array.isArray(row.descriptionBullets) ? row.descriptionBullets as string[] : null,
+          durationMonths: Math.max(1, Number(row.durationMonths ?? 1) || 1),
           sessionsCount: row.sessionsCount as number, trackingType: row.trackingType as string,
           pricingType: row.pricingType as string, currentPriceJod: row.currentPriceJod as number | null,
-          timeSlots: row.timeSlots as unknown, isActive: row.isActive as boolean, sortOrder: row.sortOrder as number,
+          timeSlots: row.timeSlots as unknown, isActive: row.isActive as boolean, showOnWebsite: Boolean(row.showOnWebsite ?? true), sortOrder: row.sortOrder as number,
         }))
       : fallback.programs;
 

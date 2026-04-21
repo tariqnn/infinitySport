@@ -71,12 +71,17 @@ function ensureDatabaseUrl(): boolean {
   return false;
 }
 
-async function getBasePriceJod(packageName: string): Promise<number> {
+type PackageDefaults = {
+  basePriceJod: number;
+  durationMonths: number;
+};
+
+async function getPackageDefaults(packageName: string): Promise<PackageDefaults> {
   const pool = getPgPool();
 
   const packageResult = await pool
-    .query<{ currentPriceJod: number | null }>(
-      'SELECT "currentPriceJod" FROM "Package" WHERE "name" = $1 LIMIT 1',
+    .query<{ currentPriceJod: number | null; durationMonths: number | null }>(
+      'SELECT "currentPriceJod", "durationMonths" FROM "Package" WHERE "name" = $1 LIMIT 1',
       [packageName],
     )
     .catch((error: unknown) => {
@@ -85,7 +90,6 @@ async function getBasePriceJod(packageName: string): Promise<number> {
       return null;
     });
   const pkg = packageResult?.rows?.[0];
-  if (pkg?.currentPriceJod != null) return Math.max(0, pkg.currentPriceJod);
 
   const pricingResult = await pool
     .query<{ basePriceJod: number | null }>(
@@ -98,7 +102,19 @@ async function getBasePriceJod(packageName: string): Promise<number> {
       return null;
     });
   const pricing = pricingResult?.rows?.[0];
-  return Math.max(0, pricing?.basePriceJod ?? 0);
+  if (pkg) {
+    return {
+      basePriceJod:
+        pkg.currentPriceJod != null
+          ? Math.max(0, pkg.currentPriceJod)
+          : Math.max(0, pricing?.basePriceJod ?? 0),
+      durationMonths: Math.max(1, pkg.durationMonths ?? 1),
+    };
+  }
+  return {
+    basePriceJod: Math.max(0, pricing?.basePriceJod ?? 0),
+    durationMonths: 1,
+  };
 }
 
 async function ensureMemberAccount(params: {
@@ -145,6 +161,7 @@ async function syncLandingRegistrationToFirestore(input: {
   customerAge: number | null;
   basePriceJod: number;
   finalPriceJod: number;
+  durationMonths: number;
 }) {
   try {
     const now = new Date();
@@ -165,6 +182,7 @@ async function syncLandingRegistrationToFirestore(input: {
         basePriceJod: input.basePriceJod,
         discountType: "NONE",
         finalPriceJod: input.finalPriceJod,
+        durationMonths: input.durationMonths,
         periodStartsAt: null,
         periodEndsAt: null,
         isFrozen: false,
@@ -234,6 +252,16 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+    if (
+      !customerEmail ||
+      typeof customerEmail !== "string" ||
+      !customerEmail.trim()
+    ) {
+      return NextResponse.json(
+        { error: "Email is required." },
+        { status: 400 },
+      );
+    }
 
     const phoneValidation = isValidPhoneNumber(customerPhone);
     if (!phoneValidation.valid) {
@@ -248,8 +276,9 @@ export async function POST(request: Request) {
     }
 
     const cleanPackage = packageName.trim();
+    const cleanEmail = customerEmail.trim();
     const pool = getPgPool();
-    const basePriceJod = await getBasePriceJod(cleanPackage);
+    const { basePriceJod, durationMonths } = await getPackageDefaults(cleanPackage);
     const registrationId = randomUUID();
 
     await pool.query(
@@ -267,6 +296,7 @@ export async function POST(request: Request) {
         "discountValue",
         "discountReason",
         "finalPriceJod",
+        "durationMonths",
         "sessionsBonus",
         "status",
         "isFrozen",
@@ -274,7 +304,7 @@ export async function POST(request: Request) {
         "updatedAt"
       )
       VALUES (
-        $1, $2, $3, $4, $5, $6, false, $7, 'NONE', NULL, NULL, $8, 0, 'ACTIVE', false, NOW(), NOW()
+        $1, $2, $3, $4, $5, $6, false, $7, 'NONE', NULL, NULL, $8, $9, 0, 'ACTIVE', false, NOW(), NOW()
       )
       `,
       [
@@ -282,17 +312,16 @@ export async function POST(request: Request) {
         cleanPackage,
         customerName.trim(),
         customerPhone.trim(),
-        typeof customerEmail === "string" && customerEmail.trim()
-          ? customerEmail.trim()
-          : null,
+        cleanEmail,
         typeof customerAge === "number" && customerAge > 0 ? customerAge : null,
         basePriceJod,
         basePriceJod,
+        durationMonths,
       ],
     );
 
     await ensureMemberAccount({
-      customerEmail: typeof customerEmail === "string" ? customerEmail : null,
+      customerEmail: cleanEmail,
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
     });
@@ -302,14 +331,12 @@ export async function POST(request: Request) {
       packageName: cleanPackage,
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
-      customerEmail:
-        typeof customerEmail === "string" && customerEmail.trim()
-          ? customerEmail.trim()
-          : null,
+      customerEmail: cleanEmail,
       customerAge:
         typeof customerAge === "number" && customerAge > 0 ? customerAge : null,
       basePriceJod,
       finalPriceJod: basePriceJod,
+      durationMonths,
     });
 
     return NextResponse.json({ success: true, id: registrationId });

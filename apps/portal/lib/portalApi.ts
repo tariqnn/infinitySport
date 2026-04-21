@@ -1,6 +1,15 @@
 import { getApiBaseUrl } from './getApiBaseUrl';
 
 const ROUTE_BASE_URL = typeof window === 'undefined' ? getApiBaseUrl().replace(/\/$/, '') : '';
+const GET_CACHE_TTL_MS = 30_000;
+
+type PortalClientCacheEntry = {
+  data: unknown;
+  expiresAt: number;
+};
+
+const portalGetCache = new Map<string, PortalClientCacheEntry>();
+const portalGetInflight = new Map<string, Promise<unknown>>();
 
 // Get company ID from localStorage or context (you may need to adjust this)
 function getCompanyId(): string | undefined {
@@ -8,6 +17,32 @@ function getCompanyId(): string | undefined {
     return localStorage.getItem('companyId') || undefined;
   }
   return undefined;
+}
+
+function canUsePortalGetCache(method: string): boolean {
+  return typeof window !== 'undefined' && method === 'GET';
+}
+
+function readPortalGetCache<T>(cacheKey: string): T | null {
+  const cached = portalGetCache.get(cacheKey);
+  if (!cached) return null;
+  if (cached.expiresAt <= Date.now()) {
+    portalGetCache.delete(cacheKey);
+    return null;
+  }
+  return cached.data as T;
+}
+
+function writePortalGetCache(cacheKey: string, data: unknown): void {
+  portalGetCache.set(cacheKey, {
+    data,
+    expiresAt: Date.now() + GET_CACHE_TTL_MS,
+  });
+}
+
+function clearPortalGetCache(): void {
+  portalGetCache.clear();
+  portalGetInflight.clear();
 }
 
 async function portalFetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
@@ -21,34 +56,74 @@ async function portalFetch<T>(endpoint: string, options?: RequestInit): Promise<
   }
 
   const url = `${ROUTE_BASE_URL}/api${endpoint}`;
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      ...options,
-      headers,
-      cache: 'no-store',
-    });
-  } catch {
-    throw new Error(`Cannot connect to route handler at ${url}.`);
-  }
+  const method = (options?.method || 'GET').toUpperCase();
+  const cacheKey = `${method}:${companyId ?? ''}:${url}`;
+  const useClientCache = canUsePortalGetCache(method);
 
-  if (!response.ok) {
-    const rawError = await response.text().catch(() => '');
-    let message = response.statusText || 'Unknown server error';
-
-    if (rawError) {
-      try {
-        const parsed = JSON.parse(rawError) as { message?: string; error?: string };
-        message = parsed.message || parsed.error || message;
-      } catch {
-        message = rawError.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() || message;
-      }
+  if (useClientCache) {
+    const cached = readPortalGetCache<T>(cacheKey);
+    if (cached !== null) {
+      return cached;
     }
 
-    throw new Error(`Request failed (${response.status}): ${message}`);
+    const inflight = portalGetInflight.get(cacheKey);
+    if (inflight) {
+      return inflight as Promise<T>;
+    }
   }
 
-  return response.json();
+  let response: Response;
+  const requestPromise = (async () => {
+    try {
+      response = await fetch(url, {
+        ...options,
+        headers,
+        cache: 'no-store',
+      });
+    } catch {
+      throw new Error(`Cannot connect to route handler at ${url}.`);
+    }
+
+    if (!response.ok) {
+      const rawError = await response.text().catch(() => '');
+      let message = response.statusText || 'Unknown server error';
+
+      if (rawError) {
+        try {
+          const parsed = JSON.parse(rawError) as { message?: string; error?: string };
+          message = parsed.message || parsed.error || message;
+        } catch {
+          message = rawError.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() || message;
+        }
+      }
+
+      throw new Error(`Request failed (${response.status}): ${message}`);
+    }
+
+    if (response.status === 204) {
+      if (!useClientCache) clearPortalGetCache();
+      return null as T;
+    }
+
+    const data = await response.json();
+    if (useClientCache) {
+      writePortalGetCache(cacheKey, data);
+    } else {
+      clearPortalGetCache();
+    }
+
+    return data as T;
+  })().finally(() => {
+    if (useClientCache) {
+      portalGetInflight.delete(cacheKey);
+    }
+  });
+
+  if (useClientCache) {
+    portalGetInflight.set(cacheKey, requestPromise as Promise<unknown>);
+  }
+
+  return requestPromise;
 }
 
 async function portalDbFetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
@@ -715,6 +790,7 @@ export type PackageRegistrationRow = {
   discountValue: number | null;
   discountReason: string | null;
   finalPriceJod: number;
+  durationMonths: number;
   periodStartsAt: string | null;
   periodEndsAt: string | null;
   isFrozen: boolean;
@@ -869,11 +945,13 @@ export type PackageOption = {
   sportType: string;
   name: string;
   description: string | null;
+  durationMonths: number;
   sessionsCount: number;
   trackingType: string;
   pricingType: string;
   currentPriceJod: number | null;
   isActive: boolean;
+  showOnWebsite: boolean;
   sortOrder: number;
 };
 
@@ -882,21 +960,44 @@ export const packagePricingApi = {
 };
 
 export const packagesApi = {
-  list: () => portalDbFetch<PackageOption[]>('/portal/packages'),
+  list: (options?: { includeInactive?: boolean }) => {
+    const params = new URLSearchParams();
+    if (options?.includeInactive) params.append('includeInactive', '1');
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return portalDbFetch<PackageOption[]>(`/portal/packages${query}`);
+  },
+  create: (
+    data: {
+      name: string;
+      sportType: string;
+      description?: string | null;
+      durationMonths: number;
+      sessionsCount: number;
+      trackingType: string;
+      pricingType: string;
+      currentPriceJod: number | null;
+      isActive: boolean;
+      showOnWebsite: boolean;
+      sortOrder: number;
+    }
+  ) => portalDbFetch<PackageOption>('/portal/packages', { method: 'POST', body: JSON.stringify(data) }),
   update: (
     id: string,
     data: Partial<{
       name: string;
       sportType: string;
       description: string | null;
+      durationMonths: number;
       sessionsCount: number;
       trackingType: string;
       pricingType: string;
       currentPriceJod: number | null;
       isActive: boolean;
+      showOnWebsite: boolean;
       sortOrder: number;
     }>
   ) => portalDbFetch<PackageOption>(`/portal/packages/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  delete: (id: string) => portalDbFetch<{ success: boolean }>(`/portal/packages/${id}`, { method: 'DELETE' }),
 };
 
 export const receiptsApi = {
@@ -1006,4 +1107,130 @@ export async function getFirstCompany(): Promise<CompanyLite | null> {
     } catch {}
     return null;
   }
+}
+
+function getCurrentWeekRange(): { startDate: string; endDate: string } {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const day = now.getDay();
+  const diffToMonday = (day + 6) % 7;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - diffToMonday);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const format = (value: Date) =>
+    `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+  return {
+    startDate: format(monday),
+    endDate: format(sunday),
+  };
+}
+
+export async function prefetchPortalRouteData(href: string): Promise<void> {
+  const tasks: Array<Promise<unknown>> = [];
+
+  switch (href) {
+    case '/':
+      tasks.push(
+        (async () => {
+          const company = await getFirstCompany();
+          const companyId = company?.id;
+          await Promise.allSettled([
+            classesApi.list(companyId),
+            inventoryApi.list(companyId),
+            financeApi.invoices.list(companyId),
+            packageRegistrationsApi.list(),
+          ]);
+        })(),
+      );
+      break;
+    case '/coaches':
+      tasks.push(landingCoachesApi.list());
+      break;
+    case '/bookings':
+      tasks.push(
+        (async () => {
+          const company = await getFirstCompany();
+          const companyId = company?.id;
+          if (!companyId) return;
+          const range = getCurrentWeekRange();
+          await Promise.allSettled([
+            bookingsApi.getOverview({
+              companyId,
+              view: 'week',
+              startDate: range.startDate,
+              endDate: range.endDate,
+              court: 'ALL',
+              label: 'ALL',
+              bookingStatus: 'ALL',
+              paymentStatus: 'ALL',
+              paymentMethod: 'ALL',
+              source: 'ALL',
+              search: '',
+            }),
+            bookingsApi.getCourtRates(),
+          ]);
+        })(),
+      );
+      break;
+    case '/registrations':
+      tasks.push(
+        Promise.allSettled([
+          packageRegistrationsApi.list(),
+          packagesApi.list(),
+          packageSessionCanceledApi.list(),
+        ]),
+      );
+      break;
+    case '/guests':
+      tasks.push(guestAccountsApi.list());
+      break;
+    case '/classes':
+      tasks.push(
+        (async () => {
+          const company = await getFirstCompany();
+          const companyId = company?.id;
+          await Promise.allSettled([
+            classesApi.list(companyId),
+            coachesApi.list(companyId),
+          ]);
+        })(),
+      );
+      break;
+    case '/shop':
+      tasks.push(
+        (async () => {
+          const company = await getFirstCompany();
+          if (!company?.id) return;
+          await shopApi.list(company.id);
+        })(),
+      );
+      break;
+    case '/inventory':
+      tasks.push(
+        (async () => {
+          const company = await getFirstCompany();
+          await inventoryApi.list(company?.id);
+        })(),
+      );
+      break;
+    case '/financials':
+      tasks.push(
+        (async () => {
+          const company = await getFirstCompany();
+          const companyId = company?.id;
+          if (!companyId) return;
+          await Promise.allSettled([
+            financeApi.cashBookCategories.list(companyId),
+            financeApi.cashBookTransactions.list({ companyId }),
+          ]);
+        })(),
+      );
+      break;
+    default:
+      break;
+  }
+
+  if (!tasks.length) return;
+  await Promise.allSettled(tasks);
 }

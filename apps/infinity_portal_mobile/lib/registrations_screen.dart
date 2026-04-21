@@ -852,7 +852,7 @@ _SessionCounter? _sessionsRemaining(
   final effectiveNow = row.isFrozen && row.frozenAt != null
       ? DateTime.tryParse(row.frozenAt!)?.toLocal() ?? DateTime.now()
       : DateTime.now();
-  final total = schedule.$1;
+  final total = row.sessionsLeft ?? schedule.$1;
   final scheduledCount =
       _countScheduledSessions(start, effectiveNow, schedule.$2);
   final canceled = canceledDatesByPackage[row.packageName] ?? const <String>{};
@@ -873,15 +873,16 @@ _SessionCounter? _sessionsRemaining(
 
 (int, List<int>)? _packageSchedule(String packageName) {
   final name = packageName.trim();
-  if (name.startsWith('Basketball - ')) {
-    if (name.contains('Private') || name.contains('Small Groups')) return null;
+  final baseName = name.replaceAll(RegExp(r'\s*-\s*\d+\s+Months?$', caseSensitive: false), '').trim();
+  if (baseName.startsWith('Basketball - ')) {
+    if (baseName.contains('Private') || baseName.contains('Small Groups')) return null;
     return (12, [6, 1, 3, 5]);
   }
-  if (name == 'Gymnastics Package A') return (12, [0, 2, 4]);
-  if (name == 'Gymnastics Package B') return (8, [0, 2]);
-  if (name == 'Gymnastics Package C') return (18, [0, 2, 4]);
-  if (name == 'Gymnastics Package D') return (12, [0, 2]);
-  if (name == 'Volleyball') return (10, [6, 2, 0]);
+  if (baseName == 'Gymnastics Package A') return (12, [0, 2, 4]);
+  if (baseName == 'Gymnastics Package B') return (8, [0, 2]);
+  if (baseName == 'Gymnastics Package C') return (18, [0, 2, 4]);
+  if (baseName == 'Gymnastics Package D') return (12, [0, 2]);
+  if (baseName.startsWith('Volleyball')) return (10, [6, 2, 0]);
   return null;
 }
 
@@ -901,8 +902,20 @@ DateTime? _periodEnd(PackageRegistrationRow row) {
   if ((row.periodEndsAt ?? '').trim().isNotEmpty) {
     return DateTime.tryParse(row.periodEndsAt!)?.toLocal();
   }
-  final created = DateTime.tryParse(row.createdAt)?.toLocal();
-  return created?.add(const Duration(days: 30));
+  final cycleStart = (row.periodStartsAt ?? '').trim().isNotEmpty
+      ? DateTime.tryParse(row.periodStartsAt!)?.toLocal()
+      : DateTime.tryParse(row.createdAt)?.toLocal();
+  if (cycleStart == null) return null;
+  return DateTime(
+    cycleStart.year,
+    cycleStart.month + (row.durationMonths <= 0 ? 1 : row.durationMonths),
+    cycleStart.day,
+    cycleStart.hour,
+    cycleStart.minute,
+    cycleStart.second,
+    cycleStart.millisecond,
+    cycleStart.microsecond,
+  );
 }
 
 DateTime? _cycleStart(PackageRegistrationRow row) {

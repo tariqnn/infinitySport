@@ -78,6 +78,18 @@ function computeFinalPriceJod(
   return base;
 }
 
+function normalizeDurationMonths(value: unknown, fallback = 1): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return Math.max(1, fallback);
+  return Math.max(1, Math.round(parsed));
+}
+
+function addCalendarMonths(date: Date, months: number): Date {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + normalizeDurationMonths(months, 1));
+  return next;
+}
+
 function billingPeriodFromDate(date: Date) {
   const y = date.getFullYear();
   const m = date.getMonth();
@@ -149,7 +161,7 @@ export async function runRegistrationDbSync(): Promise<RegistrationSyncRunResult
 
       const pkg = await prisma.package.findFirst({
         where: { name: packageName },
-        select: { currentPriceJod: true, sessionsCount: true },
+        select: { currentPriceJod: true, durationMonths: true, sessionsCount: true },
       });
       const basePriceJod = Math.max(
         0,
@@ -166,9 +178,11 @@ export async function runRegistrationDbSync(): Promise<RegistrationSyncRunResult
       const periodStartsAt = parseOptionalDate(
         entry.data.periodStartsAt ?? entry.data.periodStartsAtIso,
       );
-      const periodEndsAt = periodStartsAt
-        ? new Date(periodStartsAt.getTime() + 30 * 24 * 60 * 60 * 1000)
-        : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const durationMonths = normalizeDurationMonths(
+        entry.data.durationMonths ?? pkg?.durationMonths,
+        1,
+      );
+      const periodEndsAt = addCalendarMonths(periodStartsAt ?? now, durationMonths);
       const { billingPeriodKey, priceLockedUntil } = billingPeriodFromDate(now);
       const sessionsLeft =
         entry.data.sessionsLeft == null
@@ -202,6 +216,7 @@ export async function runRegistrationDbSync(): Promise<RegistrationSyncRunResult
             finalPriceJod: computeFinalPriceJod(basePriceJod, discountType, discountValue),
             billingPeriodKey,
             priceLockedUntil,
+            durationMonths,
             periodStartsAt,
             periodEndsAt,
             sessionsLeft,
@@ -263,11 +278,13 @@ export async function runRegistrationDbSync(): Promise<RegistrationSyncRunResult
           sportType: true,
           name: true,
           description: true,
+          durationMonths: true,
           sessionsCount: true,
           trackingType: true,
           pricingType: true,
           currentPriceJod: true,
           isActive: true,
+          showOnWebsite: true,
           sortOrder: true,
         },
       }),
@@ -320,6 +337,7 @@ export async function runRegistrationDbSync(): Promise<RegistrationSyncRunResult
             discountValue: row.discountValue,
             discountReason: row.discountReason,
             finalPriceJod: row.finalPriceJod,
+            durationMonths: row.durationMonths,
             periodStartsAt: row.periodStartsAt,
             periodEndsAt: row.periodEndsAt,
             isFrozen: row.isFrozen,

@@ -123,6 +123,10 @@ export function RegistrationDetailsModal({
             <p className="font-medium text-ui-textPrimary">{registration.packageName}</p>
           </div>
           <div>
+            <p className="text-ui-textMuted">Duration</p>
+            <p className="text-ui-textPrimary">{registration.durationMonths} month{registration.durationMonths === 1 ? '' : 's'}</p>
+          </div>
+          <div>
             <p className="text-ui-textMuted">Player name</p>
             <p className="text-ui-textPrimary">{registration.customerName}</p>
           </div>

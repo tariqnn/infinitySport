@@ -72,12 +72,14 @@ export type PackageResponse = {
   name: string;
   description: string | null;
   descriptionBullets: string[] | null;
+  durationMonths: number;
   sessionsCount: number;
   trackingType: string;
   pricingType: string;
   currentPriceJod: number | null;
   timeSlots: unknown;
   isActive: boolean;
+  showOnWebsite: boolean;
   sortOrder: number;
 };
 
@@ -147,7 +149,7 @@ export async function fetchPackages(): Promise<PackageResponse[]> {
   try {
     const prisma = await getPrisma();
     const rows = await prisma.package.findMany({
-      where: { isActive: true },
+      where: { isActive: true, showOnWebsite: true },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     });
     return rows.map((row) => ({
@@ -156,12 +158,14 @@ export async function fetchPackages(): Promise<PackageResponse[]> {
       name: row.name,
       description: row.description,
       descriptionBullets: Array.isArray(row.descriptionBullets) ? (row.descriptionBullets as string[]) : null,
+      durationMonths: Math.max(1, Number(row.durationMonths ?? 1) || 1),
       sessionsCount: row.sessionsCount,
       trackingType: row.trackingType,
       pricingType: row.pricingType,
       currentPriceJod: row.currentPriceJod,
       timeSlots: row.timeSlots,
       isActive: row.isActive,
+      showOnWebsite: Boolean(row.showOnWebsite ?? true),
       sortOrder: row.sortOrder,
     }));
   } catch {
@@ -326,7 +330,7 @@ async function _fetchLandingContent(): Promise<LandingContent> {
     const [hero, programs, offers, events, announcements, facilities, footerSettings] = await Promise.all([
       prisma.heroSection.findFirst({ orderBy: { updatedAt: 'desc' } }),
       prisma.package.findMany({
-        where: { isActive: true },
+        where: { isActive: true, showOnWebsite: true },
         orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       }),
       prisma.offer.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }),

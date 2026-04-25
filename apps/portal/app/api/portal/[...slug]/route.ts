@@ -591,6 +591,11 @@ function mapRegistrationRow(row: any) {
           (sum: number, rec: any) => sum + (rec.amountPaid || 0),
           0,
         );
+  const isPaid = isRegistrationPaid(
+    finalPriceJod,
+    collected,
+    Boolean(row.isPaid),
+  );
   return {
     id: row.id,
     packageName: row.packageName,
@@ -604,7 +609,7 @@ function mapRegistrationRow(row: any) {
     nextPaymentDate: row.nextPaymentDate ?? null,
     planLabel: row.planLabel ?? null,
     pointsBalance: Math.max(0, Number(row.pointsBalance ?? 0) || 0),
-    isPaid: Boolean(row.isPaid) && finalPriceJod > 0,
+    isPaid,
     basePriceJod: Number(row.basePriceJod) || 0,
     discountType: row.discountType ?? "NONE",
     discountValue: row.discountValue ?? null,
@@ -620,6 +625,79 @@ function mapRegistrationRow(row: any) {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
+}
+
+function isRegistrationPaid(
+  finalPriceJod: number,
+  collectedJod: number,
+  isPaidFlag: boolean,
+) {
+  const finalPrice = Math.max(0, Math.round(Number(finalPriceJod) || 0));
+  const collected = Math.max(0, Math.round(Number(collectedJod) || 0));
+  if (finalPrice <= 0) return isPaidFlag || collected > 0;
+  return isPaidFlag || collected >= finalPrice;
+}
+
+function getRegistrationPaymentStatus(
+  finalPriceJod: number,
+  collectedJod: number,
+  isPaidFlag: boolean,
+): "PAID" | "PARTIAL" | "UNPAID" {
+  if (isRegistrationPaid(finalPriceJod, collectedJod, isPaidFlag)) return "PAID";
+  return collectedJod > 0 ? "PARTIAL" : "UNPAID";
+}
+
+async function cancelMatchingRegistrationInboxEntries(params: {
+  registrationId: string;
+  packageName: string;
+  customerPhone: string;
+}) {
+  const packageName = normalizeText(params.packageName);
+  const customerPhone = normalizeText(params.customerPhone);
+  if (!packageName || !customerPhone) return;
+
+  try {
+    const firestore = getFirestore();
+    let docs: QueryDocumentSnapshot[] = [];
+    try {
+      const snapshot = await firestore
+        .collection("portalRegistrationInbox")
+        .where("packageName", "==", packageName)
+        .where("customerPhone", "==", customerPhone)
+        .limit(50)
+        .get();
+      docs = snapshot.docs;
+    } catch {
+      const snapshot = await firestore.collection("portalRegistrationInbox").limit(200).get();
+      docs = snapshot.docs.filter((doc) => {
+        const data = doc.data() as Record<string, unknown>;
+        return (
+          normalizeText(data.packageName) === packageName &&
+          normalizeText(data.customerPhone) === customerPhone
+        );
+      });
+    }
+
+    if (!docs.length) return;
+    const batch = firestore.batch();
+    for (const doc of docs) {
+      batch.set(
+        doc.ref,
+        {
+          status: "CANCELLED",
+          dbImported: true,
+          dbDeleted: true,
+          dbRegistrationId: params.registrationId,
+          syncError: null,
+          deletedAtIso: new Date().toISOString(),
+        },
+        { merge: true },
+      );
+    }
+    await batch.commit();
+  } catch (error) {
+    console.warn("[portal-db-api] registration inbox delete guard skipped", error);
+  }
 }
 
 async function enrichRegistrationRowsWithProfile(rows: any[]) {
@@ -4038,9 +4116,13 @@ async function getRegistrationTotals(request: NextRequest) {
     collectedTotal += collected;
     discountsTotal += Math.max(0, basePrice - finalPrice);
 
-    const regIsPaid = Boolean(reg.isPaid) && finalPrice > 0;
-    if (regIsPaid) paidCount += 1;
-    else if (collected > 0) partialCount += 1;
+    const paymentStatus = getRegistrationPaymentStatus(
+      finalPrice,
+      collected,
+      Boolean(reg.isPaid),
+    );
+    if (paymentStatus === "PAID") paidCount += 1;
+    else if (paymentStatus === "PARTIAL") partialCount += 1;
     else unpaidCount += 1;
 
     for (const rec of reg.receipts || []) {
@@ -5159,8 +5241,14 @@ async function markRegistrationPaid(id: string, request: NextRequest) {
   const method = (body.paymentMethod || "CASH").toUpperCase();
   if (!["CASH", "CARD", "TRANSFER", "OTHER"].includes(method))
     return jsonError("Invalid payment method");
+  const targetPrice = Math.max(0, Math.round(Number(registration.finalPriceJod || 0)));
   const amountPaid = Math.round(Number(body.amountPaid) || 0);
-  if (amountPaid <= 0) return jsonError("Amount paid must be greater than 0");
+  if (targetPrice > 0 && amountPaid <= 0) {
+    return jsonError("Amount paid must be greater than 0");
+  }
+  if (targetPrice <= 0 && amountPaid < 0) {
+    return jsonError("Amount paid cannot be negative");
+  }
 
   const user = await findOrCreateUserFromRegistration(registration);
 
@@ -5210,11 +5298,9 @@ async function markRegistrationPaid(id: string, request: NextRequest) {
 
   const totalCollected =
     (await loadCurrentCycleReceiptTotals(prisma, [id])).get(id) ?? 0;
-  const targetPrice = Number(registration.finalPriceJod || 0);
-
   await prisma.packageRegistration.update({
     where: { id },
-    data: { isPaid: targetPrice > 0 && totalCollected >= targetPrice },
+    data: { isPaid: targetPrice <= 0 || totalCollected >= targetPrice },
   });
   await syncRegistrationRealtimeById(id, "ADMIN");
 
@@ -5733,11 +5819,26 @@ async function voidReceipt(id: string, request: NextRequest) {
     (await loadCurrentCycleReceiptTotals(prisma, [receipt.registrationId])).get(
       receipt.registrationId,
     ) ?? 0;
-  const targetPrice = Number(receipt.registration.finalPriceJod || 0);
+  const targetPrice = Math.max(
+    0,
+    Math.round(Number(receipt.registration.finalPriceJod || 0)),
+  );
+  const hasActiveReceipt =
+    targetPrice <= 0
+      ? (await prisma.receipt.count({
+          where: {
+            registrationId: receipt.registrationId,
+            ...ACTIVE_RECEIPT_WHERE,
+          },
+        })) > 0
+      : false;
 
   await prisma.packageRegistration.update({
     where: { id: receipt.registrationId },
-    data: { isPaid: targetPrice > 0 && totalCollected >= targetPrice },
+    data: {
+      isPaid:
+        targetPrice <= 0 ? hasActiveReceipt : totalCollected >= targetPrice,
+    },
   });
   await syncRegistrationRealtimeById(receipt.registrationId, "ADMIN");
 
@@ -7539,7 +7640,18 @@ async function dispatchDelete(_request: NextRequest, params: Params) {
 
   if (resource === "package-registrations") {
     try {
+      const existing = await prisma.packageRegistration.findUnique({
+        where: { id },
+        select: { id: true, packageName: true, customerPhone: true },
+      });
+      if (!existing) return jsonError("Registration not found", 404);
+
       await prisma.packageRegistration.delete({ where: { id } });
+      await cancelMatchingRegistrationInboxEntries({
+        registrationId: existing.id,
+        packageName: existing.packageName,
+        customerPhone: existing.customerPhone,
+      });
       try {
         const firestore = getFirestore();
         await markRegistrationDeletedInFirestore({ firestore, registrationId: id });

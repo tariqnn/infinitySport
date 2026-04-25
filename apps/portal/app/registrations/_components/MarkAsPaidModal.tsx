@@ -29,6 +29,7 @@ export function MarkAsPaidModal({
   const [error, setError] = useState<string | null>(null);
 
   const defaultAmount = registration?.finalPriceJod ?? 0;
+  const isFreeRegistration = defaultAmount <= 0;
   const amount = amountPaid.trim() ? Number(amountPaid) : defaultAmount;
 
   useEffect(() => {
@@ -46,8 +47,8 @@ export function MarkAsPaidModal({
       setError('Private note is required.');
       return;
     }
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setError('Amount paid must be greater than 0.');
+    if (!Number.isFinite(amount) || amount < 0 || (!isFreeRegistration && amount <= 0)) {
+      setError(isFreeRegistration ? 'Amount paid cannot be negative.' : 'Amount paid must be greater than 0.');
       return;
     }
     if (!registration) return;
@@ -78,7 +79,8 @@ export function MarkAsPaidModal({
           <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>
         )}
         <p className="text-sm text-ui-textMuted">
-          Creating a receipt for <strong>{registration.customerName}</strong> ({registration.packageName}).
+          {isFreeRegistration ? 'Confirming a free registration for ' : 'Creating a receipt for '}
+          <strong>{registration.customerName}</strong> ({registration.packageName}).
         </p>
         <Input
           label="Amount paid (JOD)"
@@ -88,6 +90,7 @@ export function MarkAsPaidModal({
           value={amountPaid}
           onChange={(e) => setAmountPaid(e.target.value)}
           placeholder={defaultAmount ? String(defaultAmount) : '0'}
+          hint={isFreeRegistration ? 'Free registrations can be confirmed with 0 JOD.' : undefined}
         />
         <Select
           label="Payment method"
@@ -107,7 +110,7 @@ export function MarkAsPaidModal({
             Cancel
           </Button>
           <Button type="submit" isLoading={loading} disabled={!privateNote.trim()}>
-            Confirm & Create Receipt
+            {isFreeRegistration ? 'Confirm Free Registration' : 'Confirm & Create Receipt'}
           </Button>
         </div>
       </form>

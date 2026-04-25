@@ -78,6 +78,17 @@ function computeFinalPriceJod(
   return base;
 }
 
+function isRegistrationPaid(
+  finalPriceJod: number,
+  collectedJod: number,
+  isPaidFlag: boolean,
+) {
+  const finalPrice = Math.max(0, Math.round(Number(finalPriceJod) || 0));
+  const collected = Math.max(0, Math.round(Number(collectedJod) || 0));
+  if (finalPrice <= 0) return isPaidFlag || collected > 0;
+  return isPaidFlag || collected >= finalPrice;
+}
+
 function normalizeDurationMonths(value: unknown, fallback = 1): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return Math.max(1, fallback);
@@ -316,6 +327,11 @@ export async function runRegistrationDbSync(): Promise<RegistrationSyncRunResult
           (sum, receipt) => sum + Number(receipt.amountPaid || 0),
           0,
         );
+        const isPaid = isRegistrationPaid(
+          row.finalPriceJod,
+          collected,
+          Boolean(row.isPaid),
+        );
 
         await syncRegistrationRecordToFirestore({
           firestore,
@@ -331,7 +347,7 @@ export async function runRegistrationDbSync(): Promise<RegistrationSyncRunResult
             sessionsLeft: row.sessionsLeft,
             nextPaymentDate: row.nextPaymentDate,
             planLabel: row.planLabel,
-            isPaid: row.isPaid,
+            isPaid,
             basePriceJod: row.basePriceJod,
             discountType: row.discountType,
             discountValue: row.discountValue,

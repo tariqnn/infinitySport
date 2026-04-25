@@ -5,7 +5,7 @@ import { PageHeader, Card, CardHeader, CardBody, Badge, Select, Input, Button } 
 import { packageRegistrationsApi, packageSessionCanceledApi, packagesApi, type PackageOption, type PackageRegistrationRow } from '../../lib/portalApi';
 import { ExportCsvButton } from '../_components/ActionButtons';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { TrashIcon, BanknotesIcon, DocumentTextIcon, PlusCircleIcon, EllipsisVerticalIcon, PauseCircleIcon, PlayCircleIcon, CalendarIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { PlusCircleIcon, EllipsisVerticalIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { MarkAsPaidModal } from './_components/MarkAsPaidModal';
 import { ViewReceiptsModal } from './_components/ViewReceiptsModal';
 import { BulkAddPeopleModal } from './_components/BulkAddPeopleModal';
@@ -376,7 +376,8 @@ export default function RegistrationsPage() {
 
   function getPaymentStatus(row: Registration): 'PAID' | 'PARTIAL' | 'UNPAID' {
     const collected = row.collected ?? 0;
-    if (row.isPaid) return 'PAID';
+    const finalPrice = row.finalPriceJod ?? 0;
+    if (row.isPaid || (finalPrice <= 0 && collected > 0) || (finalPrice > 0 && collected >= finalPrice)) return 'PAID';
     if (collected > 0) return 'PARTIAL';
     return 'UNPAID';
   }
@@ -679,19 +680,19 @@ export default function RegistrationsPage() {
           </div>
         </CardHeader>
         <CardBody className="p-0">
-          <div className="max-h-[65vh] overflow-y-auto overflow-x-hidden">
-            <table className="w-full border-collapse text-left table-fixed" style={{ tableLayout: 'fixed' }}>
-              <thead className="sticky top-0 z-10 bg-ui-softBg border-b border-ui-border shadow-sm">
+          <div className="max-h-[65vh] overflow-auto">
+            <table className="min-w-[1120px] w-full border-collapse text-left table-fixed" style={{ tableLayout: 'fixed' }}>
+              <thead className="sticky top-0 z-10 border-b border-ui-border bg-slate-50 shadow-sm">
                 <tr>
-                  <th className="w-[15%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Package</th>
-                  <th className="w-[12%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Player</th>
-                  <th className="w-[14%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Contact</th>
-                  <th className="w-[4%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Age</th>
-                  <th className="w-[7%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Price</th>
-                  <th className="w-[10%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Payment</th>
-                  <th className="w-[9%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Starts</th>
-                  <th className="w-[9%] min-w-0 px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap">Remaining</th>
-                  <th className="w-[20%] min-w-0 sticky right-0 z-30 bg-ui-softBg border-l border-ui-border px-4 py-3 font-semibold text-ui-textPrimary whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.06)]">Actions</th>
+                  <th className="w-[18%] min-w-0 px-5 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">Package</th>
+                  <th className="w-[15%] min-w-0 px-5 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">Player</th>
+                  <th className="w-[17%] min-w-0 px-5 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">Contact</th>
+                  <th className="w-[5%] min-w-0 px-4 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">Age</th>
+                  <th className="w-[8%] min-w-0 px-4 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">Price</th>
+                  <th className="w-[11%] min-w-0 px-4 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">Payment</th>
+                  <th className="w-[9%] min-w-0 px-4 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">Starts</th>
+                  <th className="w-[11%] min-w-0 px-4 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">Remaining</th>
+                  <th className="w-[72px] min-w-[72px] sticky right-0 z-30 border-l border-ui-border bg-slate-50 px-2 py-3 text-center text-sm font-semibold text-ui-textPrimary whitespace-nowrap shadow-[-6px_0_10px_rgba(15,23,42,0.06)]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-ui-border">
@@ -709,11 +710,11 @@ export default function RegistrationsPage() {
                   const collected = row.collected ?? 0;
                   const paymentStatus = getPaymentStatus(row);
                   return (
-                    <tr key={row.id} className="hover:bg-ui-softBg/50">
-                      <td className="px-4 py-2 min-w-0">
+                    <tr key={row.id} className="group hover:bg-slate-50/70">
+                      <td className="px-5 py-3 min-w-0">
                         <span className="block truncate font-semibold text-ui-textPrimary" title={row.packageName}>{row.packageName}</span>
                       </td>
-                      <td className="px-4 py-2 min-w-0">
+                      <td className="px-5 py-3 min-w-0">
                         <button
                           type="button"
                           onClick={() => setPersonDetailsPhone(row.customerPhone)}
@@ -727,28 +728,31 @@ export default function RegistrationsPage() {
                           {` - Cycle ${row.currentCycle ?? 1}`}
                         </span>
                       </td>
-                      <td className="px-4 py-2 min-w-0">
+                      <td className="px-5 py-3 min-w-0">
                         <span className="block truncate text-sm text-ui-textPrimary" title={row.customerEmail ? `${row.customerPhone} | ${row.customerEmail}` : row.customerPhone}>{row.customerPhone}</span>
                         {row.customerEmail && <span className="block truncate text-xs text-ui-textMuted" title={row.customerEmail}>{row.customerEmail}</span>}
                       </td>
-                      <td className="px-4 py-2 whitespace-nowrap text-ui-textPrimary">{row.customerAge ? `${row.customerAge} y` : '-'}</td>
-                      <td className="px-4 py-2 whitespace-nowrap text-ui-textPrimary">{row.finalPriceJod ?? 0} JOD</td>
-                      <td className="px-4 py-2 min-w-0">
+                      <td className="px-4 py-3 whitespace-nowrap text-ui-textPrimary">{row.customerAge ? `${row.customerAge} y` : '-'}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-ui-textPrimary">{row.finalPriceJod ?? 0} JOD</td>
+                      <td className="px-4 py-3 min-w-0">
                         <div className="flex flex-col gap-0.5">
-                          <Badge variant={paymentStatus === 'PAID' ? 'success' : paymentStatus === 'PARTIAL' ? 'warning' : 'danger'}>
+                          <Badge
+                            variant={paymentStatus === 'PAID' ? 'success' : paymentStatus === 'PARTIAL' ? 'warning' : 'danger'}
+                            className="w-fit px-2.5 py-1 text-xs"
+                          >
                             {paymentStatus === 'PAID' ? 'Paid' : paymentStatus === 'PARTIAL' ? 'Partial' : 'Unpaid'}
                           </Badge>
                           {collected > 0 && <span className="text-xs text-ui-textMuted">{collected} JOD</span>}
                         </div>
                       </td>
-                      <td className="px-4 py-2 min-w-0 whitespace-nowrap text-sm text-ui-textPrimary">
+                      <td className="px-4 py-3 min-w-0 whitespace-nowrap text-sm text-ui-textPrimary">
                         {row.periodStartsAt ? new Date(row.periodStartsAt).toLocaleDateString() : new Date(row.createdAt).toLocaleDateString()}
                       </td>
-                      <td className="px-4 py-2 min-w-0">{renderRemainingShort(row)}</td>
-                      <td className="sticky right-0 z-20 w-[20%] min-w-0 bg-background border-l border-ui-border px-4 py-2 overflow-visible">
+                      <td className="px-4 py-3 min-w-0">{renderRemainingShort(row)}</td>
+                      <td className="sticky right-0 z-20 w-[72px] min-w-[72px] border-l border-ui-border bg-white px-2 py-3 text-center shadow-[-6px_0_10px_rgba(15,23,42,0.04)] group-hover:bg-slate-50">
                         <DropdownMenu.Root>
                           <DropdownMenu.Trigger asChild>
-                            <button type="button" className="inline-flex items-center justify-center rounded-lg p-2 text-ui-textMuted hover:bg-ui-softBg hover:text-ui-textPrimary outline-none" aria-label="Actions">
+                            <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-ui-textMuted outline-none transition hover:bg-white hover:text-ui-textPrimary focus-visible:ring-2 focus-visible:ring-brand-blue-primary/40" aria-label={`Actions for ${row.customerName}`}>
                               <EllipsisVerticalIcon className="h-5 w-5" />
                             </button>
                           </DropdownMenu.Trigger>

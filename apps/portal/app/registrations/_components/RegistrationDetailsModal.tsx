@@ -39,6 +39,91 @@ function paymentBadgeVariant(status: string) {
   return 'danger' as const;
 }
 
+function isSummerCampPackage(packageName: string) {
+  const normalized = packageName.trim().toLowerCase();
+  return normalized === 'basketball summer camp' || (normalized.includes('basketball') && normalized.includes('summer camp'));
+}
+
+function parseRegistrationNotes(planLabel: string | null | undefined) {
+  if (!planLabel) return new Map<string, string>();
+
+  const entries = planLabel
+    .split('|')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const separator = part.indexOf(':');
+      if (separator === -1) return null;
+      const key = part.slice(0, separator).trim().toLowerCase();
+      const value = part.slice(separator + 1).trim();
+      return key && value ? ([key, value] as const) : null;
+    })
+    .filter((entry): entry is readonly [string, string] => Boolean(entry));
+
+  return new Map(entries);
+}
+
+function DetailTile({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <div className="rounded-lg border border-ui-border bg-white p-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ui-textMuted">{label}</p>
+      <p className="mt-1 break-words text-sm font-medium text-ui-textPrimary">{value?.trim() || '-'}</p>
+    </div>
+  );
+}
+
+function SummerCampNotes({ planLabel }: { planLabel: string }) {
+  const notes = parseRegistrationNotes(planLabel);
+  const emergencyParts = (notes.get('emergency') || '')
+    .split('/')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  return (
+    <div className="sm:col-span-2">
+      <div className="rounded-xl border border-ui-border bg-ui-softBg/40 p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ui-textMuted">Summer camp details</p>
+            <p className="mt-1 text-sm text-ui-textMuted">Captured from the website registration form.</p>
+          </div>
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-ui-textMuted">
+            Website form
+          </span>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <DetailTile label="Medical" value={notes.get('medical')} />
+          <DetailTile label="Allergies" value={notes.get('allergies')} />
+          <DetailTile label="Media Consent" value={notes.get('media consent')} />
+          <DetailTile label="Uniform" value={notes.get('uniform')} />
+          <div className="sm:col-span-2">
+            <DetailTile label="Transportation" value={notes.get('transportation')} />
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-lg border border-ui-border bg-white p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ui-textMuted">Emergency contact</p>
+          <div className="mt-2 grid gap-3 sm:grid-cols-3">
+            <div>
+              <p className="text-xs text-ui-textMuted">Name</p>
+              <p className="font-medium text-ui-textPrimary">{emergencyParts[0] || '-'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-ui-textMuted">Relationship</p>
+              <p className="font-medium text-ui-textPrimary">{emergencyParts[1] || '-'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-ui-textMuted">Phone</p>
+              <p className="break-all font-medium text-ui-textPrimary">{emergencyParts[2] || '-'}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function RegistrationDetailsModal({
   open,
   onClose,
@@ -105,6 +190,7 @@ export function RegistrationDetailsModal({
   const paymentStatus = registration.isPaid ? 'Paid' : collected > 0 ? 'Partial' : 'Unpaid';
   const playerCode = profile?.playerCode ?? registration.playerCode ?? null;
   const currentCycle = profile?.currentCycle ?? registration.currentCycle ?? 1;
+  const isSummerCamp = isSummerCampPackage(registration.packageName);
 
   return (
     <Modal open={open} onClose={onClose} title="Registration details" size="lg">
@@ -122,7 +208,9 @@ export function RegistrationDetailsModal({
             <p className="text-ui-textMuted">Package</p>
             <p className="font-medium text-ui-textPrimary">{registration.packageName}</p>
           </div>
-          {registration.planLabel ? (
+          {registration.planLabel && isSummerCamp ? (
+            <SummerCampNotes planLabel={registration.planLabel} />
+          ) : registration.planLabel ? (
             <div className="sm:col-span-2">
               <p className="text-ui-textMuted">Registration notes</p>
               <p className="whitespace-pre-wrap text-ui-textPrimary">{registration.planLabel}</p>

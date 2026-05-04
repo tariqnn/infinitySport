@@ -122,6 +122,12 @@ export function RegistrationDetailsModal({
             <p className="text-ui-textMuted">Package</p>
             <p className="font-medium text-ui-textPrimary">{registration.packageName}</p>
           </div>
+          {registration.planLabel ? (
+            <div className="sm:col-span-2">
+              <p className="text-ui-textMuted">Registration notes</p>
+              <p className="whitespace-pre-wrap text-ui-textPrimary">{registration.planLabel}</p>
+            </div>
+          ) : null}
           <div>
             <p className="text-ui-textMuted">Duration</p>
             <p className="text-ui-textPrimary">{registration.durationMonths} month{registration.durationMonths === 1 ? '' : 's'}</p>

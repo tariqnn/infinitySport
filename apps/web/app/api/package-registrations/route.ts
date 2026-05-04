@@ -155,6 +155,7 @@ async function ensureMemberAccount(params: {
 async function syncLandingRegistrationToFirestore(input: {
   id: string;
   packageName: string;
+  planLabel?: string | null;
   customerName: string;
   customerPhone: string;
   customerEmail: string | null;
@@ -177,7 +178,7 @@ async function syncLandingRegistrationToFirestore(input: {
         customerAge: input.customerAge,
         currentCycle: 1,
         sessionsLeft: null,
-        planLabel: input.packageName,
+        planLabel: input.planLabel || input.packageName,
         isPaid: false,
         basePriceJod: input.basePriceJod,
         discountType: "NONE",
@@ -223,6 +224,7 @@ export async function POST(request: Request) {
       customerPhone,
       customerEmail,
       customerAge,
+      planLabel,
     } = body ?? {};
 
     if (
@@ -277,6 +279,10 @@ export async function POST(request: Request) {
 
     const cleanPackage = packageName.trim();
     const cleanEmail = customerEmail.trim();
+    const cleanPlanLabel =
+      typeof planLabel === "string" && planLabel.trim()
+        ? planLabel.trim().slice(0, 1000)
+        : null;
     const pool = getPgPool();
     const { basePriceJod, durationMonths } = await getPackageDefaults(cleanPackage);
     const registrationId = randomUUID();
@@ -297,6 +303,7 @@ export async function POST(request: Request) {
         "discountReason",
         "finalPriceJod",
         "durationMonths",
+        "planLabel",
         "sessionsBonus",
         "status",
         "isFrozen",
@@ -304,7 +311,7 @@ export async function POST(request: Request) {
         "updatedAt"
       )
       VALUES (
-        $1, $2, $3, $4, $5, $6, false, $7, 'NONE', NULL, NULL, $8, $9, 0, 'ACTIVE', false, NOW(), NOW()
+        $1, $2, $3, $4, $5, $6, false, $7, 'NONE', NULL, NULL, $8, $9, $10, 0, 'ACTIVE', false, NOW(), NOW()
       )
       `,
       [
@@ -317,6 +324,7 @@ export async function POST(request: Request) {
         basePriceJod,
         basePriceJod,
         durationMonths,
+        cleanPlanLabel,
       ],
     );
 
@@ -329,6 +337,7 @@ export async function POST(request: Request) {
     await syncLandingRegistrationToFirestore({
       id: registrationId,
       packageName: cleanPackage,
+      planLabel: cleanPlanLabel,
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
       customerEmail: cleanEmail,

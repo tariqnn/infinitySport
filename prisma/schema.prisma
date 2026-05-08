@@ -607,30 +607,32 @@ model PackageRegistration {
 }
 
 model Receipt {
-  id             String              @id @default(cuid())
-  receiptId      String              @unique
-  registrationId String
-  personName     String
-  personPhone    String
-  packageName    String
-  dateTimeIssued DateTime            @default(now())
-  amountPaid     Int
-  paymentMethod  String
-  privateNote    String
-  createdBy      String?
-  voidedAt       DateTime?
-  voidReason     String?
-  createdAt      DateTime            @default(now())
-  status         String              @default("ACTIVE")
-  userId         String?
-  cycleNumber    Int                 @default(1)
-  registration   PackageRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-  user           User?               @relation(fields: [userId], references: [id])
+  id               String              @id @default(cuid())
+  receiptId        String              @unique
+  registrationId   String
+  personName       String
+  personPhone      String
+  packageName      String
+  dateTimeIssued   DateTime            @default(now())
+  paymentPeriodKey String?
+  amountPaid       Int
+  paymentMethod    String
+  privateNote      String
+  createdBy        String?
+  voidedAt         DateTime?
+  voidReason       String?
+  createdAt        DateTime            @default(now())
+  status           String              @default("ACTIVE")
+  userId           String?
+  cycleNumber      Int                 @default(1)
+  registration     PackageRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  user             User?               @relation(fields: [userId], references: [id])
 
   @@index([registrationId])
   @@index([receiptId])
   @@index([status])
   @@index([userId])
+  @@index([paymentPeriodKey])
   @@index([registrationId, cycleNumber], map: "Receipt_registration_cycle_idx")
 }
 

@@ -5,6 +5,11 @@ import { NextResponse } from 'next/server';
 import { isValidPhoneNumber } from '../../../lib/phoneValidation';
 import { syncBookingRecordToFirestore } from '../../../apps/portal/lib/bookingRealtimeSync';
 import { getFirestore } from '../../../apps/portal/lib/firebase-admin';
+import {
+  ammanWeekdayKey,
+  isAmmanDateBeforeToday,
+  parseAmmanDateTime,
+} from '../../../lib/ammanTime';
 
 type CourtType = 'Basketball AC' | 'Basketball 3x3' | 'Padel' | 'Volleyball';
 
@@ -65,12 +70,6 @@ const courtTypeForId = (courtId: string): CourtType | null => {
   if (courtId === 'padel') return 'Padel';
   if (courtId === 'volleyball') return 'Volleyball';
   return null;
-};
-
-const dayKey = (dateStr: string) => {
-  const [y, m, d] = dateStr.split('-').map((n) => Number(n));
-  const date = new Date(y, (m ?? 1) - 1, d ?? 1);
-  return date.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
 };
 
 async function fetchBlockedMapFromDb(): Promise<Record<string, Partial<Record<CourtType, string[]>>>> {
@@ -237,17 +236,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const selectedDate = new Date(date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (selectedDate < today) {
+    if (isAmmanDateBeforeToday(String(date))) {
       return NextResponse.json({ error: 'Cannot book a date in the past.' }, { status: 400 });
     }
 
     const courtType = courtTypeForId(courtId);
     if (courtType) {
       const blockedMap = await fetchBlockedMapFromDb();
-      const day = dayKey(date);
+      const day = ammanWeekdayKey(String(date));
       const fullTimes = blockedMap[day]?.[courtType] ?? [];
       const slotCount = Math.ceil(durationHours);
 
@@ -266,7 +262,10 @@ export async function POST(request: Request) {
       }
     }
 
-    const startTime = new Date(`${date}T${time}:00`);
+    const startTime = parseAmmanDateTime(String(date), String(time));
+    if (!startTime) {
+      return NextResponse.json({ error: 'Invalid booking date or time.' }, { status: 400 });
+    }
     const endTime = new Date(startTime);
     endTime.setMinutes(endTime.getMinutes() + Math.round(durationHours * 60));
 

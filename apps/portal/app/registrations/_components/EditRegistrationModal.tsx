@@ -53,6 +53,7 @@ export function EditRegistrationModal({
   const [sessionsInputMode, setSessionsInputMode] = useState<'remaining' | 'base'>('base');
   const [nextPaymentDate, setNextPaymentDate] = useState('');
   const [periodStartsAt, setPeriodStartsAt] = useState('');
+  const [periodEndsAt, setPeriodEndsAt] = useState('');
   const [basePriceJod, setBasePriceJod] = useState('');
   const [discountOpen, setDiscountOpen] = useState(false);
   const [discountType, setDiscountType] = useState<'NONE' | 'PERCENT' | 'AMOUNT'>('NONE');
@@ -78,6 +79,7 @@ export function EditRegistrationModal({
     setSessionsInputMode(currentSessionSummary ? 'remaining' : 'base');
     setNextPaymentDate(toDateInputValue(registration.nextPaymentDate));
     setPeriodStartsAt(toDateInputValue(registration.periodStartsAt));
+    setPeriodEndsAt(toDateInputValue(registration.periodEndsAt));
     setBasePriceJod(String(Math.max(0, Number(registration.basePriceJod) || 0)));
 
     const nextDiscountType = (registration.discountType || 'NONE').toUpperCase();
@@ -146,7 +148,9 @@ export function EditRegistrationModal({
       !packageChanged
         ? Math.max(1, registration.durationMonths || 1)
         : getPackageDefaultDurationMonths(packageName, defaultDurationMonthsByPackage);
-    setNextPaymentDate(addDurationMonthsToDateInput(periodStartsAt, durationMonths));
+    const nextEndDate = addDurationMonthsToDateInput(periodStartsAt, durationMonths);
+    setPeriodEndsAt(nextEndDate);
+    setNextPaymentDate(nextEndDate);
   }, [defaultDurationMonthsByPackage, open, packageName, periodStartsAt, registration]);
 
   const packageList = useMemo(() => {
@@ -168,6 +172,14 @@ export function EditRegistrationModal({
     [baseNumber, discountNumber, discountType],
   );
 
+  function handlePeriodEndsAtChange(value: string) {
+    const previousEndDate = periodEndsAt;
+    setPeriodEndsAt(value);
+    if (!nextPaymentDate.trim() || nextPaymentDate === previousEndDate) {
+      setNextPaymentDate(value);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!registration) return;
@@ -182,6 +194,13 @@ export function EditRegistrationModal({
     if (!nextCustomerName) return setError('Name is required.');
     if (!nextCustomerPhone) return setError('Phone is required.');
     if (!Number.isFinite(baseNumber) || baseNumber < 0) return setError('Base price must be 0 or greater.');
+    if (periodStartsAt.trim() && periodEndsAt.trim()) {
+      const start = new Date(periodStartsAt);
+      const end = new Date(periodEndsAt);
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end.getTime() < start.getTime()) {
+        return setError('Membership end date must be after the start date.');
+      }
+    }
     if (!sessionsLeft.trim()) return setError('Sessions left is required.');
     const parsedSessionsLeft = Number(sessionsLeft);
     if (!Number.isFinite(parsedSessionsLeft) || parsedSessionsLeft < 0) {
@@ -233,6 +252,7 @@ export function EditRegistrationModal({
         discountValue: discountType === 'NONE' ? null : discountNumber,
         discountReason: discountType === 'NONE' ? null : discountReason.trim(),
         periodStartsAt: periodStartsAt.trim() || null,
+        periodEndsAt: periodEndsAt.trim() || null,
       });
       onSuccess();
       onClose();
@@ -245,7 +265,10 @@ export function EditRegistrationModal({
 
   if (!registration) return null;
 
-  const isManualPricing = !hasPackageDefaultPrice(packageName, defaultPricesByPackage) && !!packageName;
+  const hasDefaultPrice = hasPackageDefaultPrice(packageName, defaultPricesByPackage);
+  const sessionHint = currentSessionSummary
+    ? `This saves a manual remaining balance for this player only. Current used: ${currentSessionSummary.used}.`
+    : 'This saves the session balance for this player only.';
 
   return (
     <Modal open={open} onClose={onClose} title="Edit registration" size="md">
@@ -264,18 +287,26 @@ export function EditRegistrationModal({
         <Input label="Email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
         <Input label="Age" type="number" min={0} value={customerAge} onChange={(e) => setCustomerAge(e.target.value)} />
         <Input
-          label="Sessions left"
+          label="Manual sessions remaining"
           type="number"
           min={0}
           value={sessionsLeft}
           onChange={(e) => setSessionsLeft(e.target.value)}
           required
+          hint={sessionHint}
         />
         <Input
           label="When they will start"
           type="date"
           value={periodStartsAt}
           onChange={(e) => setPeriodStartsAt(e.target.value)}
+        />
+        <Input
+          label="Membership end date"
+          type="date"
+          value={periodEndsAt}
+          onChange={(e) => handlePeriodEndsAtChange(e.target.value)}
+          hint="Move this later to give this player extra days, or earlier to shorten only this player. Next payment follows this date unless you change it separately."
         />
         <Input
           label="Next payment date"
@@ -285,21 +316,19 @@ export function EditRegistrationModal({
         />
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-ui-textMuted">Base price (JOD)</label>
-          {isManualPricing ? (
-            <Input
-              type="number"
-              min={0}
-              value={basePriceJod}
-              onChange={(e) => setBasePriceJod(e.target.value)}
-              required
-            />
-          ) : (
-            <div className="rounded-xl border border-ui-border bg-ui-softBg/50 px-3 py-2.5 text-sm text-ui-textPrimary">
-              {packageName && basePriceJod !== '' ? `${basePriceJod} JOD` : '-'}
-            </div>
-          )}
-          {!isManualPricing && <p className="mt-0.5 text-xs text-ui-textMuted">This updates automatically if you switch the package.</p>}
+          <Input
+            label="Player price (JOD)"
+            type="number"
+            min={0}
+            value={basePriceJod}
+            onChange={(e) => setBasePriceJod(e.target.value)}
+            required
+            hint={
+              hasDefaultPrice
+                ? 'Package changes load the default price first, then you can override it for this player only.'
+                : 'This price applies only to this player registration.'
+            }
+          />
         </div>
 
         <div className="rounded-lg border border-ui-border">

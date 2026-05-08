@@ -251,7 +251,7 @@ export function RegistrationDetailsModal({
             <p className="text-ui-textPrimary">{formatDate(registration.nextPaymentDate)}</p>
           </div>
           <div>
-            <p className="text-ui-textMuted">Record created</p>
+            <p className="text-ui-textMuted">Registered on</p>
             <p className="text-ui-textPrimary">{formatDateTime(registration.createdAt)}</p>
           </div>
         </div>

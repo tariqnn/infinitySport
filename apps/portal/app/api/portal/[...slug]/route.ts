@@ -647,6 +647,18 @@ function getRegistrationPaymentStatus(
   return collectedJod > 0 ? "PARTIAL" : "UNPAID";
 }
 
+function paymentPeriodKeyFromDate(value: Date | string | null | undefined): string {
+  const parsed = value ? new Date(value) : new Date();
+  const date = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function normalizePaymentPeriodKey(value: unknown): string | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(raw) ? raw : null;
+}
+
 async function cancelMatchingRegistrationInboxEntries(params: {
   registrationId: string;
   packageName: string;
@@ -3859,6 +3871,7 @@ async function getMemberReceiptPdf(receiptId: string, request: NextRequest) {
   const lines = [
     `Infinity Sports Receipt - ${row.receiptId}`,
     `Date: ${new Date(row.dateTimeIssued).toLocaleString("en-GB")}`,
+    `Paid For Month: ${row.paymentPeriodKey || "-"}`,
     `Member Email: ${userEmail}`,
     `Student: ${row.personName}`,
     `Phone: ${row.personPhone}`,
@@ -5073,6 +5086,22 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
     updateData.nextPaymentDate = updateData.periodEndsAt;
   }
 
+  const validationStart =
+    updateData.periodStartsAt instanceof Date
+      ? updateData.periodStartsAt
+      : existing.periodStartsAt
+        ? new Date(existing.periodStartsAt)
+        : null;
+  const validationEnd =
+    updateData.periodEndsAt instanceof Date
+      ? updateData.periodEndsAt
+      : existing.periodEndsAt
+        ? new Date(existing.periodEndsAt)
+        : null;
+  if (validationStart && validationEnd && validationEnd.getTime() < validationStart.getTime()) {
+    return jsonError("periodEndsAt must be after periodStartsAt");
+  }
+
   if (body.isFrozen !== undefined) {
     updateData.isFrozen = Boolean(body.isFrozen);
     if (body.isFrozen) {
@@ -5220,6 +5249,7 @@ async function markRegistrationPaid(id: string, request: NextRequest) {
     amountPaid: number;
     paymentMethod: string;
     privateNote: string;
+    paymentPeriodKey?: string | null;
     createdBy?: string;
   };
 
@@ -5229,6 +5259,10 @@ async function markRegistrationPaid(id: string, request: NextRequest) {
   if (!registration) return jsonError("Registration not found", 404);
   if (!(body.privateNote || "").trim())
     return jsonError("Private note is required");
+  const paymentPeriodKey = body.paymentPeriodKey
+    ? normalizePaymentPeriodKey(body.paymentPeriodKey)
+    : paymentPeriodKeyFromDate(registration.periodStartsAt ?? registration.createdAt);
+  if (!paymentPeriodKey) return jsonError("Invalid paid for month");
 
   await ensureRegistrationProfile(prisma, {
     registrationId: registration.id,
@@ -5263,6 +5297,7 @@ async function markRegistrationPaid(id: string, request: NextRequest) {
           personName: registration.customerName,
           personPhone: registration.customerPhone,
           packageName: registration.packageName,
+          paymentPeriodKey,
           amountPaid,
           paymentMethod: method,
           privateNote: body.privateNote.trim(),

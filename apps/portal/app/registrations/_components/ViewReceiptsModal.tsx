@@ -4,6 +4,13 @@ import { useState, useEffect } from 'react';
 import { Modal, Button } from '../../_components/ui';
 import { packageRegistrationsApi, receiptsApi, type PackageRegistrationRow, type ReceiptRow } from '../../../lib/portalApi';
 
+function formatPaymentMonth(value: string | null | undefined) {
+  if (!value) return '-';
+  const parsed = new Date(`${value}-01T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+}
+
 export function ViewReceiptsModal({
   open,
   onClose,
@@ -64,6 +71,9 @@ export function ViewReceiptsModal({
                   <span className="font-semibold text-ui-textPrimary">{r.receiptId}</span>
                   <span className="ml-2 text-sm text-ui-textMuted">
                     {r.amountPaid} JOD · {r.paymentMethod} · {new Date(r.dateTimeIssued).toLocaleDateString()}
+                  </span>
+                  <span className="block text-xs text-ui-textMuted">
+                    Paid for {formatPaymentMonth(r.paymentPeriodKey)}
                   </span>
                 </div>
                 <div className="flex gap-2">
@@ -154,6 +164,7 @@ export function ReceiptDetailModal({
               <table className="w-full text-sm">
                 <tbody>
                   <tr><td className="py-1 text-ui-textMuted">Date</td><td>{new Date(receipt.dateTimeIssued).toLocaleString()}</td></tr>
+                  <tr><td className="py-1 text-ui-textMuted">Paid for month</td><td>{formatPaymentMonth(receipt.paymentPeriodKey)}</td></tr>
                   <tr><td className="py-1 text-ui-textMuted">Name</td><td>{receipt.personName}</td></tr>
                   <tr><td className="py-1 text-ui-textMuted">Phone</td><td>{receipt.personPhone}</td></tr>
                   <tr><td className="py-1 text-ui-textMuted">Package</td><td>{receipt.packageName}</td></tr>

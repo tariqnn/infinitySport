@@ -4,6 +4,13 @@ import { Modal, Badge, Button } from '../../_components/ui';
 import type { PackageRegistrationRow } from '../../../lib/portalApi';
 import type { InitialPerson } from './AddRegistrationModal';
 
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return '-';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '-';
+  return parsed.toLocaleString();
+}
+
 export function PersonDetailsModal({
   open,
   onClose,
@@ -49,6 +56,9 @@ export function PersonDetailsModal({
                   {r.periodStartsAt && (
                     <span className="ml-2">· Starts {new Date(r.periodStartsAt).toLocaleDateString()}</span>
                   )}
+                </span>
+                <span className="mt-1 block text-xs text-ui-textMuted">
+                  Registered {formatDateTime(r.createdAt)}
                 </span>
               </div>
               <div className="flex items-center gap-2">

@@ -57,6 +57,7 @@ export type TrackerReceiptSyncInput = {
   personName?: string | null;
   personPhone?: string | null;
   dateTimeIssued?: string | Date | admin.firestore.Timestamp | null;
+  paymentPeriodKey?: string | null;
   amountPaid?: number | null;
   paymentMethod?: string | null;
   status?: string | null;
@@ -779,6 +780,7 @@ export async function syncTrackerUserReceipts(params: {
           personPhone: normalizeNullableText(receipt.personPhone),
           dateTimeIssued: issuedAt,
           dateTimeIssuedIso: toIsoDateTime(receipt.dateTimeIssued),
+          paymentPeriodKey: normalizeNullableText(receipt.paymentPeriodKey),
           amountPaid: Math.max(0, Math.round(coerceOptionalNumber(receipt.amountPaid) ?? 0)),
           paymentMethod: normalizeNullableText(receipt.paymentMethod),
           status: normalizeNullableText(receipt.status) || 'ACTIVE',

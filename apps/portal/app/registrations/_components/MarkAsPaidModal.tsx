@@ -11,6 +11,13 @@ const PAYMENT_METHODS = [
   { value: 'OTHER', label: 'Other' },
 ];
 
+function toMonthInputValue(value: string | null | undefined) {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}`;
+}
+
 export function MarkAsPaidModal({
   open,
   onClose,
@@ -23,6 +30,7 @@ export function MarkAsPaidModal({
   onSuccess: () => void;
 }) {
   const [amountPaid, setAmountPaid] = useState('');
+  const [paymentPeriodKey, setPaymentPeriodKey] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [privateNote, setPrivateNote] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,10 +43,15 @@ export function MarkAsPaidModal({
   useEffect(() => {
     if (!open) return;
     setAmountPaid(registration?.finalPriceJod != null ? String(registration.finalPriceJod) : '');
+    setPaymentPeriodKey(
+      toMonthInputValue(registration?.periodStartsAt)
+        || toMonthInputValue(registration?.createdAt)
+        || toMonthInputValue(new Date().toISOString())
+    );
     setPaymentMethod('CASH');
     setPrivateNote('');
     setError(null);
-  }, [open, registration?.id, registration?.finalPriceJod]);
+  }, [open, registration?.id, registration?.finalPriceJod, registration?.periodStartsAt, registration?.createdAt]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,11 +64,16 @@ export function MarkAsPaidModal({
       setError(isFreeRegistration ? 'Amount paid cannot be negative.' : 'Amount paid must be greater than 0.');
       return;
     }
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(paymentPeriodKey)) {
+      setError('Paid for month is required.');
+      return;
+    }
     if (!registration) return;
     setLoading(true);
     try {
       await packageRegistrationsApi.markPaid(registration.id, {
         amountPaid: amount,
+        paymentPeriodKey,
         paymentMethod,
         privateNote: privateNote.trim(),
       });
@@ -91,6 +109,14 @@ export function MarkAsPaidModal({
           onChange={(e) => setAmountPaid(e.target.value)}
           placeholder={defaultAmount ? String(defaultAmount) : '0'}
           hint={isFreeRegistration ? 'Free registrations can be confirmed with 0 JOD.' : undefined}
+        />
+        <Input
+          label="Paid for month"
+          type="month"
+          value={paymentPeriodKey}
+          onChange={(e) => setPaymentPeriodKey(e.target.value)}
+          required
+          hint="Choose the membership month this receipt pays for, even if payment is recorded later."
         />
         <Select
           label="Payment method"

@@ -27,6 +27,13 @@ function formatIssuedAt(dateTimeIssued: string) {
   });
 }
 
+function formatPaymentMonth(value: string | null | undefined) {
+  if (!value) return "-";
+  const parsed = new Date(`${value}-01T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+}
+
 function LogoBlock() {
   return (
     <div className="flex items-center gap-3">
@@ -165,6 +172,10 @@ export default function ReceiptPrintPage() {
                     <span className="font-semibold">Date:</span>{" "}
                     <span className="text-ui-textPrimary">{formatIssuedAt(receipt.dateTimeIssued)}</span>
                   </div>
+                  <div>
+                    <span className="font-semibold">Paid For Month:</span>{" "}
+                    <span className="text-ui-textPrimary">{formatPaymentMonth(receipt.paymentPeriodKey)}</span>
+                  </div>
                   <div className="pt-2">
                     <div className="font-semibold">Received From:</div>
                     <div className="text-ui-textPrimary">{receipt.personName}</div>
@@ -193,6 +204,10 @@ export default function ReceiptPrintPage() {
                   <div className="flex justify-between gap-3 sm:block">
                     <span className="text-ui-textMuted">Payment Method</span>
                     <span className="font-semibold text-ui-textPrimary sm:ml-2">{receipt.paymentMethod}</span>
+                  </div>
+                  <div className="flex justify-between gap-3 sm:block sm:text-right">
+                    <span className="text-ui-textMuted">Paid For Month</span>
+                    <span className="font-semibold text-ui-textPrimary sm:ml-2">{formatPaymentMonth(receipt.paymentPeriodKey)}</span>
                   </div>
                   {receipt.transactionId ? (
                     <div className="flex justify-between gap-3 sm:block sm:text-right">

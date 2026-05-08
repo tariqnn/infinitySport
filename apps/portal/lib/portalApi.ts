@@ -821,6 +821,7 @@ export type ReceiptRow = {
   personPhone: string;
   packageName: string;
   dateTimeIssued: string;
+  paymentPeriodKey: string | null;
   amountPaid: number;
   paymentMethod: string;
   privateNote: string;
@@ -916,7 +917,7 @@ export const packageRegistrationsApi = {
   delete: (id: string) => portalDbFetch<void>(`/portal/package-registrations/${id}`, { method: 'DELETE' }),
   reregister: (id: string) =>
     portalDbFetch<PackageRegistrationRow>(`/portal/package-registrations/${id}/reregister`, { method: 'POST' }),
-  markPaid: (id: string, data: { amountPaid: number; paymentMethod: string; privateNote: string }) =>
+  markPaid: (id: string, data: { amountPaid: number; paymentMethod: string; privateNote: string; paymentPeriodKey?: string | null }) =>
     portalDbFetch<ReceiptRow>(`/portal/package-registrations/${id}/mark-paid`, { method: 'POST', body: JSON.stringify(data) }),
   markUnpaid: (id: string, voidReason?: string) =>
     portalDbFetch<{ success: boolean; voidedCount?: number }>(`/portal/package-registrations/${id}/mark-unpaid`, {

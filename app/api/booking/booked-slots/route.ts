@@ -1,19 +1,21 @@
 /// <reference lib="es2022" />
 import { NextResponse } from 'next/server';
+import {
+  addDaysToDateKey,
+  formatAmmanDateKey,
+  formatAmmanTimeKey,
+  parseAmmanDayEnd,
+  parseAmmanDayStart,
+} from '../../../../lib/ammanTime';
 
 const COURT_TYPES = ['Basketball AC', 'Basketball 3x3', 'Padel', 'Volleyball'] as const;
 
 function toDateStr(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return formatAmmanDateKey(d);
 }
 
 function toTimeStr(d: Date): string {
-  const h = String(d.getHours()).padStart(2, '0');
-  const m = String(d.getMinutes()).padStart(2, '0');
-  return `${h}:${m}`;
+  return formatAmmanTimeKey(d);
 }
 
 export async function GET(request: Request) {
@@ -23,22 +25,18 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const startDate = searchParams.get('startDate') || new Date().toISOString().slice(0, 10);
+    const startDate = searchParams.get('startDate') || formatAmmanDateKey(new Date());
     let endDate = searchParams.get('endDate');
     if (!endDate) {
-      const d = new Date(startDate);
-      d.setDate(d.getDate() + 30);
-      endDate = toDateStr(d);
+      endDate = addDaysToDateKey(startDate, 30);
     }
 
-    const endNext = new Date(endDate);
-    endNext.setDate(endNext.getDate() + 1);
-
     const { prisma } = await import('../../../../lib/db');
-    const start = new Date(startDate);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(toDateStr(endNext));
-    end.setHours(23, 59, 59, 999);
+    const start = parseAmmanDayStart(startDate);
+    const end = parseAmmanDayEnd(endDate);
+    if (!start || !end) {
+      return NextResponse.json({ booked: {} });
+    }
 
     const rows = await prisma.booking.findMany({
       where: {

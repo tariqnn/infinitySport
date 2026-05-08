@@ -92,6 +92,7 @@ export async function loadTrackerReceiptSyncInputsForContact(input: {
       personName: receipt.personName,
       personPhone: receipt.personPhone,
       dateTimeIssued: receipt.dateTimeIssued,
+      paymentPeriodKey: receipt.paymentPeriodKey ?? null,
       amountPaid: receipt.amountPaid,
       paymentMethod: receipt.paymentMethod,
       status: receipt.status,

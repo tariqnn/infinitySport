@@ -1,7 +1,9 @@
 const { Buffer } = require("node:buffer");
 const admin = require("firebase-admin");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret } = require("firebase-functions/params");
+const { Client } = require("pg");
 const {
   syncBookingInboxEntry,
   syncBookingActionInboxEntry,
@@ -15,17 +17,14 @@ const TWILIO_WHATSAPP_FROM = defineSecret("TWILIO_WHATSAPP_FROM");
 const OWNER_WHATSAPP = defineSecret("OWNER_WHATSAPP");
 const DATABASE_URL_SECRET = defineSecret("DATABASE_URL");
 
-const bookingSecrets = [
-  TWILIO_ACCOUNT_SID,
-  TWILIO_AUTH_TOKEN,
-  TWILIO_WHATSAPP_FROM,
-  OWNER_WHATSAPP
-];
+const bookingSecrets = [];
 const databaseSecrets = [DATABASE_URL_SECRET];
 const bookingInboxSecrets = [...bookingSecrets, ...databaseSecrets];
 
 const APP_NOTIFICATION_TOPIC = "infinity_portal_all";
 const APP_NOTIFICATION_CHANNEL_ID = "infinity_portal_high_priority";
+const BOOKING_NOTIFICATION_DELIVERIES = "bookingNotificationDeliveries";
+const BOOKING_NOTIFICATION_STATE = "bookingNotificationState";
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -69,6 +68,10 @@ function isAppSource(data) {
   return normalizeText(data.source).toUpperCase() === "APP";
 }
 
+function isDatabaseMirror(data) {
+  return normalizeText(data.mirroredBy) === "checkDatabaseBookingsForOwnerNotification";
+}
+
 function buildTopicNotification({ title, body, data }) {
   return {
     topic: APP_NOTIFICATION_TOPIC,
@@ -110,11 +113,11 @@ async function sendTwilioWhatsApp({ toE164, body }) {
 
   if (!sid || !token || !from) {
     console.log("[booking-wa] Missing TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, or TWILIO_WHATSAPP_FROM");
-    return;
+    return false;
   }
   if (!toE164?.startsWith("+")) {
     console.log("[booking-wa] Skip: phone must be E.164 (start with +):", toE164);
-    return;
+    return false;
   }
 
   const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`;
@@ -137,11 +140,41 @@ async function sendTwilioWhatsApp({ toE164, body }) {
     const text = await response.text();
     throw new Error(`Twilio WhatsApp failed (${response.status}): ${text}`);
   }
+  return true;
 }
 
-async function notifyBookingCreated(snapshot, sourceCollection) {
-  const data = snapshot.data() || {};
-  const bookingId = normalizeText(data.id || snapshot.id);
+function bookingNotificationDocId(bookingId) {
+  return `booking_${normalizeText(bookingId).replace(/[^\w.-]/g, "_")}`;
+}
+
+async function wasBookingOwnerNotified(bookingId) {
+  if (!bookingId) return true;
+  const snapshot = await admin
+    .firestore()
+    .collection(BOOKING_NOTIFICATION_DELIVERIES)
+    .doc(bookingNotificationDocId(bookingId))
+    .get();
+  return snapshot.exists;
+}
+
+async function markBookingOwnerNotified(bookingId, source) {
+  if (!bookingId) return;
+  await admin
+    .firestore()
+    .collection(BOOKING_NOTIFICATION_DELIVERIES)
+    .doc(bookingNotificationDocId(bookingId))
+    .set(
+      {
+        bookingId,
+        source,
+        notifiedAt: admin.firestore.FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    );
+}
+
+async function sendOwnerBookingNotification(data, sourceCollection) {
+  const bookingId = normalizeText(data.id || data.bookingId || "");
   const status = normalizeText(data.status || "PENDING").toUpperCase();
   const facilityArea = normalizeText(data.facilityArea || data.courtName || "-");
   const customerName = normalizeText(data.customerName || data.name || "Guest");
@@ -149,57 +182,233 @@ async function notifyBookingCreated(snapshot, sourceCollection) {
   const startLabel = formatDate(data.startTime || data.startTimeIso);
   const endLabel = formatDate(data.endTime || data.endTimeIso);
 
-  const ownerTo = OWNER_WHATSAPP.value();
-  if (!ownerTo) {
-    console.log("[booking-wa] Missing OWNER_WHATSAPP secret");
-    return;
+  const sent = await sendBookingPushNotification({
+    ...data,
+    id: bookingId,
+    bookingId,
+    status,
+    facilityArea,
+    customerName,
+    customerPhone,
+    startTime: data.startTime || data.startTimeIso,
+    endTime: data.endTime || data.endTimeIso,
+    sourceCollection
+  });
+  if (sent && bookingId) {
+    await markBookingOwnerNotified(bookingId, sourceCollection);
+    console.log("[booking-push] owner portal app notification sent", bookingId, sourceCollection);
   }
+  return sent;
+}
 
-  const ownerBody = [
-    "Infinity Sports - New booking",
-    `Source: ${sourceCollection}`,
-    `ID: ${bookingId}`,
-    `Status: ${status}`,
-    `Court: ${facilityArea}`,
-    `Start: ${startLabel}`,
-    `End: ${endLabel}`,
-    `Customer: ${customerName}`,
-    `Phone: ${customerPhone || "-"}`
-  ].join("\n");
+async function notifyBookingCreated(snapshot, sourceCollection) {
+  const data = snapshot.data() || {};
+  const bookingId = normalizeText(data.id || snapshot.id);
+  const facilityArea = normalizeText(data.facilityArea || data.courtName || "-");
+  const customerName = normalizeText(data.customerName || data.name || "Guest");
+  const customerPhone = normalizeText(data.customerPhone || data.phone || "");
+  const startLabel = formatDate(data.startTime || data.startTimeIso);
+  const endLabel = formatDate(data.endTime || data.endTimeIso);
 
   try {
-    await sendTwilioWhatsApp({ toE164: ownerTo, body: ownerBody });
+    if (await wasBookingOwnerNotified(bookingId)) {
+      console.log("[booking-wa] owner already notified", bookingId);
+    } else {
+      await sendOwnerBookingNotification({ ...data, id: bookingId }, sourceCollection);
+    }
   } catch (e) {
     console.error("[booking-wa] owner message failed", e);
   }
 
-  if (customerPhone && customerPhone.startsWith("+")) {
-    const userBody = [
-      "Infinity Sports - Booking received",
-      `Hi ${customerName},`,
-      "We received your booking request.",
-      `Court: ${facilityArea}`,
-      `Start: ${startLabel}`,
-      `End: ${endLabel}`,
-      `Status: ${status}`,
-      "We will contact you if we need anything else."
-    ].join("\n");
+  console.log("[booking-notify] customer WhatsApp skipped; Twilio disabled");
+}
 
-    try {
-      await sendTwilioWhatsApp({ toE164: customerPhone, body: userBody });
-    } catch (e) {
-      console.error("[booking-wa] customer message failed", e);
-    }
-  } else {
-    console.log("[booking-wa] No customer WhatsApp (need E.164 phone starting with +)");
+async function pollDatabaseBookingsForOwnerNotifications() {
+  const databaseUrl = DATABASE_URL_SECRET.value();
+  if (!databaseUrl) {
+    console.log("[booking-db-wa] Missing DATABASE_URL secret");
+    return;
   }
+
+  const firestore = admin.firestore();
+  const stateRef = firestore.collection(BOOKING_NOTIFICATION_STATE).doc("dbBookingPoller");
+  const now = new Date();
+  const stateSnapshot = await stateRef.get();
+  const lastCheckedAt = stateSnapshot.exists ? toDate(stateSnapshot.data()?.lastCheckedAt) : null;
+  const initialLookbackMs = 30 * 60 * 1000;
+  const overlapMs = 2 * 60 * 1000;
+  const since = new Date((lastCheckedAt?.getTime() ?? now.getTime() - initialLookbackMs) - overlapMs);
+  const mirrorStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const mirrorEnd = new Date(now.getTime() + 45 * 24 * 60 * 60 * 1000);
+
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    const result = await client.query(
+      `
+        SELECT
+          id,
+          "companyId",
+          status::text AS status,
+          "facilityArea",
+          "isPaid",
+          "customerName",
+          "customerPhone",
+          "customerEmail",
+          notes,
+          "startTime",
+          "endTime",
+          "createdAt",
+          "updatedAt"
+        FROM "Booking"
+        WHERE (
+            "createdAt" > $1
+            AND "createdAt" <= $2
+          )
+          OR (
+            "updatedAt" > $1
+            AND "updatedAt" <= $2
+          )
+          OR (
+            "startTime" >= $3
+            AND "startTime" <= $4
+          )
+        ORDER BY "createdAt" ASC
+        LIMIT 200
+      `,
+      [since, now, mirrorStart, mirrorEnd]
+    );
+
+    let sentCount = 0;
+    let mirroredCount = 0;
+    for (const row of result.rows) {
+      const bookingId = normalizeText(row.id);
+      if (!bookingId) continue;
+
+      await mirrorDatabaseBookingToFirestore(row);
+      mirroredCount += 1;
+      if (await wasBookingOwnerNotified(bookingId)) continue;
+      const createdAt = toDate(row.createdAt);
+      const isNewBooking = !!createdAt && createdAt > since && createdAt <= now;
+      if (!isNewBooking) continue;
+
+      try {
+        const sent = await sendOwnerBookingNotification(
+          {
+            id: bookingId,
+            status: row.status,
+            facilityArea: row.facilityArea,
+            customerName: row.customerName,
+            customerPhone: row.customerPhone,
+            customerEmail: row.customerEmail,
+            startTime: row.startTime,
+            endTime: row.endTime
+          },
+          "database"
+        );
+        if (sent) sentCount += 1;
+      } catch (error) {
+        console.error("[booking-db-wa] owner message failed", bookingId, error);
+      }
+    }
+
+    await stateRef.set(
+      {
+        lastCheckedAt: now,
+        lastRunAt: admin.firestore.FieldValue.serverTimestamp(),
+        checkedCount: result.rows.length,
+        mirroredCount,
+        sentCount
+      },
+      { merge: true }
+    );
+    console.log(
+      "[booking-db-wa] checked database bookings",
+      result.rows.length,
+      "mirrored",
+      mirroredCount,
+      "sent",
+      sentCount
+    );
+  } finally {
+    await client.end();
+  }
+}
+
+function hoursBetween(start, end) {
+  const startDate = toDate(start);
+  const endDate = toDate(end);
+  if (!startDate || !endDate) return null;
+  return Math.max(0, (endDate.getTime() - startDate.getTime()) / 3600000);
+}
+
+async function mirrorDatabaseBookingToFirestore(row) {
+  const bookingId = normalizeText(row.id);
+  if (!bookingId) return;
+
+  const startTime = toDate(row.startTime);
+  const endTime = toDate(row.endTime);
+  const createdAt = toDate(row.createdAt) || new Date();
+  const updatedAt = toDate(row.updatedAt) || createdAt;
+  const totalHours = hoursBetween(startTime, endTime);
+  const isPaid = Boolean(row.isPaid);
+
+  await admin
+    .firestore()
+    .collection("portalBookings")
+    .doc(bookingId)
+    .set(
+      {
+        id: bookingId,
+        companyId: normalizeText(row.companyId) || null,
+        courtName: normalizeText(row.facilityArea) || null,
+        facilityArea: normalizeText(row.facilityArea) || null,
+        startTime: startTime ? admin.firestore.Timestamp.fromDate(startTime) : null,
+        startTimeIso: startTime ? startTime.toISOString() : null,
+        endTime: endTime ? admin.firestore.Timestamp.fromDate(endTime) : null,
+        endTimeIso: endTime ? endTime.toISOString() : null,
+        status: normalizeText(row.status || "PENDING").toUpperCase(),
+        source: "WEBSITE",
+        isPaid,
+        customerName: normalizeText(row.customerName) || null,
+        customerPhone: normalizeText(row.customerPhone) || null,
+        customerEmail: normalizeText(row.customerEmail) || null,
+        notes: normalizeText(row.notes) || null,
+        financials: {
+          totalHours,
+          totalAmount: null,
+          paidAmount: null,
+          refundAmount: null,
+          netPaid: null,
+          remainingAmount: null,
+          paymentStatus: isPaid ? "PAID" : "UNPAID",
+          latestPaymentMethod: null
+        },
+        deleted: false,
+        createdAt: admin.firestore.Timestamp.fromDate(createdAt),
+        createdAtIso: createdAt.toISOString(),
+        updatedAt: admin.firestore.Timestamp.fromDate(updatedAt),
+        updatedAtIso: updatedAt.toISOString(),
+        syncedAt: admin.firestore.FieldValue.serverTimestamp(),
+        mirroredBy: "checkDatabaseBookingsForOwnerNotification"
+      },
+      { merge: true }
+    );
+
+  console.log("[booking-db-sync] mirrored booking to portalBookings", bookingId);
 }
 
 async function sendBookingPushNotification(data) {
   const title = "New booking";
-  const body = `${normalizeText(data.facilityArea || data.courtName || "Court")} | ${normalizeText(data.status || "PENDING")}`;
+  const facilityArea = normalizeText(data.facilityArea || data.courtName || "Court");
+  const status = normalizeText(data.status || "PENDING");
+  const customerName = normalizeText(data.customerName || data.name || "");
+  const startLabel = formatDate(data.startTime || data.startTimeIso);
+  const body = customerName
+    ? `${facilityArea} | ${customerName} | ${startLabel}`
+    : `${facilityArea} | ${status}`;
   try {
-    await admin.messaging().send(
+    const messageId = await admin.messaging().send(
       buildTopicNotification({
         title,
         body,
@@ -207,12 +416,17 @@ async function sendBookingPushNotification(data) {
           type: "BOOKING_CREATED",
           bookingId: bookingIdFromData(data),
           status: normalizeText(data.status || "PENDING"),
-          facilityArea: normalizeText(data.facilityArea || data.courtName || "")
+          facilityArea,
+          customerName,
+          startTime: toDate(data.startTime || data.startTimeIso)?.toISOString() || ""
         }
       })
     );
+    console.log("[booking-push] broadcast sent", messageId, bookingIdFromData(data));
+    return true;
   } catch (error) {
     console.error("[booking-push] broadcast failed", error);
+    return false;
   }
 }
 
@@ -247,9 +461,11 @@ exports.onPortalBookingCreated = onDocumentCreated(
     if (!event.data) return;
     const data = event.data.data() || {};
     const appSource = isAppSource(data);
+    const databaseMirror = isDatabaseMirror(data);
+    const skipOwnerNotification = appSource || databaseMirror;
     await Promise.allSettled([
-      appSource ? Promise.resolve() : notifyBookingCreated(event.data, "portalBookings"),
-      appSource ? Promise.resolve() : sendBookingPushNotification(data)
+      skipOwnerNotification ? Promise.resolve() : notifyBookingCreated(event.data, "portalBookings"),
+      skipOwnerNotification ? Promise.resolve() : sendBookingPushNotification(data)
     ]);
   }
 );
@@ -291,6 +507,16 @@ exports.onPortalBookingActionInboxCreated = onDocumentCreated(
       payload: event.data.data() || {}
     });
   }
+);
+
+exports.checkDatabaseBookingsForOwnerNotification = onSchedule(
+  {
+    schedule: "every 1 minutes",
+    timeZone: "Asia/Amman",
+    region: "us-central1",
+    secrets: bookingInboxSecrets
+  },
+  pollDatabaseBookingsForOwnerNotifications
 );
 
 exports.onPortalRegistrationCreated = onDocumentCreated(

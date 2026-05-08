@@ -7,6 +7,13 @@ import {
   bookingCourtNameFromId,
   listMobileBookingInboxEntries,
 } from '../../../../../portal/lib/bookingRealtimeSync';
+import {
+  addDaysToDateKey,
+  formatAmmanDateKey,
+  formatAmmanTimeKey,
+  parseAmmanDayEnd,
+  parseAmmanDayStart,
+} from '../../../../../../lib/ammanTime';
 
 const COURT_TYPES = ['Basketball AC', 'Basketball 3x3', 'Padel', 'Volleyball'] as const;
 type BookedPayload = { booked: Record<string, Record<string, string[]>> };
@@ -29,16 +36,11 @@ function withCacheHeaders(response: NextResponse, cacheHit: boolean) {
 }
 
 function toDateStr(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return formatAmmanDateKey(d);
 }
 
 function toTimeStr(d: Date): string {
-  const h = String(d.getHours()).padStart(2, '0');
-  const m = String(d.getMinutes()).padStart(2, '0');
-  return `${h}:${m}`;
+  return formatAmmanTimeKey(d);
 }
 
 function parseFirestoreDateValue(value: unknown): Date | null {
@@ -92,12 +94,10 @@ function mergeBookedRange(
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const startDate = searchParams.get('startDate') || new Date().toISOString().slice(0, 10);
+  const startDate = searchParams.get('startDate') || formatAmmanDateKey(new Date());
   let endDate = searchParams.get('endDate');
   if (!endDate) {
-    const d = new Date(startDate);
-    d.setDate(d.getDate() + 30);
-    endDate = toDateStr(d);
+    endDate = addDaysToDateKey(startDate, 30);
   }
 
   const key = `${startDate}:${endDate}`;
@@ -112,10 +112,11 @@ export async function GET(request: Request) {
       const payload: BookedPayload = { booked: {} };
       return withCacheHeaders(NextResponse.json(payload), false);
     }
-    const start = new Date(startDate);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
+    const start = parseAmmanDayStart(startDate);
+    const end = parseAmmanDayEnd(endDate);
+    if (!start || !end) {
+      return withCacheHeaders(NextResponse.json({ booked: {} }), false);
+    }
 
     const pool = getPgPool();
     const result = await pool.query<{

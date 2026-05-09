@@ -74,6 +74,7 @@ type RegistrationInput = {
   customerEmail?: string | null;
   customerAge?: number | null;
   sessionsLeft?: number | null;
+  sessionsUsedOverride?: number | null;
   nextPaymentDate?: string | null;
   planLabel?: string | null;
   basePriceJod?: number;
@@ -176,6 +177,14 @@ function withoutPeriodStartsAt<T extends { periodStartsAt?: unknown }>(
 ): Omit<T, "periodStartsAt"> {
   const next = { ...data } as T;
   delete next.periodStartsAt;
+  return next;
+}
+
+function withoutSessionsUsedOverride<T extends { sessionsUsedOverride?: unknown }>(
+  data: T,
+): Omit<T, "sessionsUsedOverride"> {
+  const next = { ...data } as T;
+  delete next.sessionsUsedOverride;
   return next;
 }
 
@@ -398,6 +407,15 @@ async function createPackageRegistrationCompat(
     return await delegate.create(args as any);
   } catch (error) {
     if (
+      hasUnknownArgument(error, "sessionsUsedOverride") &&
+      "sessionsUsedOverride" in args.data
+    ) {
+      return delegate.create({
+        ...args,
+        data: withoutSessionsUsedOverride(args.data),
+      } as any);
+    }
+    if (
       hasUnknownArgument(error, "periodStartsAt") &&
       "periodStartsAt" in args.data
     ) {
@@ -418,6 +436,15 @@ async function updatePackageRegistrationCompat(args: {
   try {
     return await prisma.packageRegistration.update(args as any);
   } catch (error) {
+    if (
+      hasUnknownArgument(error, "sessionsUsedOverride") &&
+      "sessionsUsedOverride" in args.data
+    ) {
+      return prisma.packageRegistration.update({
+        ...args,
+        data: withoutSessionsUsedOverride(args.data),
+      } as any);
+    }
     if (
       hasUnknownArgument(error, "periodStartsAt") &&
       "periodStartsAt" in args.data
@@ -606,6 +633,7 @@ function mapRegistrationRow(row: any) {
     playerCode: row.playerCode ?? null,
     currentCycle: row.currentCycle ?? 1,
     sessionsLeft: row.sessionsLeft ?? null,
+    sessionsUsedOverride: row.sessionsUsedOverride ?? null,
     nextPaymentDate: row.nextPaymentDate ?? null,
     planLabel: row.planLabel ?? null,
     pointsBalance: Math.max(0, Number(row.pointsBalance ?? 0) || 0),
@@ -796,6 +824,7 @@ async function syncRegistrationRealtimeById(
         playerCode: serialized.playerCode,
         currentCycle: serialized.currentCycle,
         sessionsLeft: serialized.sessionsLeft,
+        sessionsUsedOverride: serialized.sessionsUsedOverride,
         nextPaymentDate: serialized.nextPaymentDate,
         planLabel: serialized.planLabel,
         isPaid: serialized.isPaid,
@@ -3952,8 +3981,11 @@ async function createPackageRegistration(payload: RegistrationInput) {
   const now = new Date();
   const periodStartsAt = payload.periodStartsAt
     ? new Date(payload.periodStartsAt)
-    : null;
-  const cycleAnchor = periodStartsAt ?? now;
+    : now;
+  if (Number.isNaN(periodStartsAt.getTime())) {
+    throw new Error("Invalid period start date");
+  }
+  const cycleAnchor = periodStartsAt;
   const periodEndsAt = computeCyclePeriodEnd(cycleAnchor, durationMonths);
   const nextPaymentDate = payload.nextPaymentDate
     ? parseOptionalMembershipDate(payload.nextPaymentDate)
@@ -3965,6 +3997,10 @@ async function createPackageRegistration(payload: RegistrationInput) {
     payload.sessionsLeft == null
       ? defaultSessionsLeft
       : Math.max(0, Math.round(Number(payload.sessionsLeft) || 0));
+  const sessionsUsedOverride =
+    payload.sessionsUsedOverride == null
+      ? null
+      : Math.max(0, Math.round(Number(payload.sessionsUsedOverride) || 0));
   const planLabel = normalizeText(payload.planLabel) || packageName;
   const { billingPeriodKey, priceLockedUntil } = billingPeriodFromDate(now);
 
@@ -3991,10 +4027,11 @@ async function createPackageRegistration(payload: RegistrationInput) {
     durationMonths,
     periodEndsAt,
     sessionsLeft,
+    sessionsUsedOverride,
     nextPaymentDate,
     planLabel,
   };
-  if (periodStartsAt) createData.periodStartsAt = periodStartsAt;
+  createData.periodStartsAt = periodStartsAt;
 
   const row = await createPackageRegistrationCompat(
     prisma.packageRegistration,
@@ -4768,8 +4805,11 @@ async function bulkCreateForPerson(request: NextRequest) {
           ? new Date(entry.periodStartsAt)
           : body.periodStartsAt
             ? new Date(body.periodStartsAt)
-            : null;
-        const cycleAnchor = periodStartsAt ?? now;
+            : now;
+        if (Number.isNaN(periodStartsAt.getTime())) {
+          throw new Error("Invalid period start date");
+        }
+        const cycleAnchor = periodStartsAt;
         const periodEndsAt = computeCyclePeriodEnd(cycleAnchor, durationMonths);
         const nextPaymentDate = entry.nextPaymentDate
           ? parseOptionalMembershipDate(entry.nextPaymentDate)
@@ -4781,6 +4821,10 @@ async function bulkCreateForPerson(request: NextRequest) {
           entry.sessionsLeft == null
             ? defaultSessionsLeft
             : Math.max(0, Math.round(Number(entry.sessionsLeft) || 0));
+        const sessionsUsedOverride =
+          entry.sessionsUsedOverride == null
+            ? null
+            : Math.max(0, Math.round(Number(entry.sessionsUsedOverride) || 0));
         const planLabel = normalizeText(entry.planLabel) || packageName;
         const { billingPeriodKey, priceLockedUntil } =
           billingPeriodFromDate(now);
@@ -4807,10 +4851,11 @@ async function bulkCreateForPerson(request: NextRequest) {
           durationMonths,
           periodEndsAt,
           sessionsLeft,
+          sessionsUsedOverride,
           nextPaymentDate,
           planLabel,
         };
-        if (periodStartsAt) createData.periodStartsAt = periodStartsAt;
+        createData.periodStartsAt = periodStartsAt;
 
         const row = await createPackageRegistrationCompat(
           tx.packageRegistration,
@@ -4870,6 +4915,8 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
     customerEmail?: string | null;
     customerAge?: number | null;
     sessionsLeft?: number | null;
+    sessionsUsedOverride?: number | null;
+    durationMonths?: number | null;
     nextPaymentDate?: string | null;
     planLabel?: string | null;
     isPaid?: boolean;
@@ -4973,7 +5020,13 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
   const nextPackageDefaults = packageChanged
     ? await getPackageDefaults(nextPackageName)
     : null;
-  if (packageChanged) {
+  if (body.durationMonths !== undefined) {
+    const parsedDurationMonths = Number(body.durationMonths);
+    if (!Number.isFinite(parsedDurationMonths) || parsedDurationMonths < 1) {
+      return jsonError("durationMonths must be 1 or greater");
+    }
+    updateData.durationMonths = Math.round(parsedDurationMonths);
+  } else if (packageChanged) {
     updateData.durationMonths = nextPackageDefaults?.durationMonths ?? 1;
   }
   const nextDurationMonths = normalizeDurationMonths(
@@ -5068,7 +5121,7 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
   }
 
   if (
-    packageChanged &&
+    (packageChanged || body.durationMonths !== undefined) &&
     body.periodStartsAt === undefined &&
     body.periodEndsAt === undefined
   ) {
@@ -5079,11 +5132,22 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
     updateData.periodEndsAt = computeCyclePeriodEnd(cycleAnchor, nextDurationMonths);
   }
   if (
-    packageChanged &&
+    (packageChanged || body.durationMonths !== undefined) &&
     body.nextPaymentDate === undefined &&
     updateData.periodEndsAt instanceof Date
   ) {
     updateData.nextPaymentDate = updateData.periodEndsAt;
+  }
+  if (body.sessionsUsedOverride !== undefined) {
+    if (body.sessionsUsedOverride == null) {
+      updateData.sessionsUsedOverride = null;
+    } else {
+      const parsedSessionsUsed = Number(body.sessionsUsedOverride);
+      if (!Number.isFinite(parsedSessionsUsed) || parsedSessionsUsed < 0) {
+        return jsonError("Classes finished must be 0 or greater");
+      }
+      updateData.sessionsUsedOverride = Math.round(parsedSessionsUsed);
+    }
   }
 
   const validationStart =
@@ -5191,6 +5255,7 @@ async function reregisterPackage(id: string) {
       paymentStatus: summary?.paymentStatus ?? "UNPAID",
       isPaid: existing.isPaid,
       sessionsLeft: existing.sessionsLeft,
+      sessionsUsedOverride: existing.sessionsUsedOverride,
       sessionsBonus: existing.sessionsBonus,
       isFrozen: existing.isFrozen,
     },
@@ -5216,6 +5281,7 @@ async function reregisterPackage(id: string) {
       periodEndsAt,
       nextPaymentDate: computeCyclePeriodEnd(now, durationMonths),
       sessionsLeft,
+      sessionsUsedOverride: null,
       sessionsBonus: 0,
       isFrozen: false,
       frozenAt: null,
@@ -6959,6 +7025,15 @@ async function dispatchGet(request: NextRequest, params: Params) {
     return NextResponse.json(rows);
   }
 
+  if (resource === "competition-registrations" && !id) {
+    const competitionType = normalizeText(request.nextUrl.searchParams.get("competitionType")).toUpperCase();
+    const rows = await prisma.competitionRegistration.findMany({
+      where: competitionType ? { competitionType } : undefined,
+      orderBy: { createdAt: "desc" },
+    });
+    return NextResponse.json(rows);
+  }
+
   if (resource === "package-registrations" && id === "totals") {
     return getRegistrationTotals(request);
   }
@@ -7508,6 +7583,87 @@ async function dispatchPatch(request: NextRequest, params: Params) {
     }
   }
 
+  if (resource === "competition-registrations" && id && !action) {
+    const body = (await request.json()) as Record<string, unknown>;
+    const existing = await prisma.competitionRegistration.findUnique({ where: { id } });
+    if (!existing) return jsonError("Competition registration not found", 404);
+
+    const data: Record<string, unknown> = {};
+    if (body.competitionType !== undefined) {
+      const competitionType = normalizeText(body.competitionType).toUpperCase();
+      if (!competitionType) return jsonError("Competition is required");
+      data.competitionType = competitionType;
+    }
+    if (body.participantName !== undefined) data.participantName = normalizeText(body.participantName) || null;
+    if (body.age !== undefined) {
+      if (body.age == null || normalizeText(body.age) === "") {
+        data.age = null;
+      } else {
+        const age = Number(body.age);
+        if (!Number.isFinite(age) || age < 1 || age > 99) return jsonError("Age must be between 1 and 99");
+        data.age = Math.round(age);
+      }
+    }
+    if (body.gender !== undefined) {
+      const gender = normalizeText(body.gender).toUpperCase();
+      data.gender = gender || null;
+    }
+    if (body.teamName !== undefined) data.teamName = normalizeText(body.teamName) || null;
+    if (body.playerOne !== undefined) data.playerOne = normalizeText(body.playerOne) || null;
+    if (body.playerTwo !== undefined) data.playerTwo = normalizeText(body.playerTwo) || null;
+    if (body.playerThree !== undefined) data.playerThree = normalizeText(body.playerThree) || null;
+    if (body.playerFour !== undefined) data.playerFour = normalizeText(body.playerFour) || null;
+    if (body.status !== undefined) data.status = normalizeText(body.status).toUpperCase() || "NEW";
+      if (body.isPaid !== undefined) {
+        const isPaid = Boolean(body.isPaid);
+        data.isPaid = isPaid;
+        data.paidAt = isPaid ? new Date() : null;
+        if (!isPaid) {
+          data.paymentMethod = null;
+        }
+      }
+      if (body.amountDue !== undefined) {
+        if (body.amountDue == null || normalizeText(body.amountDue) === "") {
+          data.amountDue = null;
+        } else {
+          const amountDue = Number(body.amountDue);
+          if (!Number.isFinite(amountDue) || amountDue < 0) return jsonError("Amount due must be 0 or greater");
+          data.amountDue = Math.round(amountDue);
+        }
+      }
+      if (body.amountPaid !== undefined) {
+        if (body.amountPaid == null || normalizeText(body.amountPaid) === "") {
+          data.amountPaid = null;
+      } else {
+        const amountPaid = Number(body.amountPaid);
+        if (!Number.isFinite(amountPaid) || amountPaid < 0) return jsonError("Amount paid must be 0 or greater");
+        data.amountPaid = Math.round(amountPaid);
+      }
+    }
+    if (body.paymentMethod !== undefined) data.paymentMethod = normalizeText(body.paymentMethod).toUpperCase() || null;
+
+    const nextCompetitionType = String(data.competitionType ?? existing.competitionType).toUpperCase();
+    const isTeamCompetition = nextCompetitionType === "3X3" || nextCompetitionType === "3X3_MEN" || nextCompetitionType === "3X3_WOMEN";
+    if (isTeamCompetition) {
+      const teamName = normalizeText(data.teamName ?? existing.teamName);
+      const playerOne = normalizeText(data.playerOne ?? existing.playerOne);
+      const playerTwo = normalizeText(data.playerTwo ?? existing.playerTwo);
+      const playerThree = normalizeText(data.playerThree ?? existing.playerThree);
+      if (!teamName || !playerOne || !playerTwo || !playerThree) {
+        return jsonError("Team name and first 3 players are required");
+      }
+    } else {
+      const participantName = normalizeText(data.participantName ?? existing.participantName);
+      if (!participantName) return jsonError("Player name is required");
+    }
+
+    const row = await prisma.competitionRegistration.update({
+      where: { id },
+      data,
+    });
+    return NextResponse.json(row);
+  }
+
   if (resource === "packages" && !action) {
     const body = (await request.json()) as {
       name?: string;
@@ -7673,9 +7829,9 @@ async function dispatchDelete(_request: NextRequest, params: Params) {
     return removeGuestAccount(id);
   }
 
-  if (resource === "package-registrations") {
-    try {
-      const existing = await prisma.packageRegistration.findUnique({
+    if (resource === "package-registrations") {
+      try {
+        const existing = await prisma.packageRegistration.findUnique({
         where: { id },
         select: { id: true, packageName: true, customerPhone: true },
       });
@@ -7698,10 +7854,20 @@ async function dispatchDelete(_request: NextRequest, params: Params) {
       if (error?.code === "P2025")
         return jsonError("Registration not found", 404);
       return jsonError("Failed to delete registration", 500);
+      }
     }
-  }
 
-  if (resource === "packages") {
+    if (resource === "competition-registrations") {
+      try {
+        await prisma.competitionRegistration.delete({ where: { id } });
+        return NextResponse.json({ success: true });
+      } catch (error: any) {
+        if (error?.code === "P2025") return jsonError("Competition registration not found", 404);
+        return jsonError("Failed to delete competition registration", 500);
+      }
+    }
+
+    if (resource === "packages") {
     const existingPackage = await prisma.package.findUnique({
       where: { id },
       select: { id: true, name: true },

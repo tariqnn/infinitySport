@@ -215,7 +215,14 @@ export default function RegistrationsPage() {
     }
     const bonus = Number(r.sessionsBonus) || 0;
     const total = Math.max(0, baseSessions + bonus);
-    const used = schedule ? Math.min(total, Math.max(0, scheduledCount - canceledInRange)) : 0;
+    const manualUsed =
+      r.sessionsUsedOverride == null
+        ? null
+        : Math.max(0, Math.round(Number(r.sessionsUsedOverride) || 0));
+    const used = Math.min(
+      total,
+      manualUsed ?? (schedule ? Math.max(0, scheduledCount - canceledInRange) : 0),
+    );
     const remaining = Math.max(0, total - used);
     return { remaining, total, used };
   }

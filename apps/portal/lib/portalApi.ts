@@ -781,6 +781,7 @@ export type PackageRegistrationRow = {
   playerCode?: string | null;
   currentCycle?: number;
   sessionsLeft: number | null;
+  sessionsUsedOverride: number | null;
   nextPaymentDate: string | null;
   planLabel: string | null;
   pointsBalance?: number;
@@ -860,6 +861,8 @@ export const packageRegistrationsApi = {
     customerEmail?: string | null;
     customerAge?: number | null;
     sessionsLeft?: number | null;
+    sessionsUsedOverride?: number | null;
+    durationMonths?: number;
     nextPaymentDate?: string | null;
     planLabel?: string | null;
     basePriceJod?: number;
@@ -902,6 +905,8 @@ export const packageRegistrationsApi = {
     customerEmail?: string | null;
     customerAge?: number | null;
     sessionsLeft?: number | null;
+    sessionsUsedOverride?: number | null;
+    durationMonths?: number;
     nextPaymentDate?: string | null;
     planLabel?: string | null;
     isPaid?: boolean;
@@ -959,6 +964,59 @@ export type PackageOption = {
 export const packagePricingApi = {
   list: () => portalDbFetch<Array<{ packageName: string; basePriceJod: number | null }>>('/portal/package-pricing'),
 };
+
+export type CompetitionRegistrationRow = {
+  id: string;
+  competitionType: string;
+  participantName: string | null;
+  age: number | null;
+  gender: string | null;
+  teamName: string | null;
+  playerOne: string | null;
+  playerTwo: string | null;
+  playerThree: string | null;
+  playerFour: string | null;
+  isPaid: boolean;
+  amountDue: number | null;
+  amountPaid: number | null;
+  paymentMethod: string | null;
+  paidAt: string | null;
+  source: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const competitionRegistrationsApi = {
+  list: (competitionType?: string) => {
+    const params = new URLSearchParams();
+    if (competitionType && competitionType !== 'ALL') params.append('competitionType', competitionType);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return portalDbFetch<CompetitionRegistrationRow[]>(`/portal/competition-registrations${query}`);
+  },
+    update: (id: string, data: Partial<{
+      competitionType: string;
+    participantName: string | null;
+    age: number | null;
+    gender: string | null;
+    teamName: string | null;
+    playerOne: string | null;
+    playerTwo: string | null;
+      playerThree: string | null;
+      playerFour: string | null;
+      isPaid: boolean;
+      amountDue: number | null;
+      amountPaid: number | null;
+      paymentMethod: string | null;
+      status: string;
+  }>) =>
+    portalDbFetch<CompetitionRegistrationRow>(`/portal/competition-registrations/${id}`, {
+      method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+  delete: (id: string) =>
+    portalDbFetch<{ success: boolean }>(`/portal/competition-registrations/${id}`, { method: 'DELETE' }),
+  };
 
 export const packagesApi = {
   list: (options?: { includeInactive?: boolean }) => {

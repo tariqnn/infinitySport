@@ -35,7 +35,7 @@ export const translations = {
     booking_kicker: 'Booking',
     booking_title: 'Book Your Court',
     booking_subtitle:
-      "Select your preferred court and time slot. If you add your email, you'll receive a confirmation message.",
+      "Select your preferred court and time slot. You'll receive a confirmation email after submitting.",
 
     // Events
     events_kicker: 'Events',
@@ -64,7 +64,7 @@ export const translations = {
     booking_no_slots_today: 'No available time slots for today. Please select another date.',
     booking_required_error: 'Please fill in all required fields.',
     booking_slot_full: 'This time slot is fully booked. Please select another time.',
-    booking_success_email: 'Booking submitted successfully! Check your email for confirmation.',
+    booking_success_email: 'Booking submitted successfully! We sent a confirmation email.',
     booking_success_no_email: 'Booking submitted successfully! We will contact you to confirm.',
     booking_error_generic: 'Something went wrong. Please try again.',
     booking_submitting: 'Submitting...',
@@ -278,4 +278,3 @@ export function tr(lang: Language, key: TranslationKey): string {
   const value = langMap[key];
   return value ?? (translations.en[key] as string) ?? String(key);
 }
-

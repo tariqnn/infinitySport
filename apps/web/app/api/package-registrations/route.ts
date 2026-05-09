@@ -163,6 +163,8 @@ async function syncLandingRegistrationToFirestore(input: {
   basePriceJod: number;
   finalPriceJod: number;
   durationMonths: number;
+  periodStartsAt: Date;
+  periodEndsAt: Date;
 }) {
   try {
     const now = new Date();
@@ -184,8 +186,8 @@ async function syncLandingRegistrationToFirestore(input: {
         discountType: "NONE",
         finalPriceJod: input.finalPriceJod,
         durationMonths: input.durationMonths,
-        periodStartsAt: null,
-        periodEndsAt: null,
+        periodStartsAt: input.periodStartsAt,
+        periodEndsAt: input.periodEndsAt,
         isFrozen: false,
         sessionsBonus: 0,
         collected: 0,
@@ -286,6 +288,9 @@ export async function POST(request: Request) {
     const pool = getPgPool();
     const { basePriceJod, durationMonths } = await getPackageDefaults(cleanPackage);
     const registrationId = randomUUID();
+    const periodStartsAt = new Date();
+    const periodEndsAt = new Date(periodStartsAt);
+    periodEndsAt.setMonth(periodEndsAt.getMonth() + durationMonths);
 
     await pool.query(
       `
@@ -304,6 +309,9 @@ export async function POST(request: Request) {
         "finalPriceJod",
         "durationMonths",
         "planLabel",
+        "periodStartsAt",
+        "periodEndsAt",
+        "nextPaymentDate",
         "sessionsBonus",
         "status",
         "isFrozen",
@@ -311,7 +319,7 @@ export async function POST(request: Request) {
         "updatedAt"
       )
       VALUES (
-        $1, $2, $3, $4, $5, $6, false, $7, 'NONE', NULL, NULL, $8, $9, $10, 0, 'ACTIVE', false, NOW(), NOW()
+        $1, $2, $3, $4, $5, $6, false, $7, 'NONE', NULL, NULL, $8, $9, $10, $11, $12, $12, 0, 'ACTIVE', false, NOW(), NOW()
       )
       `,
       [
@@ -325,6 +333,8 @@ export async function POST(request: Request) {
         basePriceJod,
         durationMonths,
         cleanPlanLabel,
+        periodStartsAt,
+        periodEndsAt,
       ],
     );
 
@@ -346,6 +356,8 @@ export async function POST(request: Request) {
       basePriceJod,
       finalPriceJod: basePriceJod,
       durationMonths,
+      periodStartsAt,
+      periodEndsAt,
     });
 
     return NextResponse.json({ success: true, id: registrationId });

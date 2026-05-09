@@ -20,8 +20,17 @@ import {
   isAmmanDateBeforeToday,
   parseAmmanDateTime,
 } from '../../../../../lib/ammanTime';
+import { sendBookingReceivedEmail } from '../../../lib/bookingEmail';
 
 type CourtType = 'Basketball AC' | 'Basketball 3x3' | 'Padel' | 'Volleyball';
+
+function normalizeEmail(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
 
 function ensureDatabaseUrl(): boolean {
   const explicitCandidates = [
@@ -204,9 +213,13 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { courtId, courtName, date, time, duration, name, phone, email } = body ?? {};
+    const cleanEmail = normalizeEmail(email);
 
-    if (!courtId || !courtName || !date || !time || !name || !phone) {
+    if (!courtId || !courtName || !date || !time || !name || !phone || !cleanEmail) {
       return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
+    }
+    if (!isValidEmail(cleanEmail)) {
+      return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 });
     }
 
     const durationHours = typeof duration === 'number' && duration > 0 ? Math.min(3, Math.max(0.5, duration)) : 1;
@@ -347,7 +360,7 @@ export async function POST(request: Request) {
         endTime,
         name,
         phone,
-        typeof email === 'string' ? email : null,
+        cleanEmail,
         notes,
       ],
     );
@@ -362,9 +375,24 @@ export async function POST(request: Request) {
       isPaid: false,
       customerName: name,
       customerPhone: phone,
-      customerEmail: typeof email === 'string' ? email : null,
+      customerEmail: cleanEmail,
       notes,
     });
+
+    try {
+      await sendBookingReceivedEmail({
+        to: cleanEmail,
+        customerName: String(name),
+        courtName: courtType || String(courtName),
+        date: String(date),
+        startTime: String(time),
+        endTime: endTimeStr,
+        durationHours,
+        bookingId,
+      });
+    } catch (emailError) {
+      console.warn('[booking] confirmation email failed', emailError);
+    }
 
     return NextResponse.json({
       success: true,

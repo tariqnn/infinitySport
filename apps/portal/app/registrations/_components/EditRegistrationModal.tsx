@@ -23,6 +23,11 @@ function toDateInputValue(value: string | null | undefined): string {
   return value.includes('T') ? value.slice(0, 10) : value;
 }
 
+function getStartDateInputValue(registration: PackageRegistrationRow | null): string {
+  if (!registration) return '';
+  return toDateInputValue(registration.periodStartsAt || registration.createdAt);
+}
+
 export function EditRegistrationModal({
   open,
   onClose,
@@ -50,7 +55,8 @@ export function EditRegistrationModal({
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerAge, setCustomerAge] = useState('');
   const [sessionsLeft, setSessionsLeft] = useState('');
-  const [sessionsInputMode, setSessionsInputMode] = useState<'remaining' | 'base'>('base');
+  const [sessionsUsed, setSessionsUsed] = useState('');
+  const [durationMonths, setDurationMonths] = useState('');
   const [nextPaymentDate, setNextPaymentDate] = useState('');
   const [periodStartsAt, setPeriodStartsAt] = useState('');
   const [periodEndsAt, setPeriodEndsAt] = useState('');
@@ -71,14 +77,15 @@ export function EditRegistrationModal({
     setCustomerEmail(registration.customerEmail || '');
     setCustomerAge(registration.customerAge != null ? String(registration.customerAge) : '');
     const initialSessionsLeft =
-      currentSessionSummary?.remaining ??
       registration.sessionsLeft ??
+      (currentSessionSummary ? Math.max(0, currentSessionSummary.total - (Number(registration.sessionsBonus) || 0)) : null) ??
       getPackageDefaultSessions(registration.packageName, defaultSessionsByPackage) ??
       null;
     setSessionsLeft(initialSessionsLeft != null ? String(initialSessionsLeft) : '');
-    setSessionsInputMode(currentSessionSummary ? 'remaining' : 'base');
+    setSessionsUsed(String(registration.sessionsUsedOverride ?? currentSessionSummary?.used ?? 0));
+    setDurationMonths(String(Math.max(1, Number(registration.durationMonths) || 1)));
     setNextPaymentDate(toDateInputValue(registration.nextPaymentDate));
-    setPeriodStartsAt(toDateInputValue(registration.periodStartsAt));
+    setPeriodStartsAt(getStartDateInputValue(registration));
     setPeriodEndsAt(toDateInputValue(registration.periodEndsAt));
     setBasePriceJod(String(Math.max(0, Number(registration.basePriceJod) || 0)));
 
@@ -103,19 +110,19 @@ export function EditRegistrationModal({
     if (!packageName) return;
 
     const originalPackageName = registration.packageName || '';
-    const originalPeriodStart = toDateInputValue(registration.periodStartsAt);
+    const originalPeriodStart = getStartDateInputValue(registration);
     const periodChanged = periodStartsAt.trim() !== originalPeriodStart;
 
     if (packageName === originalPackageName && !periodChanged) {
       const initialSessionsLeft =
-        currentSessionSummary?.remaining ??
         registration.sessionsLeft ??
+        (currentSessionSummary ? Math.max(0, currentSessionSummary.total - (Number(registration.sessionsBonus) || 0)) : null) ??
         getPackageDefaultSessions(registration.packageName, defaultSessionsByPackage) ??
         null;
       if (initialSessionsLeft != null) {
         setSessionsLeft(String(initialSessionsLeft));
       }
-      setSessionsInputMode(currentSessionSummary ? 'remaining' : 'base');
+      setSessionsUsed(String(registration.sessionsUsedOverride ?? currentSessionSummary?.used ?? 0));
       return;
     }
 
@@ -126,7 +133,8 @@ export function EditRegistrationModal({
     if (defaultSessions != null) {
       setSessionsLeft(String(defaultSessions));
     }
-    setSessionsInputMode('base');
+    setDurationMonths(String(getPackageDefaultDurationMonths(packageName, defaultDurationMonthsByPackage)));
+    setSessionsUsed('0');
   }, [
     currentSessionSummary,
     defaultPricesByPackage,
@@ -139,19 +147,16 @@ export function EditRegistrationModal({
 
   useEffect(() => {
     if (!open || !registration) return;
-    const originalStart = toDateInputValue(registration.periodStartsAt);
+    const originalStart = getStartDateInputValue(registration);
     const packageChanged = packageName !== registration.packageName;
     const startChanged = periodStartsAt.trim() && periodStartsAt !== originalStart;
-    if (!periodStartsAt.trim() || (!startChanged && !packageChanged)) return;
-    setSessionsInputMode('base');
-    const durationMonths =
-      !packageChanged
-        ? Math.max(1, registration.durationMonths || 1)
-        : getPackageDefaultDurationMonths(packageName, defaultDurationMonthsByPackage);
-    const nextEndDate = addDurationMonthsToDateInput(periodStartsAt, durationMonths);
+    const durationChanged = durationMonths.trim() && Math.round(Number(durationMonths)) !== Math.max(1, registration.durationMonths || 1);
+    if (!periodStartsAt.trim() || (!startChanged && !packageChanged && !durationChanged)) return;
+    const parsedDuration = Math.max(1, Math.round(Number(durationMonths) || 1));
+    const nextEndDate = addDurationMonthsToDateInput(periodStartsAt, parsedDuration);
     setPeriodEndsAt(nextEndDate);
     setNextPaymentDate(nextEndDate);
-  }, [defaultDurationMonthsByPackage, open, packageName, periodStartsAt, registration]);
+  }, [durationMonths, defaultDurationMonthsByPackage, open, packageName, periodStartsAt, registration]);
 
   const packageList = useMemo(() => {
     const names = new Set(packageOptions);
@@ -194,6 +199,11 @@ export function EditRegistrationModal({
     if (!nextCustomerName) return setError('Name is required.');
     if (!nextCustomerPhone) return setError('Phone is required.');
     if (!Number.isFinite(baseNumber) || baseNumber < 0) return setError('Base price must be 0 or greater.');
+    const parsedDurationMonths = Number(durationMonths);
+    if (!Number.isFinite(parsedDurationMonths) || parsedDurationMonths < 1) {
+      return setError('Duration months must be 1 or greater.');
+    }
+    const nextDurationMonths = Math.round(parsedDurationMonths);
     if (periodStartsAt.trim() && periodEndsAt.trim()) {
       const start = new Date(periodStartsAt);
       const end = new Date(periodEndsAt);
@@ -201,20 +211,21 @@ export function EditRegistrationModal({
         return setError('Membership end date must be after the start date.');
       }
     }
-    if (!sessionsLeft.trim()) return setError('Sessions left is required.');
+    if (!sessionsLeft.trim()) return setError('Total classes is required.');
     const parsedSessionsLeft = Number(sessionsLeft);
     if (!Number.isFinite(parsedSessionsLeft) || parsedSessionsLeft < 0) {
-      return setError('Sessions left must be 0 or greater.');
+      return setError('Total classes must be 0 or greater.');
     }
-    const samePackage = nextPackageName === registration.packageName;
-    const samePeriodStart = periodStartsAt.trim() === toDateInputValue(registration.periodStartsAt);
-    const nextSessionsLeft =
-      sessionsInputMode === 'remaining' && currentSessionSummary && samePackage && samePeriodStart
-        ? Math.max(
-            0,
-            Math.round(parsedSessionsLeft + currentSessionSummary.used - (Number(registration.sessionsBonus) || 0)),
-          )
-        : Math.round(parsedSessionsLeft);
+    const parsedSessionsUsed = sessionsUsed.trim() ? Number(sessionsUsed) : 0;
+    if (!Number.isFinite(parsedSessionsUsed) || parsedSessionsUsed < 0) {
+      return setError('Classes finished must be 0 or greater.');
+    }
+    const nextSessionsLeft = Math.round(parsedSessionsLeft);
+    const nextSessionsUsed = Math.round(parsedSessionsUsed);
+    const totalWithBonus = nextSessionsLeft + (Number(registration.sessionsBonus) || 0);
+    if (nextSessionsUsed > totalWithBonus) {
+      return setError('Classes finished cannot be more than total classes.');
+    }
 
     if (discountType !== 'NONE') {
       if (discountType === 'PERCENT' && (discountNumber < 0 || discountNumber > 100)) {
@@ -246,6 +257,8 @@ export function EditRegistrationModal({
         customerEmail: nextCustomerEmail || null,
         customerAge: agePayload,
         sessionsLeft: nextSessionsLeft,
+        sessionsUsedOverride: nextSessionsUsed,
+        durationMonths: nextDurationMonths,
         nextPaymentDate: nextPaymentDate.trim() || null,
         basePriceJod: baseNumber,
         discountType,
@@ -266,9 +279,12 @@ export function EditRegistrationModal({
   if (!registration) return null;
 
   const hasDefaultPrice = hasPackageDefaultPrice(packageName, defaultPricesByPackage);
-  const sessionHint = currentSessionSummary
-    ? `This saves a manual remaining balance for this player only. Current used: ${currentSessionSummary.used}.`
-    : 'This saves the session balance for this player only.';
+  const totalClassesPreview = Math.max(0, Math.round(Number(sessionsLeft) || 0));
+  const finishedClassesPreview = Math.max(0, Math.round(Number(sessionsUsed) || 0));
+  const remainingClassesPreview = Math.max(
+    0,
+    totalClassesPreview + (Number(registration.sessionsBonus) || 0) - finishedClassesPreview,
+  );
 
   return (
     <Modal open={open} onClose={onClose} title="Edit registration" size="md">
@@ -287,19 +303,46 @@ export function EditRegistrationModal({
         <Input label="Email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
         <Input label="Age" type="number" min={0} value={customerAge} onChange={(e) => setCustomerAge(e.target.value)} />
         <Input
-          label="Manual sessions remaining"
+          label="Duration months"
           type="number"
-          min={0}
-          value={sessionsLeft}
-          onChange={(e) => setSessionsLeft(e.target.value)}
+          min={1}
+          value={durationMonths}
+          onChange={(e) => setDurationMonths(e.target.value)}
           required
-          hint={sessionHint}
+          hint="Set this player to 1, 2, 3, or more months. End date and next payment will follow."
         />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Input
+            label="Total classes in this cycle"
+            type="number"
+            min={0}
+            value={sessionsLeft}
+            onChange={(e) => setSessionsLeft(e.target.value)}
+            required
+            hint="For example, enter 40 for a three-month package with 40 classes."
+          />
+          <Input
+            label="Classes finished"
+            type="number"
+            min={0}
+            value={sessionsUsed}
+            onChange={(e) => setSessionsUsed(e.target.value)}
+            required
+            hint="For Sharbel, enter 20 if he already finished 20 classes."
+          />
+        </div>
+        <div className="rounded-lg bg-ui-softBg/60 px-3 py-2 text-sm text-ui-textPrimary">
+          Remaining classes: <span className="font-semibold">{remainingClassesPreview}</span>
+          {registration.sessionsBonus ? (
+            <span className="text-ui-textMuted"> including {registration.sessionsBonus} bonus</span>
+          ) : null}
+        </div>
         <Input
-          label="When they will start"
+          label="Start date"
           type="date"
           value={periodStartsAt}
           onChange={(e) => setPeriodStartsAt(e.target.value)}
+          hint="Defaults to the day this player was registered in the portal. Change it here when the real start date is different."
         />
         <Input
           label="Membership end date"

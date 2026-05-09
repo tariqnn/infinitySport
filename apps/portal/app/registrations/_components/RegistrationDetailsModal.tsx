@@ -251,6 +251,14 @@ export function RegistrationDetailsModal({
             <p className="text-ui-textPrimary">{formatDate(registration.nextPaymentDate)}</p>
           </div>
           <div>
+            <p className="text-ui-textMuted">Total classes</p>
+            <p className="text-ui-textPrimary">{registration.sessionsLeft ?? '-'}</p>
+          </div>
+          <div>
+            <p className="text-ui-textMuted">Classes finished</p>
+            <p className="text-ui-textPrimary">{registration.sessionsUsedOverride ?? '-'}</p>
+          </div>
+          <div>
             <p className="text-ui-textMuted">Registered on</p>
             <p className="text-ui-textPrimary">{formatDateTime(registration.createdAt)}</p>
           </div>
@@ -312,6 +320,7 @@ export function RegistrationDetailsModal({
                 const archivedRemaining = readSnapshotNumber(snapshot, 'remainingJod');
                 const archivedTotal = readSnapshotNumber(snapshot, 'finalPriceJod');
                 const archivedSessions = readSnapshotNumber(snapshot, 'sessionsLeft');
+                const archivedSessionsUsed = readSnapshotNumber(snapshot, 'sessionsUsedOverride');
                 return (
                   <div key={entry.id} className="rounded-xl border border-ui-border bg-white p-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -343,6 +352,10 @@ export function RegistrationDetailsModal({
                       <div>
                         <p className="text-xs uppercase tracking-[0.16em] text-ui-textMuted">Sessions left</p>
                         <p className="text-ui-textPrimary">{archivedSessions}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.16em] text-ui-textMuted">Classes finished</p>
+                        <p className="text-ui-textPrimary">{archivedSessionsUsed}</p>
                       </div>
                       <div>
                         <p className="text-xs uppercase tracking-[0.16em] text-ui-textMuted">Period start</p>

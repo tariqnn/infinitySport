@@ -745,6 +745,7 @@ class PackageRegistrationRow {
     required this.playerCode,
     required this.currentCycle,
     required this.sessionsLeft,
+    required this.sessionsUsedOverride,
     required this.nextPaymentDate,
     required this.planLabel,
     required this.isPaid,
@@ -778,6 +779,9 @@ class PackageRegistrationRow {
           json['currentCycle'] == null ? null : readInt(json['currentCycle']),
       sessionsLeft:
           json['sessionsLeft'] == null ? null : readInt(json['sessionsLeft']),
+      sessionsUsedOverride: json['sessionsUsedOverride'] == null
+          ? null
+          : readInt(json['sessionsUsedOverride']),
       nextPaymentDate: readNullableString(json['nextPaymentDate']),
       planLabel: readNullableString(json['planLabel']),
       isPaid: readBool(json['isPaid']),
@@ -811,6 +815,7 @@ class PackageRegistrationRow {
   final String? playerCode;
   final int? currentCycle;
   final int? sessionsLeft;
+  final int? sessionsUsedOverride;
   final String? nextPaymentDate;
   final String? planLabel;
   final bool isPaid;

@@ -242,7 +242,7 @@ export function BookingForm() {
     setSubmitStatus('idle');
     setSubmitMessage('');
 
-    if (!selectedCourt || !selectedDate || !selectedTime || !name || !phoneDigits || !selectedDuration) {
+    if (!selectedCourt || !selectedDate || !selectedTime || !name || !email || !phoneDigits || !selectedDuration) {
       setSubmitStatus('error');
       setSubmitMessage('Please fill in all required fields.');
       setIsSubmitting(false);
@@ -284,7 +284,7 @@ export function BookingForm() {
           time: selectedTime,
           duration: selectedDuration,
           name,
-          email: email || undefined,
+          email,
           phone,
         }),
       });
@@ -296,11 +296,7 @@ export function BookingForm() {
       }
 
       setSubmitStatus('success');
-      setSubmitMessage(
-        email
-          ? tr(language, 'booking_success_email')
-          : tr(language, 'booking_success_no_email')
-      );
+      setSubmitMessage(tr(language, 'booking_success_email'));
       fetchBookedForDate(selectedDate);
       // Reset form
       setSelectedCourt('');
@@ -455,10 +451,10 @@ export function BookingForm() {
           />
         </div>
 
-        {/* Email Input (Optional but recommended for confirmation) */}
+        {/* Email Input */}
         <div>
           <label htmlFor="email" className="block text-sm font-semibold text-brand-black mb-2">
-            {tr(language, 'booking_email')} <span className="text-gray-400">{tr(language, 'booking_optional')}</span>
+            {tr(language, 'booking_email')} <span className="text-red-500">*</span>
           </label>
           <input
             id="email"
@@ -466,6 +462,7 @@ export function BookingForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder={tr(language, 'booking_placeholder_email')}
+            required
             className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-brand-black placeholder:text-gray-400 focus:border-brand-blue-primary focus:outline-none focus:ring-2 focus:ring-brand-blue-primary/20 transition"
           />
         </div>
@@ -554,6 +551,7 @@ export function BookingForm() {
               !selectedDate ||
               !selectedTime ||
               !name ||
+              !email ||
               !phone ||
               !!phoneError ||
               isRangeBlockedOrBooked(

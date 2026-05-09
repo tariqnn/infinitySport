@@ -175,6 +175,8 @@ async function syncLandingRegistrationToFirestore(input: {
   basePriceJod: number;
   finalPriceJod: number;
   durationMonths: number;
+  periodStartsAt: Date;
+  periodEndsAt: Date;
 }) {
   try {
     const now = new Date();
@@ -196,8 +198,8 @@ async function syncLandingRegistrationToFirestore(input: {
         discountType: "NONE",
         finalPriceJod: input.finalPriceJod,
         durationMonths: input.durationMonths,
-        periodStartsAt: null,
-        periodEndsAt: null,
+        periodStartsAt: input.periodStartsAt,
+        periodEndsAt: input.periodEndsAt,
         isFrozen: false,
         sessionsBonus: 0,
         collected: 0,
@@ -293,6 +295,9 @@ export async function POST(request: Request) {
     const { basePriceJod, durationMonths } = await getPackageDefaults(cleanPackage);
 
     const { prisma } = await import("../../../lib/db");
+    const periodStartsAt = new Date();
+    const periodEndsAt = new Date(periodStartsAt);
+    periodEndsAt.setMonth(periodEndsAt.getMonth() + durationMonths);
     const row = await prisma.packageRegistration.create({
       data: {
         packageName: cleanPackage,
@@ -309,6 +314,9 @@ export async function POST(request: Request) {
         discountReason: null,
         finalPriceJod: basePriceJod,
         durationMonths,
+        periodStartsAt,
+        periodEndsAt,
+        nextPaymentDate: periodEndsAt,
       },
       select: { id: true },
     });
@@ -330,6 +338,8 @@ export async function POST(request: Request) {
       basePriceJod,
       finalPriceJod: basePriceJod,
       durationMonths,
+      periodStartsAt,
+      periodEndsAt,
     });
 
     return NextResponse.json({ success: true, id: row.id });

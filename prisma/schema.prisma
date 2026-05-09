@@ -591,6 +591,7 @@ model PackageRegistration {
   status                      String                        @default("ACTIVE")
   periodStartsAt              DateTime?
   sessionsLeft                Int?
+  sessionsUsedOverride        Int?
   nextPaymentDate             DateTime?                     @db.Timestamptz(6)
   planLabel                   String?
   durationMonths              Int                           @default(1)
@@ -660,6 +661,33 @@ model PackageSessionCanceled {
 
   @@index([packageName])
   @@index([sessionDate])
+}
+
+model CompetitionRegistration {
+  id              String   @id @default(cuid())
+  competitionType String
+  participantName String?
+  age             Int?
+  gender          String?
+  teamName        String?
+  playerOne       String?
+  playerTwo       String?
+  playerThree     String?
+    playerFour      String?
+    isPaid          Boolean  @default(false)
+    amountDue       Int?
+    amountPaid      Int?
+    paymentMethod   String?
+  paidAt          DateTime?
+  source          String   @default("WEBSITE")
+  status          String   @default("NEW")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([competitionType])
+  @@index([createdAt])
+  @@index([isPaid])
+  @@index([status])
 }
 
 model AvailabilityException {

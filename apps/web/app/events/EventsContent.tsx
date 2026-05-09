@@ -10,12 +10,33 @@ function isBasketballSummerCamp(title: string) {
   return normalized === 'basketball summer camp' || (normalized.includes('basketball') && normalized.includes('summer camp'));
 }
 
+function nextSaturdayIso() {
+  const date = new Date();
+  const daysUntilSaturday = (6 - date.getDay() + 7) % 7;
+  date.setDate(date.getDate() + daysUntilSaturday);
+  date.setHours(10, 0, 0, 0);
+  return date.toISOString();
+}
+
 export function EventsContent({ eventsData }: { eventsData: EventResponse[] }) {
   const { language } = useLanguage();
 
-  const events = eventsData.map((event) => {
-    const isSummerCamp = isBasketballSummerCamp(event.title);
-    return {
+  const events = [
+    {
+      id: 'weekend-basketball-competitions',
+      title: 'Weekend Basketball Competitions',
+      date: nextSaturdayIso(),
+      location: 'Infinity Campus',
+      description: 'All competitions start this weekend. Register for 3x3, King / Queen, Jack of the Court, 3 Point Competition, or Dunk Contest.',
+      imageUrl: '/weekend-competitions.png',
+      link: '/events/weekend-competitions/register',
+      highlight: true,
+      isSummerCamp: false,
+      isCompetition: true,
+    },
+    ...eventsData.map((event) => {
+      const isSummerCamp = isBasketballSummerCamp(event.title);
+      return {
       id: event.id,
       title: event.title,
       date: event.date,
@@ -25,8 +46,10 @@ export function EventsContent({ eventsData }: { eventsData: EventResponse[] }) {
       link: isSummerCamp ? '/events/basketball-summer-camp/register' : event.link || '/contact',
       highlight: event.highlight || false,
       isSummerCamp,
+      isCompetition: false,
     };
-  });
+    }),
+  ];
 
   const upcoming = events.filter((event) => new Date(event.date) >= new Date());
   const past = events.filter((event) => new Date(event.date) < new Date());
@@ -113,7 +136,7 @@ export function EventsContent({ eventsData }: { eventsData: EventResponse[] }) {
                     href={event.link}
                     className="mt-6 rounded-full bg-[#003DA5] px-6 py-3 text-center text-sm font-bold text-white shadow-button transition-all duration-300 hover:scale-105 hover:shadow-button-hover hover:bg-[#003DA5]/90"
                   >
-                    {event.isSummerCamp ? 'Register' : 'Secure slot'}
+                    {event.isSummerCamp || event.isCompetition ? 'Register now' : 'Secure slot'}
                   </Link>
                 </div>
               </div>

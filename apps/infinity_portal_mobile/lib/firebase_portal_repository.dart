@@ -997,6 +997,9 @@ class FirebasePortalRepository implements PortalRepository {
           data['currentCycle'] == null ? null : readInt(data['currentCycle']),
       sessionsLeft:
           data['sessionsLeft'] == null ? null : readInt(data['sessionsLeft']),
+      sessionsUsedOverride: data['sessionsUsedOverride'] == null
+          ? null
+          : readInt(data['sessionsUsedOverride']),
       nextPaymentDate: _readNullableIso(data['nextPaymentDate']) ??
           readNullableString(data['nextPaymentDateIso']),
       planLabel: readNullableString(data['planLabel']),

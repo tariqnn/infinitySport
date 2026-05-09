@@ -18,6 +18,7 @@ type RegistrationLike = {
   finalPriceJod?: number | null;
   durationMonths?: number | null;
   sessionsLeft?: number | null;
+  sessionsUsedOverride?: number | null;
   nextPaymentDate?: string | Date | null;
   planLabel?: string | null;
   sessionsBonus?: number | null;
@@ -70,6 +71,7 @@ export type RegistrationMembershipSummary = {
   periodStartsAt: string | null;
   periodEndsAt: string | null;
   sessionsBonus: number;
+  sessionsUsedOverride: number | null;
   sessionsRemaining: number | null;
   createdAt: string;
   updatedAt: string;
@@ -269,7 +271,11 @@ export async function buildRegistrationMembershipSummaries(
           ? Math.max(0, Math.round(toNumber(meta.sessionsCount, 0)))
           : null;
     const sessionsBonus = Math.max(0, Math.round(toNumber(row.sessionsBonus, 0)));
-    const consumed = consumedByPackage.get(String(row.packageName || "").trim()) || 0;
+    const sessionsUsedOverride =
+      row.sessionsUsedOverride == null
+        ? null
+        : Math.max(0, Math.round(toNumber(row.sessionsUsedOverride, 0)));
+    const consumed = sessionsUsedOverride ?? consumedByPackage.get(String(row.packageName || "").trim()) ?? 0;
     const sessionsRemaining =
       isSessionTracked && baseSessions != null
         ? Math.max(0, baseSessions + sessionsBonus - consumed)
@@ -300,6 +306,7 @@ export async function buildRegistrationMembershipSummaries(
       periodStartsAt: toIsoString(row.periodStartsAt),
       periodEndsAt: toIsoString(row.periodEndsAt),
       sessionsBonus,
+      sessionsUsedOverride,
       sessionsRemaining,
       createdAt: toIsoString(row.createdAt) || new Date(0).toISOString(),
       updatedAt: toIsoString(row.updatedAt) || new Date(0).toISOString(),

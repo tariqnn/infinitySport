@@ -866,7 +866,8 @@ _SessionCounter? _sessionsRemaining(
     }
   }
 
-  final used = (scheduledCount - canceledInRange).clamp(0, total);
+  final used = (row.sessionsUsedOverride ?? (scheduledCount - canceledInRange))
+      .clamp(0, total);
   final remaining = (total - used + row.sessionsBonus).clamp(0, 999);
   return _SessionCounter(remaining: remaining, total: total);
 }

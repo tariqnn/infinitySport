@@ -13,6 +13,7 @@ import {
   MapIcon,
   InboxStackIcon,
   GiftTopIcon,
+  TrophyIcon,
 } from "@heroicons/react/24/outline";
 import clsx from "clsx";
 import { prefetchPortalRouteData } from "../../lib/portalApi";
@@ -25,6 +26,7 @@ const NAV_SECTIONS = [
       { label: "Coaches", href: "/coaches", icon: UserGroupIcon },
       { label: "Bookings", href: "/bookings", icon: CalendarIcon },
       { label: "Registrations", href: "/registrations", icon: ClipboardDocumentListIcon },
+      { label: "Competitions", href: "/competitions", icon: TrophyIcon },
       { label: "Guest Accounts", href: "/guests", icon: UserGroupIcon },
     ],
   },

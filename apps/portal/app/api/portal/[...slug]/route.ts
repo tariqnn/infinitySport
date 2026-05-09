@@ -5402,7 +5402,10 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
   return NextResponse.json(serialized);
 }
 
-async function reregisterPackage(id: string) {
+async function reregisterPackage(id: string, request: NextRequest) {
+  const body = (await request.json().catch(() => ({}))) as {
+    periodStartsAt?: string | null;
+  };
   const existing = (await prisma.packageRegistration.findUnique({
     where: { id },
     include: { receipts: { where: ACTIVE_RECEIPT_WHERE } },
@@ -5445,14 +5448,19 @@ async function reregisterPackage(id: string) {
     },
   });
 
-  const now = new Date();
-  const periodStartsAt = now;
+  const periodStartsAt = body.periodStartsAt
+    ? new Date(body.periodStartsAt)
+    : new Date();
+  if (Number.isNaN(periodStartsAt.getTime())) {
+    return jsonError("Invalid period start date");
+  }
   const packageDefaults = await getPackageDefaults(existing.packageName);
   const durationMonths = packageDefaults.durationMonths;
-  const periodEndsAt = computeCyclePeriodEnd(now, durationMonths);
+  const periodEndsAt = computeCyclePeriodEnd(periodStartsAt, durationMonths);
   const sessionsLeft =
     existing.sessionsLeft ?? packageDefaults.defaultSessionsLeft;
-  const { billingPeriodKey, priceLockedUntil } = billingPeriodFromDate(now);
+  const { billingPeriodKey, priceLockedUntil } =
+    billingPeriodFromDate(periodStartsAt);
 
   const row = await updatePackageRegistrationCompat({
     where: { id },
@@ -5463,7 +5471,7 @@ async function reregisterPackage(id: string) {
       durationMonths,
       periodStartsAt,
       periodEndsAt,
-      nextPaymentDate: computeCyclePeriodEnd(now, durationMonths),
+      nextPaymentDate: periodEndsAt,
       sessionsLeft,
       sessionsUsedOverride: null,
       sessionsBonus: 0,
@@ -7766,7 +7774,7 @@ async function dispatchPost(request: NextRequest, params: Params) {
   }
 
   if (resource === "package-registrations" && action === "reregister") {
-    return reregisterPackage(id);
+    return reregisterPackage(id, request);
   }
 
   if (resource === "package-registrations" && action === "mark-paid") {

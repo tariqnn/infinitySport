@@ -20,6 +20,7 @@ import { RegisterExistingPersonModal } from './_components/RegisterExistingPerso
 import { RegisterPersonMultiPackageModal } from './_components/RegisterPersonMultiPackageModal';
 import { PersonDetailsModal } from './_components/PersonDetailsModal';
 import { EditRegistrationModal } from './_components/EditRegistrationModal';
+import { ReRegisterModal } from './_components/ReRegisterModal';
 import { CreateTrackerAccountModal } from './_components/CreateTrackerAccountModal';
 import { CreatePlayerAccountModal } from './_components/CreatePlayerAccountModal';
 import { ManagePackageSessionsModal } from './_components/ManagePackageSessionsModal';
@@ -38,7 +39,6 @@ export default function RegistrationsPage() {
   const [freezingId, setFreezingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [markingUnpaidId, setMarkingUnpaidId] = useState<string | null>(null);
-  const [reregisteringId, setReregisteringId] = useState<string | null>(null);
   const [canceledDatesByPackage, setCanceledDatesByPackage] = useState<Record<string, Set<string>>>({});
 
   const [markPaidRegistration, setMarkPaidRegistration] = useState<Registration | null>(null);
@@ -51,6 +51,7 @@ export default function RegistrationsPage() {
   const [managePackageSessionsOpen, setManagePackageSessionsOpen] = useState(false);
   const [detailsModalRow, setDetailsModalRow] = useState<Registration | null>(null);
   const [editRegistrationRow, setEditRegistrationRow] = useState<Registration | null>(null);
+  const [reRegisterRow, setReRegisterRow] = useState<Registration | null>(null);
   const [registerInAnotherPackageRow, setRegisterInAnotherPackageRow] = useState<Registration | null>(null);
   const [registerExistingPersonOpen, setRegisterExistingPersonOpen] = useState(false);
   const [addRegistrationInitialPerson, setAddRegistrationInitialPerson] = useState<InitialPerson | null>(null);
@@ -365,21 +366,6 @@ export default function RegistrationsPage() {
       alert('Failed to mark as unpaid. Please try again.');
     } finally {
       setMarkingUnpaidId(null);
-    }
-  }
-
-  async function handleReregister(r: Registration) {
-    if (reregisteringId) return;
-    if (!confirm(`Renew ${r.customerName} on the same record? The current cycle will be saved to history, the record stays the same, and the new cycle starts unpaid.`)) return;
-    setReregisteringId(r.id);
-    try {
-      await packageRegistrationsApi.reregister(r.id);
-      load();
-    } catch (e) {
-      console.error('Failed to re-register', e);
-      alert('Failed to re-register. Please try again.');
-    } finally {
-      setReregisteringId(null);
     }
   }
 
@@ -839,8 +825,8 @@ export default function RegistrationsPage() {
                               </DropdownMenu.Item>
                               <DropdownMenu.Item
                                 className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg disabled:opacity-50"
-                                onSelect={() => handleReregister(row)}
-                                disabled={reregisteringId === row.id}
+                                onSelect={() => setReRegisterRow(row)}
+                                disabled={reRegisterRow?.id === row.id}
                               >
                                 Re-register
                               </DropdownMenu.Item>
@@ -1012,6 +998,16 @@ export default function RegistrationsPage() {
         currentSessionSummary={editRegistrationSessionSummary}
         onSuccess={() => {
           setEditRegistrationRow(null);
+          load();
+        }}
+      />
+
+      <ReRegisterModal
+        open={!!reRegisterRow}
+        onClose={() => setReRegisterRow(null)}
+        registration={reRegisterRow}
+        onSuccess={() => {
+          setReRegisterRow(null);
           load();
         }}
       />

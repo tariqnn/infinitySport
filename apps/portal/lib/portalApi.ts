@@ -923,8 +923,11 @@ export const packageRegistrationsApi = {
   }) =>
     portalDbFetch<PackageRegistrationRow>(`/portal/package-registrations/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) => portalDbFetch<void>(`/portal/package-registrations/${id}`, { method: 'DELETE' }),
-  reregister: (id: string) =>
-    portalDbFetch<PackageRegistrationRow>(`/portal/package-registrations/${id}/reregister`, { method: 'POST' }),
+  reregister: (id: string, data?: { periodStartsAt?: string | null }) =>
+    portalDbFetch<PackageRegistrationRow>(`/portal/package-registrations/${id}/reregister`, {
+      method: 'POST',
+      body: JSON.stringify(data ?? {}),
+    }),
   markPaid: (id: string, data: { amountPaid: number; paymentMethod: string; privateNote: string; paymentPeriodKey?: string | null }) =>
     portalDbFetch<ReceiptRow>(`/portal/package-registrations/${id}/mark-paid`, { method: 'POST', body: JSON.stringify(data) }),
   markUnpaid: (id: string, voidReason?: string) =>

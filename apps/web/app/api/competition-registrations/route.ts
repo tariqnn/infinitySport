@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getPgPool } from "../../../lib/pg";
 import { isDatabaseUnavailableError, noteDatabaseFailure } from "../../../lib/dbGuard";
+import { isValidPhoneNumber } from "../../../lib/phoneValidation";
 
 const COMPETITIONS = new Set([
   "3X3_MEN",
@@ -36,6 +37,14 @@ export async function POST(request: Request) {
     const competitionType = cleanText(body.competitionType).toUpperCase();
     if (!COMPETITIONS.has(competitionType)) {
       return NextResponse.json({ error: "Please choose a competition." }, { status: 400 });
+    }
+    const customerPhone = cleanText(body.customerPhone);
+    const phoneValidation = isValidPhoneNumber(customerPhone);
+    if (!phoneValidation.valid) {
+      return NextResponse.json(
+        { error: phoneValidation.error || "Please enter a valid phone number." },
+        { status: 400 },
+      );
     }
 
     let participantName: string | null = null;
@@ -91,6 +100,7 @@ export async function POST(request: Request) {
         "participantName",
         "age",
         "gender",
+        "customerPhone",
         "teamName",
         "playerOne",
         "playerTwo",
@@ -101,7 +111,7 @@ export async function POST(request: Request) {
         "createdAt",
         "updatedAt"
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'WEBSITE', 'NEW', NOW(), NOW())
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'WEBSITE', 'NEW', NOW(), NOW())
       `,
       [
         id,
@@ -109,6 +119,7 @@ export async function POST(request: Request) {
         participantName,
         age,
         gender,
+        customerPhone,
         teamName,
         playerOne,
         playerTwo,

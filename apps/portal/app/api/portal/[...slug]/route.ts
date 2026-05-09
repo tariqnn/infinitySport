@@ -7608,6 +7608,11 @@ async function dispatchPatch(request: NextRequest, params: Params) {
       const gender = normalizeText(body.gender).toUpperCase();
       data.gender = gender || null;
     }
+    if (body.customerPhone !== undefined) {
+      const customerPhone = normalizeText(body.customerPhone);
+      if (!customerPhone) return jsonError("Phone number is required");
+      data.customerPhone = customerPhone;
+    }
     if (body.teamName !== undefined) data.teamName = normalizeText(body.teamName) || null;
     if (body.playerOne !== undefined) data.playerOne = normalizeText(body.playerOne) || null;
     if (body.playerTwo !== undefined) data.playerTwo = normalizeText(body.playerTwo) || null;

@@ -971,6 +971,7 @@ export type CompetitionRegistrationRow = {
   participantName: string | null;
   age: number | null;
   gender: string | null;
+  customerPhone: string | null;
   teamName: string | null;
   playerOne: string | null;
   playerTwo: string | null;
@@ -999,6 +1000,7 @@ export const competitionRegistrationsApi = {
     participantName: string | null;
     age: number | null;
     gender: string | null;
+    customerPhone: string | null;
     teamName: string | null;
     playerOne: string | null;
     playerTwo: string | null;

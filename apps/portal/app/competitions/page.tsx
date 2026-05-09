@@ -85,6 +85,7 @@ function competitionSearchText(row: CompetitionRegistrationRow) {
     competitionLabel(row.competitionType),
     row.teamName,
     row.participantName,
+    row.customerPhone,
     row.gender,
     row.playerOne,
     row.playerTwo,
@@ -164,6 +165,7 @@ function registrationHeaders() {
   return [
     'Competition',
     'Name / Team',
+    'Phone',
     'Age',
     'Gender',
     'Player 1',
@@ -186,6 +188,7 @@ function registrationRows(rows: CompetitionRegistrationRow[], filter: string) {
   return filteredRows.map((row) => [
     competitionLabel(row.competitionType),
     row.teamName || row.participantName || '',
+    row.customerPhone || '',
     row.age ?? '',
     row.gender || '',
     row.playerOne || '',
@@ -318,6 +321,7 @@ function EditCompetitionModal({
 }) {
   const [competitionType, setCompetitionType] = useState('');
   const [participantName, setParticipantName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [age, setAge] = useState('');
   const [gender, setGender] = useState('');
   const [teamName, setTeamName] = useState('');
@@ -337,6 +341,7 @@ function EditCompetitionModal({
     if (!row) return;
     setCompetitionType(row.competitionType);
     setParticipantName(row.participantName || '');
+    setCustomerPhone(row.customerPhone || '');
     setAge(row.age != null ? String(row.age) : '');
     setGender(row.gender || '');
     setTeamName(row.teamName || '');
@@ -372,12 +377,17 @@ function EditCompetitionModal({
       setError('Player name is required.');
       return;
     }
+    if (!customerPhone.trim()) {
+      setError('Phone number is required.');
+      return;
+    }
 
     setSaving(true);
     try {
       const updated = await competitionRegistrationsApi.update(currentRow.id, {
         competitionType,
         participantName: participantName.trim() || null,
+        customerPhone: customerPhone.trim(),
         age: age.trim() ? Math.max(1, Math.round(Number(age) || 0)) : null,
         gender: gender.trim() || null,
         teamName: teamName.trim() || null,
@@ -409,6 +419,7 @@ function EditCompetitionModal({
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </Select>
+        <Input label="Phone" type="tel" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} required placeholder="+962 7 9000 2200" />
 
         {isTeam ? (
           <div className="grid gap-4 sm:grid-cols-2">
@@ -720,7 +731,7 @@ export default function CompetitionsPage() {
                   label="Search"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Team or player"
+                  placeholder="Team, player, or phone"
                 />
                 <Select label="Competition" value={filter} onChange={(event) => setFilter(event.target.value)}>
                   <option value="ALL">All competitions</option>
@@ -750,6 +761,7 @@ export default function CompetitionsPage() {
                   <tr className="text-left">
                     <th className="px-4 py-3 font-semibold text-ui-textPrimary">Competition</th>
                     <th className="px-4 py-3 font-semibold text-ui-textPrimary">Name / Team</th>
+                    <th className="px-4 py-3 font-semibold text-ui-textPrimary">Phone</th>
                     <th className="px-4 py-3 font-semibold text-ui-textPrimary">Age</th>
                     <th className="px-4 py-3 font-semibold text-ui-textPrimary">Gender</th>
                     <th className="px-4 py-3 font-semibold text-ui-textPrimary">Players</th>
@@ -762,11 +774,11 @@ export default function CompetitionsPage() {
                 <tbody className="divide-y divide-ui-border">
                   {loading && rows.length === 0 ? (
                     <tr>
-                      <td className="px-4 py-8 text-center text-ui-textMuted" colSpan={9}>Loading competitions...</td>
+                      <td className="px-4 py-8 text-center text-ui-textMuted" colSpan={10}>Loading competitions...</td>
                     </tr>
                   ) : filteredRows.length === 0 ? (
                     <tr>
-                      <td className="px-4 py-8 text-center text-ui-textMuted" colSpan={9}>
+                      <td className="px-4 py-8 text-center text-ui-textMuted" colSpan={10}>
                         {rows.length === 0 ? 'No registrations yet.' : 'No registrations match your search.'}
                       </td>
                     </tr>
@@ -774,6 +786,13 @@ export default function CompetitionsPage() {
                     <tr key={row.id} className="hover:bg-ui-softBg/70">
                       <td className="px-4 py-3 font-medium text-ui-textPrimary">{competitionLabel(row.competitionType)}</td>
                       <td className="px-4 py-3 text-ui-textPrimary">{row.teamName || row.participantName || '-'}</td>
+                      <td className="px-4 py-3 text-ui-textMuted">
+                        {row.customerPhone ? (
+                          <a className="font-medium text-brand-blue-primary hover:underline" href={`tel:${row.customerPhone.replace(/\s+/g, '')}`}>
+                            {row.customerPhone}
+                          </a>
+                        ) : '-'}
+                      </td>
                       <td className="px-4 py-3 text-ui-textMuted">{row.age ?? '-'}</td>
                       <td className="px-4 py-3 text-ui-textMuted">{row.gender || '-'}</td>
                       <td className="min-w-[260px] px-4 py-3 text-ui-textMuted">{competitorNames(row)}</td>

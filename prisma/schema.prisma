@@ -669,6 +669,7 @@ model CompetitionRegistration {
   participantName String?
   age             Int?
   gender          String?
+  customerPhone   String?
   teamName        String?
   playerOne       String?
   playerTwo       String?

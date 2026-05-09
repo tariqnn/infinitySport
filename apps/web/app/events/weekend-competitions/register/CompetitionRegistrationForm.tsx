@@ -2,6 +2,23 @@
 
 import { useMemo, useState } from 'react';
 
+const PHONE_COUNTRIES: Array<{ value: string; label: string }> = [
+  { value: '+962', label: 'Jordan (+962)' },
+  { value: '+966', label: 'Saudi Arabia (+966)' },
+  { value: '+971', label: 'UAE (+971)' },
+  { value: '+965', label: 'Kuwait (+965)' },
+  { value: '+974', label: 'Qatar (+974)' },
+  { value: '+973', label: 'Bahrain (+973)' },
+  { value: '+20', label: 'Egypt (+20)' },
+  { value: '+964', label: 'Iraq (+964)' },
+  { value: '+961', label: 'Lebanon (+961)' },
+  { value: '+963', label: 'Syria (+963)' },
+  { value: '+970', label: 'Palestine (+970)' },
+  { value: '+90', label: 'Turkey (+90)' },
+  { value: '+44', label: 'UK (+44)' },
+  { value: '+1', label: 'USA/Canada (+1)' },
+];
+
 const COMPETITION_OPTIONS = [
   { id: '3X3_MEN', label: '3x3 Tournament - Men', kind: 'team' },
   { id: '3X3_WOMEN', label: '3x3 Tournament - Women', kind: 'team' },
@@ -22,10 +39,14 @@ export function CompetitionRegistrationForm() {
   const [playerThree, setPlayerThree] = useState('');
   const [playerFour, setPlayerFour] = useState('');
   const [participantName, setParticipantName] = useState('');
+  const [phoneCountry, setPhoneCountry] = useState('+962');
+  const [phoneLocal, setPhoneLocal] = useState('');
   const [age, setAge] = useState('');
   const [gender, setGender] = useState<'MALE' | 'FEMALE'>('MALE');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const phoneDigits = phoneLocal.replace(/[^\d]/g, '');
+  const customerPhone = `${phoneCountry}${phoneDigits}`;
 
   const selected = useMemo(
     () => COMPETITION_OPTIONS.find((option) => option.id === competitionType) || COMPETITION_OPTIONS[0],
@@ -41,6 +62,7 @@ export function CompetitionRegistrationForm() {
     setPlayerThree('');
     setPlayerFour('');
     setParticipantName('');
+    setPhoneLocal('');
     setAge('');
     setGender('MALE');
   }
@@ -62,6 +84,7 @@ export function CompetitionRegistrationForm() {
           playerThree,
           playerFour,
           participantName,
+          customerPhone,
           age,
           gender: needsGender ? gender : undefined,
         }),
@@ -100,6 +123,34 @@ export function CompetitionRegistrationForm() {
             <option key={option.id} value={option.id}>{option.label}</option>
           ))}
         </select>
+      </div>
+
+      <div className="mt-5">
+        <label className="mb-2 block text-sm font-bold text-brand-black">Phone number</label>
+        <div className="flex gap-2">
+          <select
+            aria-label="Country code"
+            value={phoneCountry}
+            onChange={(event) => setPhoneCountry(event.target.value)}
+            className="h-[46px] w-[170px] rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-[#003DA5] focus:ring-4 focus:ring-[#003DA5]/10"
+          >
+            {PHONE_COUNTRIES.map((country) => (
+              <option key={country.value} value={country.value}>
+                {country.label}
+              </option>
+            ))}
+          </select>
+          <input
+            className={`${inputClass} min-w-0 flex-1`}
+            type="tel"
+            inputMode="numeric"
+            autoComplete="tel"
+            value={phoneLocal}
+            onChange={(event) => setPhoneLocal(event.target.value)}
+            placeholder="7 9000 2200"
+            required
+          />
+        </div>
       </div>
 
       {isTeam ? (

@@ -777,6 +777,7 @@ export type PackageRegistrationRow = {
   customerPhone: string;
   customerEmail: string | null;
   customerAge: number | null;
+  status: string;
   playerId?: string | null;
   playerCode?: string | null;
   currentCycle?: number;
@@ -860,9 +861,9 @@ export const packageRegistrationsApi = {
     customerPhone: string;
     customerEmail?: string | null;
     customerAge?: number | null;
+    durationMonths?: number | null;
     sessionsLeft?: number | null;
     sessionsUsedOverride?: number | null;
-    durationMonths?: number;
     nextPaymentDate?: string | null;
     planLabel?: string | null;
     basePriceJod?: number;
@@ -894,6 +895,7 @@ export const packageRegistrationsApi = {
       discountType?: string;
       discountValue?: number | null;
       discountReason?: string | null;
+      durationMonths?: number | null;
       periodStartsAt?: string | null;
     }>;
   }) =>
@@ -904,9 +906,10 @@ export const packageRegistrationsApi = {
     customerPhone?: string;
     customerEmail?: string | null;
     customerAge?: number | null;
+    status?: string;
+    durationMonths?: number | null;
     sessionsLeft?: number | null;
     sessionsUsedOverride?: number | null;
-    durationMonths?: number;
     nextPaymentDate?: string | null;
     planLabel?: string | null;
     isPaid?: boolean;

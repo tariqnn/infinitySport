@@ -228,7 +228,7 @@ export function RegisterPersonMultiPackageModal({
           ) : (
             <div className="max-h-[40vh] overflow-y-auto rounded-lg border border-ui-border">
               {filteredPersons.length === 0 ? (
-                <div className="p-4 text-center text-sm text-ui-textMuted">No match. Use "Create new person" or adjust search.</div>
+                <div className="p-4 text-center text-sm text-ui-textMuted">No match. Use &quot;Create new person&quot; or adjust search.</div>
               ) : (
                 <ul className="divide-y divide-ui-border">
                   {filteredPersons.map((row) => (

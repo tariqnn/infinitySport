@@ -122,7 +122,7 @@ export default async function DashboardPage() {
     <div className="space-y-8">
       <div className="space-y-2">
         <h1 className="text-3xl font-extrabold tracking-tight text-ui-textPrimary sm:text-4xl">Dashboard</h1>
-        <p className="text-base text-ui-textMuted">Welcome back. Here's what's happening today.</p>
+        <p className="text-base text-ui-textMuted">Welcome back. Here&apos;s what&apos;s happening today.</p>
       </div>
 
       {/* KPI Cards */}

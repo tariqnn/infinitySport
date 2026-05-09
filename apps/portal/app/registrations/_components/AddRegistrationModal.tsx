@@ -50,6 +50,7 @@ export function AddRegistrationModal({
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerAge, setCustomerAge] = useState('');
+  const [durationMonths, setDurationMonths] = useState('1');
   const [sessionsLeft, setSessionsLeft] = useState('');
   const [nextPaymentDate, setNextPaymentDate] = useState('');
   const [basePriceJod, setBasePriceJod] = useState('');
@@ -66,6 +67,7 @@ export function AddRegistrationModal({
     const today = new Date().toISOString().split('T')[0];
 
     setPackageName('');
+    setDurationMonths('1');
     setSessionsLeft('');
     setNextPaymentDate(addDurationMonthsToDateInput(today, 1));
     setBasePriceJod('');
@@ -109,14 +111,20 @@ export function AddRegistrationModal({
 
   useEffect(() => {
     if (!open) return;
+    const defaultDuration = getPackageDefaultDurationMonths(
+      packageName,
+      defaultDurationMonthsByPackage,
+    );
+    setDurationMonths(String(defaultDuration));
+  }, [defaultDurationMonthsByPackage, open, packageName]);
+
+  useEffect(() => {
+    if (!open) return;
     if (periodStartsAt.trim()) {
-      const durationMonths = getPackageDefaultDurationMonths(
-        packageName,
-        defaultDurationMonthsByPackage,
-      );
-      setNextPaymentDate(addDurationMonthsToDateInput(periodStartsAt, durationMonths));
+      const parsedDuration = Math.max(1, Math.round(Number(durationMonths) || 1));
+      setNextPaymentDate(addDurationMonthsToDateInput(periodStartsAt, parsedDuration));
     }
-  }, [defaultDurationMonthsByPackage, open, packageName, periodStartsAt]);
+  }, [durationMonths, open, periodStartsAt]);
 
   const baseNumber = basePriceJod.trim() === '' ? 0 : parseInt(basePriceJod, 10) || 0;
   const discountNumber = discountType === 'NONE' ? 0 : parseFloat(discountValue) || 0;
@@ -137,6 +145,11 @@ export function AddRegistrationModal({
     }
     if (!sessionsLeft.trim()) {
       setError('Sessions left is required.');
+      return;
+    }
+    const parsedDurationMonths = Math.max(1, Math.round(Number(durationMonths) || 0));
+    if (!Number.isFinite(parsedDurationMonths) || parsedDurationMonths < 1) {
+      setError('Duration must be at least 1 month.');
       return;
     }
     if (!nextPaymentDate.trim()) {
@@ -163,6 +176,7 @@ export function AddRegistrationModal({
         customerPhone: customerPhone.trim(),
         customerEmail: customerEmail.trim() || undefined,
         customerAge: customerAge.trim() ? parseInt(customerAge, 10) : undefined,
+        durationMonths: parsedDurationMonths,
         sessionsLeft: Math.max(0, parseInt(sessionsLeft, 10) || 0),
         nextPaymentDate: nextPaymentDate.trim(),
         basePriceJod: hasDefaultPrice && base === 0 ? undefined : base,
@@ -197,12 +211,22 @@ export function AddRegistrationModal({
         <Input label="Email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} placeholder="Email (optional)" />
         <Input label="Age" type="number" value={customerAge} onChange={(e) => setCustomerAge(e.target.value)} placeholder="Age (optional)" />
         <Input
-          label="Sessions left"
+          label="Duration (months)"
+          type="number"
+          min={1}
+          value={durationMonths}
+          onChange={(e) => setDurationMonths(e.target.value)}
+          hint="Example: use 3 for a 3-month registration."
+          required
+        />
+        <Input
+          label="Total sessions for this cycle"
           type="number"
           min={0}
           value={sessionsLeft}
           onChange={(e) => setSessionsLeft(e.target.value)}
-          placeholder="e.g. 10"
+          placeholder="e.g. 43"
+          hint="Example: 43 sessions over 3 months."
           required
         />
         <Input

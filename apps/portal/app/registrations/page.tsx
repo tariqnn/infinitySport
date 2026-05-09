@@ -203,12 +203,14 @@ export default function RegistrationsPage() {
 
     const effectiveNow =
       r.isFrozen && r.frozenAt ? new Date(r.frozenAt) : new Date();
+    const cappedEnd =
+      effectiveNow.getTime() < end.getTime() ? effectiveNow : end;
 
-    const scheduledCount = schedule ? countScheduledSessions(start, effectiveNow, schedule.daysOfWeek) : 0;
+    const scheduledCount = schedule ? countScheduledSessions(start, cappedEnd, schedule.daysOfWeek) : 0;
     const canceledSet = canceledDatesByPackage[r.packageName];
     let canceledInRange = 0;
     if (canceledSet && schedule) {
-      for (let d = new Date(start); d.getTime() <= effectiveNow.getTime(); d = addDays(d, 1)) {
+      for (let d = new Date(start); d.getTime() <= cappedEnd.getTime(); d = addDays(d, 1)) {
         const key = d.toISOString().split('T')[0];
         if (canceledSet.has(key)) canceledInRange += 1;
       }
@@ -697,7 +699,7 @@ export default function RegistrationsPage() {
                   <th className="w-[5%] min-w-0 px-4 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">Age</th>
                   <th className="w-[8%] min-w-0 px-4 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">Price</th>
                   <th className="w-[11%] min-w-0 px-4 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">Payment</th>
-                  <th className="w-[9%] min-w-0 px-4 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">Starts</th>
+                  <th className="w-[9%] min-w-0 px-4 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">Registered</th>
                   <th className="w-[11%] min-w-0 px-4 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">Remaining</th>
                   <th className="w-[72px] min-w-[72px] sticky right-0 z-30 border-l border-ui-border bg-slate-50 px-2 py-3 text-center text-sm font-semibold text-ui-textPrimary whitespace-nowrap shadow-[-6px_0_10px_rgba(15,23,42,0.06)]">Actions</th>
                 </tr>
@@ -753,7 +755,14 @@ export default function RegistrationsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 min-w-0 whitespace-nowrap text-sm text-ui-textPrimary">
-                        {row.periodStartsAt ? new Date(row.periodStartsAt).toLocaleDateString() : new Date(row.createdAt).toLocaleDateString()}
+                        <span className="block">
+                          {row.periodStartsAt ? new Date(row.periodStartsAt).toLocaleDateString() : new Date(row.createdAt).toLocaleDateString()}
+                        </span>
+                        {row.periodStartsAt && row.periodStartsAt.slice(0, 10) !== row.createdAt.slice(0, 10) ? (
+                          <span className="block text-xs text-ui-textMuted">
+                            Created {new Date(row.createdAt).toLocaleDateString()}
+                          </span>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3 min-w-0">{renderRemainingShort(row)}</td>
                       <td className="sticky right-0 z-20 w-[72px] min-w-[72px] border-l border-ui-border bg-white px-2 py-3 text-center shadow-[-6px_0_10px_rgba(15,23,42,0.04)] group-hover:bg-slate-50">
@@ -982,6 +991,10 @@ export default function RegistrationsPage() {
         open={!!detailsModalRow}
         onClose={() => setDetailsModalRow(null)}
         registration={detailsModalRow}
+        onEditRegistration={(row) => {
+          setDetailsModalRow(null);
+          setEditRegistrationRow(row);
+        }}
         onViewReceipts={(row) => {
           setDetailsModalRow(null);
           setViewReceiptsRegistration(row);

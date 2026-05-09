@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Modal, Badge } from '../../_components/ui';
+import { Modal, Badge, Button } from '../../_components/ui';
 import {
   packageRegistrationsApi,
   type PackageRegistrationRow,
@@ -129,11 +129,13 @@ export function RegistrationDetailsModal({
   onClose,
   registration,
   onViewReceipts,
+  onEditRegistration,
 }: {
   open: boolean;
   onClose: () => void;
   registration: PackageRegistrationRow | null;
   onViewReceipts: (registration: PackageRegistrationRow) => void;
+  onEditRegistration: (registration: PackageRegistrationRow) => void;
 }) {
   const [history, setHistory] = useState<RegistrationRenewalHistoryRow[]>([]);
   const [profile, setProfile] = useState<{ playerCode: string | null; currentCycle: number } | null>(null);
@@ -382,16 +384,28 @@ export function RegistrationDetailsModal({
         </div>
 
         <div className="border-t border-ui-border pt-2">
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              onViewReceipts(registration);
-            }}
-            className="font-medium text-brand-blue-primary hover:underline"
-          >
-            View Receipt(s)
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                onClose();
+                onEditRegistration(registration);
+              }}
+            >
+              Edit registration
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                onClose();
+                onViewReceipts(registration);
+              }}
+            >
+              View Receipt(s)
+            </Button>
+          </div>
         </div>
       </div>
     </Modal>

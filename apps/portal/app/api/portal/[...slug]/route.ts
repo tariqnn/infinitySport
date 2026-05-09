@@ -77,6 +77,7 @@ type RegistrationInput = {
   customerPhone: string;
   customerEmail?: string | null;
   customerAge?: number | null;
+  durationMonths?: number | null;
   sessionsLeft?: number | null;
   sessionsUsedOverride?: number | null;
   nextPaymentDate?: string | null;
@@ -636,6 +637,7 @@ function mapRegistrationRow(row: any) {
     customerPhone: row.customerPhone,
     customerEmail: row.customerEmail ?? null,
     customerAge: row.customerAge ?? null,
+    status: String(row.status || "ACTIVE").trim().toUpperCase() || "ACTIVE",
     playerCode: row.playerCode ?? null,
     currentCycle: row.currentCycle ?? 1,
     sessionsLeft: row.sessionsLeft ?? null,
@@ -4074,7 +4076,10 @@ async function createPackageRegistration(payload: RegistrationInput) {
       ? clampNonNegative(Number(payload.basePriceJod))
       : packageDefaults.basePriceJod;
   const defaultSessionsLeft = packageDefaults.defaultSessionsLeft;
-  const durationMonths = packageDefaults.durationMonths;
+  const durationMonths = normalizeDurationMonths(
+    payload.durationMonths,
+    packageDefaults.durationMonths,
+  );
 
   const discountType = (payload.discountType || "NONE").toUpperCase();
   const discountValue =
@@ -4937,7 +4942,10 @@ async function bulkCreateForPerson(request: NextRequest) {
             ? clampNonNegative(Number(entry.basePriceJod))
             : packageDefaults.basePriceJod;
         const defaultSessionsLeft = packageDefaults.defaultSessionsLeft;
-        const durationMonths = packageDefaults.durationMonths;
+        const durationMonths = normalizeDurationMonths(
+          entry.durationMonths,
+          packageDefaults.durationMonths,
+        );
         const discountType = (entry.discountType || "NONE").toUpperCase();
         const discountValue =
           discountType === "NONE" ? null : Number(entry.discountValue ?? 0);
@@ -5061,9 +5069,10 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
     customerPhone?: string;
     customerEmail?: string | null;
     customerAge?: number | null;
+    status?: string;
+    durationMonths?: number | null;
     sessionsLeft?: number | null;
     sessionsUsedOverride?: number | null;
-    durationMonths?: number | null;
     nextPaymentDate?: string | null;
     planLabel?: string | null;
     isPaid?: boolean;
@@ -5114,6 +5123,13 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
       }
       updateData.customerAge = Math.round(parsedAge);
     }
+  }
+  if (body.status !== undefined) {
+    const nextStatus = String(body.status || "").trim().toUpperCase();
+    if (!["ACTIVE", "EXPIRED", "CANCELLED"].includes(nextStatus)) {
+      return jsonError("status must be ACTIVE, EXPIRED, or CANCELLED");
+    }
+    updateData.status = nextStatus;
   }
   if (body.sessionsLeft !== undefined) {
     if (body.sessionsLeft == null) {
@@ -5168,11 +5184,17 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
     ? await getPackageDefaults(nextPackageName)
     : null;
   if (body.durationMonths !== undefined) {
-    const parsedDurationMonths = Number(body.durationMonths);
-    if (!Number.isFinite(parsedDurationMonths) || parsedDurationMonths < 1) {
-      return jsonError("durationMonths must be 1 or greater");
+    if (body.durationMonths == null) {
+      updateData.durationMonths = packageChanged
+        ? nextPackageDefaults?.durationMonths ?? 1
+        : existing.durationMonths;
+    } else {
+      const durationMonths = Number(body.durationMonths);
+      if (!Number.isFinite(durationMonths) || durationMonths < 1) {
+        return jsonError("durationMonths must be 1 or greater");
+      }
+      updateData.durationMonths = Math.round(durationMonths);
     }
-    updateData.durationMonths = Math.round(parsedDurationMonths);
   } else if (packageChanged) {
     updateData.durationMonths = nextPackageDefaults?.durationMonths ?? 1;
   }

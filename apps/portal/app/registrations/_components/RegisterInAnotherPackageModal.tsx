@@ -39,6 +39,7 @@ export function RegisterInAnotherPackageModal({
 }) {
   const [packageName, setPackageName] = useState('');
   const [startDate, setStartDate] = useState('');
+  const [durationMonths, setDurationMonths] = useState('1');
   const [sessionsLeft, setSessionsLeft] = useState('');
   const [nextPaymentDate, setNextPaymentDate] = useState('');
   const [basePriceJod, setBasePriceJod] = useState('');
@@ -54,6 +55,7 @@ export function RegisterInAnotherPackageModal({
     const today = new Date().toISOString().split('T')[0];
     setPackageName('');
     setStartDate(today);
+    setDurationMonths('1');
     setSessionsLeft('');
     setNextPaymentDate(addDurationMonthsToDateInput(today, 1));
     setBasePriceJod('');
@@ -84,14 +86,20 @@ export function RegisterInAnotherPackageModal({
 
   useEffect(() => {
     if (!open) return;
+    const defaultDuration = getPackageDefaultDurationMonths(
+      packageName,
+      defaultDurationMonthsByPackage,
+    );
+    setDurationMonths(String(defaultDuration));
+  }, [defaultDurationMonthsByPackage, open, packageName]);
+
+  useEffect(() => {
+    if (!open) return;
     if (startDate.trim()) {
-      const durationMonths = getPackageDefaultDurationMonths(
-        packageName,
-        defaultDurationMonthsByPackage,
-      );
-      setNextPaymentDate(addDurationMonthsToDateInput(startDate, durationMonths));
+      const parsedDuration = Math.max(1, Math.round(Number(durationMonths) || 1));
+      setNextPaymentDate(addDurationMonthsToDateInput(startDate, parsedDuration));
     }
-  }, [defaultDurationMonthsByPackage, open, packageName, startDate]);
+  }, [durationMonths, open, startDate]);
 
   const baseNumber = basePriceJod.trim() === '' ? 0 : parseInt(basePriceJod, 10) || 0;
   const discountNumber = discountType === 'NONE' ? 0 : parseFloat(discountValue) || 0;
@@ -108,6 +116,11 @@ export function RegisterInAnotherPackageModal({
     }
     if (!sessionsLeft.trim()) {
       setError('Sessions left is required.');
+      return;
+    }
+    const parsedDurationMonths = Math.max(1, Math.round(Number(durationMonths) || 0));
+    if (!Number.isFinite(parsedDurationMonths) || parsedDurationMonths < 1) {
+      setError('Duration must be at least 1 month.');
       return;
     }
     if (!nextPaymentDate.trim()) {
@@ -134,6 +147,7 @@ export function RegisterInAnotherPackageModal({
         customerPhone: registration.customerPhone,
         customerEmail: registration.customerEmail ?? undefined,
         customerAge: registration.customerAge ?? undefined,
+        durationMonths: parsedDurationMonths,
         sessionsLeft: Math.max(0, parseInt(sessionsLeft, 10) || 0),
         nextPaymentDate: nextPaymentDate.trim(),
         basePriceJod: hasDefaultPrice && base === 0 ? undefined : base,
@@ -144,8 +158,8 @@ export function RegisterInAnotherPackageModal({
       });
       onSuccess();
       onClose();
-    } catch (err: any) {
-      setError(err?.message || 'Failed to create registration');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to create registration');
     } finally {
       setLoading(false);
     }
@@ -176,11 +190,21 @@ export function RegisterInAnotherPackageModal({
           hint="Registration will use this start date for the next payment default."
         />
         <Input
-          label="Sessions left"
+          label="Duration (months)"
+          type="number"
+          min={1}
+          value={durationMonths}
+          onChange={(e) => setDurationMonths(e.target.value)}
+          hint="Example: use 3 for a 3-month registration."
+          required
+        />
+        <Input
+          label="Total sessions for this cycle"
           type="number"
           min={0}
           value={sessionsLeft}
           onChange={(e) => setSessionsLeft(e.target.value)}
+          hint="Example: 43 sessions over 3 months."
           required
         />
         <Input

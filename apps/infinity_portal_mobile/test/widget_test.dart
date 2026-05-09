@@ -25,6 +25,10 @@ void main() {
       findsOneWidget,
     );
     expect(
+      find.descendant(of: navigationBar, matching: find.text('Competitions')),
+      findsOneWidget,
+    );
+    expect(
       find.descendant(of: navigationBar, matching: find.text('New Booking')),
       findsOneWidget,
     );
@@ -131,11 +135,13 @@ class _FakePortalRepository implements PortalRepository {
         sportType: 'Basketball',
         name: 'Basketball - Little Kobes U12-U10',
         description: 'Foundation sessions',
+        durationMonths: 1,
         sessionsCount: 12,
         trackingType: 'SESSIONS',
         pricingType: 'FIXED',
         currentPriceJod: 90,
         isActive: true,
+        showOnWebsite: true,
         sortOrder: 0,
       ),
     ];
@@ -144,6 +150,12 @@ class _FakePortalRepository implements PortalRepository {
   @override
   Future<List<PackageRegistrationRow>> fetchRegistrations(
       RegistrationFilters filters) async {
+    return const [];
+  }
+
+  @override
+  Future<List<CompetitionRegistrationRow>> fetchCompetitions(
+      CompetitionFilters filters) async {
     return const [];
   }
 

@@ -1,8 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getPgPool } from "../../../lib/pg";
-import { isDatabaseUnavailableError, noteDatabaseFailure } from "../../../lib/dbGuard";
+import {
+  isDatabaseUnavailableError,
+  noteDatabaseFailure,
+} from "../../../lib/dbGuard";
 import { isValidPhoneNumber } from "../../../lib/phoneValidation";
+import { syncCompetitionRecordToFirestore } from "../../../../portal/lib/competitionRealtimeSync";
+import { getFirestore } from "../../../../portal/lib/firebase-admin";
 
 const COMPETITIONS = new Set([
   "3X3_MEN",
@@ -25,10 +30,57 @@ function optionalText(value: unknown): string | null {
 }
 
 function parseAge(value: unknown): number | null {
-  if (value === null || value === undefined || cleanText(value) === "") return null;
+  if (value === null || value === undefined || cleanText(value) === "")
+    return null;
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 1 || parsed > 99) return null;
   return Math.round(parsed);
+}
+
+function defaultCompetitionRate(competitionType: string): number {
+  return competitionType === "3X3" ||
+    competitionType === "3X3_MEN" ||
+    competitionType === "3X3_WOMEN"
+    ? 50
+    : 25;
+}
+
+async function syncLandingCompetitionToFirestore(input: {
+  id: string;
+  competitionType: string;
+  participantName: string | null;
+  age: number | null;
+  gender: string | null;
+  customerPhone: string;
+  teamName: string | null;
+  playerOne: string | null;
+  playerTwo: string | null;
+  playerThree: string | null;
+  playerFour: string | null;
+  amountDue: number;
+}) {
+  try {
+    const now = new Date();
+    const firestore = getFirestore();
+    await syncCompetitionRecordToFirestore({
+      firestore,
+      registration: {
+        ...input,
+        isPaid: false,
+        amountDue: input.amountDue,
+        amountPaid: null,
+        paymentMethod: null,
+        paidAt: null,
+        source: "WEBSITE",
+        status: "NEW",
+        createdAt: now,
+        updatedAt: now,
+        deleted: false,
+      },
+    });
+  } catch (error) {
+    console.warn("[competition-registrations] firestore sync skipped", error);
+  }
 }
 
 export async function POST(request: Request) {
@@ -36,13 +88,18 @@ export async function POST(request: Request) {
     const body = (await request.json()) as Record<string, unknown>;
     const competitionType = cleanText(body.competitionType).toUpperCase();
     if (!COMPETITIONS.has(competitionType)) {
-      return NextResponse.json({ error: "Please choose a competition." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Please choose a competition." },
+        { status: 400 },
+      );
     }
     const customerPhone = cleanText(body.customerPhone);
     const phoneValidation = isValidPhoneNumber(customerPhone);
     if (!phoneValidation.valid) {
       return NextResponse.json(
-        { error: phoneValidation.error || "Please enter a valid phone number." },
+        {
+          error: phoneValidation.error || "Please enter a valid phone number.",
+        },
         { status: 400 },
       );
     }
@@ -74,17 +131,26 @@ export async function POST(request: Request) {
       participantName = optionalText(body.participantName);
       age = parseAge(body.age);
       if (!participantName || !age) {
-        return NextResponse.json({ error: "Name and age are required." }, { status: 400 });
+        return NextResponse.json(
+          { error: "Name and age are required." },
+          { status: 400 },
+        );
       }
 
       if (competitionType === "KING") {
         gender = "MALE";
       } else if (competitionType === "QUEEN") {
         gender = "FEMALE";
-      } else if (competitionType === "KING_QUEEN" || competitionType === "JACK_OF_THE_COURT") {
+      } else if (
+        competitionType === "KING_QUEEN" ||
+        competitionType === "JACK_OF_THE_COURT"
+      ) {
         gender = cleanText(body.gender).toUpperCase();
         if (gender !== "MALE" && gender !== "FEMALE") {
-          return NextResponse.json({ error: "Please choose male or female." }, { status: 400 });
+          return NextResponse.json(
+            { error: "Please choose male or female." },
+            { status: 400 },
+          );
         }
       } else if (competitionType === "THREE_POINT_MEN") {
         gender = "MALE";
@@ -92,6 +158,7 @@ export async function POST(request: Request) {
     }
 
     const id = randomUUID();
+    const amountDue = defaultCompetitionRate(competitionType);
     await getPgPool().query(
       `
       INSERT INTO "CompetitionRegistration" (
@@ -106,12 +173,13 @@ export async function POST(request: Request) {
         "playerTwo",
         "playerThree",
         "playerFour",
+        "amountDue",
         "source",
         "status",
         "createdAt",
         "updatedAt"
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'WEBSITE', 'NEW', NOW(), NOW())
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'WEBSITE', 'NEW', NOW(), NOW())
       `,
       [
         id,
@@ -125,8 +193,24 @@ export async function POST(request: Request) {
         playerTwo,
         playerThree,
         playerFour,
+        amountDue,
       ],
     );
+
+    await syncLandingCompetitionToFirestore({
+      id,
+      competitionType,
+      participantName,
+      age,
+      gender,
+      customerPhone,
+      teamName,
+      playerOne,
+      playerTwo,
+      playerThree,
+      playerFour,
+      amountDue,
+    });
 
     return NextResponse.json({ success: true, id });
   } catch (error) {

@@ -304,6 +304,49 @@ class RegistrationFilters {
   }
 }
 
+class CompetitionFilters {
+  const CompetitionFilters({
+    required this.competitionType,
+    required this.search,
+  });
+
+  factory CompetitionFilters.initial() {
+    return const CompetitionFilters(
+      competitionType: 'ALL',
+      search: '',
+    );
+  }
+
+  final String competitionType;
+  final String search;
+
+  CompetitionFilters copyWith({
+    String? competitionType,
+    String? search,
+  }) {
+    return CompetitionFilters(
+      competitionType: competitionType ?? this.competitionType,
+      search: search ?? this.search,
+    );
+  }
+
+  Map<String, String> toQueryParameters() {
+    final params = <String, String>{};
+    if (competitionType.isNotEmpty && competitionType != 'ALL') {
+      params['competitionType'] = competitionType;
+    }
+    if (search.isNotEmpty) params['search'] = search;
+    return params;
+  }
+
+  int get activeFilterCount {
+    var count = 0;
+    if (competitionType != 'ALL') count += 1;
+    if (search.isNotEmpty) count += 1;
+    return count;
+  }
+}
+
 class BookingKpis {
   const BookingKpis({
     required this.totalCollected,
@@ -635,9 +678,8 @@ class PackageOption {
       sportType: readString(json['sportType']),
       name: readString(json['name']),
       description: readNullableString(json['description']),
-      durationMonths: json['durationMonths'] == null
-          ? 1
-          : readInt(json['durationMonths']),
+      durationMonths:
+          json['durationMonths'] == null ? 1 : readInt(json['durationMonths']),
       sessionsCount: readInt(json['sessionsCount']),
       trackingType: readString(json['trackingType']),
       pricingType: readString(json['pricingType']),
@@ -792,9 +834,8 @@ class PackageRegistrationRow {
           : readDouble(json['discountValue']),
       discountReason: readNullableString(json['discountReason']),
       finalPriceJod: readDouble(json['finalPriceJod']),
-      durationMonths: json['durationMonths'] == null
-          ? 1
-          : readInt(json['durationMonths']),
+      durationMonths:
+          json['durationMonths'] == null ? 1 : readInt(json['durationMonths']),
       periodStartsAt: readNullableString(json['periodStartsAt']),
       periodEndsAt: readNullableString(json['periodEndsAt']),
       isFrozen: readBool(json['isFrozen']),
@@ -833,4 +874,102 @@ class PackageRegistrationRow {
   final double collected;
   final String createdAt;
   final String updatedAt;
+}
+
+class CompetitionRegistrationRow {
+  const CompetitionRegistrationRow({
+    required this.id,
+    required this.competitionType,
+    required this.participantName,
+    required this.age,
+    required this.gender,
+    required this.customerPhone,
+    required this.teamName,
+    required this.playerOne,
+    required this.playerTwo,
+    required this.playerThree,
+    required this.playerFour,
+    required this.isPaid,
+    required this.amountDue,
+    required this.amountPaid,
+    required this.paymentMethod,
+    required this.paidAt,
+    required this.source,
+    required this.status,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  factory CompetitionRegistrationRow.fromJson(JsonMap json) {
+    return CompetitionRegistrationRow(
+      id: readString(json['id']),
+      competitionType: readString(json['competitionType'], fallback: 'UNKNOWN')
+          .toUpperCase(),
+      participantName: readNullableString(json['participantName']),
+      age: json['age'] == null ? null : readInt(json['age']),
+      gender: readNullableString(json['gender']),
+      customerPhone: readNullableString(json['customerPhone']),
+      teamName: readNullableString(json['teamName']),
+      playerOne: readNullableString(json['playerOne']),
+      playerTwo: readNullableString(json['playerTwo']),
+      playerThree: readNullableString(json['playerThree']),
+      playerFour: readNullableString(json['playerFour']),
+      isPaid: readBool(json['isPaid']),
+      amountDue:
+          json['amountDue'] == null ? null : readDouble(json['amountDue']),
+      amountPaid:
+          json['amountPaid'] == null ? null : readDouble(json['amountPaid']),
+      paymentMethod: readNullableString(json['paymentMethod']),
+      paidAt: readNullableString(json['paidAt']),
+      source: readString(json['source'], fallback: 'WEBSITE'),
+      status: readString(json['status'], fallback: 'NEW'),
+      createdAt: readString(json['createdAt']),
+      updatedAt: readString(json['updatedAt']),
+    );
+  }
+
+  final String id;
+  final String competitionType;
+  final String? participantName;
+  final int? age;
+  final String? gender;
+  final String? customerPhone;
+  final String? teamName;
+  final String? playerOne;
+  final String? playerTwo;
+  final String? playerThree;
+  final String? playerFour;
+  final bool isPaid;
+  final double? amountDue;
+  final double? amountPaid;
+  final String? paymentMethod;
+  final String? paidAt;
+  final String source;
+  final String status;
+  final String createdAt;
+  final String updatedAt;
+
+  bool get isTeamCompetition =>
+      competitionType == '3X3' ||
+      competitionType == '3X3_MEN' ||
+      competitionType == '3X3_WOMEN';
+
+  String get displayName {
+    if (teamName != null && teamName!.trim().isNotEmpty) return teamName!;
+    if (participantName != null && participantName!.trim().isNotEmpty) {
+      return participantName!;
+    }
+    return 'Unknown player';
+  }
+
+  List<String> get players => [
+        playerOne,
+        playerTwo,
+        playerThree,
+        playerFour,
+      ]
+          .whereType<String>()
+          .map((item) => item.trim())
+          .where((item) => item.isNotEmpty)
+          .toList(growable: false);
 }

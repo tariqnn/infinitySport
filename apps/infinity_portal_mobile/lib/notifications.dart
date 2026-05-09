@@ -11,7 +11,7 @@ const String kPortalNotificationTopic = 'infinity_portal_all';
 const String kPortalNotificationChannelId = 'infinity_portal_high_priority';
 const String kPortalNotificationChannelName = 'Infinity Portal Alerts';
 const String kPortalNotificationChannelDescription =
-    'Booking and registration alerts for the Infinity Portal mobile app.';
+    'Booking, registration, and competition alerts for the Infinity Portal mobile app.';
 
 const AndroidNotificationChannel _portalNotificationChannel =
     AndroidNotificationChannel(
@@ -36,6 +36,7 @@ Future<void> portalFirebaseMessagingBackgroundHandler(
 enum PortalNotificationDestination {
   bookings,
   registrations,
+  competitions,
 }
 
 class PortalNotificationSelection {
@@ -53,6 +54,8 @@ class PortalNotificationSelection {
         return 0;
       case PortalNotificationDestination.registrations:
         return 1;
+      case PortalNotificationDestination.competitions:
+        return 2;
     }
   }
 
@@ -67,6 +70,8 @@ class PortalNotificationSelection {
         return 'New booking';
       case PortalNotificationDestination.registrations:
         return 'New registration';
+      case PortalNotificationDestination.competitions:
+        return 'New competition registration';
     }
   }
 
@@ -76,6 +81,8 @@ class PortalNotificationSelection {
         return 'A new booking was added to Infinity Portal.';
       case PortalNotificationDestination.registrations:
         return 'A new player registration was added to Infinity Portal.';
+      case PortalNotificationDestination.competitions:
+        return 'A new competition registration was added to Infinity Portal.';
     }
   }
 
@@ -93,6 +100,13 @@ class PortalNotificationSelection {
       return PortalNotificationSelection(
         destination: PortalNotificationDestination.registrations,
         entityId: _nullableValue(data['registrationId']),
+      );
+    }
+    if (type == 'COMPETITION_REGISTRATION_CREATED' ||
+        _normalizeValue(data['competitionRegistrationId']).isNotEmpty) {
+      return PortalNotificationSelection(
+        destination: PortalNotificationDestination.competitions,
+        entityId: _nullableValue(data['competitionRegistrationId']),
       );
     }
     return null;
@@ -115,6 +129,11 @@ class PortalNotificationSelection {
         case 'REGISTRATIONS':
           return PortalNotificationSelection(
             destination: PortalNotificationDestination.registrations,
+            entityId: _nullableValue(decoded['entityId']),
+          );
+        case 'COMPETITIONS':
+          return PortalNotificationSelection(
+            destination: PortalNotificationDestination.competitions,
             entityId: _nullableValue(decoded['entityId']),
           );
       }

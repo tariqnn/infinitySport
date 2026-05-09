@@ -226,6 +226,48 @@ class _RegistrationsScreenState extends State<RegistrationsScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: ChoiceChip(
+                    label: const Text('All packages'),
+                    selected: _filters.packageName.isEmpty,
+                    onSelected: (_) {
+                      setState(() {
+                        _filters = _filters.copyWith(packageName: '');
+                      });
+                      unawaited(_loadRegistrations());
+                    },
+                  ),
+                ),
+                for (final package in _packages)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: ChoiceChip(
+                      label: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 210),
+                        child: Text(
+                          package.name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      selected: _filters.packageName == package.name,
+                      onSelected: (_) {
+                        setState(() {
+                          _filters =
+                              _filters.copyWith(packageName: package.name);
+                        });
+                        unawaited(_loadRegistrations());
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
           const SizedBox(height: 18),
           SizedBox(
             height: 178,
@@ -874,9 +916,13 @@ _SessionCounter? _sessionsRemaining(
 
 (int, List<int>)? _packageSchedule(String packageName) {
   final name = packageName.trim();
-  final baseName = name.replaceAll(RegExp(r'\s*-\s*\d+\s+Months?$', caseSensitive: false), '').trim();
+  final baseName = name
+      .replaceAll(RegExp(r'\s*-\s*\d+\s+Months?$', caseSensitive: false), '')
+      .trim();
   if (baseName.startsWith('Basketball - ')) {
-    if (baseName.contains('Private') || baseName.contains('Small Groups')) return null;
+    if (baseName.contains('Private') || baseName.contains('Small Groups')) {
+      return null;
+    }
     return (12, [6, 1, 3, 5]);
   }
   if (baseName == 'Gymnastics Package A') return (12, [0, 2, 4]);

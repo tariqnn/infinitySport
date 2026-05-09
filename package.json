@@ -38,6 +38,7 @@
     "prisma:seed-packages": "cd prisma && ts-node --project tsconfig.json seed-packages.ts",
     "bookings:backfill:firebase": "node scripts/backfill-bookings-to-firestore.js",
     "registrations:backfill:firebase": "node scripts/backfill-registrations-to-firestore.js",
+    "competitions:backfill:firebase": "node scripts/backfill-competitions-to-firestore.js",
     "firebase:functions:install": "npm --prefix functions install",
     "firebase:functions:deploy": "npm --prefix functions run deploy",
     "firebase:twilio-secrets": "node scripts/push-twilio-secrets-to-firebase.mjs",

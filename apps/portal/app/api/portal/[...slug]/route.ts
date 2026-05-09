@@ -35,6 +35,10 @@ import {
   syncRegistrationRecordToFirestore,
 } from "../../../../lib/registrationRealtimeSync";
 import {
+  markCompetitionDeletedInFirestore,
+  syncCompetitionRecordToFirestore,
+} from "../../../../lib/competitionRealtimeSync";
+import {
   addBookingRewardPointAdjustment,
   calculateBookingRewardPoints,
 } from "../../../../lib/bookingRewardPoints";
@@ -89,9 +93,7 @@ function jsonError(message: string, status = 400) {
   return NextResponse.json({ message }, { status });
 }
 
-async function resolveRouteParams(
-  params: Promise<Params>,
-): Promise<Params> {
+async function resolveRouteParams(params: Promise<Params>): Promise<Params> {
   return await params;
 }
 
@@ -180,9 +182,9 @@ function withoutPeriodStartsAt<T extends { periodStartsAt?: unknown }>(
   return next;
 }
 
-function withoutSessionsUsedOverride<T extends { sessionsUsedOverride?: unknown }>(
-  data: T,
-): Omit<T, "sessionsUsedOverride"> {
+function withoutSessionsUsedOverride<
+  T extends { sessionsUsedOverride?: unknown },
+>(data: T): Omit<T, "sessionsUsedOverride"> {
   const next = { ...data } as T;
   delete next.sessionsUsedOverride;
   return next;
@@ -486,7 +488,9 @@ function normalizeDurationMonths(value: unknown, fallback = 1): number {
   return Math.max(1, Math.round(parsed));
 }
 
-async function getPackageConfigByName(packageName: string): Promise<PackageConfig | null> {
+async function getPackageConfigByName(
+  packageName: string,
+): Promise<PackageConfig | null> {
   const pkg = await prisma.package
     .findUnique({
       where: { name: packageName },
@@ -514,7 +518,9 @@ async function getPackageConfigByName(packageName: string): Promise<PackageConfi
   };
 }
 
-async function getPackageDefaults(packageName: string): Promise<PackageDefaults> {
+async function getPackageDefaults(
+  packageName: string,
+): Promise<PackageDefaults> {
   const pkg = await getPackageConfigByName(packageName);
   const pricing = await prisma.packagePricing
     .findUnique({ where: { packageName } })
@@ -671,11 +677,14 @@ function getRegistrationPaymentStatus(
   collectedJod: number,
   isPaidFlag: boolean,
 ): "PAID" | "PARTIAL" | "UNPAID" {
-  if (isRegistrationPaid(finalPriceJod, collectedJod, isPaidFlag)) return "PAID";
+  if (isRegistrationPaid(finalPriceJod, collectedJod, isPaidFlag))
+    return "PAID";
   return collectedJod > 0 ? "PARTIAL" : "UNPAID";
 }
 
-function paymentPeriodKeyFromDate(value: Date | string | null | undefined): string {
+function paymentPeriodKeyFromDate(
+  value: Date | string | null | undefined,
+): string {
   const parsed = value ? new Date(value) : new Date();
   const date = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
@@ -708,7 +717,10 @@ async function cancelMatchingRegistrationInboxEntries(params: {
         .get();
       docs = snapshot.docs;
     } catch {
-      const snapshot = await firestore.collection("portalRegistrationInbox").limit(200).get();
+      const snapshot = await firestore
+        .collection("portalRegistrationInbox")
+        .limit(200)
+        .get();
       docs = snapshot.docs.filter((doc) => {
         const data = doc.data() as Record<string, unknown>;
         return (
@@ -736,7 +748,10 @@ async function cancelMatchingRegistrationInboxEntries(params: {
     }
     await batch.commit();
   } catch (error) {
-    console.warn("[portal-db-api] registration inbox delete guard skipped", error);
+    console.warn(
+      "[portal-db-api] registration inbox delete guard skipped",
+      error,
+    );
   }
 }
 
@@ -776,8 +791,13 @@ async function enrichRegistrationRowsWithProfile(rows: any[]) {
 
 async function serializeRegistrationRows(rows: any[]) {
   const profiledRows = await enrichRegistrationRowsWithProfile(rows);
-  const summaries = await buildRegistrationMembershipSummaries(prisma, profiledRows);
-  const summaryById = new Map(summaries.map((summary) => [summary.id, summary]));
+  const summaries = await buildRegistrationMembershipSummaries(
+    prisma,
+    profiledRows,
+  );
+  const summaryById = new Map(
+    summaries.map((summary) => [summary.id, summary]),
+  );
 
   return profiledRows.map((row) => {
     const summary = summaryById.get(row.id);
@@ -882,7 +902,10 @@ async function syncStandaloneTrackerPlayers(
   const firestore = getFirestore();
   const latestByChild = new Map<string, RegistrationMembershipSummary>();
   for (const row of summaries) {
-    const childKey = buildTrackerChildKey(row.studentName, row.customerAge ?? null);
+    const childKey = buildTrackerChildKey(
+      row.studentName,
+      row.customerAge ?? null,
+    );
     if (!latestByChild.has(childKey)) {
       latestByChild.set(childKey, row);
     }
@@ -908,7 +931,9 @@ async function ensureTrackerPlayerForRegistration(
   });
   if (!registration) return null;
 
-  const summaries = await buildRegistrationMembershipSummaries(prisma, [registration]);
+  const summaries = await buildRegistrationMembershipSummaries(prisma, [
+    registration,
+  ]);
   const summary = summaries.find((row) => row.id === registrationId);
   if (!summary) return null;
 
@@ -947,7 +972,10 @@ async function syncTrackerForRegistrationContact(input: {
 
     const latestByChild = new Map<string, RegistrationMembershipSummary>();
     for (const row of summaries) {
-      const childKey = buildTrackerChildKey(row.studentName, row.customerAge ?? null);
+      const childKey = buildTrackerChildKey(
+        row.studentName,
+        row.customerAge ?? null,
+      );
       if (!latestByChild.has(childKey)) {
         latestByChild.set(childKey, row);
       }
@@ -1017,12 +1045,13 @@ async function syncGuestAccessForEmail(input: {
   try {
     await restoreGuestAccount(prisma, customerEmail);
     const firestore = getFirestore();
-    const totals =
-      (await loadGuestTotalPointsByEmail(prisma, [customerEmail])).get(customerEmail) ?? {
-        rewardPoints: 0,
-        manualPoints: 0,
-        totalPoints: 0,
-      };
+    const totals = (
+      await loadGuestTotalPointsByEmail(prisma, [customerEmail])
+    ).get(customerEmail) ?? {
+      rewardPoints: 0,
+      manualPoints: 0,
+      totalPoints: 0,
+    };
 
     let uid: string | null = null;
     let accountName: string | null = normalizeText(input.customerName) || null;
@@ -1034,7 +1063,10 @@ async function syncGuestAccessForEmail(input: {
       uid = userRecord.uid;
       accountName = normalizeText(userRecord.displayName) || accountName;
 
-      const userSnap = await firestore.collection("users").doc(userRecord.uid).get();
+      const userSnap = await firestore
+        .collection("users")
+        .doc(userRecord.uid)
+        .get();
       const userData = userSnap.exists
         ? ((userSnap.data() as Record<string, unknown>) ?? {})
         : {};
@@ -1187,13 +1219,18 @@ function hoursBetween(start: Date, end: Date): number {
   return Math.round((ms / (1000 * 60 * 60)) * 100) / 100;
 }
 
-function getCourtRate(court: string | null | undefined, rates?: CourtRateMap): number {
+function getCourtRate(
+  court: string | null | undefined,
+  rates?: CourtRateMap,
+): number {
   if (!court) return 30;
   if (rates && Number.isFinite(rates[court])) return Number(rates[court]);
   return HOURLY_RATE_BY_COURT[court] ?? 30;
 }
 
-async function listStoredCourtRates(): Promise<Array<{ courtType: string; hourlyRate: number; rewardPointsPerHour: number }>> {
+async function listStoredCourtRates(): Promise<
+  Array<{ courtType: string; hourlyRate: number; rewardPointsPerHour: number }>
+> {
   await ensureBookingInfrastructure();
   const rows = (await prisma.$queryRawUnsafe(
     `
@@ -1201,14 +1238,23 @@ async function listStoredCourtRates(): Promise<Array<{ courtType: string; hourly
       FROM "CourtRate"
       ORDER BY "courtType" ASC
     `,
-  )) as Array<{ courtType: string; hourlyRate: number; rewardPointsPerHour: number }>;
+  )) as Array<{
+    courtType: string;
+    hourlyRate: number;
+    rewardPointsPerHour: number;
+  }>;
   return rows
     .map((row) => ({
       courtType: String(row.courtType || "").trim(),
       hourlyRate: Number(row.hourlyRate || 0),
       rewardPointsPerHour: Number(row.rewardPointsPerHour || 0),
     }))
-    .filter((row) => !!row.courtType && Number.isFinite(row.hourlyRate) && row.hourlyRate > 0);
+    .filter(
+      (row) =>
+        !!row.courtType &&
+        Number.isFinite(row.hourlyRate) &&
+        row.hourlyRate > 0,
+    );
 }
 
 async function getEffectiveCourtRates(): Promise<CourtRateMap> {
@@ -1225,7 +1271,8 @@ function getCourtRewardPoints(
   rewards?: CourtRewardPointMap,
 ): number {
   if (!court) return 0;
-  if (rewards && Number.isFinite(rewards[court])) return Math.max(0, Number(rewards[court]));
+  if (rewards && Number.isFinite(rewards[court]))
+    return Math.max(0, Number(rewards[court]));
   return Math.max(0, REWARD_POINTS_BY_COURT[court] ?? 0);
 }
 
@@ -1235,16 +1282,21 @@ async function getEffectiveCourtRewardPoints(): Promise<CourtRewardPointMap> {
   for (const row of stored) {
     defaults[row.courtType] = Math.max(
       0,
-      Math.round(Number(row.rewardPointsPerHour || defaults[row.courtType] || 0)),
+      Math.round(
+        Number(row.rewardPointsPerHour || defaults[row.courtType] || 0),
+      ),
     );
   }
   return defaults;
 }
 
-function inferBookingSource(notes: string | null | undefined): "WEBSITE" | "APP" | "ADMIN" {
+function inferBookingSource(
+  notes: string | null | undefined,
+): "WEBSITE" | "APP" | "ADMIN" {
   const text = String(notes || "");
   const tagged = text.match(BOOKING_SOURCE_PATTERN)?.[1];
-  if (tagged === "WEBSITE" || tagged === "APP" || tagged === "ADMIN") return tagged;
+  if (tagged === "WEBSITE" || tagged === "APP" || tagged === "ADMIN")
+    return tagged;
   const lowered = text.toLowerCase();
   if (lowered.includes("public booking")) return "WEBSITE";
   if (lowered.includes("mobile app")) return "APP";
@@ -1252,7 +1304,9 @@ function inferBookingSource(notes: string | null | undefined): "WEBSITE" | "APP"
 }
 
 function normalizePaymentMethod(value: unknown): BookingPaymentMethod {
-  const candidate = String(value || "").trim().toUpperCase();
+  const candidate = String(value || "")
+    .trim()
+    .toUpperCase();
   if (candidate === "CASH") return "CASH";
   if (candidate === "CARD") return "CARD";
   if (candidate === "ONLINE") return "ONLINE";
@@ -1261,12 +1315,17 @@ function normalizePaymentMethod(value: unknown): BookingPaymentMethod {
 }
 
 function normalizePaymentStatus(value: unknown): BookingPaymentStatus {
-  return String(value || "").trim().toUpperCase() === "REFUNDED"
+  return String(value || "")
+    .trim()
+    .toUpperCase() === "REFUNDED"
     ? "REFUNDED"
     : "PAID";
 }
 
-function withSourceTag(notes: string | null | undefined, source: "WEBSITE" | "APP" | "ADMIN"): string {
+function withSourceTag(
+  notes: string | null | undefined,
+  source: "WEBSITE" | "APP" | "ADMIN",
+): string {
   const text = String(notes || "").trim();
   if (!text) return `[SOURCE:${source}]`;
   if (BOOKING_SOURCE_PATTERN.test(text)) {
@@ -1276,7 +1335,9 @@ function withSourceTag(notes: string | null | undefined, source: "WEBSITE" | "AP
 }
 
 function normalizeSource(value: unknown): "WEBSITE" | "APP" | "ADMIN" | null {
-  const candidate = String(value || "").trim().toUpperCase();
+  const candidate = String(value || "")
+    .trim()
+    .toUpperCase();
   if (candidate === "WEBSITE") return "WEBSITE";
   if (candidate === "APP") return "APP";
   if (candidate === "ADMIN") return "ADMIN";
@@ -1286,7 +1347,9 @@ function normalizeSource(value: unknown): "WEBSITE" | "APP" | "ADMIN" | null {
 function normalizeBookingStatusValue(
   value: unknown,
 ): "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED" {
-  const candidate = String(value || "").trim().toUpperCase();
+  const candidate = String(value || "")
+    .trim()
+    .toUpperCase();
   if (candidate === "CONFIRMED") return "CONFIRMED";
   if (candidate === "CANCELLED") return "CANCELLED";
   if (candidate === "COMPLETED") return "COMPLETED";
@@ -1310,7 +1373,9 @@ function parseFirestoreDateValue(value: unknown): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function resolveBookingCourtNameFromPayload(payload: Record<string, unknown>): string | null {
+function resolveBookingCourtNameFromPayload(
+  payload: Record<string, unknown>,
+): string | null {
   const direct =
     normalizeText(payload.facilityArea) ||
     normalizeText(payload.courtName) ||
@@ -1323,7 +1388,8 @@ function resolveBookingCourtNameFromPayload(payload: Record<string, unknown>): s
       ? (payload.court as Record<string, unknown>)
       : null;
   const nestedName =
-    normalizeText(courtRecord?.name) || normalizeText(courtRecord?.facilityArea);
+    normalizeText(courtRecord?.name) ||
+    normalizeText(courtRecord?.facilityArea);
   if (nestedName) return nestedName;
 
   const courtId =
@@ -1508,7 +1574,9 @@ async function maybeSyncAllBookingsToRealtime(force = false) {
       },
       orderBy: { updatedAt: "desc" },
     });
-    const payments = await listPaymentsForBookingIds(bookings.map((row) => row.id));
+    const payments = await listPaymentsForBookingIds(
+      bookings.map((row) => row.id),
+    );
     const paymentsByBooking = new Map<string, BookingPaymentRow[]>();
     for (const payment of payments) {
       const current = paymentsByBooking.get(payment.bookingId) || [];
@@ -1571,7 +1639,9 @@ async function importPendingMobileBookingsFromFirestore(force = false) {
       const startTime = parseFirestoreDateValue(
         payload.startTime ?? payload.startTimeIso,
       );
-      const endTime = parseFirestoreDateValue(payload.endTime ?? payload.endTimeIso);
+      const endTime = parseFirestoreDateValue(
+        payload.endTime ?? payload.endTimeIso,
+      );
       const customerName = normalizeText(payload.customerName);
       const customerPhone = normalizeText(payload.customerPhone);
       const customerEmail = normalizeText(payload.customerEmail) || null;
@@ -1735,8 +1805,14 @@ function computeBookingFinancials(
   payments: BookingPaymentRow[],
   courtRates?: CourtRateMap,
 ): BookingFinancialSummary {
-  const totalHours = hoursBetween(new Date(booking.startTime), new Date(booking.endTime));
-  const totalAmount = Math.max(0, Math.round(totalHours * getCourtRate(booking.facilityArea, courtRates)));
+  const totalHours = hoursBetween(
+    new Date(booking.startTime),
+    new Date(booking.endTime),
+  );
+  const totalAmount = Math.max(
+    0,
+    Math.round(totalHours * getCourtRate(booking.facilityArea, courtRates)),
+  );
   const paidAmount = payments
     .filter((row) => row.status === "PAID")
     .reduce((sum, row) => sum + Number(row.amount || 0), 0);
@@ -1746,12 +1822,12 @@ function computeBookingFinancials(
   const netPaid = paidAmount - refundAmount;
   const remainingAmount = Math.max(0, totalAmount - netPaid);
   const latestPaymentMethod = payments.length
-    ? payments
+    ? (payments
         .slice()
         .sort(
           (a, b) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-        )[0]?.method ?? null
+        )[0]?.method ?? null)
     : null;
 
   let paymentStatus: BookingFinancialSummary["paymentStatus"] = "UNPAID";
@@ -1794,7 +1870,10 @@ async function maybeAwardBookingRewardPoints(input: {
       normalizedStatus === "COMPLETED");
   if (!eligible) return { awarded: false, points: 0 };
 
-  const totalHours = hoursBetween(new Date(input.startTime), new Date(input.endTime));
+  const totalHours = hoursBetween(
+    new Date(input.startTime),
+    new Date(input.endTime),
+  );
   const rewardPointsPerHour = getCourtRewardPoints(
     input.facilityArea,
     await getEffectiveCourtRewardPoints(),
@@ -1836,7 +1915,8 @@ async function maybeAwardBookingRewardPoints(input: {
 async function ensureBookingInfrastructure() {
   if (
     bookingInfraState.__portalBookingInfraReady &&
-    (bookingInfraState.__portalBookingInfraVersion || 0) >= BOOKING_INFRA_VERSION
+    (bookingInfraState.__portalBookingInfraVersion || 0) >=
+      BOOKING_INFRA_VERSION
   ) {
     return;
   }
@@ -2036,7 +2116,10 @@ async function validateBookingAvailability(input: {
   facilityArea: string | null | undefined;
   adminOverride?: boolean;
   createdByAdminId?: string | null;
-}): Promise<{ conflict: string | null; conflictMeta?: Record<string, unknown> }> {
+}): Promise<{
+  conflict: string | null;
+  conflictMeta?: Record<string, unknown>;
+}> {
   const facilityArea = (input.facilityArea || "").trim();
   if (!facilityArea) return { conflict: null };
   const dayOfWeek = dayOfWeekUpper(input.startTime);
@@ -2049,7 +2132,13 @@ async function validateBookingAvailability(input: {
       courtType: facilityArea,
       time: { in: slots },
     },
-    select: { id: true, time: true, label: true, startDate: true, endDate: true },
+    select: {
+      id: true,
+      time: true,
+      label: true,
+      startDate: true,
+      endDate: true,
+    },
   });
   const activeBlocked = blocked.find((row) =>
     isBlockedSlotActiveForRange(row, input.startTime, input.endTime),
@@ -2091,7 +2180,8 @@ async function validateBookingAvailability(input: {
     const startM =
       input.startTime.getHours() * 60 + input.startTime.getMinutes();
     const endM = input.endTime.getHours() * 60 + input.endTime.getMinutes();
-    const closeAdjusted = close != null && open != null && close > open ? close : 24 * 60;
+    const closeAdjusted =
+      close != null && open != null && close > open ? close : 24 * 60;
     if (
       open != null &&
       closeAdjusted != null &&
@@ -2136,13 +2226,19 @@ async function validateBookingAvailability(input: {
       },
     };
   }
-  if (exception && !exception.isClosed && exception.openTime && exception.closeTime) {
+  if (
+    exception &&
+    !exception.isClosed &&
+    exception.openTime &&
+    exception.closeTime
+  ) {
     const open = parseClockToMinutes(exception.openTime);
     const close = parseClockToMinutes(exception.closeTime);
     const startM =
       input.startTime.getHours() * 60 + input.startTime.getMinutes();
     const endM = input.endTime.getHours() * 60 + input.endTime.getMinutes();
-    const closeAdjusted = close != null && open != null && close > open ? close : 24 * 60;
+    const closeAdjusted =
+      close != null && open != null && close > open ? close : 24 * 60;
     if (
       open != null &&
       closeAdjusted != null &&
@@ -2372,10 +2468,11 @@ async function resolveMemberUserFromRequest(request: NextRequest): Promise<
     });
     if (!user || !user.isActive)
       return { error: jsonError("Member account not found", 404) };
-    if (normalizeEmail(user.email) !== normalizeEmail(payload.email)) {
+    const userEmail = normalizeEmail(user.email);
+    if (!userEmail || userEmail !== normalizeEmail(payload.email)) {
       return { error: jsonError("Invalid token subject", 401) };
     }
-    return { user };
+    return { user: { ...user, email: userEmail } };
   }
 
   const memberEmail = normalizeEmail(request.headers.get("x-member-email"));
@@ -2384,7 +2481,9 @@ async function resolveMemberUserFromRequest(request: NextRequest): Promise<
   const user = await ensureMemberUserByRegistrationEmail(memberEmail);
   if (!user || !user.isActive)
     return { error: jsonError("Member account not found", 404) };
-  return { user };
+  return {
+    user: { ...user, email: normalizeEmail(user.email) || memberEmail },
+  };
 }
 
 async function buildMemberAuthPayload(user: {
@@ -2485,7 +2584,12 @@ async function memberSetupPassword(request: NextRequest) {
     },
   });
 
-  return NextResponse.json(await buildMemberAuthPayload(updated));
+  return NextResponse.json(
+    await buildMemberAuthPayload({
+      ...updated,
+      email: normalizeEmail(updated.email) || email,
+    }),
+  );
 }
 
 async function memberChangePassword(request: NextRequest) {
@@ -2742,7 +2846,9 @@ function parseInvoiceMeta(value: unknown): InvoiceMeta {
 }
 
 function normalizeInvoiceStatus(value: unknown): NormalizedInvoiceStatus {
-  const next = String(value || "DRAFT").trim().toUpperCase();
+  const next = String(value || "DRAFT")
+    .trim()
+    .toUpperCase();
   if (
     next === "DRAFT" ||
     next === "SENT" ||
@@ -2877,7 +2983,11 @@ function buildInvoiceDescription(input: {
   }
   const totalSessions =
     input.totalSessions == null ? null : Number(input.totalSessions);
-  if (totalSessions != null && Number.isFinite(totalSessions) && totalSessions > 0) {
+  if (
+    totalSessions != null &&
+    Number.isFinite(totalSessions) &&
+    totalSessions > 0
+  ) {
     meta.totalSessions = Math.round(totalSessions);
   }
   const bankName = normalizeInvoiceText(input.bankName);
@@ -2906,7 +3016,7 @@ function serializeInvoiceRow(row: any) {
     ...row,
     description:
       meta.descriptionText ??
-      (Object.keys(meta).length > 0 ? null : row.description ?? null),
+      (Object.keys(meta).length > 0 ? null : (row.description ?? null)),
     meta,
     paymentMethod: meta.paymentMethod ?? null,
     pdfPath: `/api/portal/invoices/${row.id}/pdf`,
@@ -2952,7 +3062,9 @@ const DEFAULT_CASH_BOOK_CATEGORIES: Array<{
 function normalizeCashBookType(
   value: unknown,
 ): CashBookTransactionTypeValue | null {
-  const normalized = String(value || "").trim().toUpperCase();
+  const normalized = String(value || "")
+    .trim()
+    .toUpperCase();
   if (normalized === "INCOME" || normalized === "EXPENSE") {
     return normalized as CashBookTransactionTypeValue;
   }
@@ -2965,8 +3077,7 @@ function resolveCompanyIdFromRequest(
 ): string | null {
   return (
     (body
-      ? extractConnectId(body, "company") ||
-        extractConnectId(body, "companyId")
+      ? extractConnectId(body, "company") || extractConnectId(body, "companyId")
       : null) ||
     request.nextUrl.searchParams.get("companyId") ||
     request.headers.get("x-company-id") ||
@@ -3096,9 +3207,7 @@ async function updateCashBookCategory(id: string, request: NextRequest) {
   const nextName =
     body.name === undefined ? existing.name : normalizeText(body.name);
   const nextType =
-    body.type === undefined
-      ? existing.type
-      : normalizeCashBookType(body.type);
+    body.type === undefined ? existing.type : normalizeCashBookType(body.type);
 
   if (!nextName) return jsonError("Category name is required");
   if (!nextType) return jsonError("type must be INCOME or EXPENSE");
@@ -3371,9 +3480,7 @@ async function updateCashBookTransaction(id: string, request: NextRequest) {
   if (!existing) return jsonError("Cash book transaction not found", 404);
 
   const type =
-    body.type === undefined
-      ? existing.type
-      : normalizeCashBookType(body.type);
+    body.type === undefined ? existing.type : normalizeCashBookType(body.type);
   if (!type) return jsonError("type must be INCOME or EXPENSE");
 
   const amount =
@@ -3385,7 +3492,9 @@ async function updateCashBookTransaction(id: string, request: NextRequest) {
   }
 
   const date =
-    body.date === undefined ? existing.date : parseDate(String(body.date || ""));
+    body.date === undefined
+      ? existing.date
+      : parseDate(String(body.date || ""));
   if (!date) return jsonError("Valid date is required");
 
   let nextCategoryId: string | null = existing.categoryId;
@@ -3557,14 +3666,15 @@ async function createInvoice(request: NextRequest) {
     const description = buildInvoiceDescription(body);
     const paidAt =
       status === "PAID" || amountPaid >= amount
-        ? parseInvoiceDate(body.paidAt, "paidAt") ?? new Date()
+        ? (parseInvoiceDate(body.paidAt, "paidAt") ?? new Date())
         : parseInvoiceDate(body.paidAt, "paidAt");
 
     const number = await generateInvoiceNumber();
     const row = await prisma.invoice.create({
       data: {
         company: { connect: { id: companyId } },
-        ...(extractConnectId(body, "member") || extractConnectId(body, "memberId")
+        ...(extractConnectId(body, "member") ||
+        extractConnectId(body, "memberId")
           ? {
               member: {
                 connect: {
@@ -3605,10 +3715,10 @@ async function createInvoice(request: NextRequest) {
         lineItems: lineItems ?? undefined,
         subtotal:
           body.subtotal == null
-            ? lineItems?.reduce((sum, item) => sum + item.lineTotal, 0) ?? amount
+            ? (lineItems?.reduce((sum, item) => sum + item.lineTotal, 0) ??
+              amount)
             : normalizeInvoiceAmount(body.subtotal, "subtotal"),
-        tax:
-          body.tax == null ? null : normalizeInvoiceAmount(body.tax, "tax"),
+        tax: body.tax == null ? null : normalizeInvoiceAmount(body.tax, "tax"),
         discount:
           body.discount == null
             ? null
@@ -3746,14 +3856,18 @@ async function updateInvoice(id: string, request: NextRequest) {
       "cashAccepted",
       "installments",
     ].some((key) => body[key] !== undefined);
-    if (body.description !== undefined || hasMetaPatch || Object.keys(existingMeta).length > 0) {
+    if (
+      body.description !== undefined ||
+      hasMetaPatch ||
+      Object.keys(existingMeta).length > 0
+    ) {
       const nextMeta = buildInvoiceDescription({
         ...existingMeta,
         ...body,
         description:
           body.description !== undefined
             ? body.description
-            : existingMeta.descriptionText ?? undefined,
+            : (existingMeta.descriptionText ?? undefined),
       });
       data.description =
         nextMeta ??
@@ -3785,7 +3899,10 @@ async function updateInvoice(id: string, request: NextRequest) {
     const nextAmount = Number(data.amount ?? existing.amount);
     const nextAmountPaid = Number(data.amountPaid ?? existing.amountPaid);
     const nextStatus = normalizeInvoiceStatus(data.status ?? existing.status);
-    if (!("paidAt" in data) && (nextStatus === "PAID" || nextAmountPaid >= nextAmount)) {
+    if (
+      !("paidAt" in data) &&
+      (nextStatus === "PAID" || nextAmountPaid >= nextAmount)
+    ) {
       data.paidAt = existing.paidAt ?? new Date();
     }
 
@@ -3835,7 +3952,8 @@ async function getInvoicePdf(id: string) {
   const items = Array.isArray(row.lineItems)
     ? (row.lineItems as Array<Record<string, unknown>>)
     : [];
-  const memberName = `${row.member?.firstName || ""} ${row.member?.lastName || ""}`.trim();
+  const memberName =
+    `${row.member?.firstName || ""} ${row.member?.lastName || ""}`.trim();
   const lines = [
     `Infinity Sports Invoice - ${row.number}`,
     `Issue Date: ${new Date(row.issuedAt).toLocaleDateString("en-GB")}`,
@@ -4057,7 +4175,10 @@ async function createPackageRegistration(payload: RegistrationInput) {
   try {
     trackerPlayerId = await ensureTrackerPlayerForRegistration(row.id);
   } catch (error) {
-    console.warn("[portal-db-api] tracker player sync skipped on registration create", error);
+    console.warn(
+      "[portal-db-api] tracker player sync skipped on registration create",
+      error,
+    );
   }
   await syncRegistrationRealtimeById(row.id, "ADMIN");
   const [serialized] = await serializeRegistrationRows([row]);
@@ -4288,7 +4409,9 @@ type ShopItemRow = {
 };
 
 function normalizeShopItemStatus(value: unknown): ShopItemStatus {
-  const normalized = String(value || "ACTIVE").trim().toUpperCase();
+  const normalized = String(value || "ACTIVE")
+    .trim()
+    .toUpperCase();
   return (SHOP_ITEM_STATUSES as readonly string[]).includes(normalized)
     ? (normalized as ShopItemStatus)
     : "ACTIVE";
@@ -4433,7 +4556,9 @@ async function syncShopCatalogForCompany(companyId: string) {
       imageUrl: row.imageUrl,
       pointsCost: Number(row.pointsCost || 0),
       quantityAvailable:
-        row.quantityAvailable == null ? null : Number(row.quantityAvailable || 0),
+        row.quantityAvailable == null
+          ? null
+          : Number(row.quantityAvailable || 0),
       status: normalizeShopItemStatus(row.status),
       isFeatured: Boolean(row.isFeatured),
       redemptionNote: row.redemptionNote,
@@ -4449,7 +4574,9 @@ function buildShopItemPayload(
   existing?: ReturnType<typeof serializeShopItemRow> | null,
 ) {
   const name =
-    source.name !== undefined ? normalizeText(source.name) : existing?.name || "";
+    source.name !== undefined
+      ? normalizeText(source.name)
+      : existing?.name || "";
   const category =
     source.category !== undefined
       ? normalizeText(source.category) || null
@@ -4465,13 +4592,13 @@ function buildShopItemPayload(
   const pointsCost =
     source.pointsCost !== undefined
       ? coerceOptionalInteger(source.pointsCost)
-      : existing?.pointsCost ?? null;
+      : (existing?.pointsCost ?? null);
   const quantityAvailable =
     source.quantityAvailable !== undefined
       ? normalizeText(source.quantityAvailable) === ""
         ? null
         : coerceOptionalInteger(source.quantityAvailable)
-      : existing?.quantityAvailable ?? null;
+      : (existing?.quantityAvailable ?? null);
   const status =
     source.status !== undefined
       ? normalizeShopItemStatus(source.status)
@@ -4487,7 +4614,7 @@ function buildShopItemPayload(
   const sortOrder =
     source.sortOrder !== undefined
       ? Math.max(0, coerceOptionalInteger(source.sortOrder) ?? 0)
-      : existing?.sortOrder ?? 0;
+      : (existing?.sortOrder ?? 0);
 
   if (!name) throw new Error("Item name is required.");
   if (pointsCost == null || pointsCost <= 0) {
@@ -4512,7 +4639,9 @@ function buildShopItemPayload(
 }
 
 async function listShopItems(request: NextRequest) {
-  const companyId = normalizeText(request.nextUrl.searchParams.get("companyId"));
+  const companyId = normalizeText(
+    request.nextUrl.searchParams.get("companyId"),
+  );
   const statusParam = normalizeText(request.nextUrl.searchParams.get("status"));
   const rows = await loadShopItemRows(
     companyId || null,
@@ -4524,7 +4653,10 @@ async function listShopItems(request: NextRequest) {
 }
 
 async function publishShopCatalog(request: NextRequest) {
-  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+  const body = (await request.json().catch(() => ({}))) as Record<
+    string,
+    unknown
+  >;
   const companyId =
     normalizeText(body.companyId) ||
     normalizeText(request.nextUrl.searchParams.get("companyId"));
@@ -4535,7 +4667,10 @@ async function publishShopCatalog(request: NextRequest) {
 }
 
 async function createShopItem(request: NextRequest) {
-  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+  const body = (await request.json().catch(() => ({}))) as Record<
+    string,
+    unknown
+  >;
   const companyId = normalizeText(body.companyId);
   if (!companyId) return jsonError("companyId is required");
 
@@ -4583,7 +4718,10 @@ async function createShopItem(request: NextRequest) {
     try {
       await syncShopCatalogForCompany(companyId);
     } catch (error) {
-      console.error("[portal-shop] Failed to sync catalog after create:", error);
+      console.error(
+        "[portal-shop] Failed to sync catalog after create:",
+        error,
+      );
     }
 
     return NextResponse.json(serializeShopItemRow(row), { status: 201 });
@@ -4598,7 +4736,10 @@ async function updateShopItem(id: string, request: NextRequest) {
   const existing = await loadShopItemById(id);
   if (!existing) return jsonError("Shop item not found", 404);
 
-  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+  const body = (await request.json().catch(() => ({}))) as Record<
+    string,
+    unknown
+  >;
 
   try {
     const payload = buildShopItemPayload(body, serializeShopItemRow(existing));
@@ -4638,7 +4779,10 @@ async function updateShopItem(id: string, request: NextRequest) {
     try {
       await syncShopCatalogForCompany(row.companyId);
     } catch (error) {
-      console.error("[portal-shop] Failed to sync catalog after update:", error);
+      console.error(
+        "[portal-shop] Failed to sync catalog after update:",
+        error,
+      );
     }
 
     return NextResponse.json(serializeShopItemRow(row));
@@ -4653,7 +4797,10 @@ async function removeShopItem(id: string) {
   const existing = await loadShopItemById(id);
   if (!existing) return jsonError("Shop item not found", 404);
 
-  await prisma.$executeRawUnsafe(`DELETE FROM "PortalShopItem" WHERE "id" = $1`, id);
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM "PortalShopItem" WHERE "id" = $1`,
+    id,
+  );
 
   try {
     await syncShopCatalogForCompany(existing.companyId);
@@ -5099,10 +5246,16 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
       }
       updateData.periodStartsAt = periodStartsAt;
       if (body.periodEndsAt === undefined) {
-        updateData.periodEndsAt = computeCyclePeriodEnd(periodStartsAt, nextDurationMonths);
+        updateData.periodEndsAt = computeCyclePeriodEnd(
+          periodStartsAt,
+          nextDurationMonths,
+        );
       }
       if (body.nextPaymentDate === undefined) {
-        updateData.nextPaymentDate = computeCyclePeriodEnd(periodStartsAt, nextDurationMonths);
+        updateData.nextPaymentDate = computeCyclePeriodEnd(
+          periodStartsAt,
+          nextDurationMonths,
+        );
       }
     } else {
       updateData.periodStartsAt = null;
@@ -5129,7 +5282,10 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
       periodStartsAt: existing.periodStartsAt,
       createdAt: existing.createdAt,
     });
-    updateData.periodEndsAt = computeCyclePeriodEnd(cycleAnchor, nextDurationMonths);
+    updateData.periodEndsAt = computeCyclePeriodEnd(
+      cycleAnchor,
+      nextDurationMonths,
+    );
   }
   if (
     (packageChanged || body.durationMonths !== undefined) &&
@@ -5162,7 +5318,11 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
       : existing.periodEndsAt
         ? new Date(existing.periodEndsAt)
         : null;
-  if (validationStart && validationEnd && validationEnd.getTime() < validationStart.getTime()) {
+  if (
+    validationStart &&
+    validationEnd &&
+    validationEnd.getTime() < validationStart.getTime()
+  ) {
     return jsonError("periodEndsAt must be after periodStartsAt");
   }
 
@@ -5234,7 +5394,9 @@ async function reregisterPackage(id: string) {
     customerPhone: existing.customerPhone ?? null,
     customerEmail: existing.customerEmail ?? null,
   });
-  const summaries = await buildRegistrationMembershipSummaries(prisma, [existing]);
+  const summaries = await buildRegistrationMembershipSummaries(prisma, [
+    existing,
+  ]);
   const summary = summaries[0];
 
   await addRegistrationRenewalHistory(prisma, {
@@ -5327,7 +5489,9 @@ async function markRegistrationPaid(id: string, request: NextRequest) {
     return jsonError("Private note is required");
   const paymentPeriodKey = body.paymentPeriodKey
     ? normalizePaymentPeriodKey(body.paymentPeriodKey)
-    : paymentPeriodKeyFromDate(registration.periodStartsAt ?? registration.createdAt);
+    : paymentPeriodKeyFromDate(
+        registration.periodStartsAt ?? registration.createdAt,
+      );
   if (!paymentPeriodKey) return jsonError("Invalid paid for month");
 
   await ensureRegistrationProfile(prisma, {
@@ -5341,7 +5505,10 @@ async function markRegistrationPaid(id: string, request: NextRequest) {
   const method = (body.paymentMethod || "CASH").toUpperCase();
   if (!["CASH", "CARD", "TRANSFER", "OTHER"].includes(method))
     return jsonError("Invalid payment method");
-  const targetPrice = Math.max(0, Math.round(Number(registration.finalPriceJod || 0)));
+  const targetPrice = Math.max(
+    0,
+    Math.round(Number(registration.finalPriceJod || 0)),
+  );
   const amountPaid = Math.round(Number(body.amountPaid) || 0);
   if (targetPrice > 0 && amountPaid <= 0) {
     return jsonError("Amount paid must be greater than 0");
@@ -5656,7 +5823,9 @@ async function getGuestAccounts(request: NextRequest) {
 
       const name = guestDocDisplayName(guestDoc);
       const playerIds = Array.isArray(guestDoc.playerIds)
-        ? guestDoc.playerIds.map((entry) => normalizeText(entry)).filter(Boolean)
+        ? guestDoc.playerIds
+            .map((entry) => normalizeText(entry))
+            .filter(Boolean)
         : Array.isArray(guestDoc.players)
           ? guestDoc.players
               .map((entry) =>
@@ -5669,7 +5838,9 @@ async function getGuestAccounts(request: NextRequest) {
       const rewardPoints = clampNonNegative(
         Number(guestDoc.bookingPointsBalance ?? guestDoc.rewardPoints ?? 0),
       );
-      const manualPoints = Math.round(Number(guestDoc.manualPointsBalance ?? 0));
+      const manualPoints = Math.round(
+        Number(guestDoc.manualPointsBalance ?? 0),
+      );
       const totalPoints = clampNonNegative(
         Number(guestDoc.pointsBalance ?? rewardPoints + manualPoints),
       );
@@ -5715,7 +5886,10 @@ async function getGuestAccounts(request: NextRequest) {
 
     return NextResponse.json(filtered);
   } catch (error) {
-    console.warn("[portal-db-api] guest account firebase-only list failed", error);
+    console.warn(
+      "[portal-db-api] guest account firebase-only list failed",
+      error,
+    );
     return NextResponse.json([]);
   }
 }
@@ -5813,8 +5987,7 @@ async function addGuestPoints(email: string, request: NextRequest) {
     customerEmail: normalizedEmail,
     change: points,
     reason,
-    createdBy:
-      typeof body.createdBy === "string" ? body.createdBy : null,
+    createdBy: typeof body.createdBy === "string" ? body.createdBy : null,
   });
 
   await syncTrackerForRegistrationContact({
@@ -5827,12 +6000,13 @@ async function addGuestPoints(email: string, request: NextRequest) {
     customerName: body.customerName ?? null,
   });
 
-  const totals =
-    (await loadGuestTotalPointsByEmail(prisma, [normalizedEmail])).get(normalizedEmail) ?? {
-      rewardPoints: 0,
-      manualPoints: 0,
-      totalPoints: 0,
-    };
+  const totals = (
+    await loadGuestTotalPointsByEmail(prisma, [normalizedEmail])
+  ).get(normalizedEmail) ?? {
+    rewardPoints: 0,
+    manualPoints: 0,
+    totalPoints: 0,
+  };
 
   return NextResponse.json({
     success: true,
@@ -5952,8 +6126,13 @@ async function voidReceipt(id: string, request: NextRequest) {
   return NextResponse.json({ success: true });
 }
 
-function parseOverviewDateRange(request: NextRequest): { start: Date; end: Date } {
-  const view = (request.nextUrl.searchParams.get("view") || "week").toLowerCase();
+function parseOverviewDateRange(request: NextRequest): {
+  start: Date;
+  end: Date;
+} {
+  const view = (
+    request.nextUrl.searchParams.get("view") || "week"
+  ).toLowerCase();
   const startDate = request.nextUrl.searchParams.get("startDate");
   const endDate = request.nextUrl.searchParams.get("endDate");
   if (startDate && endDate) {
@@ -5982,16 +6161,28 @@ function bookingCustomerDisplayName(row: {
   customerName?: string | null;
   member?: { firstName: string; lastName: string } | null;
 }): string {
-  if (row.customerName && row.customerName.trim()) return row.customerName.trim();
-  if (row.member) return `${row.member.firstName} ${row.member.lastName}`.trim();
+  if (row.customerName && row.customerName.trim())
+    return row.customerName.trim();
+  if (row.member)
+    return `${row.member.firstName} ${row.member.lastName}`.trim();
   return "Unknown customer";
 }
 
-function bookingDateFitsRange(row: { startTime: Date; endTime: Date }, start: Date, end: Date): boolean {
-  return row.startTime.getTime() <= end.getTime() && row.endTime.getTime() >= start.getTime();
+function bookingDateFitsRange(
+  row: { startTime: Date; endTime: Date },
+  start: Date,
+  end: Date,
+): boolean {
+  return (
+    row.startTime.getTime() <= end.getTime() &&
+    row.endTime.getTime() >= start.getTime()
+  );
 }
 
-function compareByDateDesc(a: { createdAt: string }, b: { createdAt: string }): number {
+function compareByDateDesc(
+  a: { createdAt: string },
+  b: { createdAt: string },
+): number {
   return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
 }
 
@@ -6013,7 +6204,11 @@ async function getBookingCourtRates() {
 
 async function updateBookingCourtRates(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as {
-    rates?: Array<{ name?: string; hourlyRate?: number; rewardPointsPerHour?: number }>;
+    rates?: Array<{
+      name?: string;
+      hourlyRate?: number;
+      rewardPointsPerHour?: number;
+    }>;
     createdByAdminId?: string | null;
   };
   const rates = Array.isArray(body.rates) ? body.rates : [];
@@ -6030,10 +6225,14 @@ async function updateBookingCourtRates(request: NextRequest) {
         : getCourtRewardPoints(courtName, existingRewardPoints);
     if (!courtName) return jsonError("Court name is required");
     if (!Number.isFinite(hourlyRate) || hourlyRate <= 0) {
-      return jsonError(`Hourly rate must be greater than 0 for court: ${courtName}`);
+      return jsonError(
+        `Hourly rate must be greater than 0 for court: ${courtName}`,
+      );
     }
     if (!Number.isFinite(rewardPointsPerHour) || rewardPointsPerHour < 0) {
-      return jsonError(`Reward points per hour cannot be negative for court: ${courtName}`);
+      return jsonError(
+        `Reward points per hour cannot be negative for court: ${courtName}`,
+      );
     }
     await prisma.$executeRawUnsafe(
       `
@@ -6057,7 +6256,10 @@ async function updateBookingCourtRates(request: NextRequest) {
       rates: rates.map((row) => ({
         name: String(row?.name || "").trim(),
         hourlyRate: Math.round(Number(row?.hourlyRate || 0)),
-        rewardPointsPerHour: Math.max(0, Math.round(Number(row?.rewardPointsPerHour || 0))),
+        rewardPointsPerHour: Math.max(
+          0,
+          Math.round(Number(row?.rewardPointsPerHour || 0)),
+        ),
       })),
     },
     createdByAdminId:
@@ -6078,11 +6280,25 @@ async function getBookingOverview(request: NextRequest) {
   const companyId = request.nextUrl.searchParams.get("companyId") || undefined;
   const court = (request.nextUrl.searchParams.get("court") || "").trim();
   const labelFilter = (request.nextUrl.searchParams.get("label") || "").trim();
-  const bookingStatus = (request.nextUrl.searchParams.get("bookingStatus") || "").trim().toUpperCase();
-  const paymentStatusFilter = (request.nextUrl.searchParams.get("paymentStatus") || "").trim().toUpperCase();
-  const paymentMethodFilter = normalizePaymentMethod(request.nextUrl.searchParams.get("paymentMethod") || undefined);
-  const sourceFilter = normalizeSource(request.nextUrl.searchParams.get("source") || undefined);
-  const search = (request.nextUrl.searchParams.get("search") || "").trim().toLowerCase();
+  const bookingStatus = (
+    request.nextUrl.searchParams.get("bookingStatus") || ""
+  )
+    .trim()
+    .toUpperCase();
+  const paymentStatusFilter = (
+    request.nextUrl.searchParams.get("paymentStatus") || ""
+  )
+    .trim()
+    .toUpperCase();
+  const paymentMethodFilter = normalizePaymentMethod(
+    request.nextUrl.searchParams.get("paymentMethod") || undefined,
+  );
+  const sourceFilter = normalizeSource(
+    request.nextUrl.searchParams.get("source") || undefined,
+  );
+  const search = (request.nextUrl.searchParams.get("search") || "")
+    .trim()
+    .toLowerCase();
 
   const bookingWhere: any = {
     startTime: { lte: end },
@@ -6106,7 +6322,9 @@ async function getBookingOverview(request: NextRequest) {
     orderBy: { startTime: "asc" },
   });
 
-  const payments = await listPaymentsForBookingIds(bookings.map((row) => row.id));
+  const payments = await listPaymentsForBookingIds(
+    bookings.map((row) => row.id),
+  );
   const paymentsByBooking = new Map<string, BookingPaymentRow[]>();
   for (const payment of payments) {
     const list = paymentsByBooking.get(payment.bookingId) || [];
@@ -6116,7 +6334,11 @@ async function getBookingOverview(request: NextRequest) {
 
   let rows: BookingOverviewItem[] = bookings.map((row) => {
     const financials = computeBookingFinancials(
-      { startTime: row.startTime, endTime: row.endTime, facilityArea: row.facilityArea },
+      {
+        startTime: row.startTime,
+        endTime: row.endTime,
+        facilityArea: row.facilityArea,
+      },
       paymentsByBooking.get(row.id) || [],
       courtRates,
     );
@@ -6153,15 +6375,25 @@ async function getBookingOverview(request: NextRequest) {
 
   if (bookingStatus === "NO_SHOW") {
     rows = rows.filter((row) =>
-      String(row.notes || "").toUpperCase().includes("[NO_SHOW]"),
+      String(row.notes || "")
+        .toUpperCase()
+        .includes("[NO_SHOW]"),
     );
   }
 
   if (paymentStatusFilter && paymentStatusFilter !== "ALL") {
-    rows = rows.filter((row) => row.financials.paymentStatus === paymentStatusFilter);
+    rows = rows.filter(
+      (row) => row.financials.paymentStatus === paymentStatusFilter,
+    );
   }
-  if (paymentMethodFilter && paymentMethodFilter !== "OTHER" && request.nextUrl.searchParams.get("paymentMethod")) {
-    rows = rows.filter((row) => row.financials.latestPaymentMethod === paymentMethodFilter);
+  if (
+    paymentMethodFilter &&
+    paymentMethodFilter !== "OTHER" &&
+    request.nextUrl.searchParams.get("paymentMethod")
+  ) {
+    rows = rows.filter(
+      (row) => row.financials.latestPaymentMethod === paymentMethodFilter,
+    );
   }
   if (sourceFilter) {
     rows = rows.filter((row) => row.source === sourceFilter);
@@ -6171,7 +6403,11 @@ async function getBookingOverview(request: NextRequest) {
       const bookingId = row.id.toLowerCase();
       const name = bookingCustomerDisplayName(row).toLowerCase();
       const phone = String(row.customerPhone || "").toLowerCase();
-      return bookingId.includes(search) || name.includes(search) || phone.includes(search);
+      return (
+        bookingId.includes(search) ||
+        name.includes(search) ||
+        phone.includes(search)
+      );
     });
   }
 
@@ -6244,17 +6480,32 @@ async function getBookingOverview(request: NextRequest) {
   for (const block of blockedSlots) {
     const targetDow = dayMap.get(String(block.dayOfWeek).toUpperCase());
     if (targetDow == null) continue;
-    for (let d = new Date(start); d.getTime() <= end.getTime(); d.setDate(d.getDate() + 1)) {
+    for (
+      let d = new Date(start);
+      d.getTime() <= end.getTime();
+      d.setDate(d.getDate() + 1)
+    ) {
       if (d.getDay() !== targetDow) continue;
       if (!isBlockedSlotActiveForRange(block, d, d)) continue;
-      const [h, m] = String(block.time || "00:00").split(":").map((x) => Number(x));
+      const [h, m] = String(block.time || "00:00")
+        .split(":")
+        .map((x) => Number(x));
       const eventStart = new Date(d);
-      eventStart.setHours(Number.isFinite(h) ? h : 0, Number.isFinite(m) ? m : 0, 0, 0);
+      eventStart.setHours(
+        Number.isFinite(h) ? h : 0,
+        Number.isFinite(m) ? m : 0,
+        0,
+        0,
+      );
       const eventEnd = new Date(eventStart);
       eventEnd.setHours(eventStart.getHours() + 1, 0, 0, 0);
       const looksMaintenance =
-        String(block.label || "").toLowerCase().includes("maintenance") ||
-        String(block.label || "").toLowerCase().includes("exception");
+        String(block.label || "")
+          .toLowerCase()
+          .includes("maintenance") ||
+        String(block.label || "")
+          .toLowerCase()
+          .includes("exception");
       calendarEvents.push({
         id: `block-${block.id}-${eventStart.toISOString()}`,
         type: looksMaintenance ? "MAINTENANCE" : "RECURRING_BLOCK",
@@ -6278,7 +6529,8 @@ async function getBookingOverview(request: NextRequest) {
     calendarEvents.push({
       id: `exception-${ex.id}`,
       type: "EXCEPTION",
-      title: ex.reason || (ex.isClosed ? "Court closed" : "Availability exception"),
+      title:
+        ex.reason || (ex.isClosed ? "Court closed" : "Availability exception"),
       court: ex.courtType,
       startTime: eventStart.toISOString(),
       endTime: eventEnd.toISOString(),
@@ -6301,7 +6553,10 @@ async function getBookingOverview(request: NextRequest) {
     closeTime: string;
     isClosed: boolean;
   }>;
-  const workingMap = new Map<string, { openTime: string; closeTime: string; isClosed: boolean }>();
+  const workingMap = new Map<
+    string,
+    { openTime: string; closeTime: string; isClosed: boolean }
+  >();
   for (const row of workingRows) {
     workingMap.set(`${row.courtType}::${row.dayOfWeek}`, {
       openTime: row.openTime,
@@ -6309,7 +6564,7 @@ async function getBookingOverview(request: NextRequest) {
       isClosed: !!row.isClosed,
     });
   }
-  const exceptionMap = new Map<string, typeof exceptionRows[number]>();
+  const exceptionMap = new Map<string, (typeof exceptionRows)[number]>();
   for (const row of exceptionRows) {
     const key = `${row.courtType}::${toIsoDate(new Date(row.date))}`;
     exceptionMap.set(key, row);
@@ -6317,20 +6572,29 @@ async function getBookingOverview(request: NextRequest) {
   const knownCourts = Array.from(
     new Set([
       ...DEFAULT_BOOKING_COURTS,
-      ...rows.map((row) => String(row.facilityArea || "").trim()).filter(Boolean),
-      ...blockedSlots.map((row) => String(row.courtType || "").trim()).filter(Boolean),
-      ...workingRows.map((row) => String(row.courtType || "").trim()).filter(Boolean),
-      ...exceptionRows.map((row) => String(row.courtType || "").trim()).filter(Boolean),
+      ...rows
+        .map((row) => String(row.facilityArea || "").trim())
+        .filter(Boolean),
+      ...blockedSlots
+        .map((row) => String(row.courtType || "").trim())
+        .filter(Boolean),
+      ...workingRows
+        .map((row) => String(row.courtType || "").trim())
+        .filter(Boolean),
+      ...exceptionRows
+        .map((row) => String(row.courtType || "").trim())
+        .filter(Boolean),
       ...Object.keys(courtRates),
     ]),
   ).sort((a, b) => a.localeCompare(b));
 
-  const selectedCourts =
-    court && court !== "ALL"
-      ? [court]
-      : knownCourts;
+  const selectedCourts = court && court !== "ALL" ? [court] : knownCourts;
   let availableHours = 0;
-  for (let d = new Date(start); d.getTime() <= end.getTime(); d.setDate(d.getDate() + 1)) {
+  for (
+    let d = new Date(start);
+    d.getTime() <= end.getTime();
+    d.setDate(d.getDate() + 1)
+  ) {
     const dateKey = toIsoDate(d);
     const dow = d.getDay();
     for (const courtName of selectedCourts) {
@@ -6344,7 +6608,12 @@ async function getBookingOverview(request: NextRequest) {
         openTime = working.openTime || openTime;
         closeTime = working.closeTime || closeTime;
       }
-      if (exception && !exception.isClosed && exception.openTime && exception.closeTime) {
+      if (
+        exception &&
+        !exception.isClosed &&
+        exception.openTime &&
+        exception.closeTime
+      ) {
         openTime = exception.openTime;
         closeTime = exception.closeTime;
       }
@@ -6359,11 +6628,24 @@ async function getBookingOverview(request: NextRequest) {
     .filter((row) => row.status !== "CANCELLED")
     .reduce((sum, row) => sum + row.financials.totalHours, 0);
 
-  const grossPaid = rows.reduce((sum, row) => sum + row.financials.paidAmount, 0);
-  const refundsTotal = rows.reduce((sum, row) => sum + row.financials.refundAmount, 0);
-  const collectedTotal = rows.reduce((sum, row) => sum + row.financials.netPaid, 0);
-  const pendingTotal = rows.reduce((sum, row) => sum + row.financials.remainingAmount, 0);
-  const utilization = availableHours > 0 ? (bookedHours / availableHours) * 100 : 0;
+  const grossPaid = rows.reduce(
+    (sum, row) => sum + row.financials.paidAmount,
+    0,
+  );
+  const refundsTotal = rows.reduce(
+    (sum, row) => sum + row.financials.refundAmount,
+    0,
+  );
+  const collectedTotal = rows.reduce(
+    (sum, row) => sum + row.financials.netPaid,
+    0,
+  );
+  const pendingTotal = rows.reduce(
+    (sum, row) => sum + row.financials.remainingAmount,
+    0,
+  );
+  const utilization =
+    availableHours > 0 ? (bookedHours / availableHours) * 100 : 0;
 
   const paymentsByMethod = filteredPayments.reduce(
     (acc, row) => {
@@ -6413,7 +6695,10 @@ async function getBookingOverview(request: NextRequest) {
       totalRevenue: grossPaid - refundsTotal,
       bookingsCount: rows.length,
       totalHoursBooked: bookedHours,
-      utilizationPercent: Math.max(0, Math.min(100, Number(utilization.toFixed(2)))),
+      utilizationPercent: Math.max(
+        0,
+        Math.min(100, Number(utilization.toFixed(2))),
+      ),
       availableHours: Number(availableHours.toFixed(2)),
     },
     bookings: rows,
@@ -6428,7 +6713,11 @@ async function getBookingOverview(request: NextRequest) {
       rewardPointsPerHour: getCourtRewardPoints(name, rewardPoints),
     })),
     labels: Array.from(
-      new Set(blockedSlots.map((row) => String(row.label || "").trim()).filter(Boolean)),
+      new Set(
+        blockedSlots
+          .map((row) => String(row.label || "").trim())
+          .filter(Boolean),
+      ),
     ),
   });
 }
@@ -6437,12 +6726,18 @@ async function getBookingPayments(bookingId: string) {
   const courtRates = await getEffectiveCourtRates();
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
-    include: { member: { select: { id: true, firstName: true, lastName: true } } },
+    include: {
+      member: { select: { id: true, firstName: true, lastName: true } },
+    },
   });
   if (!booking) return jsonError("Booking not found", 404);
   const payments = await listPaymentsForBookingIds([bookingId]);
   const financials = computeBookingFinancials(
-    { startTime: booking.startTime, endTime: booking.endTime, facilityArea: booking.facilityArea },
+    {
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+      facilityArea: booking.facilityArea,
+    },
     payments,
     courtRates,
   );
@@ -6511,7 +6806,11 @@ async function addBookingPayment(bookingId: string, request: NextRequest) {
 
   const payments = await listPaymentsForBookingIds([bookingId]);
   const financials = computeBookingFinancials(
-    { startTime: booking.startTime, endTime: booking.endTime, facilityArea: booking.facilityArea },
+    {
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+      facilityArea: booking.facilityArea,
+    },
     payments,
     courtRates,
   );
@@ -6523,7 +6822,10 @@ async function addBookingPayment(bookingId: string, request: NextRequest) {
 
   await addBookingAuditLog({
     bookingId,
-    action: status === "REFUNDED" ? "BOOKING_PAYMENT_REFUNDED" : "BOOKING_PAYMENT_ADDED",
+    action:
+      status === "REFUNDED"
+        ? "BOOKING_PAYMENT_REFUNDED"
+        : "BOOKING_PAYMENT_ADDED",
     payload: {
       amount,
       method,
@@ -6545,11 +6847,17 @@ async function addBookingPayment(bookingId: string, request: NextRequest) {
   });
 }
 
-function parseCustomerKey(value: string): { field: "phone" | "email" | "memberId"; val: string } {
+function parseCustomerKey(value: string): {
+  field: "phone" | "email" | "memberId";
+  val: string;
+} {
   const decoded = decodeURIComponent(value || "").trim();
-  if (decoded.startsWith("email:")) return { field: "email", val: decoded.slice(6).trim() };
-  if (decoded.startsWith("member:")) return { field: "memberId", val: decoded.slice(7).trim() };
-  if (decoded.startsWith("phone:")) return { field: "phone", val: decoded.slice(6).trim() };
+  if (decoded.startsWith("email:"))
+    return { field: "email", val: decoded.slice(6).trim() };
+  if (decoded.startsWith("member:"))
+    return { field: "memberId", val: decoded.slice(7).trim() };
+  if (decoded.startsWith("phone:"))
+    return { field: "phone", val: decoded.slice(6).trim() };
   if (decoded.includes("@")) return { field: "email", val: decoded };
   return { field: "phone", val: decoded };
 }
@@ -6573,7 +6881,9 @@ async function getBookingCustomerProfile(customerKey: string) {
     },
     orderBy: { startTime: "desc" },
   });
-  const payments = await listPaymentsForBookingIds(bookings.map((row) => row.id));
+  const payments = await listPaymentsForBookingIds(
+    bookings.map((row) => row.id),
+  );
   const paymentsByBooking = new Map<string, BookingPaymentRow[]>();
   for (const payment of payments) {
     const list = paymentsByBooking.get(payment.bookingId) || [];
@@ -6583,7 +6893,11 @@ async function getBookingCustomerProfile(customerKey: string) {
 
   const bookingRows = bookings.map((row) => {
     const financials = computeBookingFinancials(
-      { startTime: row.startTime, endTime: row.endTime, facilityArea: row.facilityArea },
+      {
+        startTime: row.startTime,
+        endTime: row.endTime,
+        facilityArea: row.facilityArea,
+      },
       paymentsByBooking.get(row.id) || [],
       courtRates,
     );
@@ -6601,9 +6915,18 @@ async function getBookingCustomerProfile(customerKey: string) {
     };
   });
 
-  const lifetimePaid = bookingRows.reduce((sum, row) => sum + row.financials.netPaid, 0);
-  const lifetimeUnpaid = bookingRows.reduce((sum, row) => sum + row.financials.remainingAmount, 0);
-  const lifetimeRefunds = bookingRows.reduce((sum, row) => sum + row.financials.refundAmount, 0);
+  const lifetimePaid = bookingRows.reduce(
+    (sum, row) => sum + row.financials.netPaid,
+    0,
+  );
+  const lifetimeUnpaid = bookingRows.reduce(
+    (sum, row) => sum + row.financials.remainingAmount,
+    0,
+  );
+  const lifetimeRefunds = bookingRows.reduce(
+    (sum, row) => sum + row.financials.refundAmount,
+    0,
+  );
 
   const paymentHistory = payments
     .map((row) => {
@@ -6645,10 +6968,15 @@ async function updateRecurringBlock(blockId: string, request: NextRequest) {
     endDate?: string | null;
   };
 
-  const existing = await prisma.blockedSlot.findUnique({ where: { id: blockId } });
+  const existing = await prisma.blockedSlot.findUnique({
+    where: { id: blockId },
+  });
   if (!existing) return jsonError("Recurring block not found", 404);
 
-  const nextDay = body.dayOfWeek !== undefined ? normalizeDayOfWeek(body.dayOfWeek) : existing.dayOfWeek;
+  const nextDay =
+    body.dayOfWeek !== undefined
+      ? normalizeDayOfWeek(body.dayOfWeek)
+      : existing.dayOfWeek;
   if (!nextDay) return jsonError("dayOfWeek must be a valid weekday");
 
   const nextCourt =
@@ -6691,7 +7019,9 @@ async function updateRecurringBlock(blockId: string, request: NextRequest) {
         courtType: nextCourt,
         time: nextTime,
         isBlocked:
-          body.isBlocked === undefined ? existing.isBlocked : Boolean(body.isBlocked),
+          body.isBlocked === undefined
+            ? existing.isBlocked
+            : Boolean(body.isBlocked),
         label:
           body.label === undefined
             ? existing.label
@@ -6703,7 +7033,10 @@ async function updateRecurringBlock(blockId: string, request: NextRequest) {
     return NextResponse.json(row);
   } catch (error: any) {
     if (error?.code === "P2002") {
-      return jsonError("A recurring block already exists for this day/court/time", 409);
+      return jsonError(
+        "A recurring block already exists for this day/court/time",
+        409,
+      );
     }
     return jsonError("Failed to update recurring block", 500);
   }
@@ -6719,7 +7052,9 @@ function addOneHourClock(time: string): string {
 }
 
 async function duplicateRecurringBlock(blockId: string, request: NextRequest) {
-  const source = await prisma.blockedSlot.findUnique({ where: { id: blockId } });
+  const source = await prisma.blockedSlot.findUnique({
+    where: { id: blockId },
+  });
   if (!source) return jsonError("Recurring block not found", 404);
 
   const body = (await request.json().catch(() => ({}))) as {
@@ -6739,7 +7074,9 @@ async function duplicateRecurringBlock(blockId: string, request: NextRequest) {
   const time = String(body.time ?? addOneHourClock(source.time)).trim();
   if (!/^\d{2}:\d{2}$/.test(time)) return jsonError("time must be HH:MM");
 
-  const startDate = body.startDate ? parseDate(body.startDate) : source.startDate;
+  const startDate = body.startDate
+    ? parseDate(body.startDate)
+    : source.startDate;
   const endDate = body.endDate ? parseDate(body.endDate) : source.endDate;
   if ((body.startDate && !startDate) || (body.endDate && !endDate)) {
     return jsonError("Invalid startDate or endDate");
@@ -6754,7 +7091,10 @@ async function duplicateRecurringBlock(blockId: string, request: NextRequest) {
         dayOfWeek,
         courtType,
         time,
-        isBlocked: body.isBlocked === undefined ? source.isBlocked : Boolean(body.isBlocked),
+        isBlocked:
+          body.isBlocked === undefined
+            ? source.isBlocked
+            : Boolean(body.isBlocked),
         label:
           body.label === undefined
             ? source.label
@@ -6766,7 +7106,10 @@ async function duplicateRecurringBlock(blockId: string, request: NextRequest) {
     return NextResponse.json(row);
   } catch (error: any) {
     if (error?.code === "P2002") {
-      return jsonError("A recurring block already exists for this day/court/time", 409);
+      return jsonError(
+        "A recurring block already exists for this day/court/time",
+        409,
+      );
     }
     return jsonError("Failed to duplicate recurring block", 500);
   }
@@ -6842,7 +7185,12 @@ async function dispatchGet(request: NextRequest, params: Params) {
     return getBookingCourtRates();
   }
 
-  if (resource === "bookings" && id === "customers" && action && extra === "profile") {
+  if (
+    resource === "bookings" &&
+    id === "customers" &&
+    action &&
+    extra === "profile"
+  ) {
     await importPendingMobileBookingsFromFirestore();
     return getBookingCustomerProfile(action);
   }
@@ -7026,7 +7374,9 @@ async function dispatchGet(request: NextRequest, params: Params) {
   }
 
   if (resource === "competition-registrations" && !id) {
-    const competitionType = normalizeText(request.nextUrl.searchParams.get("competitionType")).toUpperCase();
+    const competitionType = normalizeText(
+      request.nextUrl.searchParams.get("competitionType"),
+    ).toUpperCase();
     const rows = await prisma.competitionRegistration.findMany({
       where: competitionType ? { competitionType } : undefined,
       orderBy: { createdAt: "desc" },
@@ -7053,10 +7403,7 @@ async function dispatchGet(request: NextRequest, params: Params) {
     return listSessionAdjustments(id);
   }
 
-  if (
-    resource === "package-registrations" &&
-    action === "point-adjustments"
-  ) {
+  if (resource === "package-registrations" && action === "point-adjustments") {
     return listPointAdjustments(id);
   }
 
@@ -7196,9 +7543,10 @@ async function dispatchPost(request: NextRequest, params: Params) {
     const source =
       requestedSource ||
       inferBookingSource((body.notes as string | undefined) || undefined);
-    const isNoShow = String(body.status || "")
-      .trim()
-      .toUpperCase() === "NO_SHOW";
+    const isNoShow =
+      String(body.status || "")
+        .trim()
+        .toUpperCase() === "NO_SHOW";
     const adminOverride = Boolean(body.adminOverride);
     const createdByAdminId =
       typeof body.createdByAdminId === "string" ? body.createdByAdminId : null;
@@ -7351,14 +7699,19 @@ async function dispatchPost(request: NextRequest, params: Params) {
           name,
           sportType: String(body.sportType || "").trim() || "Other",
           description:
-            body.description == null ? null : String(body.description).trim() || null,
+            body.description == null
+              ? null
+              : String(body.description).trim() || null,
           durationMonths,
           sessionsCount: Math.round(sessionsCount),
           trackingType:
-            String(body.trackingType || "SESSIONS").trim().toUpperCase() ||
-            "SESSIONS",
+            String(body.trackingType || "SESSIONS")
+              .trim()
+              .toUpperCase() || "SESSIONS",
           pricingType:
-            String(body.pricingType || "FIXED").trim().toUpperCase() || "FIXED",
+            String(body.pricingType || "FIXED")
+              .trim()
+              .toUpperCase() || "FIXED",
           currentPriceJod,
           isActive: Boolean(body.isActive ?? true),
           showOnWebsite: Boolean(body.showOnWebsite ?? true),
@@ -7480,8 +7833,12 @@ async function dispatchPatch(request: NextRequest, params: Params) {
     if (body.facilityArea !== undefined)
       data.facilityArea = (body.facilityArea as string | null) ?? null;
     if (body.status !== undefined) {
-      const statusValue = String(body.status || "").trim().toUpperCase();
-      data.status = (statusValue === "NO_SHOW" ? "CANCELLED" : statusValue) as any;
+      const statusValue = String(body.status || "")
+        .trim()
+        .toUpperCase();
+      data.status = (
+        statusValue === "NO_SHOW" ? "CANCELLED" : statusValue
+      ) as any;
     }
     if (body.isPaid !== undefined) data.isPaid = Boolean(body.isPaid);
     if (body.notes !== undefined)
@@ -7493,13 +7850,21 @@ async function dispatchPatch(request: NextRequest, params: Params) {
     if (body.customerEmail !== undefined)
       data.customerEmail = (body.customerEmail as string | null) ?? null;
     if (body.source !== undefined) {
-      const source = normalizeSource(body.source) || inferBookingSource(existing.notes);
-      const notesBase = (data.notes as string | null | undefined) ?? existing.notes ?? null;
+      const source =
+        normalizeSource(body.source) || inferBookingSource(existing.notes);
+      const notesBase =
+        (data.notes as string | null | undefined) ?? existing.notes ?? null;
       data.notes = withSourceTag(notesBase, source);
     }
-    if (String(body.status || "").trim().toUpperCase() === "NO_SHOW") {
+    if (
+      String(body.status || "")
+        .trim()
+        .toUpperCase() === "NO_SHOW"
+    ) {
       const base = String(data.notes ?? existing.notes ?? "").trim();
-      data.notes = base.toLowerCase().includes("[no_show]") ? base : `${base} [NO_SHOW]`.trim();
+      data.notes = base.toLowerCase().includes("[no_show]")
+        ? base
+        : `${base} [NO_SHOW]`.trim();
     }
 
     const classId =
@@ -7519,7 +7884,8 @@ async function dispatchPatch(request: NextRequest, params: Params) {
     else if (body.memberId !== undefined || body.member !== undefined)
       data.member = { disconnect: true };
 
-    const nextStart = (data.startTime as Date | undefined) ?? existing.startTime;
+    const nextStart =
+      (data.startTime as Date | undefined) ?? existing.startTime;
     const nextEnd = (data.endTime as Date | undefined) ?? existing.endTime;
     if (nextEnd.getTime() <= nextStart.getTime()) {
       return jsonError("endTime must be later than startTime");
@@ -7539,7 +7905,10 @@ async function dispatchPatch(request: NextRequest, params: Params) {
     });
     if (availability.conflict) {
       return NextResponse.json(
-        { message: availability.conflict, conflict: availability.conflictMeta ?? null },
+        {
+          message: availability.conflict,
+          conflict: availability.conflictMeta ?? null,
+        },
         { status: 409 },
       );
     }
@@ -7585,7 +7954,9 @@ async function dispatchPatch(request: NextRequest, params: Params) {
 
   if (resource === "competition-registrations" && id && !action) {
     const body = (await request.json()) as Record<string, unknown>;
-    const existing = await prisma.competitionRegistration.findUnique({ where: { id } });
+    const existing = await prisma.competitionRegistration.findUnique({
+      where: { id },
+    });
     if (!existing) return jsonError("Competition registration not found", 404);
 
     const data: Record<string, unknown> = {};
@@ -7594,13 +7965,15 @@ async function dispatchPatch(request: NextRequest, params: Params) {
       if (!competitionType) return jsonError("Competition is required");
       data.competitionType = competitionType;
     }
-    if (body.participantName !== undefined) data.participantName = normalizeText(body.participantName) || null;
+    if (body.participantName !== undefined)
+      data.participantName = normalizeText(body.participantName) || null;
     if (body.age !== undefined) {
       if (body.age == null || normalizeText(body.age) === "") {
         data.age = null;
       } else {
         const age = Number(body.age);
-        if (!Number.isFinite(age) || age < 1 || age > 99) return jsonError("Age must be between 1 and 99");
+        if (!Number.isFinite(age) || age < 1 || age > 99)
+          return jsonError("Age must be between 1 and 99");
         data.age = Math.round(age);
       }
     }
@@ -7613,52 +7986,71 @@ async function dispatchPatch(request: NextRequest, params: Params) {
       if (!customerPhone) return jsonError("Phone number is required");
       data.customerPhone = customerPhone;
     }
-    if (body.teamName !== undefined) data.teamName = normalizeText(body.teamName) || null;
-    if (body.playerOne !== undefined) data.playerOne = normalizeText(body.playerOne) || null;
-    if (body.playerTwo !== undefined) data.playerTwo = normalizeText(body.playerTwo) || null;
-    if (body.playerThree !== undefined) data.playerThree = normalizeText(body.playerThree) || null;
-    if (body.playerFour !== undefined) data.playerFour = normalizeText(body.playerFour) || null;
-    if (body.status !== undefined) data.status = normalizeText(body.status).toUpperCase() || "NEW";
-      if (body.isPaid !== undefined) {
-        const isPaid = Boolean(body.isPaid);
-        data.isPaid = isPaid;
-        data.paidAt = isPaid ? new Date() : null;
-        if (!isPaid) {
-          data.paymentMethod = null;
-        }
+    if (body.teamName !== undefined)
+      data.teamName = normalizeText(body.teamName) || null;
+    if (body.playerOne !== undefined)
+      data.playerOne = normalizeText(body.playerOne) || null;
+    if (body.playerTwo !== undefined)
+      data.playerTwo = normalizeText(body.playerTwo) || null;
+    if (body.playerThree !== undefined)
+      data.playerThree = normalizeText(body.playerThree) || null;
+    if (body.playerFour !== undefined)
+      data.playerFour = normalizeText(body.playerFour) || null;
+    if (body.status !== undefined)
+      data.status = normalizeText(body.status).toUpperCase() || "NEW";
+    if (body.isPaid !== undefined) {
+      const isPaid = Boolean(body.isPaid);
+      data.isPaid = isPaid;
+      data.paidAt = isPaid ? new Date() : null;
+      if (!isPaid) {
+        data.paymentMethod = null;
       }
-      if (body.amountDue !== undefined) {
-        if (body.amountDue == null || normalizeText(body.amountDue) === "") {
-          data.amountDue = null;
-        } else {
-          const amountDue = Number(body.amountDue);
-          if (!Number.isFinite(amountDue) || amountDue < 0) return jsonError("Amount due must be 0 or greater");
-          data.amountDue = Math.round(amountDue);
-        }
+    }
+    if (body.amountDue !== undefined) {
+      if (body.amountDue == null || normalizeText(body.amountDue) === "") {
+        data.amountDue = null;
+      } else {
+        const amountDue = Number(body.amountDue);
+        if (!Number.isFinite(amountDue) || amountDue < 0)
+          return jsonError("Amount due must be 0 or greater");
+        data.amountDue = Math.round(amountDue);
       }
-      if (body.amountPaid !== undefined) {
-        if (body.amountPaid == null || normalizeText(body.amountPaid) === "") {
-          data.amountPaid = null;
+    }
+    if (body.amountPaid !== undefined) {
+      if (body.amountPaid == null || normalizeText(body.amountPaid) === "") {
+        data.amountPaid = null;
       } else {
         const amountPaid = Number(body.amountPaid);
-        if (!Number.isFinite(amountPaid) || amountPaid < 0) return jsonError("Amount paid must be 0 or greater");
+        if (!Number.isFinite(amountPaid) || amountPaid < 0)
+          return jsonError("Amount paid must be 0 or greater");
         data.amountPaid = Math.round(amountPaid);
       }
     }
-    if (body.paymentMethod !== undefined) data.paymentMethod = normalizeText(body.paymentMethod).toUpperCase() || null;
+    if (body.paymentMethod !== undefined)
+      data.paymentMethod =
+        normalizeText(body.paymentMethod).toUpperCase() || null;
 
-    const nextCompetitionType = String(data.competitionType ?? existing.competitionType).toUpperCase();
-    const isTeamCompetition = nextCompetitionType === "3X3" || nextCompetitionType === "3X3_MEN" || nextCompetitionType === "3X3_WOMEN";
+    const nextCompetitionType = String(
+      data.competitionType ?? existing.competitionType,
+    ).toUpperCase();
+    const isTeamCompetition =
+      nextCompetitionType === "3X3" ||
+      nextCompetitionType === "3X3_MEN" ||
+      nextCompetitionType === "3X3_WOMEN";
     if (isTeamCompetition) {
       const teamName = normalizeText(data.teamName ?? existing.teamName);
       const playerOne = normalizeText(data.playerOne ?? existing.playerOne);
       const playerTwo = normalizeText(data.playerTwo ?? existing.playerTwo);
-      const playerThree = normalizeText(data.playerThree ?? existing.playerThree);
+      const playerThree = normalizeText(
+        data.playerThree ?? existing.playerThree,
+      );
       if (!teamName || !playerOne || !playerTwo || !playerThree) {
         return jsonError("Team name and first 3 players are required");
       }
     } else {
-      const participantName = normalizeText(data.participantName ?? existing.participantName);
+      const participantName = normalizeText(
+        data.participantName ?? existing.participantName,
+      );
       if (!participantName) return jsonError("Player name is required");
     }
 
@@ -7666,6 +8058,12 @@ async function dispatchPatch(request: NextRequest, params: Params) {
       where: { id },
       data,
     });
+    try {
+      const firestore = getFirestore();
+      await syncCompetitionRecordToFirestore({ firestore, registration: row });
+    } catch (error) {
+      console.warn("[portal-db-api] competition sync skipped", error);
+    }
     return NextResponse.json(row);
   }
 
@@ -7696,8 +8094,13 @@ async function dispatchPatch(request: NextRequest, params: Params) {
       if (!name) return jsonError("Package name is required");
       data.name = name;
     }
-    if (body.sportType !== undefined) data.sportType = String(body.sportType || "").trim() || "Other";
-    if (body.description !== undefined) data.description = body.description == null ? null : String(body.description).trim() || null;
+    if (body.sportType !== undefined)
+      data.sportType = String(body.sportType || "").trim() || "Other";
+    if (body.description !== undefined)
+      data.description =
+        body.description == null
+          ? null
+          : String(body.description).trim() || null;
     if (body.durationMonths !== undefined) {
       const durationMonths = Number(body.durationMonths);
       if (!Number.isFinite(durationMonths) || durationMonths < 1) {
@@ -7712,8 +8115,16 @@ async function dispatchPatch(request: NextRequest, params: Params) {
       }
       data.sessionsCount = Math.round(sessionsCount);
     }
-    if (body.trackingType !== undefined) data.trackingType = String(body.trackingType || "SESSIONS").trim().toUpperCase() || "SESSIONS";
-    if (body.pricingType !== undefined) data.pricingType = String(body.pricingType || "FIXED").trim().toUpperCase() || "FIXED";
+    if (body.trackingType !== undefined)
+      data.trackingType =
+        String(body.trackingType || "SESSIONS")
+          .trim()
+          .toUpperCase() || "SESSIONS";
+    if (body.pricingType !== undefined)
+      data.pricingType =
+        String(body.pricingType || "FIXED")
+          .trim()
+          .toUpperCase() || "FIXED";
     if (body.currentPriceJod !== undefined) {
       if (body.currentPriceJod == null) {
         data.currentPriceJod = null;
@@ -7739,7 +8150,9 @@ async function dispatchPatch(request: NextRequest, params: Params) {
 
     const nextName = String(data.name ?? existingPackage.name);
     const nextSessionsCount =
-      data.sessionsCount === undefined ? existingPackage.sessionsCount : Number(data.sessionsCount);
+      data.sessionsCount === undefined
+        ? existingPackage.sessionsCount
+        : Number(data.sessionsCount);
 
     const row = await prisma.package.update({
       where: { id },
@@ -7753,7 +8166,10 @@ async function dispatchPatch(request: NextRequest, params: Params) {
       });
     }
 
-    if (data.sessionsCount !== undefined && nextSessionsCount !== existingPackage.sessionsCount) {
+    if (
+      data.sessionsCount !== undefined &&
+      nextSessionsCount !== existingPackage.sessionsCount
+    ) {
       await prisma.packageRegistration.updateMany({
         where: {
           packageName: nextName,
@@ -7762,7 +8178,9 @@ async function dispatchPatch(request: NextRequest, params: Params) {
             { sessionsLeft: existingPackage.sessionsCount },
           ],
         },
-        data: { sessionsLeft: nextSessionsCount > 0 ? nextSessionsCount : null },
+        data: {
+          sessionsLeft: nextSessionsCount > 0 ? nextSessionsCount : null,
+        },
       });
     }
 
@@ -7834,9 +8252,9 @@ async function dispatchDelete(_request: NextRequest, params: Params) {
     return removeGuestAccount(id);
   }
 
-    if (resource === "package-registrations") {
-      try {
-        const existing = await prisma.packageRegistration.findUnique({
+  if (resource === "package-registrations") {
+    try {
+      const existing = await prisma.packageRegistration.findUnique({
         where: { id },
         select: { id: true, packageName: true, customerPhone: true },
       });
@@ -7850,7 +8268,10 @@ async function dispatchDelete(_request: NextRequest, params: Params) {
       });
       try {
         const firestore = getFirestore();
-        await markRegistrationDeletedInFirestore({ firestore, registrationId: id });
+        await markRegistrationDeletedInFirestore({
+          firestore,
+          registrationId: id,
+        });
       } catch (error) {
         console.warn("[portal-db-api] registration delete sync skipped", error);
       }
@@ -7859,20 +8280,30 @@ async function dispatchDelete(_request: NextRequest, params: Params) {
       if (error?.code === "P2025")
         return jsonError("Registration not found", 404);
       return jsonError("Failed to delete registration", 500);
-      }
     }
+  }
 
-    if (resource === "competition-registrations") {
+  if (resource === "competition-registrations") {
+    try {
+      await prisma.competitionRegistration.delete({ where: { id } });
       try {
-        await prisma.competitionRegistration.delete({ where: { id } });
-        return NextResponse.json({ success: true });
-      } catch (error: any) {
-        if (error?.code === "P2025") return jsonError("Competition registration not found", 404);
-        return jsonError("Failed to delete competition registration", 500);
+        const firestore = getFirestore();
+        await markCompetitionDeletedInFirestore({
+          firestore,
+          registrationId: id,
+        });
+      } catch (error) {
+        console.warn("[portal-db-api] competition delete sync skipped", error);
       }
+      return NextResponse.json({ success: true });
+    } catch (error: any) {
+      if (error?.code === "P2025")
+        return jsonError("Competition registration not found", 404);
+      return jsonError("Failed to delete competition registration", 500);
     }
+  }
 
-    if (resource === "packages") {
+  if (resource === "packages") {
     const existingPackage = await prisma.package.findUnique({
       where: { id },
       select: { id: true, name: true },

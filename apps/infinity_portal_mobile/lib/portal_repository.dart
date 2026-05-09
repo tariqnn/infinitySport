@@ -52,6 +52,9 @@ abstract class PortalRepository {
     String? endDate,
   });
 
+  Future<List<CompetitionRegistrationRow>> fetchCompetitions(
+      CompetitionFilters filters);
+
   Future<void> createRegistration({
     required PackageOption package,
     required String customerName,
@@ -438,6 +441,32 @@ class HttpPortalRepository implements PortalRepository {
       grouped.putIfAbsent(pkg, () => <String>{}).add(key);
     }
     return grouped;
+  }
+
+  @override
+  Future<List<CompetitionRegistrationRow>> fetchCompetitions(
+      CompetitionFilters filters) async {
+    final payload = await _request(
+      'GET',
+      '/api/portal/competition-registrations',
+      queryParameters: filters.toQueryParameters(),
+    );
+    final rows = asJsonList(payload)
+        .map((item) => CompetitionRegistrationRow.fromJson(asJsonMap(item)))
+        .toList(growable: false);
+    final search = filters.search.trim().toLowerCase();
+    if (search.isEmpty) return rows;
+    return rows.where((row) {
+      final haystack = [
+        row.id,
+        row.competitionType,
+        row.displayName,
+        row.customerPhone ?? '',
+        row.gender ?? '',
+        ...row.players,
+      ].join(' ').toLowerCase();
+      return haystack.contains(search);
+    }).toList(growable: false);
   }
 
   @override

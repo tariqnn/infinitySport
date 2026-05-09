@@ -645,6 +645,23 @@ class FirebasePortalRepository implements PortalRepository {
   }
 
   @override
+  Future<List<CompetitionRegistrationRow>> fetchCompetitions(
+    CompetitionFilters filters,
+  ) async {
+    final snapshot =
+        await _firestore.collection('portalCompetitionRegistrations').get();
+    final rows = <CompetitionRegistrationRow>[];
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      if (readBool(data['deleted'])) continue;
+      final row = _competitionRowFromFirestore(doc.id, data);
+      if (row == null) continue;
+      rows.add(row);
+    }
+    return _filterCompetitionRows(rows, filters);
+  }
+
+  @override
   Future<void> createRegistration({
     required PackageOption package,
     required String customerName,
@@ -693,7 +710,8 @@ class FirebasePortalRepository implements PortalRepository {
       payload['periodStartsAtIso'] = periodStartsAt.toUtc().toIso8601String();
       final periodEndsAt = DateTime(
         periodStartsAt.toUtc().year,
-        periodStartsAt.toUtc().month + (package.durationMonths <= 0 ? 1 : package.durationMonths),
+        periodStartsAt.toUtc().month +
+            (package.durationMonths <= 0 ? 1 : package.durationMonths),
         periodStartsAt.toUtc().day,
         periodStartsAt.toUtc().hour,
         periodStartsAt.toUtc().minute,
@@ -793,6 +811,8 @@ class FirebasePortalRepository implements PortalRepository {
         (snapshots[1] as QuerySnapshot<Map<String, dynamic>>).docs;
 
     for (final doc in registrationDocs) {
+      final data = doc.data();
+      if (_isDeletedRegistrationEntry(data)) continue;
       final row = _registrationRowFromFirestore(doc.id, doc.data());
       if (row == null) continue;
       rowsByKey['portal:${row.id}'] = row;
@@ -861,6 +881,44 @@ class FirebasePortalRepository implements PortalRepository {
       final aDate = DateTime.tryParse(a.periodStartsAt ?? a.createdAt) ??
           DateTime.fromMillisecondsSinceEpoch(0);
       final bDate = DateTime.tryParse(b.periodStartsAt ?? b.createdAt) ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      return bDate.compareTo(aDate);
+    });
+    return filtered;
+  }
+
+  List<CompetitionRegistrationRow> _filterCompetitionRows(
+    List<CompetitionRegistrationRow> rows,
+    CompetitionFilters filters,
+  ) {
+    final filtered = rows.where((row) {
+      if (filters.competitionType.isNotEmpty &&
+          filters.competitionType != 'ALL' &&
+          row.competitionType != filters.competitionType) {
+        return false;
+      }
+
+      final search = filters.search.trim().toLowerCase();
+      if (search.isNotEmpty) {
+        final haystack = [
+          row.id,
+          row.competitionType,
+          row.displayName,
+          row.customerPhone ?? '',
+          row.gender ?? '',
+          row.status,
+          ...row.players,
+        ].join(' ').toLowerCase();
+        if (!haystack.contains(search)) return false;
+      }
+
+      return true;
+    }).toList(growable: false);
+
+    filtered.sort((a, b) {
+      final aDate = DateTime.tryParse(a.createdAt) ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      final bDate = DateTime.tryParse(b.createdAt) ??
           DateTime.fromMillisecondsSinceEpoch(0);
       return bDate.compareTo(aDate);
     });
@@ -1011,9 +1069,8 @@ class FirebasePortalRepository implements PortalRepository {
           : readDouble(data['discountValue']),
       discountReason: readNullableString(data['discountReason']),
       finalPriceJod: readDouble(data['finalPriceJod']),
-      durationMonths: data['durationMonths'] == null
-          ? 1
-          : readInt(data['durationMonths']),
+      durationMonths:
+          data['durationMonths'] == null ? 1 : readInt(data['durationMonths']),
       periodStartsAt: _readNullableIso(data['periodStartsAt']) ??
           readNullableString(data['periodStartsAtIso']),
       periodEndsAt: _readNullableIso(data['periodEndsAt']) ??
@@ -1023,6 +1080,43 @@ class FirebasePortalRepository implements PortalRepository {
           readNullableString(data['frozenAtIso']),
       sessionsBonus: readInt(data['sessionsBonus']),
       collected: readDouble(data['collected']),
+      createdAt: createdAt,
+      updatedAt: _readIsoValue(data['updatedAt']) ??
+          readString(data['updatedAtIso'], fallback: createdAt),
+    );
+  }
+
+  CompetitionRegistrationRow? _competitionRowFromFirestore(
+    String docId,
+    Map<String, dynamic> data,
+  ) {
+    final createdAt =
+        _readIsoValue(data['createdAt']) ?? readString(data['createdAtIso']);
+    if (createdAt.isEmpty) return null;
+
+    return CompetitionRegistrationRow(
+      id: readString(data['id'], fallback: docId),
+      competitionType: readString(data['competitionType'], fallback: 'UNKNOWN')
+          .toUpperCase(),
+      participantName: readNullableString(data['participantName']),
+      age: data['age'] == null ? null : readInt(data['age']),
+      gender: readNullableString(data['gender']),
+      customerPhone: readNullableString(data['customerPhone']),
+      teamName: readNullableString(data['teamName']),
+      playerOne: readNullableString(data['playerOne']),
+      playerTwo: readNullableString(data['playerTwo']),
+      playerThree: readNullableString(data['playerThree']),
+      playerFour: readNullableString(data['playerFour']),
+      isPaid: readBool(data['isPaid']),
+      amountDue:
+          data['amountDue'] == null ? null : readDouble(data['amountDue']),
+      amountPaid:
+          data['amountPaid'] == null ? null : readDouble(data['amountPaid']),
+      paymentMethod: readNullableString(data['paymentMethod']),
+      paidAt: _readNullableIso(data['paidAt']) ??
+          readNullableString(data['paidAtIso']),
+      source: readString(data['source'], fallback: 'WEBSITE'),
+      status: readString(data['status'], fallback: 'NEW'),
       createdAt: createdAt,
       updatedAt: _readIsoValue(data['updatedAt']) ??
           readString(data['updatedAtIso'], fallback: createdAt),
@@ -1105,6 +1199,11 @@ bool _isVisibleRegistrationInboxEntry(Map<String, dynamic> data) {
   if (readBool(data['dbImported'])) return false;
   final status = readString(data['status'], fallback: 'PENDING').toUpperCase();
   return !const {'SYNCED', 'CANCELLED', 'CONFLICT', 'ERROR'}.contains(status);
+}
+
+bool _isDeletedRegistrationEntry(Map<String, dynamic> data) {
+  final status = readString(data['status']).toUpperCase();
+  return readBool(data['deleted']) || status == 'DELETED';
 }
 
 class _BlockedSlotRecord {

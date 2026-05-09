@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'bookings_screen.dart';
+import 'competitions_screen.dart';
 import 'create_booking_screen.dart';
 import 'create_registration_screen.dart';
 import 'notifications.dart';
@@ -54,6 +55,7 @@ class _HomeShellState extends State<HomeShell> {
     final pages = [
       BookingsScreen(repository: widget.repository),
       RegistrationsScreen(repository: widget.repository),
+      CompetitionsScreen(repository: widget.repository),
       CreateBookingScreen(repository: widget.repository),
       CreateRegistrationScreen(repository: widget.repository),
     ];
@@ -99,6 +101,11 @@ class _HomeShellState extends State<HomeShell> {
                   icon: Icon(Icons.groups_2_outlined),
                   selectedIcon: Icon(Icons.groups_2),
                   label: 'Registrations',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.emoji_events_outlined),
+                  selectedIcon: Icon(Icons.emoji_events),
+                  label: 'Competitions',
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.add_box_outlined),

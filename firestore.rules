@@ -1,7 +1,111 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function hasUserDoc() {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function role() {
+      return hasUserDoc()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : null;
+    }
+
+    function isCoach() {
+      return role() == "coach";
+    }
+
+    function isPlayer() {
+      return role() == "player";
+    }
+
+    function userData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function playerDoc(playerId) {
+      return get(/databases/$(database)/documents/players/$(playerId)).data;
+    }
+
+    function playerManagedByGuardian(playerData) {
+      return playerData.parentId == request.auth.uid ||
+        (
+          'guardianIds' in playerData &&
+          request.auth.uid in playerData.guardianIds
+        );
+    }
+
+    function playerLinkedToCurrentUser(playerId) {
+      return hasUserDoc() && (
+        (
+          'playerId' in userData() &&
+          userData().playerId is string &&
+          userData().playerId == playerId
+        ) ||
+        (
+          'playerIds' in userData() &&
+          userData().playerIds is list &&
+          playerId in userData().playerIds
+        )
+      );
+    }
+
+    function playerBelongsToUser(playerId, playerData) {
+      return playerManagedByGuardian(playerData) ||
+        (
+          isPlayer() &&
+          playerLinkedToCurrentUser(playerId)
+        );
+    }
+
+    function ownsPlayer(playerId) {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/players/$(playerId)) &&
+        playerBelongsToUser(playerId, playerDoc(playerId));
+    }
+
+    function listedForViewer(data) {
+      return 'viewerIds' in data && request.auth.uid in data.viewerIds;
+    }
+
+    function canReadPlayer(playerId, playerData) {
+      return isCoach() || playerBelongsToUser(playerId, playerData);
+    }
+
+    function canReadPlayerLinkedData(data) {
+      return isCoach() || (
+        'playerId' in data &&
+        data.playerId is string &&
+        ownsPlayer(data.playerId)
+      );
+    }
+
+    function onlyPhotoUrlChanged(newData, oldData) {
+      return newData.diff(oldData).affectedKeys().hasOnly(['photoUrl']) &&
+        (
+          !('photoUrl' in newData) ||
+          newData.photoUrl is string
+        );
+    }
+
+    function validParentPointsRedemptionUpdate(newData, oldData) {
+      return 'portalOverview' in newData &&
+        'portalOverview' in oldData &&
+        newData.diff(oldData).affectedKeys().hasOnly([
+          'portalOverview',
+          'updatedAt'
+        ]) &&
+        newData.portalOverview.pointsBalance is int &&
+        oldData.portalOverview.pointsBalance is int &&
+        newData.portalOverview.pointsBalance >= 0 &&
+        newData.portalOverview.pointsBalance <= oldData.portalOverview.pointsBalance;
+    }
+
     function isString(field, maxLen) {
       return field is string && field.size() > 0 && field.size() <= maxLen;
     }
@@ -22,24 +126,16 @@ service cloud.firestore {
       return field == null || field is number;
     }
 
-    function isBookingInboxCreate() {
+    function isBookingActionInboxCreate() {
       return request.resource.data.keys().hasOnly([
         'id',
         'bookingId',
-        'companyId',
-        'facilityArea',
-        'courtName',
-        'status',
+        'actionType',
+        'confirmBooking',
+        'paymentAmount',
+        'paymentMethod',
         'source',
-        'isPaid',
-        'customerName',
-        'customerPhone',
-        'customerEmail',
-        'notes',
-        'startTime',
-        'startTimeIso',
-        'endTime',
-        'endTimeIso',
+        'status',
         'dbImported',
         'createdAt',
         'createdAtIso',
@@ -47,22 +143,34 @@ service cloud.firestore {
         'updatedAtIso'
       ]) &&
       request.resource.data.id == request.resource.id &&
-      request.resource.data.bookingId == request.resource.id &&
-      request.resource.data.status == 'PENDING' &&
+      isString(request.resource.data.bookingId, 120) &&
+      request.resource.data.actionType in ['CONFIRM_BOOKING', 'COLLECT_PAYMENT'] &&
+      request.resource.data.confirmBooking is bool &&
       request.resource.data.source == 'APP' &&
-      request.resource.data.isPaid == false &&
+      request.resource.data.status == 'PENDING' &&
       request.resource.data.dbImported == false &&
-      isString(request.resource.data.customerName, 160) &&
-      isString(request.resource.data.customerPhone, 60) &&
-      isString(request.resource.data.facilityArea, 160) &&
-      isString(request.resource.data.courtName, 160) &&
-      (request.resource.data.companyId == null || isOptionalString(request.resource.data.companyId, 120)) &&
-      isOptionalEmail(request.resource.data.customerEmail) &&
-      isOptionalString(request.resource.data.notes, 800) &&
-      request.resource.data.startTime is timestamp &&
-      request.resource.data.endTime is timestamp &&
-      isString(request.resource.data.startTimeIso, 40) &&
-      isString(request.resource.data.endTimeIso, 40) &&
+      isOptionalNumber(request.resource.data.paymentAmount) &&
+      isOptionalString(request.resource.data.paymentMethod, 20) &&
+      (
+        (
+          request.resource.data.actionType == 'CONFIRM_BOOKING' &&
+          request.resource.data.confirmBooking == true &&
+          request.resource.data.paymentAmount == null &&
+          request.resource.data.paymentMethod == null
+        ) ||
+        (
+          request.resource.data.actionType == 'COLLECT_PAYMENT' &&
+          request.resource.data.paymentAmount is number &&
+          request.resource.data.paymentAmount > 0 &&
+          request.resource.data.paymentMethod in [
+            'CASH',
+            'CARD',
+            'ONLINE',
+            'TRANSFER',
+            'OTHER'
+          ]
+        )
+      ) &&
       isString(request.resource.data.createdAtIso, 40) &&
       isString(request.resource.data.updatedAtIso, 40) &&
       isOptionalTimestamp(request.resource.data.createdAt) &&
@@ -132,82 +240,164 @@ service cloud.firestore {
       (request.resource.data.frozenAtIso == null || isOptionalString(request.resource.data.frozenAtIso, 40)) &&
       (request.resource.data.sessionsBonus == null || request.resource.data.sessionsBonus is int) &&
       (request.resource.data.collected == null || request.resource.data.collected is number) &&
-      isOptionalTimestamp(request.resource.data.periodStartsAt) &&
       isOptionalTimestamp(request.resource.data.createdAt) &&
       isOptionalTimestamp(request.resource.data.updatedAt) &&
       isString(request.resource.data.createdAtIso, 40) &&
       isString(request.resource.data.updatedAtIso, 40);
     }
 
-    function isBookingActionInboxCreate() {
-      return request.resource.data.keys().hasOnly([
-        'id',
-        'bookingId',
-        'actionType',
-        'confirmBooking',
-        'paymentAmount',
-        'paymentMethod',
-        'source',
-        'status',
-        'dbImported',
-        'createdAt',
-        'createdAtIso',
-        'updatedAt',
-        'updatedAtIso'
-      ]) &&
-      request.resource.data.id == request.resource.id &&
-      isString(request.resource.data.bookingId, 120) &&
-      request.resource.data.actionType in ['CONFIRM_BOOKING', 'COLLECT_PAYMENT'] &&
-      request.resource.data.confirmBooking is bool &&
-      request.resource.data.source == 'APP' &&
-      request.resource.data.status == 'PENDING' &&
-      request.resource.data.dbImported == false &&
-      isOptionalNumber(request.resource.data.paymentAmount) &&
-      isOptionalString(request.resource.data.paymentMethod, 20) &&
-      (
-        (request.resource.data.actionType == 'CONFIRM_BOOKING' &&
-          request.resource.data.confirmBooking == true &&
-          request.resource.data.paymentAmount == null &&
-          request.resource.data.paymentMethod == null) ||
-        (request.resource.data.actionType == 'COLLECT_PAYMENT' &&
-          request.resource.data.paymentAmount is number &&
-          request.resource.data.paymentAmount > 0 &&
-          request.resource.data.paymentMethod in ['CASH', 'CARD', 'ONLINE', 'TRANSFER', 'OTHER'])
-      ) &&
-      isString(request.resource.data.createdAtIso, 40) &&
-      isString(request.resource.data.updatedAtIso, 40) &&
-      isOptionalTimestamp(request.resource.data.createdAt) &&
-      isOptionalTimestamp(request.resource.data.updatedAt);
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow update: if signedIn() &&
+        request.auth.uid == uid &&
+        (
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'name',
+              'photoUrl'
+            ]) &&
+            (
+              !('name' in request.resource.data) ||
+              request.resource.data.name is string
+            ) &&
+            (
+              !('photoUrl' in request.resource.data) ||
+              request.resource.data.photoUrl is string
+            )
+          ) ||
+          (
+            request.auth.token.email == 'guest.access@infinitytrack.app' &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'sessionEmail'
+            ]) &&
+            request.resource.data.sessionEmail is string
+          ) ||
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'fcmToken'
+            ]) &&
+            request.resource.data.fcmToken is string
+          )
+        );
+      allow create: if signedIn() &&
+        request.auth.uid == uid &&
+        request.auth.token.email == 'guest.access@infinitytrack.app' &&
+        request.resource.data.role == 'guest' &&
+        request.resource.data.email == 'guest.access@infinitytrack.app';
+      allow delete: if false;
+
+      match /portalReceipts/{receiptId} {
+        allow read: if signedIn() && request.auth.uid == uid;
+        allow create, update, delete: if false;
+      }
+
+      match /shopRedemptions/{redemptionId} {
+        allow read: if signedIn() && request.auth.uid == uid;
+        allow create: if signedIn() && request.auth.uid == uid;
+        allow update, delete: if false;
+      }
     }
 
-    match /portalBookings/{document=**} {
-      allow read: if true;
-      allow write: if false;
+    match /guestAccess/{emailKey} {
+      allow read: if signedIn();
+      allow create, update: if (
+        hasUserDoc() &&
+        role() == 'parent' &&
+        request.resource.data.parentUid == request.auth.uid &&
+        request.resource.data.email == emailKey &&
+        request.resource.data.playerIds is list &&
+        request.resource.data.players is list
+      ) || (
+        signedIn() &&
+        request.auth.token.email == 'guest.access@infinitytrack.app' &&
+        request.resource.data.guestEmail is string &&
+        request.resource.data.guestEmail == emailKey
+      ) || (
+        signedIn() &&
+        request.auth.token.email == 'guest.access@infinitytrack.app' &&
+        (
+          ('guestEmail' in resource.data && resource.data.guestEmail == emailKey) ||
+          ('email' in resource.data && resource.data.email == emailKey)
+        ) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmToken']) &&
+        (
+          !('fcmToken' in request.resource.data) ||
+          request.resource.data.fcmToken is string
+        )
+      );
+      allow delete: if false;
     }
 
-    match /portalBookingConfig/{document=**} {
-      allow read: if true;
-      allow write: if false;
+    match /players/{playerId} {
+      allow list: if isCoach() || (signedIn() && hasUserDoc());
+      allow get: if canReadPlayer(playerId, resource.data);
+      allow create, delete: if isCoach();
+      allow update: if isCoach() || (
+        (
+          playerManagedByGuardian(resource.data) &&
+          (
+            onlyPhotoUrlChanged(request.resource.data, resource.data) ||
+            validParentPointsRedemptionUpdate(request.resource.data, resource.data)
+          )
+        ) ||
+        (
+          playerLinkedToCurrentUser(playerId) &&
+          (
+            onlyPhotoUrlChanged(request.resource.data, resource.data) ||
+            validParentPointsRedemptionUpdate(request.resource.data, resource.data)
+          )
+        )
+      );
     }
 
-    match /portalBookingAvailability/{document=**} {
-      allow read: if true;
-      allow write: if false;
+    match /portalShopItems/{itemId} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
     }
 
-    match /portalRegistrations/{document=**} {
-      allow read: if true;
-      allow write: if false;
+    match /portalRegistrations/{registrationId} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
     }
 
-    match /portalRegistrationConfig/{document=**} {
-      allow read: if true;
-      allow write: if false;
+    match /portalCompetitionRegistrations/{registrationId} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
     }
 
-    match /portalBookingInbox/{documentId} {
+    match /academyEvents/{eventId} {
       allow read: if true;
-      allow create: if isBookingInboxCreate();
+      allow create, update, delete: if false;
+    }
+
+    match /portalBookingConfig/{docId} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
+    }
+
+    match /portalBookingAvailability/{docId} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
+    }
+
+    match /portalBookings/{bookingId} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
+    }
+
+    match /portalBookingInbox/{bookingId} {
+      allow read: if signedIn();
+      allow create: if signedIn() &&
+        request.resource.data.source == 'APP' &&
+        request.resource.data.status == 'PENDING' &&
+        request.resource.data.bookingId is string &&
+        request.resource.data.courtId is string &&
+        request.resource.data.courtName is string &&
+        request.resource.data.startTime is timestamp &&
+        request.resource.data.endTime is timestamp &&
+        request.resource.data.customerName is string &&
+        request.resource.data.customerPhone is string &&
+        request.resource.data.customerEmail is string;
       allow update, delete: if false;
     }
 
@@ -217,14 +407,55 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /portalRegistrations/{documentId} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
+    }
+
+    match /portalRegistrationConfig/{documentId} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
+    }
+
     match /portalRegistrationInbox/{documentId} {
-      allow read: if true;
-      allow create: if isRegistrationInboxCreate();
+      allow read: if signedIn();
+      allow create: if signedIn() && isRegistrationInboxCreate();
       allow update, delete: if false;
     }
 
-    match /{document=**} {
-      allow read, write: if false;
+    match /appMeta/{docId} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
+    }
+
+    match /evaluations/{evaluationId} {
+      allow get: if canReadPlayerLinkedData(resource.data) || listedForViewer(resource.data);
+      allow list: if isCoach() || (signedIn() && hasUserDoc());
+      allow create, update, delete: if isCoach();
+    }
+
+    match /videos/{videoId} {
+      allow get: if canReadPlayerLinkedData(resource.data) || listedForViewer(resource.data);
+      allow list: if isCoach() || (signedIn() && hasUserDoc());
+      allow create, update, delete: if isCoach();
+    }
+
+    match /attendance/{attendanceId} {
+      allow get: if isCoach() || ownsPlayer(resource.data.playerId);
+      allow list: if isCoach() || (signedIn() && hasUserDoc());
+      allow create, update, delete: if isCoach();
+    }
+
+    match /goals/{goalId} {
+      allow get: if isCoach() || ownsPlayer(resource.data.playerId);
+      allow list: if isCoach() || (signedIn() && hasUserDoc());
+      allow create, update, delete: if isCoach();
+    }
+
+    match /wellness/{entryId} {
+      allow get: if isCoach() || ownsPlayer(resource.data.playerId);
+      allow list: if isCoach() || (signedIn() && hasUserDoc());
+      allow create, update, delete: if isCoach();
     }
   }
 }

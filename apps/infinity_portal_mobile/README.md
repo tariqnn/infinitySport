@@ -1,6 +1,6 @@
 # Infinity Portal Mobile (Flutter)
 
-The mobile app now connects directly to Firebase. It does not require the portal HTTP API for bookings or registrations.
+The mobile app now connects directly to Firebase. It does not require the portal HTTP API for bookings, registrations, or competition registrations.
 
 ## Firebase read/write model
 
@@ -11,6 +11,7 @@ The mobile app now connects directly to Firebase. It does not require the portal
 - Reads registrations from `portalRegistrations`
 - Reads package and canceled-session config from `portalRegistrationConfig/current`
 - Writes new registration requests to `portalRegistrationInbox`
+- Reads competition registrations from `portalCompetitionRegistrations`
 
 The website/portal can keep using Neon/Postgres. Firebase acts as the mobile database, and the portal sync jobs keep both stores aligned.
 
@@ -22,6 +23,7 @@ From the repo root, backfill existing portal data into Firebase:
 
 - `npm run bookings:backfill:firebase`
 - `npm run registrations:backfill:firebase`
+- `npm run competitions:backfill:firebase`
 
 Keep the mirror fresh by calling:
 
@@ -45,6 +47,6 @@ If you want Firebase Functions to import app-origin mobile writes directly into 
 ## Notifications
 
 - The app subscribes devices to `infinity_portal_all`.
-- Firebase Functions can broadcast booking and registration updates to that topic immediately when Firestore inbox records are created.
+- Firebase Functions can broadcast booking, registration, and competition registration updates to that topic immediately when Firestore records are created.
 - The same Firebase Functions can also write those app-origin records directly into Postgres, so the data shows in the portal even when the portal site is not running.
 - No login is required.

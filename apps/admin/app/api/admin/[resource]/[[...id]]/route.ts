@@ -252,7 +252,7 @@ async function handlePost(resource: string, body: JsonBody) {
 
     const firestoreId = await createAcademyEvent({
       title,
-      location: toTrimmedString(body.location) || 'Infinity Campus',
+      location: toTrimmedString(body.location) || 'Infinity Sports',
       startAt,
       endAt,
       description: toOptionalString(body.description),
@@ -267,7 +267,7 @@ async function handlePost(resource: string, body: JsonBody) {
           title,
           description: toOptionalString(body.description),
           date: startAt,
-          location: toTrimmedString(body.location) || 'Infinity Campus',
+          location: toTrimmedString(body.location) || 'Infinity Sports',
           imageUrl,
           highlight: published,
         },
@@ -454,7 +454,7 @@ async function handlePatch(resource: string, id: string | null, body: JsonBody) 
     if (hasOwn(body, 'title')) patchFs.title = toTrimmedString(body.title) || '';
     if (hasOwn(body, 'description')) patchFs.description = toOptionalString(body.description);
     if (hasOwn(body, 'date')) patchFs.startAt = toDate(body.date) || new Date();
-    if (hasOwn(body, 'location')) patchFs.location = toTrimmedString(body.location) || 'Infinity Campus';
+    if (hasOwn(body, 'location')) patchFs.location = toTrimmedString(body.location) || 'Infinity Sports';
     if (hasOwn(body, 'endAt')) patchFs.endAt = toDate(body.endAt);
     if (hasOwn(body, 'imageUrl')) {
       const imageUrl = toTrimmedString(body.imageUrl);
@@ -477,7 +477,7 @@ async function handlePatch(resource: string, id: string | null, body: JsonBody) 
         title: fresh.title,
         description: fresh.description,
         date: fresh.startAt ?? new Date(),
-        location: fresh.location || 'Infinity Campus',
+        location: fresh.location || 'Infinity Sports',
         imageUrl: fresh.imageUrl,
         highlight: fresh.published,
       },
@@ -485,7 +485,7 @@ async function handlePatch(resource: string, id: string | null, body: JsonBody) 
         title: fresh.title,
         description: fresh.description,
         date: fresh.startAt ?? new Date(),
-        location: fresh.location || 'Infinity Campus',
+        location: fresh.location || 'Infinity Sports',
         imageUrl: fresh.imageUrl,
         highlight: fresh.published,
       },

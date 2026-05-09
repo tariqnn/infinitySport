@@ -10,46 +10,34 @@ function isBasketballSummerCamp(title: string) {
   return normalized === 'basketball summer camp' || (normalized.includes('basketball') && normalized.includes('summer camp'));
 }
 
-function nextSaturdayIso() {
-  const date = new Date();
-  const daysUntilSaturday = (6 - date.getDay() + 7) % 7;
-  date.setDate(date.getDate() + daysUntilSaturday);
-  date.setHours(10, 0, 0, 0);
-  return date.toISOString();
+function isWeekendBasketballCompetition(title: string) {
+  const normalized = title.trim().toLowerCase();
+  return normalized.includes('weekend') && normalized.includes('basketball') && normalized.includes('competition');
 }
 
 export function EventsContent({ eventsData }: { eventsData: EventResponse[] }) {
   const { language } = useLanguage();
 
-  const events = [
-    {
-      id: 'weekend-basketball-competitions',
-      title: 'Weekend Basketball Competitions',
-      date: nextSaturdayIso(),
-      location: 'Infinity Campus',
-      description: 'All competitions start this weekend. Register for 3x3, King / Queen, Jack of the Court, 3 Point Competition, or Dunk Contest.',
-      imageUrl: '/weekend-competitions.png',
-      link: '/events/weekend-competitions/register',
-      highlight: true,
-      isSummerCamp: false,
-      isCompetition: true,
-    },
-    ...eventsData.map((event) => {
-      const isSummerCamp = isBasketballSummerCamp(event.title);
-      return {
+  const events = eventsData.map((event) => {
+    const isSummerCamp = isBasketballSummerCamp(event.title);
+    const isCompetition = event.id === 'weekend-basketball-competitions' || isWeekendBasketballCompetition(event.title);
+    return {
       id: event.id,
       title: event.title,
       date: event.date,
-      location: event.location || 'Infinity Campus',
+      location: event.location || 'Infinity Sports',
       description: event.description || '',
       imageUrl: event.imageUrl || (isSummerCamp ? '/hero-basketball.jpg' : '/events.jpeg'),
-      link: isSummerCamp ? '/events/basketball-summer-camp/register' : event.link || '/contact',
+      link: isSummerCamp
+        ? '/events/basketball-summer-camp/register'
+        : isCompetition
+          ? '/events/weekend-competitions/register'
+          : event.link || '/contact',
       highlight: event.highlight || false,
       isSummerCamp,
-      isCompetition: false,
+      isCompetition,
     };
-    }),
-  ];
+  });
 
   const upcoming = events.filter((event) => new Date(event.date) >= new Date());
   const past = events.filter((event) => new Date(event.date) < new Date());

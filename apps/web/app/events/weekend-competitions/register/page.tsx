@@ -23,7 +23,7 @@ export default function WeekendCompetitionsRegisterPage() {
           </p>
           <div className="mt-6 overflow-hidden rounded-2xl border border-brand-lightBlue/20 shadow-[0_8px_32px_rgba(0,0,0,0.08)]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/weekend-competitions.png" alt="Weekend basketball competitions" className="h-72 w-full object-cover" />
+            <img src="/1.jpeg" alt="Weekend basketball competitions" className="h-72 w-full object-cover" />
           </div>
         </div>
 

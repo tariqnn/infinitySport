@@ -148,7 +148,7 @@ export function academyEventToAdminApi(row: AcademyEventRecord) {
     title: row.title,
     date: (row.startAt ?? new Date()).toISOString(),
     endAt: row.endAt ? row.endAt.toISOString() : null,
-    location: row.location || "Infinity Campus",
+    location: row.location || "Infinity Sports",
     description: row.description ?? undefined,
     imageUrl: row.imageUrl ?? "",
     highlight: row.published,

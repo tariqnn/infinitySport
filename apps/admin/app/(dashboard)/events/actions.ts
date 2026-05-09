@@ -16,7 +16,7 @@ export async function upsertEventAction(_prev: EventState, formData: FormData): 
       title: formData.get('title')?.toString() ?? '',
       description: formData.get('description')?.toString() ?? '',
       date: new Date(formData.get('date')?.toString() ?? '').toISOString(),
-      location: formData.get('location')?.toString() ?? 'Infinity Campus',
+      location: formData.get('location')?.toString() ?? 'Infinity Sports',
       link: formData.get('link')?.toString() || '/events',
       isActive: formData.get('isActive')?.toString() !== 'hidden'
     });

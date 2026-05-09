@@ -15,6 +15,17 @@ interface EventState {
 /** Admin API row (Prisma + Firestore academyEvents); `endAt` optional for mobile app. */
 type AdminEventRow = LandingEvent & { endAt?: string | Date | null };
 
+type AdminApiEvent = {
+  id: string;
+  title: string;
+  date: string;
+  endAt?: string | Date | null;
+  location?: string | null;
+  description?: string | null;
+  imageUrl?: string | null;
+  highlight?: boolean;
+};
+
 const initialState: EventState = { status: 'idle' };
 const appBaseUrl = (process.env.NEXT_PUBLIC_APP_BASE_URL || '').replace(/\/$/, '');
 
@@ -43,6 +54,20 @@ function toDatetimeLocalValue(value: string | Date | null | undefined): string {
   return d.toISOString().slice(0, 16);
 }
 
+function toAdminEventRow(event: AdminApiEvent): AdminEventRow {
+  return {
+    id: event.id,
+    title: event.title,
+    date: event.date,
+    endAt: event.endAt ?? undefined,
+    location: event.location || 'Infinity Sports',
+    description: event.description || undefined,
+    imageUrl: event.imageUrl || undefined,
+    link: '/events',
+    isActive: event.highlight !== false,
+  };
+}
+
 export function EventsManager() {
   const [events, setEvents] = useState<AdminEventRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,20 +87,8 @@ export function EventsManager() {
   useEffect(() => {
     async function loadEvents() {
       try {
-        const apiEvents = await apiClient.getEvents();
-        // Transform API events to LandingEvent format
-        const transformed: AdminEventRow[] = apiEvents.map((e: any) => ({
-          id: e.id,
-          title: e.title,
-          date: e.date,
-          endAt: e.endAt ?? undefined,
-          location: e.location,
-          description: e.description || undefined,
-          imageUrl: e.imageUrl || undefined,
-          link: '/events',
-          isActive: e.highlight !== false,
-        }));
-        setEvents(transformed);
+        const apiEvents = (await apiClient.getEvents()) as AdminApiEvent[];
+        setEvents(apiEvents.map(toAdminEventRow));
       } catch (error) {
         console.error('Failed to load events:', error);
         setCreateState({ 
@@ -123,7 +136,7 @@ export function EventsManager() {
         description: formData.get('description')?.toString() || undefined,
         date: date,
         endAt,
-        location: formData.get('location')?.toString() || 'Infinity Campus',
+        location: formData.get('location')?.toString() || 'Infinity Sports',
         imageUrl,
         highlight: formData.get('isActive')?.toString() !== 'hidden',
       };
@@ -137,19 +150,8 @@ export function EventsManager() {
       }
 
       // Reload events
-      const apiEvents = await apiClient.getEvents();
-      const transformed: AdminEventRow[] = apiEvents.map((e: any) => ({
-        id: e.id,
-        title: e.title,
-        date: e.date,
-        endAt: e.endAt ?? undefined,
-        location: e.location,
-        description: e.description || undefined,
-        imageUrl: e.imageUrl || undefined,
-        link: '/events',
-        isActive: e.highlight !== false,
-      }));
-      setEvents(transformed);
+      const apiEvents = (await apiClient.getEvents()) as AdminApiEvent[];
+      setEvents(apiEvents.map(toAdminEventRow));
       setEditing(null);
       if (!isEdit) {
         setFormKey((value) => value + 1);
@@ -177,19 +179,8 @@ export function EventsManager() {
       setDeleteState({ status: 'success', message: 'Event deleted successfully!' });
       
       // Reload events
-      const apiEvents = await apiClient.getEvents();
-      const transformed: AdminEventRow[] = apiEvents.map((e: any) => ({
-        id: e.id,
-        title: e.title,
-        date: e.date,
-        endAt: e.endAt ?? undefined,
-        location: e.location,
-        description: e.description || undefined,
-        imageUrl: e.imageUrl || undefined,
-        link: '/events',
-        isActive: e.highlight !== false,
-      }));
-      setEvents(transformed);
+      const apiEvents = (await apiClient.getEvents()) as AdminApiEvent[];
+      setEvents(apiEvents.map(toAdminEventRow));
       router.refresh();
     } catch (error) {
       console.error('Failed to delete event:', error);
@@ -246,7 +237,7 @@ export function EventsManager() {
         </label>
         <label className="text-sm font-semibold text-slate-600">
           Location
-          <input name="location" defaultValue={current?.location ?? 'Infinity Campus'} className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2" />
+          <input name="location" defaultValue={current?.location ?? 'Infinity Sports'} className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2" />
         </label>
         <label className="text-sm font-semibold text-slate-600">
           Link

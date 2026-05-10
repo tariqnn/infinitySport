@@ -5,7 +5,7 @@ import { PageHeader, Card, CardHeader, CardBody, Badge, Select, Input, Button } 
 import { packageRegistrationsApi, packageSessionCanceledApi, packagesApi, type PackageOption, type PackageRegistrationRow } from '../../lib/portalApi';
 import { ExportCsvButton } from '../_components/ActionButtons';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { PlusCircleIcon, EllipsisVerticalIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { PlusCircleIcon, EllipsisVerticalIcon, ArrowPathIcon, ClipboardDocumentListIcon } from '@heroicons/react/24/outline';
 import { MarkAsPaidModal } from './_components/MarkAsPaidModal';
 import { ViewReceiptsModal } from './_components/ViewReceiptsModal';
 import { BulkAddPeopleModal } from './_components/BulkAddPeopleModal';
@@ -15,7 +15,6 @@ import { RegistrationTotalsPanel } from './_components/RegistrationTotalsPanel';
 import { CancelSessionDayModal } from './_components/CancelSessionDayModal';
 import { AddRegistrationModal, type InitialPerson } from './_components/AddRegistrationModal';
 import { RegistrationDetailsModal } from './_components/RegistrationDetailsModal';
-import { RegisterInAnotherPackageModal } from './_components/RegisterInAnotherPackageModal';
 import { RegisterExistingPersonModal } from './_components/RegisterExistingPersonModal';
 import { RegisterPersonMultiPackageModal } from './_components/RegisterPersonMultiPackageModal';
 import { PersonDetailsModal } from './_components/PersonDetailsModal';
@@ -24,6 +23,7 @@ import { ReRegisterModal } from './_components/ReRegisterModal';
 import { CreateTrackerAccountModal } from './_components/CreateTrackerAccountModal';
 import { CreatePlayerAccountModal } from './_components/CreatePlayerAccountModal';
 import { ManagePackageSessionsModal } from './_components/ManagePackageSessionsModal';
+import { OldRegistrationImportModal } from './_components/OldRegistrationImportModal';
 
 type Registration = PackageRegistrationRow;
 
@@ -44,6 +44,7 @@ export default function RegistrationsPage() {
   const [markPaidRegistration, setMarkPaidRegistration] = useState<Registration | null>(null);
   const [viewReceiptsRegistration, setViewReceiptsRegistration] = useState<Registration | null>(null);
   const [bulkAddOpen, setBulkAddOpen] = useState(false);
+  const [oldImportOpen, setOldImportOpen] = useState(false);
   const [increaseSessionRegistration, setIncreaseSessionRegistration] = useState<Registration | null>(null);
   const [addPointsRegistration, setAddPointsRegistration] = useState<Registration | null>(null);
   const [cancelSessionDayOpen, setCancelSessionDayOpen] = useState(false);
@@ -52,7 +53,6 @@ export default function RegistrationsPage() {
   const [detailsModalRow, setDetailsModalRow] = useState<Registration | null>(null);
   const [editRegistrationRow, setEditRegistrationRow] = useState<Registration | null>(null);
   const [reRegisterRow, setReRegisterRow] = useState<Registration | null>(null);
-  const [registerInAnotherPackageRow, setRegisterInAnotherPackageRow] = useState<Registration | null>(null);
   const [registerExistingPersonOpen, setRegisterExistingPersonOpen] = useState(false);
   const [addRegistrationInitialPerson, setAddRegistrationInitialPerson] = useState<InitialPerson | null>(null);
   const [personDetailsPhone, setPersonDetailsPhone] = useState<string | null>(null);
@@ -439,6 +439,13 @@ export default function RegistrationsPage() {
           <div className="flex items-center gap-2">
             <Button
               variant="secondary"
+              onClick={() => setOldImportOpen(true)}
+              leadingIcon={<ClipboardDocumentListIcon className="h-4 w-4" />}
+            >
+              Bulk old records
+            </Button>
+            <Button
+              variant="secondary"
               onClick={() => setManagePackageSessionsOpen(true)}
             >
               Manage packages
@@ -448,7 +455,7 @@ export default function RegistrationsPage() {
               onClick={() => setTrackerCoachOnlyOpen(true)}
               className="text-indigo-700 border-indigo-200 hover:bg-indigo-50"
             >
-              Create coach account for Infinity Tracker
+              Create coach account
             </Button>
             <Button
               variant="secondary"
@@ -534,17 +541,17 @@ export default function RegistrationsPage() {
                 />
               </div>
               <Button variant="secondary" onClick={() => setCancelSessionDayOpen(true)} className="inline-flex items-center gap-1">
-                Record canceled day
+                Record canceled class day
               </Button>
               <Button variant="secondary" onClick={() => setAddRegistrationOpen(true)} className="inline-flex items-center gap-1">
-                Add person
+                Add new player
               </Button>
               <Button variant="secondary" onClick={() => { setRegisterPersonMultiInitialPerson(null); setRegisterPersonMultiOpen(true); }} className="inline-flex items-center gap-1">
-                Register existing person
+                Add package(s)
               </Button>
               <Button variant="primary" onClick={() => setBulkAddOpen(true)} className="inline-flex items-center gap-1">
                 <PlusCircleIcon className="h-4 w-4" />
-                Add Multiple People
+                Bulk add players
               </Button>
               <ExportCsvButton
                 rows={rows.map(r => {
@@ -767,6 +774,9 @@ export default function RegistrationsPage() {
                               collisionPadding={12}
                               className="z-[60] min-w-[14rem] rounded-lg border border-ui-border bg-white py-1 shadow-lg focus:outline-none"
                             >
+                              <DropdownMenu.Label className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ui-textMuted">
+                                Payment
+                              </DropdownMenu.Label>
                               {paymentStatus !== 'PAID' && (
                                 <DropdownMenu.Item
                                   className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
@@ -792,49 +802,28 @@ export default function RegistrationsPage() {
                                   {markingUnpaidId === row.id ? 'Marking unpaid…' : 'Mark as Unpaid'}
                                 </DropdownMenu.Item>
                               )}
-                              <DropdownMenu.Item
-                                className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg disabled:opacity-50"
-                                onSelect={() => toggleFreeze(row)}
-                                disabled={freezingId === row.id}
-                              >
-                                {row.isFrozen ? 'Unfreeze' : 'Freeze'}
-                              </DropdownMenu.Item>
+                              <DropdownMenu.Separator className="my-1 h-px bg-ui-border" />
+                              <DropdownMenu.Label className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ui-textMuted">
+                                Player & registration
+                              </DropdownMenu.Label>
                               <DropdownMenu.Item
                                 className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
-                                onSelect={() => setIncreaseSessionRegistration(row)}
+                                onSelect={() => setDetailsModalRow(row)}
                               >
-                                +1 Session
-                              </DropdownMenu.Item>
-                              <DropdownMenu.Item
-                                className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
-                                onSelect={() => setAddPointsRegistration(row)}
-                              >
-                                Add points
+                                View player details
                               </DropdownMenu.Item>
                               <DropdownMenu.Item
                                 className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
                                 onSelect={() => { setRegisterPersonMultiInitialPerson({ customerName: row.customerName, customerPhone: row.customerPhone, customerEmail: row.customerEmail ?? undefined, customerAge: row.customerAge ?? undefined }); setRegisterPersonMultiOpen(true); }}
                               >
-                                Add another package
-                              </DropdownMenu.Item>
-                              <DropdownMenu.Item
-                                className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
-                                onSelect={() => setRegisterInAnotherPackageRow(row)}
-                              >
-                                Register in one more package
+                                Add package(s)
                               </DropdownMenu.Item>
                               <DropdownMenu.Item
                                 className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg disabled:opacity-50"
                                 onSelect={() => setReRegisterRow(row)}
                                 disabled={reRegisterRow?.id === row.id}
                               >
-                                Re-register
-                              </DropdownMenu.Item>
-                              <DropdownMenu.Item
-                                className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
-                                onSelect={() => setDetailsModalRow(row)}
-                              >
-                                View details
+                                Add missing month
                               </DropdownMenu.Item>
                               <DropdownMenu.Item
                                 className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
@@ -843,13 +832,36 @@ export default function RegistrationsPage() {
                                 Edit registration
                               </DropdownMenu.Item>
                               <DropdownMenu.Item
+                                className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg disabled:opacity-50"
+                                onSelect={() => toggleFreeze(row)}
+                                disabled={freezingId === row.id}
+                              >
+                                {row.isFrozen ? 'Unfreeze registration' : 'Freeze registration'}
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item
+                                className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
+                                onSelect={() => setIncreaseSessionRegistration(row)}
+                              >
+                                Add 1 session
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item
+                                className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
+                                onSelect={() => setAddPointsRegistration(row)}
+                              >
+                                Add points
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Separator className="my-1 h-px bg-ui-border" />
+                              <DropdownMenu.Label className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ui-textMuted">
+                                Accounts
+                              </DropdownMenu.Label>
+                              <DropdownMenu.Item
                                 className="cursor-pointer px-4 py-2 text-sm text-indigo-700 outline-none hover:bg-indigo-50 data-[highlighted]:bg-indigo-50"
                                 onSelect={() => {
                                   setTrackerAccountInitialRole('parent');
                                   setTrackerAccountRegistrations(getTrackerLinkedRegistrations(row));
                                 }}
                               >
-                                Create account for Infinity Tracker
+                                Create account for parents
                               </DropdownMenu.Item>
                               <DropdownMenu.Item
                                 className="cursor-pointer px-4 py-2 text-sm text-violet-700 outline-none hover:bg-violet-50 data-[highlighted]:bg-violet-50"
@@ -857,12 +869,13 @@ export default function RegistrationsPage() {
                               >
                                 Create player account
                               </DropdownMenu.Item>
+                              <DropdownMenu.Separator className="my-1 h-px bg-ui-border" />
                               <DropdownMenu.Item
                                 className="cursor-pointer px-4 py-2 text-sm text-red-600 outline-none hover:bg-red-50 data-[highlighted]:bg-red-50 disabled:opacity-50"
                                 onSelect={() => handleDelete(row)}
                                 disabled={deletingId === row.id}
                               >
-                                Delete
+                                Delete registration
                               </DropdownMenu.Item>
                             </DropdownMenu.Content>
                           </DropdownMenu.Portal>
@@ -908,6 +921,16 @@ export default function RegistrationsPage() {
           setBulkAddOpen(false);
           load();
         }}
+      />
+
+      <OldRegistrationImportModal
+        open={oldImportOpen}
+        onClose={() => setOldImportOpen(false)}
+        onSuccess={load}
+        packageOptions={packageOpts}
+        defaultPricesByPackage={defaultPricesByPackage}
+        defaultSessionsByPackage={defaultSessionsByPackage}
+        defaultDurationMonthsByPackage={defaultDurationMonthsByPackage}
       />
 
       {increaseSessionRegistration && (
@@ -1010,20 +1033,6 @@ export default function RegistrationsPage() {
           setReRegisterRow(null);
           load();
         }}
-      />
-
-      <RegisterInAnotherPackageModal
-        open={!!registerInAnotherPackageRow}
-        onClose={() => setRegisterInAnotherPackageRow(null)}
-        onSuccess={() => {
-          setRegisterInAnotherPackageRow(null);
-          load();
-        }}
-        registration={registerInAnotherPackageRow}
-        packageOptions={packageOpts}
-        defaultPricesByPackage={defaultPricesByPackage}
-        defaultSessionsByPackage={defaultSessionsByPackage}
-        defaultDurationMonthsByPackage={defaultDurationMonthsByPackage}
       />
 
       <RegisterExistingPersonModal

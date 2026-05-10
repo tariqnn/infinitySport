@@ -90,6 +90,23 @@ type RegistrationInput = {
   createdBy?: string | null;
 };
 
+type OldRegistrationImportInput = RegistrationInput & {
+  row?: number;
+  amountPaid?: number | null;
+  paymentMethod?: string | null;
+  paymentPeriodKey?: string | null;
+  privateNote?: string | null;
+};
+
+type OldRegistrationImportResult = {
+  row: number;
+  status: "created" | "renewed" | "skipped" | "failed";
+  id?: string;
+  existingId?: string;
+  message?: string;
+  error?: string;
+};
+
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ message }, { status });
 }
@@ -4061,6 +4078,150 @@ async function generateReceiptId(): Promise<string> {
   return `${prefix}${String(nextNumber).padStart(4, "0")}`;
 }
 
+function normalizeReceiptPaymentMethod(value: unknown): string {
+  const method = String(value || "CASH").trim().toUpperCase();
+  return ["CASH", "CARD", "TRANSFER", "OTHER"].includes(method)
+    ? method
+    : "CASH";
+}
+
+async function createRegistrationReceiptAndUpdatePayment(params: {
+  registrationId: string;
+  amountPaid: number;
+  paymentMethod?: string | null;
+  paymentPeriodKey?: string | null;
+  privateNote?: string | null;
+  createdBy?: string | null;
+}) {
+  const registration = await prisma.packageRegistration.findUnique({
+    where: { id: params.registrationId },
+  });
+  if (!registration) throw new Error("Registration not found");
+
+  const amountPaid = Math.max(0, Math.round(Number(params.amountPaid) || 0));
+  if (amountPaid <= 0) return null;
+
+  const privateNote = normalizeText(params.privateNote);
+  if (!privateNote) {
+    throw new Error("Private note is required when amount paid is greater than 0");
+  }
+
+  const paymentPeriodKey =
+    normalizePaymentPeriodKey(params.paymentPeriodKey) ||
+    paymentPeriodKeyFromDate(registration.periodStartsAt ?? registration.createdAt);
+  const paymentMethod = normalizeReceiptPaymentMethod(params.paymentMethod);
+  const user = await findOrCreateUserFromRegistration(registration);
+
+  let receipt = null as any;
+  for (let i = 0; i < 3; i += 1) {
+    const receiptId = await generateReceiptId();
+    try {
+      receipt = await prisma.receipt.create({
+        data: {
+          receiptId,
+          registrationId: registration.id,
+          personName: registration.customerName,
+          personPhone: registration.customerPhone,
+          packageName: registration.packageName,
+          paymentPeriodKey,
+          amountPaid,
+          paymentMethod,
+          privateNote,
+          createdBy: params.createdBy ?? null,
+          userId: user?.id ?? null,
+        },
+      });
+      break;
+    } catch (error: any) {
+      if (error?.code !== "P2002") throw error;
+    }
+  }
+
+  if (!receipt) {
+    throw new Error("Unable to generate receipt ID. Please retry.");
+  }
+
+  await stampReceiptCycle(prisma, {
+    receiptId: receipt.id,
+    registrationId: registration.id,
+  });
+
+  const totalCollected =
+    (await loadCurrentCycleReceiptTotals(prisma, [registration.id])).get(
+      registration.id,
+    ) ?? 0;
+  const targetPrice = Math.max(
+    0,
+    Math.round(Number(registration.finalPriceJod || 0)),
+  );
+  await prisma.packageRegistration.update({
+    where: { id: registration.id },
+    data: { isPaid: targetPrice <= 0 || totalCollected >= targetPrice },
+  });
+
+  return receipt;
+}
+
+async function createHistoricalRegistrationReceipt(params: {
+  registrationId: string;
+  amountPaid: number;
+  paymentMethod?: string | null;
+  paymentPeriodKey?: string | null;
+  privateNote?: string | null;
+  createdBy?: string | null;
+}) {
+  const registration = await prisma.packageRegistration.findUnique({
+    where: { id: params.registrationId },
+  });
+  if (!registration) throw new Error("Registration not found");
+
+  const amountPaid = Math.max(0, Math.round(Number(params.amountPaid) || 0));
+  if (amountPaid <= 0) return null;
+
+  const privateNote = normalizeText(params.privateNote);
+  if (!privateNote) {
+    throw new Error("Private note is required when amount paid is greater than 0");
+  }
+
+  const paymentPeriodKey =
+    normalizePaymentPeriodKey(params.paymentPeriodKey) ||
+    paymentPeriodKeyFromDate(registration.periodStartsAt ?? registration.createdAt);
+  const paymentMethod = normalizeReceiptPaymentMethod(params.paymentMethod);
+  const user = await findOrCreateUserFromRegistration(registration);
+
+  let receipt = null as any;
+  for (let i = 0; i < 3; i += 1) {
+    const receiptId = await generateReceiptId();
+    try {
+      receipt = await prisma.receipt.create({
+        data: {
+          receiptId,
+          registrationId: registration.id,
+          personName: registration.customerName,
+          personPhone: registration.customerPhone,
+          packageName: registration.packageName,
+          paymentPeriodKey,
+          amountPaid,
+          paymentMethod,
+          privateNote,
+          createdBy: params.createdBy ?? null,
+          cycleNumber: 0,
+          userId: user?.id ?? null,
+        },
+      });
+      break;
+    } catch (error: any) {
+      if (error?.code !== "P2002") throw error;
+    }
+  }
+
+  if (!receipt) {
+    throw new Error("Unable to generate receipt ID. Please retry.");
+  }
+
+  return receipt;
+}
+
 async function createPackageRegistration(payload: RegistrationInput) {
   const packageName = (payload.packageName || "").trim();
   const customerName = (payload.customerName || "").trim();
@@ -4890,6 +5051,286 @@ async function bulkCreatePackageRegistrations(request: NextRequest) {
   return NextResponse.json({ results });
 }
 
+async function renewExistingRegistrationFromOldImport(
+  existingId: string,
+  item: OldRegistrationImportInput,
+) {
+  const existing = (await prisma.packageRegistration.findUnique({
+    where: { id: existingId },
+    include: { receipts: { where: ACTIVE_RECEIPT_WHERE } },
+  })) as any;
+  if (!existing) throw new Error("Registration not found");
+
+  const periodStartsAt = item.periodStartsAt
+    ? new Date(item.periodStartsAt)
+    : new Date();
+  if (Number.isNaN(periodStartsAt.getTime())) {
+    throw new Error("Invalid period start date");
+  }
+
+  const profile = await ensureRegistrationProfile(prisma, {
+    registrationId: existing.id,
+    customerName: existing.customerName,
+    customerAge: existing.customerAge ?? null,
+    customerPhone: existing.customerPhone ?? null,
+    customerEmail: existing.customerEmail ?? null,
+  });
+  const summaries = await buildRegistrationMembershipSummaries(prisma, [
+    existing,
+  ]);
+  const summary = summaries[0];
+
+  await addRegistrationRenewalHistory(prisma, {
+    registrationId: existing.id,
+    playerCode: profile.playerCode,
+    cycleNumber: profile.currentCycle,
+    action: "IMPORTED_OLD_REGISTRATION",
+    snapshot: {
+      packageName: existing.packageName,
+      customerName: existing.customerName,
+      durationMonths: existing.durationMonths,
+      periodStartsAt: existing.periodStartsAt,
+      periodEndsAt: existing.periodEndsAt,
+      nextPaymentDate: existing.nextPaymentDate,
+      finalPriceJod: existing.finalPriceJod,
+      collectedJod: summary?.collectedJod ?? 0,
+      remainingJod: summary?.remainingJod ?? 0,
+      paymentStatus: summary?.paymentStatus ?? "UNPAID",
+      isPaid: existing.isPaid,
+      sessionsLeft: existing.sessionsLeft,
+      sessionsUsedOverride: existing.sessionsUsedOverride,
+      sessionsBonus: existing.sessionsBonus,
+      isFrozen: existing.isFrozen,
+    },
+  });
+
+  const packageDefaults = await getPackageDefaults(existing.packageName);
+  const durationMonths = normalizeDurationMonths(
+    item.durationMonths,
+    packageDefaults.durationMonths,
+  );
+  const periodEndsAt = computeCyclePeriodEnd(periodStartsAt, durationMonths);
+  const nextPaymentDate = item.nextPaymentDate
+    ? parseOptionalMembershipDate(item.nextPaymentDate)
+    : periodEndsAt;
+  if (item.nextPaymentDate && !nextPaymentDate) {
+    throw new Error("Invalid next payment date");
+  }
+  const basePriceJod =
+    item.basePriceJod != null
+      ? clampNonNegative(Number(item.basePriceJod))
+      : packageDefaults.basePriceJod;
+  const sessionsLeft =
+    item.sessionsLeft == null
+      ? packageDefaults.defaultSessionsLeft
+      : Math.max(0, Math.round(Number(item.sessionsLeft) || 0));
+  const { billingPeriodKey, priceLockedUntil } =
+    billingPeriodFromDate(periodStartsAt);
+
+  const row = await updatePackageRegistrationCompat({
+    where: { id: existing.id },
+    data: {
+      customerName: normalizeText(item.customerName) || existing.customerName,
+      customerPhone: normalizeText(item.customerPhone) || existing.customerPhone,
+      customerEmail:
+        item.customerEmail !== undefined
+          ? normalizeEmail(item.customerEmail) || null
+          : existing.customerEmail,
+      customerAge:
+        item.customerAge !== undefined ? item.customerAge ?? null : existing.customerAge,
+      isPaid: false,
+      basePriceJod,
+      discountType: "NONE",
+      discountValue: null,
+      discountReason: null,
+      discountAppliedBy: null,
+      discountAppliedAt: null,
+      finalPriceJod: basePriceJod,
+      billingPeriodKey,
+      priceLockedUntil,
+      durationMonths,
+      periodStartsAt,
+      periodEndsAt,
+      nextPaymentDate,
+      sessionsLeft,
+      sessionsUsedOverride: null,
+      sessionsBonus: 0,
+      isFrozen: false,
+      frozenAt: null,
+      status: "ACTIVE",
+      planLabel: normalizeText(item.planLabel) || existing.packageName,
+    },
+    include: { receipts: { where: ACTIVE_RECEIPT_WHERE } },
+  });
+
+  await updateRegistrationCurrentCycle(prisma, existing.id, profile.currentCycle + 1);
+
+  await findOrCreateUserFromRegistration({
+    customerEmail: row.customerEmail,
+    customerName: row.customerName,
+    customerPhone: row.customerPhone,
+  });
+
+  await syncTrackerForRegistrationContact({
+    customerName: row.customerName,
+    customerEmail: row.customerEmail,
+    customerPhone: row.customerPhone,
+  });
+
+  return row;
+}
+
+async function importOldRegistrationRow(params: {
+  item: OldRegistrationImportInput;
+  rowNumber: number;
+  renewExisting: boolean;
+}): Promise<OldRegistrationImportResult> {
+  const item = params.item;
+  const packageName = normalizeText(item.packageName);
+  const customerName = normalizeText(item.customerName);
+  const customerPhone = normalizeText(item.customerPhone);
+
+  if (!packageName) {
+    return { row: params.rowNumber, status: "failed", error: "Package is required" };
+  }
+  if (!customerName) {
+    return { row: params.rowNumber, status: "failed", error: "Customer name is required" };
+  }
+  if (!customerPhone) {
+    return { row: params.rowNumber, status: "failed", error: "Customer phone is required" };
+  }
+
+  const amountPaid = Math.max(0, Math.round(Number(item.amountPaid ?? 0) || 0));
+  if (amountPaid > 0 && !normalizeText(item.privateNote)) {
+    return {
+      row: params.rowNumber,
+      status: "failed",
+      error: "Private note is required when amount paid is greater than 0",
+    };
+  }
+  if (item.paymentPeriodKey && !normalizePaymentPeriodKey(item.paymentPeriodKey)) {
+    return {
+      row: params.rowNumber,
+      status: "failed",
+      error: "Paid for month must use YYYY-MM",
+    };
+  }
+
+  try {
+    const existing = await prisma.packageRegistration.findFirst({
+      where: { packageName, customerPhone },
+      select: { id: true, customerName: true },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    let registrationId: string;
+    let status: OldRegistrationImportResult["status"];
+
+    if (existing) {
+      if (!params.renewExisting) {
+        return {
+          row: params.rowNumber,
+          status: "skipped",
+          existingId: existing.id,
+          message: `Existing registration found for ${existing.customerName}`,
+        };
+      }
+
+      const renewed = await renewExistingRegistrationFromOldImport(existing.id, {
+        ...item,
+        packageName,
+        customerName,
+        customerPhone,
+      });
+      registrationId = renewed.id;
+      status = "renewed";
+    } else {
+      const created = await createPackageRegistration({
+        ...item,
+        packageName,
+        customerName,
+        customerPhone,
+        discountType: "NONE",
+        discountValue: null,
+        discountReason: null,
+      });
+      registrationId = created.id;
+      status = "created";
+    }
+
+    if (amountPaid > 0) {
+      await createRegistrationReceiptAndUpdatePayment({
+        registrationId,
+        amountPaid,
+        paymentMethod: item.paymentMethod,
+        paymentPeriodKey:
+          item.paymentPeriodKey ||
+          paymentPeriodKeyFromDate(item.periodStartsAt || new Date()),
+        privateNote: item.privateNote,
+        createdBy: item.createdBy ?? "old-registration-import",
+      });
+    }
+
+    await syncRegistrationRealtimeById(registrationId, "ADMIN");
+
+    return {
+      row: params.rowNumber,
+      status,
+      id: registrationId,
+      message:
+        status === "renewed"
+          ? "Existing registration renewed/imported as a new cycle"
+          : "Registration created",
+    };
+  } catch (error) {
+    return {
+      row: params.rowNumber,
+      status: "failed",
+      error: error instanceof Error ? error.message : "Import failed",
+    };
+  }
+}
+
+async function importOldPackageRegistrations(request: NextRequest) {
+  const body = (await request.json()) as {
+    renewExisting?: boolean;
+    registrations?: OldRegistrationImportInput[];
+  };
+
+  if (!Array.isArray(body.registrations)) {
+    return jsonError("registrations must be an array");
+  }
+
+  const results: OldRegistrationImportResult[] = [];
+  const seen = new Set<string>();
+  const renewExisting = body.renewExisting !== false;
+
+  for (let i = 0; i < body.registrations.length; i += 1) {
+    const item = body.registrations[i];
+    const rowNumber = item.row ?? i + 1;
+    const key = `${normalizeText(item.packageName)}|${normalizeText(item.customerPhone)}`;
+    if (key !== "|" && seen.has(key)) {
+      results.push({
+        row: rowNumber,
+        status: "failed",
+        error: "Duplicate phone and package in this import batch",
+      });
+      continue;
+    }
+    seen.add(key);
+
+    results.push(
+      await importOldRegistrationRow({
+        item,
+        rowNumber,
+        renewExisting,
+      }),
+    );
+  }
+
+  return NextResponse.json({ results });
+}
+
 async function bulkCreateForPerson(request: NextRequest) {
   const body = (await request.json()) as {
     person: {
@@ -5405,6 +5846,15 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
 async function reregisterPackage(id: string, request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as {
     periodStartsAt?: string | null;
+    durationMonths?: number | null;
+    sessionsLeft?: number | null;
+    nextPaymentDate?: string | null;
+    basePriceJod?: number | null;
+    amountPaid?: number | null;
+    paymentMethod?: string | null;
+    paymentPeriodKey?: string | null;
+    privateNote?: string | null;
+    createdBy?: string | null;
   };
   const existing = (await prisma.packageRegistration.findUnique({
     where: { id },
@@ -5455,10 +5905,32 @@ async function reregisterPackage(id: string, request: NextRequest) {
     return jsonError("Invalid period start date");
   }
   const packageDefaults = await getPackageDefaults(existing.packageName);
-  const durationMonths = packageDefaults.durationMonths;
+  const durationMonths = normalizeDurationMonths(
+    body.durationMonths,
+    packageDefaults.durationMonths,
+  );
   const periodEndsAt = computeCyclePeriodEnd(periodStartsAt, durationMonths);
+  const nextPaymentDate = body.nextPaymentDate
+    ? parseOptionalMembershipDate(body.nextPaymentDate)
+    : periodEndsAt;
+  if (body.nextPaymentDate && !nextPaymentDate) {
+    return jsonError("Invalid next payment date");
+  }
+  const basePriceJod =
+    body.basePriceJod != null
+      ? clampNonNegative(Number(body.basePriceJod))
+      : clampNonNegative(existing.finalPriceJod ?? packageDefaults.basePriceJod);
   const sessionsLeft =
-    existing.sessionsLeft ?? packageDefaults.defaultSessionsLeft;
+    body.sessionsLeft == null
+      ? existing.sessionsLeft ?? packageDefaults.defaultSessionsLeft
+      : Math.max(0, Math.round(Number(body.sessionsLeft) || 0));
+  const amountPaid = Math.max(0, Math.round(Number(body.amountPaid ?? 0) || 0));
+  if (amountPaid > 0 && !normalizeText(body.privateNote)) {
+    return jsonError("Private note is required when amount paid is greater than 0");
+  }
+  if (body.paymentPeriodKey && !normalizePaymentPeriodKey(body.paymentPeriodKey)) {
+    return jsonError("Invalid paid for month");
+  }
   const { billingPeriodKey, priceLockedUntil } =
     billingPeriodFromDate(periodStartsAt);
 
@@ -5466,12 +5938,19 @@ async function reregisterPackage(id: string, request: NextRequest) {
     where: { id },
     data: {
       isPaid: false,
+      basePriceJod,
+      discountType: "NONE",
+      discountValue: null,
+      discountReason: null,
+      discountAppliedBy: null,
+      discountAppliedAt: null,
+      finalPriceJod: basePriceJod,
       billingPeriodKey,
       priceLockedUntil,
       durationMonths,
       periodStartsAt,
       periodEndsAt,
-      nextPaymentDate: periodEndsAt,
+      nextPaymentDate,
       sessionsLeft,
       sessionsUsedOverride: null,
       sessionsBonus: 0,
@@ -5484,6 +5963,18 @@ async function reregisterPackage(id: string, request: NextRequest) {
   });
 
   await updateRegistrationCurrentCycle(prisma, id, profile.currentCycle + 1);
+
+  if (amountPaid > 0) {
+    await createRegistrationReceiptAndUpdatePayment({
+      registrationId: id,
+      amountPaid,
+      paymentMethod: body.paymentMethod,
+      paymentPeriodKey:
+        body.paymentPeriodKey || paymentPeriodKeyFromDate(periodStartsAt),
+      privateNote: body.privateNote,
+      createdBy: body.createdBy ?? "missing-month-registration",
+    });
+  }
 
   await findOrCreateUserFromRegistration({
     customerEmail: row.customerEmail,
@@ -5500,6 +5991,320 @@ async function reregisterPackage(id: string, request: NextRequest) {
 
   const [serialized] = await serializeRegistrationRows([row]);
   return NextResponse.json(serialized);
+}
+
+async function recordOldRegistrationMonth(id: string, request: NextRequest) {
+  const body = (await request.json().catch(() => ({}))) as {
+    periodStartsAt?: string | null;
+    durationMonths?: number | null;
+    sessionsLeft?: number | null;
+    basePriceJod?: number | null;
+    amountPaid?: number | null;
+    paymentMethod?: string | null;
+    paymentPeriodKey?: string | null;
+    privateNote?: string | null;
+    createdBy?: string | null;
+  };
+
+  const existing = await prisma.packageRegistration.findUnique({
+    where: { id },
+  });
+  if (!existing) return jsonError("Registration not found", 404);
+
+  const periodStartsAt = body.periodStartsAt
+    ? new Date(body.periodStartsAt)
+    : null;
+  if (!periodStartsAt || Number.isNaN(periodStartsAt.getTime())) {
+    return jsonError("Missing month start date is required");
+  }
+
+  const packageDefaults = await getPackageDefaults(existing.packageName);
+  const durationMonths = normalizeDurationMonths(
+    body.durationMonths,
+    packageDefaults.durationMonths,
+  );
+  const periodEndsAt = computeCyclePeriodEnd(periodStartsAt, durationMonths);
+  const sessionsLeft =
+    body.sessionsLeft == null
+      ? existing.sessionsLeft ?? packageDefaults.defaultSessionsLeft
+      : Math.max(0, Math.round(Number(body.sessionsLeft) || 0));
+  const basePriceJod =
+    body.basePriceJod != null
+      ? clampNonNegative(Number(body.basePriceJod))
+      : clampNonNegative(existing.finalPriceJod ?? packageDefaults.basePriceJod);
+  const amountPaid = Math.max(0, Math.round(Number(body.amountPaid ?? 0) || 0));
+
+  if (amountPaid > 0 && !normalizeText(body.privateNote)) {
+    return jsonError("Private note is required when amount paid is greater than 0");
+  }
+  if (body.paymentPeriodKey && !normalizePaymentPeriodKey(body.paymentPeriodKey)) {
+    return jsonError("Invalid paid for month");
+  }
+
+  const profile = await ensureRegistrationProfile(prisma, {
+    registrationId: existing.id,
+    customerName: existing.customerName,
+    customerAge: existing.customerAge ?? null,
+    customerPhone: existing.customerPhone ?? null,
+    customerEmail: existing.customerEmail ?? null,
+  });
+
+  let receipt = null as any;
+  if (amountPaid > 0) {
+    receipt = await createHistoricalRegistrationReceipt({
+      registrationId: id,
+      amountPaid,
+      paymentMethod: body.paymentMethod,
+      paymentPeriodKey:
+        body.paymentPeriodKey || paymentPeriodKeyFromDate(periodStartsAt),
+      privateNote: body.privateNote,
+      createdBy: body.createdBy ?? "old-month-record",
+    });
+  }
+
+  await addRegistrationRenewalHistory(prisma, {
+    registrationId: existing.id,
+    playerCode: profile.playerCode,
+    cycleNumber: profile.currentCycle,
+    action: "OLD_MONTH_RECORDED",
+    snapshot: {
+      packageName: existing.packageName,
+      customerName: existing.customerName,
+      customerPhone: existing.customerPhone,
+      currentCycleKept: profile.currentCycle,
+      periodStartsAt,
+      periodEndsAt,
+      durationMonths,
+      sessionsLeft,
+      finalPriceJod: basePriceJod,
+      amountPaid,
+      paymentMethod: normalizeReceiptPaymentMethod(body.paymentMethod),
+      paymentPeriodKey:
+        normalizePaymentPeriodKey(body.paymentPeriodKey) ||
+        paymentPeriodKeyFromDate(periodStartsAt),
+      privateNote: normalizeText(body.privateNote) || null,
+      receiptId: receipt?.receiptId ?? null,
+    },
+  });
+
+  await syncTrackerForRegistrationContact({
+    customerName: existing.customerName,
+    customerEmail: existing.customerEmail,
+    customerPhone: existing.customerPhone,
+  });
+
+  return NextResponse.json({
+    success: true,
+    registrationId: id,
+    currentCycle: profile.currentCycle,
+    receiptId: receipt?.receiptId ?? null,
+  });
+}
+
+async function loadOldMonthHistoryEntry(historyId: string) {
+  const rows = (await prisma.$queryRawUnsafe(
+    `
+      SELECT
+        h."id",
+        h."registrationId",
+        h."playerCode",
+        h."cycleNumber",
+        h."action",
+        h."snapshot",
+        h."createdAt",
+        pr."customerName",
+        pr."customerPhone",
+        pr."customerEmail"
+      FROM "RegistrationRenewalHistory" h
+      JOIN "PackageRegistration" pr ON pr."id" = h."registrationId"
+      WHERE h."id" = $1
+      LIMIT 1
+    `,
+    historyId,
+  )) as Array<{
+    id: string;
+    registrationId: string;
+    playerCode: string;
+    cycleNumber: number;
+    action: string;
+    snapshot: Record<string, unknown> | null;
+    createdAt: Date;
+    customerName: string;
+    customerPhone: string;
+    customerEmail: string | null;
+  }>;
+
+  const entry = rows[0];
+  if (!entry) return null;
+  return entry;
+}
+
+async function updateOldMonthHistoryRecord(historyId: string, request: NextRequest) {
+  const body = (await request.json().catch(() => ({}))) as {
+    periodStartsAt?: string | null;
+    durationMonths?: number | null;
+    sessionsLeft?: number | null;
+    basePriceJod?: number | null;
+    amountPaid?: number | null;
+    paymentMethod?: string | null;
+    paymentPeriodKey?: string | null;
+    privateNote?: string | null;
+  };
+
+  let entry;
+  try {
+    entry = await loadOldMonthHistoryEntry(historyId);
+  } catch (error) {
+    return jsonError(error instanceof Error ? error.message : "History entry cannot be edited", 400);
+  }
+  if (!entry) return jsonError("History entry not found", 404);
+
+  const currentSnapshot = entry.snapshot ?? {};
+  const periodStartsAt = body.periodStartsAt
+    ? new Date(body.periodStartsAt)
+    : currentSnapshot.periodStartsAt
+      ? new Date(String(currentSnapshot.periodStartsAt))
+      : null;
+  if (!periodStartsAt || Number.isNaN(periodStartsAt.getTime())) {
+    return jsonError("Missing month start date is required");
+  }
+
+  const durationMonths = normalizeDurationMonths(
+    body.durationMonths,
+    Number(currentSnapshot.durationMonths ?? 1),
+  );
+  const periodEndsAt = computeCyclePeriodEnd(periodStartsAt, durationMonths);
+  const amountPaid =
+    body.amountPaid == null
+      ? Math.max(0, Math.round(Number(currentSnapshot.amountPaid ?? 0) || 0))
+      : Math.max(0, Math.round(Number(body.amountPaid) || 0));
+  const privateNote =
+    body.privateNote !== undefined
+      ? normalizeText(body.privateNote)
+      : normalizeText(currentSnapshot.privateNote);
+  if (amountPaid > 0 && !privateNote) {
+    return jsonError("Private note is required when amount paid is greater than 0");
+  }
+
+  const paymentPeriodKey =
+    normalizePaymentPeriodKey(body.paymentPeriodKey) ||
+    normalizePaymentPeriodKey(currentSnapshot.paymentPeriodKey) ||
+    paymentPeriodKeyFromDate(periodStartsAt);
+  if (body.paymentPeriodKey && !normalizePaymentPeriodKey(body.paymentPeriodKey)) {
+    return jsonError("Invalid paid for month");
+  }
+
+  const receiptId = normalizeText(currentSnapshot.receiptId);
+  let nextReceiptId = receiptId || null;
+  if (amountPaid > 0) {
+    if (receiptId) {
+      await prisma.receipt.updateMany({
+        where: { receiptId, registrationId: entry.registrationId },
+        data: {
+          amountPaid,
+          paymentMethod: normalizeReceiptPaymentMethod(body.paymentMethod ?? currentSnapshot.paymentMethod),
+          paymentPeriodKey,
+          privateNote,
+          status: "ACTIVE",
+          voidedAt: null,
+          voidReason: null,
+        },
+      });
+    } else {
+      const receipt = await createHistoricalRegistrationReceipt({
+        registrationId: entry.registrationId,
+        amountPaid,
+        paymentMethod: body.paymentMethod ?? String(currentSnapshot.paymentMethod ?? "CASH"),
+        paymentPeriodKey,
+        privateNote,
+        createdBy: "old-month-edit",
+      });
+      nextReceiptId = receipt?.receiptId ?? null;
+    }
+  } else if (receiptId) {
+    await prisma.receipt.updateMany({
+      where: { receiptId, registrationId: entry.registrationId },
+      data: {
+        status: "VOIDED",
+        voidedAt: new Date(),
+        voidReason: "Old month record edited to unpaid",
+      },
+    });
+    nextReceiptId = null;
+  }
+
+  const nextSnapshot = {
+    ...currentSnapshot,
+    periodStartsAt,
+    periodEndsAt,
+    durationMonths,
+    sessionsLeft:
+      body.sessionsLeft == null
+        ? currentSnapshot.sessionsLeft ?? null
+        : Math.max(0, Math.round(Number(body.sessionsLeft) || 0)),
+    finalPriceJod:
+      body.basePriceJod == null
+        ? Math.max(0, Math.round(Number(currentSnapshot.finalPriceJod ?? 0) || 0))
+        : clampNonNegative(Number(body.basePriceJod)),
+    amountPaid,
+    paymentMethod: normalizeReceiptPaymentMethod(body.paymentMethod ?? currentSnapshot.paymentMethod),
+    paymentPeriodKey,
+    privateNote: privateNote || null,
+    receiptId: nextReceiptId,
+  };
+
+  await prisma.$executeRawUnsafe(
+    `
+      UPDATE "RegistrationRenewalHistory"
+      SET "snapshot" = $2::jsonb
+      WHERE "id" = $1
+    `,
+    historyId,
+    JSON.stringify(nextSnapshot),
+  );
+
+  await syncTrackerForRegistrationContact({
+    customerName: entry.customerName,
+    customerEmail: entry.customerEmail,
+    customerPhone: entry.customerPhone,
+  });
+
+  return NextResponse.json({ success: true });
+}
+
+async function deleteOldMonthHistoryRecord(historyId: string) {
+  let entry;
+  try {
+    entry = await loadOldMonthHistoryEntry(historyId);
+  } catch (error) {
+    return jsonError(error instanceof Error ? error.message : "History entry cannot be deleted", 400);
+  }
+  if (!entry) return jsonError("History entry not found", 404);
+
+  const receiptId = normalizeText(entry.snapshot?.receiptId);
+  if (receiptId) {
+    await prisma.receipt.updateMany({
+      where: { receiptId, registrationId: entry.registrationId },
+      data: {
+        status: "VOIDED",
+        voidedAt: new Date(),
+        voidReason: "Old month record deleted",
+      },
+    });
+  }
+
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM "RegistrationRenewalHistory" WHERE "id" = $1`,
+    historyId,
+  );
+
+  await syncTrackerForRegistrationContact({
+    customerName: entry.customerName,
+    customerEmail: entry.customerEmail,
+    customerPhone: entry.customerPhone,
+  });
+
+  return NextResponse.json({ success: true });
 }
 
 async function markRegistrationPaid(id: string, request: NextRequest) {
@@ -7681,6 +8486,10 @@ async function dispatchPost(request: NextRequest, params: Params) {
     return bulkCreateForPerson(request);
   }
 
+  if (resource === "package-registrations" && id === "old-import") {
+    return importOldPackageRegistrations(request);
+  }
+
   if (resource === "packages" && !id) {
     const body = (await request.json()) as {
       name?: string;
@@ -7775,6 +8584,10 @@ async function dispatchPost(request: NextRequest, params: Params) {
 
   if (resource === "package-registrations" && action === "reregister") {
     return reregisterPackage(id, request);
+  }
+
+  if (resource === "package-registrations" && action === "old-month") {
+    return recordOldRegistrationMonth(id, request);
   }
 
   if (resource === "package-registrations" && action === "mark-paid") {
@@ -8226,6 +9039,10 @@ async function dispatchPatch(request: NextRequest, params: Params) {
     return updateCashBookTransaction(id, request);
   }
 
+  if (resource === "registration-history" && !action) {
+    return updateOldMonthHistoryRecord(id, request);
+  }
+
   if (resource === "package-registrations" && !action) {
     return updatePackageRegistration(id, request);
   }
@@ -8276,6 +9093,10 @@ async function dispatchDelete(_request: NextRequest, params: Params) {
 
   if (resource === "shop-items") {
     return removeShopItem(id);
+  }
+
+  if (resource === "registration-history") {
+    return deleteOldMonthHistoryRecord(id);
   }
 
   if (resource === "guest-accounts") {

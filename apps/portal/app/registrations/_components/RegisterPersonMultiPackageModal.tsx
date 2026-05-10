@@ -203,7 +203,7 @@ export function RegisterPersonMultiPackageModal({
   const packageList = Array.from(new Set((packageOptions || []).filter(Boolean))).sort((left, right) => left.localeCompare(right));
 
   return (
-    <Modal open={open} onClose={onClose} title="Register person in multiple packages" size="xl">
+    <Modal open={open} onClose={onClose} title="Add package(s) to player" size="xl">
       {error && <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       {step === 1 && (

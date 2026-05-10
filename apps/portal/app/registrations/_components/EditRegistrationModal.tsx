@@ -28,6 +28,21 @@ function getStartDateInputValue(registration: PackageRegistrationRow | null): st
   return toDateInputValue(registration.periodStartsAt || registration.createdAt);
 }
 
+function FormSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-3 border-t border-ui-border pt-4 first:border-t-0 first:pt-0">
+      <h3 className="text-sm font-semibold text-ui-textPrimary">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
 export function EditRegistrationModal({
   open,
   onClose,
@@ -287,78 +302,90 @@ export function EditRegistrationModal({
   );
 
   return (
-    <Modal open={open} onClose={onClose} title="Edit registration" size="md">
+    <Modal open={open} onClose={onClose} title="Edit registration" size="lg">
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
-        <Select label="Package" value={packageName} onChange={(e) => setPackageName(e.target.value)} required>
-          <option value="">Select package</option>
-          {packageList.map((pkg) => (
-            <option key={pkg} value={pkg}>{pkg}</option>
-          ))}
-        </Select>
+        <FormSection title="Player information">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input label="Name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} required />
+            <Input label="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} required />
+            <Input label="Email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
+            <Input label="Age" type="number" min={0} value={customerAge} onChange={(e) => setCustomerAge(e.target.value)} />
+          </div>
+        </FormSection>
 
-        <Input label="Name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} required />
-        <Input label="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} required />
-        <Input label="Email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
-        <Input label="Age" type="number" min={0} value={customerAge} onChange={(e) => setCustomerAge(e.target.value)} />
-        <Input
-          label="Duration months"
-          type="number"
-          min={1}
-          value={durationMonths}
-          onChange={(e) => setDurationMonths(e.target.value)}
-          required
-          hint="Set this player to 1, 2, 3, or more months. End date and next payment will follow."
-        />
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Input
-            label="Total classes in this cycle"
-            type="number"
-            min={0}
-            value={sessionsLeft}
-            onChange={(e) => setSessionsLeft(e.target.value)}
-            required
-            hint="For example, enter 40 for a three-month package with 40 classes."
-          />
-          <Input
-            label="Classes finished"
-            type="number"
-            min={0}
-            value={sessionsUsed}
-            onChange={(e) => setSessionsUsed(e.target.value)}
-            required
-            hint="For Sharbel, enter 20 if he already finished 20 classes."
-          />
-        </div>
-        <div className="rounded-lg bg-ui-softBg/60 px-3 py-2 text-sm text-ui-textPrimary">
-          Remaining classes: <span className="font-semibold">{remainingClassesPreview}</span>
-          {registration.sessionsBonus ? (
-            <span className="text-ui-textMuted"> including {registration.sessionsBonus} bonus</span>
-          ) : null}
-        </div>
-        <Input
-          label="Start date"
-          type="date"
-          value={periodStartsAt}
-          onChange={(e) => setPeriodStartsAt(e.target.value)}
-          hint="Defaults to the day this player was registered in the portal. Change it here when the real start date is different."
-        />
-        <Input
-          label="Membership end date"
-          type="date"
-          value={periodEndsAt}
-          onChange={(e) => handlePeriodEndsAtChange(e.target.value)}
-          hint="Move this later to give this player extra days, or earlier to shorten only this player. Next payment follows this date unless you change it separately."
-        />
-        <Input
-          label="Next payment date"
-          type="date"
-          value={nextPaymentDate}
-          onChange={(e) => setNextPaymentDate(e.target.value)}
-        />
+        <FormSection title="Package and dates">
+          <Select label="Package" value={packageName} onChange={(e) => setPackageName(e.target.value)} required>
+            <option value="">Select package</option>
+            {packageList.map((pkg) => (
+              <option key={pkg} value={pkg}>{pkg}</option>
+            ))}
+          </Select>
 
-        <div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input
+              label="Duration months"
+              type="number"
+              min={1}
+              value={durationMonths}
+              onChange={(e) => setDurationMonths(e.target.value)}
+              required
+              hint="End date and next payment follow this duration."
+            />
+            <Input
+              label="Next payment date"
+              type="date"
+              value={nextPaymentDate}
+              onChange={(e) => setNextPaymentDate(e.target.value)}
+            />
+            <Input
+              label="Start date"
+              type="date"
+              value={periodStartsAt}
+              onChange={(e) => setPeriodStartsAt(e.target.value)}
+              hint="The real start date for this current registration."
+            />
+            <Input
+              label="Membership end date"
+              type="date"
+              value={periodEndsAt}
+              onChange={(e) => handlePeriodEndsAtChange(e.target.value)}
+              hint="Change this to extend or shorten this registration only."
+            />
+          </div>
+        </FormSection>
+
+        <FormSection title="Classes">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input
+              label="Total classes in this cycle"
+              type="number"
+              min={0}
+              value={sessionsLeft}
+              onChange={(e) => setSessionsLeft(e.target.value)}
+              required
+              hint="The total classes included in this registration."
+            />
+            <Input
+              label="Classes finished"
+              type="number"
+              min={0}
+              value={sessionsUsed}
+              onChange={(e) => setSessionsUsed(e.target.value)}
+              required
+              hint="How many classes the player already used."
+            />
+          </div>
+          <div className="rounded-lg bg-ui-softBg/60 px-3 py-2 text-sm text-ui-textPrimary">
+            Remaining classes: <span className="font-semibold">{remainingClassesPreview}</span>
+            {registration.sessionsBonus ? (
+              <span className="text-ui-textMuted"> including {registration.sessionsBonus} bonus</span>
+            ) : null}
+          </div>
+        </FormSection>
+
+        <FormSection title="Price and discount">
           <Input
             label="Player price (JOD)"
             type="number"
@@ -372,53 +399,53 @@ export function EditRegistrationModal({
                 : 'This price applies only to this player registration.'
             }
           />
-        </div>
 
-        <div className="rounded-lg border border-ui-border">
-          <button
-            type="button"
-            onClick={() => setDiscountOpen((prev) => !prev)}
-            className="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium text-ui-textPrimary"
-          >
-            Discount {discountOpen ? 'v' : '>'}
-          </button>
-          {discountOpen && (
-            <div className="space-y-2 border-t border-ui-border p-3">
-              <Select
-                label="Type"
-                value={discountType}
-                onChange={(e) => setDiscountType(e.target.value as 'NONE' | 'PERCENT' | 'AMOUNT')}
-              >
-                <option value="NONE">None</option>
-                <option value="PERCENT">Percent (%)</option>
-                <option value="AMOUNT">Amount (JOD)</option>
-              </Select>
-              {discountType !== 'NONE' && (
-                <>
-                  <Input
-                    label={discountType === 'PERCENT' ? 'Discount %' : 'Discount (JOD)'}
-                    type="number"
-                    min={0}
-                    value={discountValue}
-                    onChange={(e) => setDiscountValue(e.target.value)}
-                    required
-                  />
-                  <Input
-                    label="Reason (required)"
-                    value={discountReason}
-                    onChange={(e) => setDiscountReason(e.target.value)}
-                    required
-                  />
-                </>
-              )}
-            </div>
-          )}
-        </div>
+          <div className="rounded-lg border border-ui-border">
+            <button
+              type="button"
+              onClick={() => setDiscountOpen((prev) => !prev)}
+              className="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium text-ui-textPrimary"
+            >
+              Discount {discountOpen ? 'v' : '>'}
+            </button>
+            {discountOpen && (
+              <div className="space-y-2 border-t border-ui-border p-3">
+                <Select
+                  label="Type"
+                  value={discountType}
+                  onChange={(e) => setDiscountType(e.target.value as 'NONE' | 'PERCENT' | 'AMOUNT')}
+                >
+                  <option value="NONE">None</option>
+                  <option value="PERCENT">Percent (%)</option>
+                  <option value="AMOUNT">Amount (JOD)</option>
+                </Select>
+                {discountType !== 'NONE' && (
+                  <>
+                    <Input
+                      label={discountType === 'PERCENT' ? 'Discount %' : 'Discount (JOD)'}
+                      type="number"
+                      min={0}
+                      value={discountValue}
+                      onChange={(e) => setDiscountValue(e.target.value)}
+                      required
+                    />
+                    <Input
+                      label="Reason (required)"
+                      value={discountReason}
+                      onChange={(e) => setDiscountReason(e.target.value)}
+                      required
+                    />
+                  </>
+                )}
+              </div>
+            )}
+          </div>
 
-        <div className="rounded-lg bg-ui-bgMuted/50 p-3">
-          <p className="text-xs text-ui-textMuted">Final price</p>
-          <p className="text-xl font-bold text-ui-textPrimary">{finalPrice} JOD</p>
-        </div>
+          <div className="rounded-lg bg-ui-bgMuted/50 p-3">
+            <p className="text-xs text-ui-textMuted">Final price</p>
+            <p className="text-xl font-bold text-ui-textPrimary">{finalPrice} JOD</p>
+          </div>
+        </FormSection>
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>

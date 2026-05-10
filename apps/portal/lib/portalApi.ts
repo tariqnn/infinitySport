@@ -845,6 +845,34 @@ export type RegistrationTotals = {
   byPackage?: Record<string, { registered: number; expected: number; collected: number; remaining: number }>;
 };
 
+export type OldRegistrationImportRow = {
+  row?: number;
+  packageName: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string | null;
+  customerAge?: number | null;
+  durationMonths?: number | null;
+  sessionsLeft?: number | null;
+  nextPaymentDate?: string | null;
+  planLabel?: string | null;
+  basePriceJod?: number;
+  periodStartsAt?: string | null;
+  amountPaid?: number | null;
+  paymentMethod?: string | null;
+  paymentPeriodKey?: string | null;
+  privateNote?: string | null;
+};
+
+export type OldRegistrationImportResult = {
+  row: number;
+  status: 'created' | 'renewed' | 'skipped' | 'failed';
+  id?: string;
+  existingId?: string;
+  message?: string;
+  error?: string;
+};
+
 export const packageRegistrationsApi = {
   list: (packageName?: string, startDate?: string, endDate?: string, search?: string) => {
     const params = new URLSearchParams();
@@ -883,6 +911,8 @@ export const packageRegistrationsApi = {
   },
   bulkCreate: (data: { startDate?: string | null; registrations: Array<{ packageName: string; customerName: string; customerPhone: string; customerEmail?: string | null; customerAge?: number | null; sessionsLeft?: number | null; nextPaymentDate?: string | null; planLabel?: string | null; basePriceJod?: number; periodStartsAt?: string | null }> }) =>
     portalDbFetch<{ results: Array<{ success: boolean; id?: string; row?: number; error?: string }> }>('/portal/package-registrations/bulk', { method: 'POST', body: JSON.stringify(data) }),
+  oldImport: (data: { renewExisting?: boolean; registrations: OldRegistrationImportRow[] }) =>
+    portalDbFetch<{ results: OldRegistrationImportResult[] }>('/portal/package-registrations/old-import', { method: 'POST', body: JSON.stringify(data) }),
   bulkCreateForPerson: (data: {
     person: { customerName: string; customerPhone: string; customerEmail?: string | null; customerAge?: number | null };
     periodStartsAt?: string | null;
@@ -923,11 +953,35 @@ export const packageRegistrationsApi = {
   }) =>
     portalDbFetch<PackageRegistrationRow>(`/portal/package-registrations/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) => portalDbFetch<void>(`/portal/package-registrations/${id}`, { method: 'DELETE' }),
-  reregister: (id: string, data?: { periodStartsAt?: string | null }) =>
+  reregister: (id: string, data?: {
+    periodStartsAt?: string | null;
+    durationMonths?: number | null;
+    sessionsLeft?: number | null;
+    nextPaymentDate?: string | null;
+    basePriceJod?: number | null;
+    amountPaid?: number | null;
+    paymentMethod?: string | null;
+    paymentPeriodKey?: string | null;
+    privateNote?: string | null;
+  }) =>
     portalDbFetch<PackageRegistrationRow>(`/portal/package-registrations/${id}/reregister`, {
       method: 'POST',
       body: JSON.stringify(data ?? {}),
     }),
+  recordOldMonth: (id: string, data: {
+    periodStartsAt: string;
+    durationMonths?: number | null;
+    sessionsLeft?: number | null;
+    basePriceJod?: number | null;
+    amountPaid?: number | null;
+    paymentMethod?: string | null;
+    paymentPeriodKey?: string | null;
+    privateNote?: string | null;
+  }) =>
+    portalDbFetch<{ success: boolean; registrationId: string; currentCycle: number; receiptId?: string | null }>(
+      `/portal/package-registrations/${id}/old-month`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
   markPaid: (id: string, data: { amountPaid: number; paymentMethod: string; privateNote: string; paymentPeriodKey?: string | null }) =>
     portalDbFetch<ReceiptRow>(`/portal/package-registrations/${id}/mark-paid`, { method: 'POST', body: JSON.stringify(data) }),
   markUnpaid: (id: string, voidReason?: string) =>
@@ -950,6 +1004,24 @@ export const packageRegistrationsApi = {
       currentCycle: number;
       history: RegistrationRenewalHistoryRow[];
     }>(`/portal/package-registrations/${id}/history`),
+  updateOldMonthHistory: (historyId: string, data: {
+    periodStartsAt?: string | null;
+    durationMonths?: number | null;
+    sessionsLeft?: number | null;
+    basePriceJod?: number | null;
+    amountPaid?: number | null;
+    paymentMethod?: string | null;
+    paymentPeriodKey?: string | null;
+    privateNote?: string | null;
+  }) =>
+    portalDbFetch<{ success: boolean }>(`/portal/registration-history/${historyId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteOldMonthHistory: (historyId: string) =>
+    portalDbFetch<{ success: boolean }>(`/portal/registration-history/${historyId}`, {
+      method: 'DELETE',
+    }),
 };
 
 export type PackageOption = {

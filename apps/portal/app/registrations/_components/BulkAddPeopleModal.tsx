@@ -202,7 +202,7 @@ export function BulkAddPeopleModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Add Multiple People"
+      title="Bulk add players"
       description="Add people manually or paste from a spreadsheet."
       size="2xl"
       footer={

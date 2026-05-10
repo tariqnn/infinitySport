@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Modal, Badge, Button } from '../../_components/ui';
+import { Modal, Badge, Button, Input, Select } from '../../_components/ui';
 import {
   packageRegistrationsApi,
   type PackageRegistrationRow,
@@ -37,6 +37,46 @@ function paymentBadgeVariant(status: string) {
   if (status === 'Paid') return 'success' as const;
   if (status === 'Partial') return 'warning' as const;
   return 'danger' as const;
+}
+
+type OldMonthEditForm = {
+  periodStartsAt: string;
+  durationMonths: string;
+  sessionsLeft: string;
+  basePriceJod: string;
+  amountPaid: string;
+  paymentMethod: string;
+  paymentPeriodKey: string;
+  privateNote: string;
+};
+
+const PAYMENT_METHODS = ['CASH', 'CARD', 'TRANSFER', 'OTHER'];
+
+function toDateInput(value: unknown) {
+  if (!value) return '';
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toISOString().slice(0, 10);
+}
+
+function toMonthInput(value: unknown) {
+  if (typeof value === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(value)) return value;
+  const date = toDateInput(value);
+  return date ? date.slice(0, 7) : '';
+}
+
+function buildOldMonthEditForm(entry: RegistrationRenewalHistoryRow): OldMonthEditForm {
+  const snapshot = entry.snapshot ?? {};
+  return {
+    periodStartsAt: toDateInput(snapshot.periodStartsAt),
+    durationMonths: String(snapshot.durationMonths ?? 1),
+    sessionsLeft: snapshot.sessionsLeft == null ? '' : String(snapshot.sessionsLeft),
+    basePriceJod: String(snapshot.finalPriceJod ?? 0),
+    amountPaid: String(snapshot.amountPaid ?? 0),
+    paymentMethod: typeof snapshot.paymentMethod === 'string' ? snapshot.paymentMethod : 'CASH',
+    paymentPeriodKey: toMonthInput(snapshot.paymentPeriodKey || snapshot.periodStartsAt),
+    privateNote: typeof snapshot.privateNote === 'string' ? snapshot.privateNote : '',
+  };
 }
 
 function isSummerCampPackage(packageName: string) {
@@ -141,6 +181,9 @@ export function RegistrationDetailsModal({
   const [profile, setProfile] = useState<{ playerCode: string | null; currentCycle: number } | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [editingHistoryId, setEditingHistoryId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<OldMonthEditForm | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
     if (!open || !registration) {
@@ -183,6 +226,62 @@ export function RegistrationDetailsModal({
       cancelled = true;
     };
   }, [open, registration]);
+
+  async function refreshHistory() {
+    if (!registration) return;
+    const response = await packageRegistrationsApi.getHistory(registration.id);
+    setProfile({
+      playerCode: response.playerCode ?? registration.playerCode ?? null,
+      currentCycle: response.currentCycle ?? registration.currentCycle ?? 1,
+    });
+    setHistory(response.history || []);
+  }
+
+  function startEditingOldMonth(entry: RegistrationRenewalHistoryRow) {
+    setEditingHistoryId(entry.id);
+    setEditForm(buildOldMonthEditForm(entry));
+    setHistoryError(null);
+  }
+
+  async function saveEditingOldMonth() {
+    if (!editingHistoryId || !editForm) return;
+    setEditLoading(true);
+    setHistoryError(null);
+    try {
+      await packageRegistrationsApi.updateOldMonthHistory(editingHistoryId, {
+        periodStartsAt: editForm.periodStartsAt,
+        durationMonths: Math.max(1, Math.round(Number(editForm.durationMonths) || 1)),
+        sessionsLeft: editForm.sessionsLeft.trim() ? Math.max(0, Math.round(Number(editForm.sessionsLeft) || 0)) : null,
+        basePriceJod: Math.max(0, Math.round(Number(editForm.basePriceJod) || 0)),
+        amountPaid: Math.max(0, Math.round(Number(editForm.amountPaid) || 0)),
+        paymentMethod: editForm.paymentMethod,
+        paymentPeriodKey: editForm.paymentPeriodKey,
+        privateNote: editForm.privateNote.trim() || null,
+      });
+      setEditingHistoryId(null);
+      setEditForm(null);
+      await refreshHistory();
+    } catch (error) {
+      setHistoryError(error instanceof Error ? error.message : 'Could not update old month.');
+    } finally {
+      setEditLoading(false);
+    }
+  }
+
+  async function deleteOldMonth(entry: RegistrationRenewalHistoryRow) {
+    if (!confirm('Delete this old month record? Any historical receipt linked to it will be voided.')) return;
+    setHistoryError(null);
+    try {
+      await packageRegistrationsApi.deleteOldMonthHistory(entry.id);
+      if (editingHistoryId === entry.id) {
+        setEditingHistoryId(null);
+        setEditForm(null);
+      }
+      await refreshHistory();
+    } catch (error) {
+      setHistoryError(error instanceof Error ? error.message : 'Could not delete old month.');
+    }
+  }
 
   if (!registration) return null;
 
@@ -317,9 +416,18 @@ export function RegistrationDetailsModal({
             ) : (
               history.map((entry) => {
                 const snapshot = entry.snapshot;
-                const archivedPaymentStatus = readSnapshotText(snapshot, 'paymentStatus') || 'UNPAID';
-                const archivedCollected = readSnapshotNumber(snapshot, 'collectedJod');
-                const archivedRemaining = readSnapshotNumber(snapshot, 'remainingJod');
+                const isOldMonth = entry.action === 'OLD_MONTH_RECORDED' || entry.action === 'IMPORTED_OLD_REGISTRATION';
+                const archivedPaymentStatus = isOldMonth
+                  ? readSnapshotNumber(snapshot, 'amountPaid') > 0
+                    ? 'PAID'
+                    : 'UNPAID'
+                  : readSnapshotText(snapshot, 'paymentStatus') || 'UNPAID';
+                const archivedCollected = isOldMonth
+                  ? readSnapshotNumber(snapshot, 'amountPaid')
+                  : readSnapshotNumber(snapshot, 'collectedJod');
+                const archivedRemaining = isOldMonth
+                  ? Math.max(0, readSnapshotNumber(snapshot, 'finalPriceJod') - readSnapshotNumber(snapshot, 'amountPaid'))
+                  : readSnapshotNumber(snapshot, 'remainingJod');
                 const archivedTotal = readSnapshotNumber(snapshot, 'finalPriceJod');
                 const archivedSessions = readSnapshotNumber(snapshot, 'sessionsLeft');
                 const archivedSessionsUsed = readSnapshotNumber(snapshot, 'sessionsUsedOverride');
@@ -328,16 +436,52 @@ export function RegistrationDetailsModal({
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <p className="font-semibold text-ui-textPrimary">
-                          Cycle {entry.cycleNumber}
+                          {isOldMonth ? 'Old month record' : `Cycle ${entry.cycleNumber}`}
                         </p>
                         <p className="text-xs text-ui-textMuted">
                           {entry.action} on {formatDateTime(entry.createdAt)}
                         </p>
                       </div>
-                      <Badge variant={paymentBadgeVariant(archivedPaymentStatus === 'PAID' ? 'Paid' : archivedPaymentStatus === 'PARTIAL' ? 'Partial' : 'Unpaid')}>
-                        {archivedPaymentStatus}
-                      </Badge>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant={paymentBadgeVariant(archivedPaymentStatus === 'PAID' ? 'Paid' : archivedPaymentStatus === 'PARTIAL' ? 'Partial' : 'Unpaid')}>
+                          {archivedPaymentStatus}
+                        </Badge>
+                        {entry.action !== 'CURRENT' ? (
+                          <>
+                            <Button type="button" variant="secondary" size="sm" onClick={() => startEditingOldMonth(entry)}>
+                              Edit
+                            </Button>
+                            <Button type="button" variant="ghost" size="sm" className="text-red-600 hover:bg-red-50" onClick={() => deleteOldMonth(entry)}>
+                              Delete
+                            </Button>
+                          </>
+                        ) : null}
+                      </div>
                     </div>
+                    {editingHistoryId === entry.id && editForm ? (
+                      <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                          <Input label="Start" type="date" value={editForm.periodStartsAt} onChange={(e) => setEditForm({ ...editForm, periodStartsAt: e.target.value, paymentPeriodKey: e.target.value.slice(0, 7) })} />
+                          <Input label="Months" type="number" min={1} value={editForm.durationMonths} onChange={(e) => setEditForm({ ...editForm, durationMonths: e.target.value })} />
+                          <Input label="Sessions" type="number" min={0} value={editForm.sessionsLeft} onChange={(e) => setEditForm({ ...editForm, sessionsLeft: e.target.value })} />
+                          <Input label="Price" type="number" min={0} value={editForm.basePriceJod} onChange={(e) => setEditForm({ ...editForm, basePriceJod: e.target.value })} />
+                          <Input label="Paid" type="number" min={0} value={editForm.amountPaid} onChange={(e) => setEditForm({ ...editForm, amountPaid: e.target.value })} />
+                          <Select label="Method" value={editForm.paymentMethod} onChange={(e) => setEditForm({ ...editForm, paymentMethod: e.target.value })}>
+                            {PAYMENT_METHODS.map((method) => <option key={method} value={method}>{method}</option>)}
+                          </Select>
+                          <Input label="Paid month" type="month" value={editForm.paymentPeriodKey} onChange={(e) => setEditForm({ ...editForm, paymentPeriodKey: e.target.value })} />
+                          <Input label="Private note" value={editForm.privateNote} onChange={(e) => setEditForm({ ...editForm, privateNote: e.target.value })} />
+                        </div>
+                        <div className="mt-3 flex justify-end gap-2">
+                          <Button type="button" variant="secondary" size="sm" onClick={() => { setEditingHistoryId(null); setEditForm(null); }}>
+                            Cancel
+                          </Button>
+                          <Button type="button" size="sm" isLoading={editLoading} onClick={saveEditingOldMonth}>
+                            Save old month
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
                     <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                       <div>
                         <p className="text-xs uppercase tracking-[0.16em] text-ui-textMuted">Archived total</p>

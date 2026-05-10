@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Modal, Badge, Button } from '../../_components/ui';
+import { Modal, Badge, Button, Input, Select } from '../../_components/ui';
 import {
   packageRegistrationsApi,
   type PackageRegistrationRow,
@@ -72,9 +72,11 @@ function paymentBadgeVariant(status: string): 'success' | 'warning' | 'danger' {
 type PlayerCycle = {
   id: string;
   registration: PackageRegistrationRow;
+  history?: RegistrationRenewalHistoryRow;
   packageName: string;
   cycleNumber: number | null;
   isCurrent: boolean;
+  isOldMonth: boolean;
   startDate: string | null;
   endDate: string | null;
   totalJod: number | null;
@@ -83,6 +85,46 @@ type PlayerCycle = {
   paymentStatus: string;
   archivedAt: string | null;
 };
+
+type OldMonthEditForm = {
+  periodStartsAt: string;
+  durationMonths: string;
+  sessionsLeft: string;
+  basePriceJod: string;
+  amountPaid: string;
+  paymentMethod: string;
+  paymentPeriodKey: string;
+  privateNote: string;
+};
+
+const PAYMENT_METHODS = ['CASH', 'CARD', 'TRANSFER', 'OTHER'];
+
+function toDateInput(value: unknown) {
+  if (!value) return '';
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toISOString().slice(0, 10);
+}
+
+function toMonthInput(value: unknown) {
+  if (typeof value === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(value)) return value;
+  const date = toDateInput(value);
+  return date ? date.slice(0, 7) : '';
+}
+
+function buildOldMonthEditForm(history: RegistrationRenewalHistoryRow): OldMonthEditForm {
+  const snapshot = history.snapshot ?? {};
+  return {
+    periodStartsAt: toDateInput(snapshot.periodStartsAt),
+    durationMonths: String(snapshot.durationMonths ?? 1),
+    sessionsLeft: snapshot.sessionsLeft == null ? '' : String(snapshot.sessionsLeft),
+    basePriceJod: String(snapshot.finalPriceJod ?? 0),
+    amountPaid: String(snapshot.amountPaid ?? 0),
+    paymentMethod: typeof snapshot.paymentMethod === 'string' ? snapshot.paymentMethod : 'CASH',
+    paymentPeriodKey: toMonthInput(snapshot.paymentPeriodKey || snapshot.periodStartsAt),
+    privateNote: typeof snapshot.privateNote === 'string' ? snapshot.privateNote : '',
+  };
+}
 
 function buildCurrentCycle(registration: PackageRegistrationRow): PlayerCycle {
   const collected = registration.collected ?? 0;
@@ -93,6 +135,7 @@ function buildCurrentCycle(registration: PackageRegistrationRow): PlayerCycle {
     packageName: registration.packageName,
     cycleNumber: registration.currentCycle ?? null,
     isCurrent: true,
+    isOldMonth: false,
     startDate: registration.periodStartsAt || registration.createdAt,
     endDate: registration.periodEndsAt,
     totalJod: total,
@@ -108,18 +151,25 @@ function buildArchivedCycle(
   history: RegistrationRenewalHistoryRow,
 ): PlayerCycle {
   const snapshot = history.snapshot;
+  const isOldMonth = history.action === 'OLD_MONTH_RECORDED' || history.action === 'IMPORTED_OLD_REGISTRATION';
+  const total = readSnapshotNumber(snapshot, 'finalPriceJod');
+  const paid = isOldMonth ? readSnapshotNumber(snapshot, 'amountPaid') ?? 0 : readSnapshotNumber(snapshot, 'collectedJod');
   return {
     id: history.id,
     registration,
+    history,
     packageName: readSnapshotText(snapshot, 'packageName') || registration.packageName,
     cycleNumber: history.cycleNumber,
     isCurrent: false,
+    isOldMonth,
     startDate: readSnapshotText(snapshot, 'periodStartsAt'),
     endDate: readSnapshotText(snapshot, 'periodEndsAt'),
-    totalJod: readSnapshotNumber(snapshot, 'finalPriceJod'),
-    collectedJod: readSnapshotNumber(snapshot, 'collectedJod'),
-    remainingJod: readSnapshotNumber(snapshot, 'remainingJod'),
-    paymentStatus: readSnapshotText(snapshot, 'paymentStatus') || 'UNPAID',
+    totalJod: total,
+    collectedJod: paid,
+    remainingJod: isOldMonth
+      ? Math.max(0, (total ?? 0) - (paid ?? 0))
+      : readSnapshotNumber(snapshot, 'remainingJod'),
+    paymentStatus: isOldMonth ? ((paid ?? 0) > 0 ? 'PAID' : 'UNPAID') : readSnapshotText(snapshot, 'paymentStatus') || 'UNPAID',
     archivedAt: history.createdAt,
   };
 }
@@ -143,6 +193,9 @@ export function PersonDetailsModal({
   const [historyByRegistrationId, setHistoryByRegistrationId] = useState<Record<string, RegistrationRenewalHistoryRow[]>>({});
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [editingHistoryId, setEditingHistoryId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<OldMonthEditForm | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
     if (!open || registrations.length === 0) return;
@@ -198,6 +251,62 @@ export function PersonDetailsModal({
       cancelled = true;
     };
   }, [open, registrations]);
+
+  async function refreshPersonHistory(rows = allRegistrations) {
+    const historyEntries = await Promise.all(
+      rows.map(async (row) => {
+        const response = await packageRegistrationsApi.getHistory(row.id);
+        return [row.id, response.history || []] as const;
+      }),
+    );
+    setHistoryByRegistrationId(Object.fromEntries(historyEntries));
+  }
+
+  function startEditingOldMonth(history: RegistrationRenewalHistoryRow) {
+    setEditingHistoryId(history.id);
+    setEditForm(buildOldMonthEditForm(history));
+    setHistoryError(null);
+  }
+
+  async function saveEditingOldMonth() {
+    if (!editingHistoryId || !editForm) return;
+    setEditLoading(true);
+    setHistoryError(null);
+    try {
+      await packageRegistrationsApi.updateOldMonthHistory(editingHistoryId, {
+        periodStartsAt: editForm.periodStartsAt,
+        durationMonths: Math.max(1, Math.round(Number(editForm.durationMonths) || 1)),
+        sessionsLeft: editForm.sessionsLeft.trim() ? Math.max(0, Math.round(Number(editForm.sessionsLeft) || 0)) : null,
+        basePriceJod: Math.max(0, Math.round(Number(editForm.basePriceJod) || 0)),
+        amountPaid: Math.max(0, Math.round(Number(editForm.amountPaid) || 0)),
+        paymentMethod: editForm.paymentMethod,
+        paymentPeriodKey: editForm.paymentPeriodKey,
+        privateNote: editForm.privateNote.trim() || null,
+      });
+      setEditingHistoryId(null);
+      setEditForm(null);
+      await refreshPersonHistory();
+    } catch (error) {
+      setHistoryError(error instanceof Error ? error.message : 'Could not update old month.');
+    } finally {
+      setEditLoading(false);
+    }
+  }
+
+  async function deleteOldMonth(history: RegistrationRenewalHistoryRow) {
+    if (!confirm('Delete this old month record? Any historical receipt linked to it will be voided.')) return;
+    setHistoryError(null);
+    try {
+      await packageRegistrationsApi.deleteOldMonthHistory(history.id);
+      if (editingHistoryId === history.id) {
+        setEditingHistoryId(null);
+        setEditForm(null);
+      }
+      await refreshPersonHistory();
+    } catch (error) {
+      setHistoryError(error instanceof Error ? error.message : 'Could not delete old month.');
+    }
+  }
 
   const timeline = useMemo(() => {
     const cycles = allRegistrations.flatMap((registration) => [
@@ -287,7 +396,7 @@ export function PersonDetailsModal({
                   <div>
                     <p className="font-medium text-ui-textPrimary">{cycle.packageName}</p>
                     <p className="text-xs text-ui-textMuted">
-                      {cycle.isCurrent ? 'Current cycle' : `Archived cycle ${cycle.cycleNumber ?? '-'}`}
+                      {cycle.isCurrent ? 'Current cycle' : cycle.isOldMonth ? 'Old month record' : `Archived cycle ${cycle.cycleNumber ?? '-'}`}
                       {' - '}
                       {formatDate(cycle.startDate)} to {formatDate(cycle.endDate)}
                     </p>
@@ -295,8 +404,44 @@ export function PersonDetailsModal({
                       <p className="text-xs text-ui-textMuted">Archived {formatDateTime(cycle.archivedAt)}</p>
                     ) : null}
                   </div>
-                  <Badge variant={paymentBadgeVariant(cycle.paymentStatus)}>{cycle.paymentStatus}</Badge>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={paymentBadgeVariant(cycle.paymentStatus)}>{cycle.paymentStatus}</Badge>
+                    {!cycle.isCurrent && cycle.history ? (
+                      <>
+                        <Button size="sm" variant="secondary" onClick={() => startEditingOldMonth(cycle.history!)}>
+                          Edit
+                        </Button>
+                        <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => deleteOldMonth(cycle.history!)}>
+                          Delete
+                        </Button>
+                      </>
+                    ) : null}
+                  </div>
                 </div>
+                {editingHistoryId === cycle.id && editForm ? (
+                  <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Input label="Start" type="date" value={editForm.periodStartsAt} onChange={(e) => setEditForm({ ...editForm, periodStartsAt: e.target.value, paymentPeriodKey: e.target.value.slice(0, 7) })} />
+                      <Input label="Months" type="number" min={1} value={editForm.durationMonths} onChange={(e) => setEditForm({ ...editForm, durationMonths: e.target.value })} />
+                      <Input label="Sessions" type="number" min={0} value={editForm.sessionsLeft} onChange={(e) => setEditForm({ ...editForm, sessionsLeft: e.target.value })} />
+                      <Input label="Price" type="number" min={0} value={editForm.basePriceJod} onChange={(e) => setEditForm({ ...editForm, basePriceJod: e.target.value })} />
+                      <Input label="Paid" type="number" min={0} value={editForm.amountPaid} onChange={(e) => setEditForm({ ...editForm, amountPaid: e.target.value })} />
+                      <Select label="Method" value={editForm.paymentMethod} onChange={(e) => setEditForm({ ...editForm, paymentMethod: e.target.value })}>
+                        {PAYMENT_METHODS.map((method) => <option key={method} value={method}>{method}</option>)}
+                      </Select>
+                      <Input label="Paid month" type="month" value={editForm.paymentPeriodKey} onChange={(e) => setEditForm({ ...editForm, paymentPeriodKey: e.target.value })} />
+                      <Input label="Private note" value={editForm.privateNote} onChange={(e) => setEditForm({ ...editForm, privateNote: e.target.value })} />
+                    </div>
+                    <div className="mt-3 flex justify-end gap-2">
+                      <Button type="button" size="sm" variant="secondary" onClick={() => { setEditingHistoryId(null); setEditForm(null); }}>
+                        Cancel
+                      </Button>
+                      <Button type="button" size="sm" isLoading={editLoading} onClick={saveEditingOldMonth}>
+                        Save old month
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
                 <div className="mt-2 grid gap-2 text-xs text-ui-textMuted sm:grid-cols-3">
                   <span>Total: <strong className="text-ui-textPrimary">{cycle.totalJod ?? '-'} JOD</strong></span>
                   <span>Collected: <strong className="text-ui-textPrimary">{cycle.collectedJod ?? '-'} JOD</strong></span>

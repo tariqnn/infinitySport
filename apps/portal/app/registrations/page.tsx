@@ -39,6 +39,7 @@ export default function RegistrationsPage() {
   const [freezingId, setFreezingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [markingUnpaidId, setMarkingUnpaidId] = useState<string | null>(null);
+  const [startingCycleId, setStartingCycleId] = useState<string | null>(null);
   const [canceledDatesByPackage, setCanceledDatesByPackage] = useState<Record<string, Set<string>>>({});
 
   const [markPaidRegistration, setMarkPaidRegistration] = useState<Registration | null>(null);
@@ -369,7 +370,33 @@ export default function RegistrationsPage() {
     }
   }
 
+  async function handleStartNewCycle(r: Registration) {
+    if (startingCycleId) return;
+    if (!confirm(`Start a new cycle for ${r.customerName}? The finished cycle will be archived and the new cycle will be unpaid until payment is recorded.`)) {
+      return;
+    }
+    setStartingCycleId(r.id);
+    try {
+      await packageRegistrationsApi.reregister(r.id);
+      load();
+    } catch (e) {
+      console.error('Failed to start new cycle', e);
+      alert('Failed to start a new cycle. Please try again.');
+    } finally {
+      setStartingCycleId(null);
+    }
+  }
+
+  function isNewCycleDue(row: Registration) {
+    if (row.isFrozen) return false;
+    const sessions = getSessionsRemaining(row);
+    if (sessions) return sessions.remaining <= 0;
+    const days = getDaysRemaining(row);
+    return days === 0;
+  }
+
   function getPaymentStatus(row: Registration): 'PAID' | 'PARTIAL' | 'UNPAID' {
+    if (isNewCycleDue(row)) return 'UNPAID';
     const collected = row.collected ?? 0;
     const finalPrice = row.finalPriceJod ?? 0;
     if (row.isPaid || (finalPrice <= 0 && collected > 0) || (finalPrice > 0 && collected >= finalPrice)) return 'PAID';
@@ -594,6 +621,7 @@ export default function RegistrationsPage() {
 
                   const remainingDisplay = (() => {
                     if (r.isFrozen) return 'Frozen';
+                    if (isNewCycleDue(r as Registration)) return 'New cycle due';
                     if (sessions) {
                       if (sessions.remaining <= 0) return 'No sessions left';
                       return `${sessions.remaining}/${sessions.total} sessions`;
@@ -710,6 +738,7 @@ export default function RegistrationsPage() {
                   </tr>
                 ) : rows.map((row) => {
                   const collected = row.collected ?? 0;
+                  const renewalDue = isNewCycleDue(row);
                   const paymentStatus = getPaymentStatus(row);
                   return (
                     <tr key={row.id} className="group hover:bg-slate-50/70">
@@ -744,7 +773,14 @@ export default function RegistrationsPage() {
                           >
                             {paymentStatus === 'PAID' ? 'Paid' : paymentStatus === 'PARTIAL' ? 'Partial' : 'Unpaid'}
                           </Badge>
-                          {collected > 0 && <span className="text-xs text-ui-textMuted">{collected} JOD</span>}
+                          {renewalDue ? (
+                            <span className="text-xs font-medium text-red-600">New cycle due</span>
+                          ) : null}
+                          {collected > 0 && (
+                            <span className="text-xs text-ui-textMuted">
+                              {renewalDue ? 'Previous: ' : ''}{collected} JOD
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-3 min-w-0 whitespace-nowrap text-sm text-ui-textPrimary">
@@ -775,7 +811,16 @@ export default function RegistrationsPage() {
                               <DropdownMenu.Label className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ui-textMuted">
                                 Payment
                               </DropdownMenu.Label>
-                              {paymentStatus !== 'PAID' && (
+                              {renewalDue && (
+                                <DropdownMenu.Item
+                                  className="cursor-pointer px-4 py-2 text-sm font-medium text-emerald-700 outline-none hover:bg-emerald-50 data-[highlighted]:bg-emerald-50 disabled:opacity-50"
+                                  onSelect={() => handleStartNewCycle(row)}
+                                  disabled={startingCycleId === row.id}
+                                >
+                                  {startingCycleId === row.id ? 'Starting new cycle...' : 'Start new cycle'}
+                                </DropdownMenu.Item>
+                              )}
+                              {!renewalDue && paymentStatus !== 'PAID' && (
                                 <DropdownMenu.Item
                                   className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
                                   onSelect={() => setMarkPaidRegistration(row)}
@@ -791,7 +836,7 @@ export default function RegistrationsPage() {
                                   View Receipt(s)
                                 </DropdownMenu.Item>
                               )}
-                              {(paymentStatus === 'PAID' || paymentStatus === 'PARTIAL') && (
+                              {!renewalDue && (paymentStatus === 'PAID' || paymentStatus === 'PARTIAL') && (
                                 <DropdownMenu.Item
                                   className="cursor-pointer px-4 py-2 text-sm text-amber-700 outline-none hover:bg-amber-50 data-[highlighted]:bg-amber-50 disabled:opacity-50"
                                   onSelect={() => handleMarkUnpaid(row)}

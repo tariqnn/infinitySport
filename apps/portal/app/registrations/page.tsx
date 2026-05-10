@@ -26,6 +26,8 @@ import { ManagePackageSessionsModal } from './_components/ManagePackageSessionsM
 import { OldRegistrationImportModal } from './_components/OldRegistrationImportModal';
 
 type Registration = PackageRegistrationRow;
+type SortKey = 'registered' | 'remaining';
+type SortDirection = 'asc' | 'desc';
 
 export default function RegistrationsPage() {
   const [rows, setRows] = useState<Registration[]>([]);
@@ -36,6 +38,7 @@ export default function RegistrationsPage() {
   const [customEndDate, setCustomEndDate] = useState<string>('');
   const [searchInput, setSearchInput] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
   const [freezingId, setFreezingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [markingUnpaidId, setMarkingUnpaidId] = useState<string | null>(null);
@@ -395,6 +398,30 @@ export default function RegistrationsPage() {
     return days === 0;
   }
 
+  function getRemainingSortValue(row: Registration) {
+    if (row.isFrozen) return -1;
+    const sessions = getSessionsRemaining(row);
+    if (sessions) return sessions.remaining;
+    const days = getDaysRemaining(row);
+    return days ?? -1;
+  }
+
+  function toggleSort(key: SortKey) {
+    setSortConfig((current) => {
+      if (!current || current.key !== key) return { key, direction: 'desc' };
+      return { key, direction: current.direction === 'desc' ? 'asc' : 'desc' };
+    });
+  }
+
+  function renderSortLabel(key: SortKey) {
+    if (sortConfig?.key !== key) return null;
+    return (
+      <span className="ml-1 text-[11px] font-medium text-ui-textMuted">
+        {sortConfig.direction === 'desc' ? 'high-low' : 'low-high'}
+      </span>
+    );
+  }
+
   function getPaymentStatus(row: Registration): 'PAID' | 'PARTIAL' | 'UNPAID' {
     if (isNewCycleDue(row)) return 'UNPAID';
     const collected = row.collected ?? 0;
@@ -452,6 +479,27 @@ export default function RegistrationsPage() {
     () => (editRegistrationRow ? getSessionsRemaining(editRegistrationRow) : null),
     [editRegistrationRow, canceledDatesByPackage, defaultSessionsByPackage],
   );
+  const displayedRows = useMemo(() => {
+    if (!sortConfig) return rows;
+
+    const directionMultiplier = sortConfig.direction === 'desc' ? -1 : 1;
+    return [...rows].sort((left, right) => {
+      const leftValue =
+        sortConfig.key === 'registered'
+          ? new Date(left.createdAt).getTime()
+          : getRemainingSortValue(left);
+      const rightValue =
+        sortConfig.key === 'registered'
+          ? new Date(right.createdAt).getTime()
+          : getRemainingSortValue(right);
+      const safeLeft = Number.isFinite(leftValue) ? leftValue : -1;
+      const safeRight = Number.isFinite(rightValue) ? rightValue : -1;
+      if (safeLeft === safeRight) {
+        return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+      }
+      return (safeLeft - safeRight) * directionMultiplier;
+    });
+  }, [rows, sortConfig, canceledDatesByPackage, defaultSessionsByPackage]);
 
   if (loading && rows.length === 0) {
     return <div className="py-12 text-center text-ui-textMuted">Loading registrations...</div>;
@@ -581,7 +629,7 @@ export default function RegistrationsPage() {
                 Bulk add players
               </Button>
               <ExportCsvButton
-                rows={rows.map(r => {
+                rows={displayedRows.map(r => {
                   const createdAt = new Date(r.createdAt);
                   const updatedAt = new Date(r.updatedAt);
                   
@@ -702,7 +750,7 @@ export default function RegistrationsPage() {
                   `Filter - Package: ${packageFilter || 'All packages'}`,
                   `Filter - Date range: ${dateRange === 'custom' ? `${customStartDate || '?'} to ${customEndDate || '?'}` : dateRange === 'all' ? 'All time' : dateRange}`,
                   `Filter - Search: ${searchTerm || 'None'}`,
-                  `Total rows: ${rows.length}`,
+                  `Total rows: ${displayedRows.length}`,
                 ]}
                 label="Export to Excel"
               />
@@ -720,13 +768,31 @@ export default function RegistrationsPage() {
                   <th className="w-[5%] min-w-0 px-4 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">Age</th>
                   <th className="w-[8%] min-w-0 px-4 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">Price</th>
                   <th className="w-[11%] min-w-0 px-4 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">Payment</th>
-                  <th className="w-[9%] min-w-0 px-4 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">Registered</th>
-                  <th className="w-[11%] min-w-0 px-4 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">Remaining</th>
+                  <th className="w-[9%] min-w-0 px-4 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('registered')}
+                      className="inline-flex items-center text-left font-semibold text-ui-textPrimary hover:text-brand-blue-primary"
+                      aria-label="Sort by registered date"
+                    >
+                      Registered{renderSortLabel('registered')}
+                    </button>
+                  </th>
+                  <th className="w-[11%] min-w-0 px-4 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('remaining')}
+                      className="inline-flex items-center text-left font-semibold text-ui-textPrimary hover:text-brand-blue-primary"
+                      aria-label="Sort by remaining sessions or days"
+                    >
+                      Remaining{renderSortLabel('remaining')}
+                    </button>
+                  </th>
                   <th className="w-[72px] min-w-[72px] sticky right-0 z-30 border-l border-ui-border bg-slate-50 px-2 py-3 text-center text-sm font-semibold text-ui-textPrimary whitespace-nowrap shadow-[-6px_0_10px_rgba(15,23,42,0.06)]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-ui-border">
-                {rows.length === 0 ? (
+                {displayedRows.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="px-4 py-10 text-center text-sm text-ui-textMuted">
                       {loading
@@ -736,7 +802,7 @@ export default function RegistrationsPage() {
                           : 'No registrations found for the selected filters.'}
                     </td>
                   </tr>
-                ) : rows.map((row) => {
+                ) : displayedRows.map((row) => {
                   const collected = row.collected ?? 0;
                   const renewalDue = isNewCycleDue(row);
                   const paymentStatus = getPaymentStatus(row);

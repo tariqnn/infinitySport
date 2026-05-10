@@ -811,15 +811,6 @@ export default function RegistrationsPage() {
                               <DropdownMenu.Label className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ui-textMuted">
                                 Payment
                               </DropdownMenu.Label>
-                              {renewalDue && (
-                                <DropdownMenu.Item
-                                  className="cursor-pointer px-4 py-2 text-sm font-medium text-emerald-700 outline-none hover:bg-emerald-50 data-[highlighted]:bg-emerald-50 disabled:opacity-50"
-                                  onSelect={() => handleStartNewCycle(row)}
-                                  disabled={startingCycleId === row.id}
-                                >
-                                  {startingCycleId === row.id ? 'Starting new cycle...' : 'Start new cycle'}
-                                </DropdownMenu.Item>
-                              )}
                               {!renewalDue && paymentStatus !== 'PAID' && (
                                 <DropdownMenu.Item
                                   className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
@@ -860,6 +851,17 @@ export default function RegistrationsPage() {
                                 onSelect={() => { setRegisterPersonMultiInitialPerson({ customerName: row.customerName, customerPhone: row.customerPhone, customerEmail: row.customerEmail ?? undefined, customerAge: row.customerAge ?? undefined }); setRegisterPersonMultiOpen(true); }}
                               >
                                 Add package(s)
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item
+                                className="cursor-pointer px-4 py-2 text-sm font-medium text-emerald-700 outline-none hover:bg-emerald-50 data-[highlighted]:bg-emerald-50 disabled:opacity-50"
+                                onSelect={() => handleStartNewCycle(row)}
+                                disabled={startingCycleId === row.id}
+                              >
+                                {startingCycleId === row.id
+                                  ? 'Starting new cycle...'
+                                  : renewalDue
+                                    ? 'Start new cycle'
+                                    : 'Register again (same package)'}
                               </DropdownMenu.Item>
                               <DropdownMenu.Item
                                 className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg disabled:opacity-50"

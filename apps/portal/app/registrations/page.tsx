@@ -748,12 +748,10 @@ export default function RegistrationsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 min-w-0 whitespace-nowrap text-sm text-ui-textPrimary">
-                        <span className="block">
-                          {row.periodStartsAt ? new Date(row.periodStartsAt).toLocaleDateString() : new Date(row.createdAt).toLocaleDateString()}
-                        </span>
+                        <span className="block">{new Date(row.createdAt).toLocaleDateString()}</span>
                         {row.periodStartsAt && row.periodStartsAt.slice(0, 10) !== row.createdAt.slice(0, 10) ? (
                           <span className="block text-xs text-ui-textMuted">
-                            Created {new Date(row.createdAt).toLocaleDateString()}
+                            Cycle: {new Date(row.periodStartsAt).toLocaleDateString()}
                           </span>
                         ) : null}
                       </td>

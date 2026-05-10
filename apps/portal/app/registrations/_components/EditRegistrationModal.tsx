@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Modal, Input, Select, Button } from '../../_components/ui';
+import { Modal, Input, Select, Textarea, Button } from '../../_components/ui';
 import { packageRegistrationsApi, type PackageRegistrationRow } from '../../../lib/portalApi';
 import {
   addDurationMonthsToDateInput,
@@ -69,9 +69,12 @@ export function EditRegistrationModal({
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerAge, setCustomerAge] = useState('');
+  const [status, setStatus] = useState('ACTIVE');
+  const [planLabel, setPlanLabel] = useState('');
+  const [isFrozen, setIsFrozen] = useState(false);
+  const [durationMonths, setDurationMonths] = useState('');
   const [sessionsLeft, setSessionsLeft] = useState('');
   const [sessionsUsed, setSessionsUsed] = useState('');
-  const [durationMonths, setDurationMonths] = useState('');
   const [nextPaymentDate, setNextPaymentDate] = useState('');
   const [periodStartsAt, setPeriodStartsAt] = useState('');
   const [periodEndsAt, setPeriodEndsAt] = useState('');
@@ -91,6 +94,10 @@ export function EditRegistrationModal({
     setCustomerPhone(registration.customerPhone || '');
     setCustomerEmail(registration.customerEmail || '');
     setCustomerAge(registration.customerAge != null ? String(registration.customerAge) : '');
+    setStatus(String(registration.status || 'ACTIVE').trim().toUpperCase() || 'ACTIVE');
+    setPlanLabel(registration.planLabel || '');
+    setIsFrozen(Boolean(registration.isFrozen));
+    setDurationMonths(String(Math.max(1, Number(registration.durationMonths ?? 1) || 1)));
     const initialSessionsLeft =
       registration.sessionsLeft ??
       (currentSessionSummary ? Math.max(0, currentSessionSummary.total - (Number(registration.sessionsBonus) || 0)) : null) ??
@@ -98,7 +105,6 @@ export function EditRegistrationModal({
       null;
     setSessionsLeft(initialSessionsLeft != null ? String(initialSessionsLeft) : '');
     setSessionsUsed(String(registration.sessionsUsedOverride ?? currentSessionSummary?.used ?? 0));
-    setDurationMonths(String(Math.max(1, Number(registration.durationMonths) || 1)));
     setNextPaymentDate(toDateInputValue(registration.nextPaymentDate));
     setPeriodStartsAt(getStartDateInputValue(registration));
     setPeriodEndsAt(toDateInputValue(registration.periodEndsAt));
@@ -143,6 +149,11 @@ export function EditRegistrationModal({
 
     const defaultPrice = getPackageDefaultPrice(packageName, defaultPricesByPackage);
     setBasePriceJod(defaultPrice != null ? String(defaultPrice) : '');
+    if (packageName !== originalPackageName) {
+      setDurationMonths(
+        String(getPackageDefaultDurationMonths(packageName, defaultDurationMonthsByPackage)),
+      );
+    }
 
     const defaultSessions = getPackageDefaultSessions(packageName, defaultSessionsByPackage);
     if (defaultSessions != null) {
@@ -152,6 +163,7 @@ export function EditRegistrationModal({
     setSessionsUsed('0');
   }, [
     currentSessionSummary,
+    defaultDurationMonthsByPackage,
     defaultPricesByPackage,
     defaultSessionsByPackage,
     open,
@@ -167,11 +179,14 @@ export function EditRegistrationModal({
     const startChanged = periodStartsAt.trim() && periodStartsAt !== originalStart;
     const durationChanged = durationMonths.trim() && Math.round(Number(durationMonths)) !== Math.max(1, registration.durationMonths || 1);
     if (!periodStartsAt.trim() || (!startChanged && !packageChanged && !durationChanged)) return;
-    const parsedDuration = Math.max(1, Math.round(Number(durationMonths) || 1));
-    const nextEndDate = addDurationMonthsToDateInput(periodStartsAt, parsedDuration);
+    const nextDurationMonths =
+      packageChanged
+        ? getPackageDefaultDurationMonths(packageName, defaultDurationMonthsByPackage)
+        : Math.max(1, Math.round(Number(durationMonths) || Number(registration.durationMonths) || 1));
+    const nextEndDate = addDurationMonthsToDateInput(periodStartsAt, nextDurationMonths);
     setPeriodEndsAt(nextEndDate);
     setNextPaymentDate(nextEndDate);
-  }, [durationMonths, defaultDurationMonthsByPackage, open, packageName, periodStartsAt, registration]);
+  }, [defaultDurationMonthsByPackage, durationMonths, open, packageName, periodStartsAt, registration]);
 
   const packageList = useMemo(() => {
     const names = new Set(packageOptions);
@@ -213,12 +228,15 @@ export function EditRegistrationModal({
     if (!nextPackageName) return setError('Package is required.');
     if (!nextCustomerName) return setError('Name is required.');
     if (!nextCustomerPhone) return setError('Phone is required.');
-    if (!Number.isFinite(baseNumber) || baseNumber < 0) return setError('Base price must be 0 or greater.');
-    const parsedDurationMonths = Number(durationMonths);
-    if (!Number.isFinite(parsedDurationMonths) || parsedDurationMonths < 1) {
-      return setError('Duration months must be 1 or greater.');
+    const nextStatus = String(status || 'ACTIVE').trim().toUpperCase();
+    if (!['ACTIVE', 'EXPIRED', 'CANCELLED'].includes(nextStatus)) {
+      return setError('Status must be Active, Expired, or Cancelled.');
     }
-    const nextDurationMonths = Math.round(parsedDurationMonths);
+    const parsedDurationMonths = Math.max(1, Math.round(Number(durationMonths) || 0));
+    if (!Number.isFinite(parsedDurationMonths) || parsedDurationMonths < 1) {
+      return setError('Duration must be at least 1 month.');
+    }
+    if (!Number.isFinite(baseNumber) || baseNumber < 0) return setError('Base price must be 0 or greater.');
     if (periodStartsAt.trim() && periodEndsAt.trim()) {
       const start = new Date(periodStartsAt);
       const end = new Date(periodEndsAt);
@@ -271,9 +289,12 @@ export function EditRegistrationModal({
         customerPhone: nextCustomerPhone,
         customerEmail: nextCustomerEmail || null,
         customerAge: agePayload,
+        status: nextStatus,
+        isFrozen,
+        planLabel: planLabel.trim() || null,
+        durationMonths: parsedDurationMonths,
         sessionsLeft: nextSessionsLeft,
         sessionsUsedOverride: nextSessionsUsed,
-        durationMonths: nextDurationMonths,
         nextPaymentDate: nextPaymentDate.trim() || null,
         basePriceJod: baseNumber,
         discountType,
@@ -284,8 +305,8 @@ export function EditRegistrationModal({
       });
       onSuccess();
       onClose();
-    } catch (err: any) {
-      setError(err?.message || 'Failed to update registration');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to update registration');
     } finally {
       setLoading(false);
     }
@@ -312,7 +333,28 @@ export function EditRegistrationModal({
             <Input label="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} required />
             <Input label="Email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
             <Input label="Age" type="number" min={0} value={customerAge} onChange={(e) => setCustomerAge(e.target.value)} />
+            <Select label="Registration status" value={status} onChange={(e) => setStatus(e.target.value)} required>
+              <option value="ACTIVE">Active</option>
+              <option value="EXPIRED">Expired</option>
+              <option value="CANCELLED">Cancelled</option>
+            </Select>
           </div>
+          <Textarea
+            label="Notes / plan label"
+            value={planLabel}
+            onChange={(e) => setPlanLabel(e.target.value)}
+            rows={3}
+            placeholder="Optional internal notes, plan label, or registration details"
+          />
+          <label className="flex items-center gap-2 rounded-lg border border-ui-border bg-ui-softBg/30 px-3 py-2.5 text-sm text-ui-textPrimary">
+            <input
+              type="checkbox"
+              checked={isFrozen}
+              onChange={(e) => setIsFrozen(e.target.checked)}
+              className="rounded border-ui-border"
+            />
+            Freeze this registration
+          </label>
         </FormSection>
 
         <FormSection title="Package and dates">

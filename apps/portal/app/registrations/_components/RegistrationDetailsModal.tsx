@@ -356,6 +356,10 @@ export function RegistrationDetailsModal({
             <p className="text-ui-textPrimary">{registration.sessionsLeft ?? '-'}</p>
           </div>
           <div>
+            <p className="text-ui-textMuted">Sessions per week</p>
+            <p className="text-ui-textPrimary">{registration.sessionsPerWeek ?? 'Package default'}</p>
+          </div>
+          <div>
             <p className="text-ui-textMuted">Classes finished</p>
             <p className="text-ui-textPrimary">{registration.sessionsUsedOverride ?? '-'}</p>
           </div>

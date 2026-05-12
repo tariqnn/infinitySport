@@ -80,6 +80,7 @@ type RegistrationInput = {
   durationMonths?: number | null;
   sessionsLeft?: number | null;
   sessionsUsedOverride?: number | null;
+  sessionsPerWeek?: number | null;
   nextPaymentDate?: string | null;
   planLabel?: string | null;
   basePriceJod?: number;
@@ -205,6 +206,14 @@ function withoutSessionsUsedOverride<
 >(data: T): Omit<T, "sessionsUsedOverride"> {
   const next = { ...data } as T;
   delete next.sessionsUsedOverride;
+  return next;
+}
+
+function withoutSessionsPerWeek<
+  T extends { sessionsPerWeek?: unknown },
+>(data: T): Omit<T, "sessionsPerWeek"> {
+  const next = { ...data } as T;
+  delete next.sessionsPerWeek;
   return next;
 }
 
@@ -436,6 +445,15 @@ async function createPackageRegistrationCompat(
       } as any);
     }
     if (
+      hasUnknownArgument(error, "sessionsPerWeek") &&
+      "sessionsPerWeek" in args.data
+    ) {
+      return delegate.create({
+        ...args,
+        data: withoutSessionsPerWeek(args.data),
+      } as any);
+    }
+    if (
       hasUnknownArgument(error, "periodStartsAt") &&
       "periodStartsAt" in args.data
     ) {
@@ -463,6 +481,15 @@ async function updatePackageRegistrationCompat(args: {
       return prisma.packageRegistration.update({
         ...args,
         data: withoutSessionsUsedOverride(args.data),
+      } as any);
+    }
+    if (
+      hasUnknownArgument(error, "sessionsPerWeek") &&
+      "sessionsPerWeek" in args.data
+    ) {
+      return prisma.packageRegistration.update({
+        ...args,
+        data: withoutSessionsPerWeek(args.data),
       } as any);
     }
     if (
@@ -659,6 +686,7 @@ function mapRegistrationRow(row: any) {
     currentCycle: row.currentCycle ?? 1,
     sessionsLeft: row.sessionsLeft ?? null,
     sessionsUsedOverride: row.sessionsUsedOverride ?? null,
+    sessionsPerWeek: row.sessionsPerWeek ?? null,
     nextPaymentDate: row.nextPaymentDate ?? null,
     planLabel: row.planLabel ?? null,
     pointsBalance: Math.max(0, Number(row.pointsBalance ?? 0) || 0),
@@ -864,6 +892,7 @@ async function syncRegistrationRealtimeById(
         currentCycle: serialized.currentCycle,
         sessionsLeft: serialized.sessionsLeft,
         sessionsUsedOverride: serialized.sessionsUsedOverride,
+        sessionsPerWeek: serialized.sessionsPerWeek,
         nextPaymentDate: serialized.nextPaymentDate,
         planLabel: serialized.planLabel,
         isPaid: serialized.isPaid,
@@ -4285,6 +4314,10 @@ async function createPackageRegistration(payload: RegistrationInput) {
     payload.sessionsUsedOverride == null
       ? null
       : Math.max(0, Math.round(Number(payload.sessionsUsedOverride) || 0));
+  const sessionsPerWeek =
+    payload.sessionsPerWeek == null
+      ? null
+      : Math.max(1, Math.round(Number(payload.sessionsPerWeek) || 1));
   const planLabel = normalizeText(payload.planLabel) || packageName;
   const { billingPeriodKey, priceLockedUntil } = billingPeriodFromDate(now);
 
@@ -4312,6 +4345,7 @@ async function createPackageRegistration(payload: RegistrationInput) {
     periodEndsAt,
     sessionsLeft,
     sessionsUsedOverride,
+    sessionsPerWeek,
     nextPaymentDate,
     planLabel,
   };
@@ -5099,6 +5133,7 @@ async function renewExistingRegistrationFromOldImport(
       isPaid: existing.isPaid,
       sessionsLeft: existing.sessionsLeft,
       sessionsUsedOverride: existing.sessionsUsedOverride,
+      sessionsPerWeek: existing.sessionsPerWeek,
       sessionsBonus: existing.sessionsBonus,
       isFrozen: existing.isFrozen,
     },
@@ -5154,6 +5189,7 @@ async function renewExistingRegistrationFromOldImport(
       nextPaymentDate,
       sessionsLeft,
       sessionsUsedOverride: null,
+      sessionsPerWeek: existing.sessionsPerWeek,
       sessionsBonus: 0,
       isFrozen: false,
       frozenAt: null,
@@ -5514,6 +5550,7 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
     durationMonths?: number | null;
     sessionsLeft?: number | null;
     sessionsUsedOverride?: number | null;
+    sessionsPerWeek?: number | null;
     nextPaymentDate?: string | null;
     planLabel?: string | null;
     isPaid?: boolean;
@@ -5638,6 +5675,19 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
     }
   } else if (packageChanged) {
     updateData.durationMonths = nextPackageDefaults?.durationMonths ?? 1;
+  }
+  if (body.durationMonths !== undefined) {
+    if (body.durationMonths == null) {
+      updateData.durationMonths = packageChanged
+        ? nextPackageDefaults?.durationMonths ?? 1
+        : existing.durationMonths;
+    } else {
+      const durationMonths = Number(body.durationMonths);
+      if (!Number.isFinite(durationMonths) || durationMonths < 1) {
+        return jsonError("durationMonths must be 1 or greater");
+      }
+      updateData.durationMonths = Math.round(durationMonths);
+    }
   }
   const nextDurationMonths = normalizeDurationMonths(
     updateData.durationMonths ?? existing.durationMonths,
@@ -5768,6 +5818,17 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
       updateData.sessionsUsedOverride = Math.round(parsedSessionsUsed);
     }
   }
+  if (body.sessionsPerWeek !== undefined) {
+    if (body.sessionsPerWeek == null) {
+      updateData.sessionsPerWeek = null;
+    } else {
+      const parsedSessionsPerWeek = Number(body.sessionsPerWeek);
+      if (!Number.isFinite(parsedSessionsPerWeek) || parsedSessionsPerWeek < 1) {
+        return jsonError("Sessions per week must be 1 or greater");
+      }
+      updateData.sessionsPerWeek = Math.round(parsedSessionsPerWeek);
+    }
+  }
 
   const validationStart =
     updateData.periodStartsAt instanceof Date
@@ -5843,11 +5904,131 @@ async function updatePackageRegistration(id: string, request: NextRequest) {
   return NextResponse.json(serialized);
 }
 
+async function updateRegistrationManualFinancials(id: string, request: NextRequest) {
+  const body = (await request.json().catch(() => ({}))) as {
+    finalPriceJod?: number | null;
+    collected?: number | null;
+    paymentMethod?: string | null;
+    paymentPeriodKey?: string | null;
+    privateNote?: string | null;
+    createdBy?: string | null;
+  };
+
+  const registration = await prisma.packageRegistration.findUnique({
+    where: { id },
+  });
+  if (!registration) return jsonError("Registration not found", 404);
+
+  const targetPrice =
+    body.finalPriceJod == null
+      ? Math.max(0, Math.round(Number(registration.finalPriceJod || 0)))
+      : Math.max(0, Math.round(Number(body.finalPriceJod) || 0));
+  const collectedProvided = body.collected !== undefined;
+  const targetCollected =
+    body.collected == null
+      ? 0
+      : Math.max(0, Math.round(Number(body.collected) || 0));
+
+  await ensureRegistrationProfile(prisma, {
+    registrationId: registration.id,
+    customerName: registration.customerName,
+    customerAge: registration.customerAge ?? null,
+    customerPhone: registration.customerPhone ?? null,
+    customerEmail: registration.customerEmail ?? null,
+  });
+
+  const existingBase = Math.max(
+    0,
+    Math.round(Number(registration.basePriceJod || 0)),
+  );
+  const priceUpdate =
+    targetPrice < existingBase
+      ? {
+          basePriceJod: existingBase,
+          discountType: "AMOUNT",
+          discountValue: existingBase - targetPrice,
+          discountReason:
+            normalizeText(registration.discountReason) || "Manual price edit",
+          discountAppliedBy: body.createdBy ?? null,
+          discountAppliedAt: new Date(),
+          finalPriceJod: targetPrice,
+        }
+      : {
+          basePriceJod: targetPrice,
+          discountType: "NONE",
+          discountValue: null,
+          discountReason: null,
+          finalPriceJod: targetPrice,
+        };
+
+  await prisma.packageRegistration.update({
+    where: { id },
+    data: priceUpdate,
+  });
+
+  if (collectedProvided) {
+    const activeReceiptIds = await loadCurrentCycleReceiptIds(prisma, id);
+    if (activeReceiptIds.length > 0) {
+      await prisma.receipt.updateMany({
+        where: { id: { in: activeReceiptIds } },
+        data: {
+          status: "VOIDED",
+          voidedAt: new Date(),
+          voidReason: "Manual financial edit",
+        },
+      });
+    }
+
+    if (targetCollected > 0) {
+      await createRegistrationReceiptAndUpdatePayment({
+        registrationId: id,
+        amountPaid: targetCollected,
+        paymentMethod: body.paymentMethod,
+        paymentPeriodKey: body.paymentPeriodKey,
+        privateNote:
+          normalizeText(body.privateNote) ||
+          `Manual collected adjustment to ${targetCollected} JOD`,
+        createdBy: body.createdBy ?? null,
+      });
+    } else {
+      await prisma.packageRegistration.update({
+        where: { id },
+        data: { isPaid: targetPrice <= 0 },
+      });
+    }
+  } else {
+    const totalCollected =
+      (await loadCurrentCycleReceiptTotals(prisma, [id])).get(id) ?? 0;
+    await prisma.packageRegistration.update({
+      where: { id },
+      data: { isPaid: targetPrice <= 0 || totalCollected >= targetPrice },
+    });
+  }
+
+  const row = await prisma.packageRegistration.findUnique({
+    where: { id },
+    include: { receipts: { where: ACTIVE_RECEIPT_WHERE } },
+  });
+  if (!row) return jsonError("Registration not found", 404);
+
+  await syncRegistrationRealtimeById(id, "ADMIN");
+  await syncTrackerForRegistrationContact({
+    customerName: row.customerName,
+    customerEmail: row.customerEmail ?? null,
+    customerPhone: row.customerPhone,
+  });
+
+  const [serialized] = await serializeRegistrationRows([row as any]);
+  return NextResponse.json(serialized);
+}
+
 async function reregisterPackage(id: string, request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as {
     periodStartsAt?: string | null;
+    periodEndsAt?: string | null;
     durationMonths?: number | null;
     sessionsLeft?: number | null;
+    sessionsPerWeek?: number | null;
     nextPaymentDate?: string | null;
     basePriceJod?: number | null;
     amountPaid?: number | null;
@@ -5893,6 +6074,7 @@ async function reregisterPackage(id: string, request: NextRequest) {
       isPaid: existing.isPaid,
       sessionsLeft: existing.sessionsLeft,
       sessionsUsedOverride: existing.sessionsUsedOverride,
+      sessionsPerWeek: existing.sessionsPerWeek,
       sessionsBonus: existing.sessionsBonus,
       isFrozen: existing.isFrozen,
     },
@@ -5924,6 +6106,10 @@ async function reregisterPackage(id: string, request: NextRequest) {
     body.sessionsLeft == null
       ? existing.sessionsLeft ?? packageDefaults.defaultSessionsLeft
       : Math.max(0, Math.round(Number(body.sessionsLeft) || 0));
+  const sessionsPerWeek =
+    body.sessionsPerWeek == null
+      ? existing.sessionsPerWeek ?? null
+      : Math.max(1, Math.round(Number(body.sessionsPerWeek) || 1));
   const amountPaid = Math.max(0, Math.round(Number(body.amountPaid ?? 0) || 0));
   if (amountPaid > 0 && !normalizeText(body.privateNote)) {
     return jsonError("Private note is required when amount paid is greater than 0");
@@ -5953,6 +6139,7 @@ async function reregisterPackage(id: string, request: NextRequest) {
       nextPaymentDate,
       sessionsLeft,
       sessionsUsedOverride: null,
+      sessionsPerWeek,
       sessionsBonus: 0,
       isFrozen: false,
       frozenAt: null,
@@ -6173,7 +6360,17 @@ async function updateOldMonthHistoryRecord(historyId: string, request: NextReque
     body.durationMonths,
     Number(currentSnapshot.durationMonths ?? 1),
   );
-  const periodEndsAt = computeCyclePeriodEnd(periodStartsAt, durationMonths);
+  const periodEndsAt = body.periodEndsAt
+    ? new Date(body.periodEndsAt)
+    : currentSnapshot.periodEndsAt
+      ? new Date(String(currentSnapshot.periodEndsAt))
+      : computeCyclePeriodEnd(periodStartsAt, durationMonths);
+  if (!periodEndsAt || Number.isNaN(periodEndsAt.getTime())) {
+    return jsonError("Missing month end date is required");
+  }
+  if (periodEndsAt <= periodStartsAt) {
+    return jsonError("Month end date must be after start date");
+  }
   const amountPaid =
     body.amountPaid == null
       ? Math.max(0, Math.round(Number(currentSnapshot.amountPaid ?? 0) || 0))
@@ -9041,6 +9238,10 @@ async function dispatchPatch(request: NextRequest, params: Params) {
 
   if (resource === "registration-history" && !action) {
     return updateOldMonthHistoryRecord(id, request);
+  }
+
+  if (resource === "package-registrations" && action === "manual-financials") {
+    return updateRegistrationManualFinancials(id, request);
   }
 
   if (resource === "package-registrations" && !action) {

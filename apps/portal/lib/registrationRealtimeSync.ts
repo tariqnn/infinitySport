@@ -26,6 +26,7 @@ export type RegistrationRealtimeRecordInput = {
   currentCycle?: number | null;
   sessionsLeft?: number | null;
   sessionsUsedOverride?: number | null;
+  sessionsPerWeek?: number | null;
   nextPaymentDate?: string | Date | admin.firestore.Timestamp | null;
   planLabel?: string | null;
   isPaid?: boolean | null;
@@ -168,6 +169,7 @@ function serializeRegistration(input: RegistrationRealtimeRecordInput) {
     currentCycle: normalizeInteger(input.currentCycle),
     sessionsLeft: normalizeInteger(input.sessionsLeft),
     sessionsUsedOverride: normalizeInteger(input.sessionsUsedOverride),
+    sessionsPerWeek: normalizeInteger(input.sessionsPerWeek),
     nextPaymentDate: toTimestamp(input.nextPaymentDate),
     nextPaymentDateIso: toIsoString(input.nextPaymentDate),
     planLabel: normalizeNullableText(input.planLabel),

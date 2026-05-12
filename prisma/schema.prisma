@@ -592,6 +592,7 @@ model PackageRegistration {
   periodStartsAt              DateTime?
   sessionsLeft                Int?
   sessionsUsedOverride        Int?
+  sessionsPerWeek             Int?
   nextPaymentDate             DateTime?                     @db.Timestamptz(6)
   planLabel                   String?
   durationMonths              Int                           @default(1)

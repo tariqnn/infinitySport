@@ -783,6 +783,7 @@ export type PackageRegistrationRow = {
   currentCycle?: number;
   sessionsLeft: number | null;
   sessionsUsedOverride: number | null;
+  sessionsPerWeek: number | null;
   nextPaymentDate: string | null;
   planLabel: string | null;
   pointsBalance?: number;
@@ -892,6 +893,7 @@ export const packageRegistrationsApi = {
     durationMonths?: number | null;
     sessionsLeft?: number | null;
     sessionsUsedOverride?: number | null;
+    sessionsPerWeek?: number | null;
     nextPaymentDate?: string | null;
     planLabel?: string | null;
     basePriceJod?: number;
@@ -940,6 +942,7 @@ export const packageRegistrationsApi = {
     durationMonths?: number | null;
     sessionsLeft?: number | null;
     sessionsUsedOverride?: number | null;
+    sessionsPerWeek?: number | null;
     nextPaymentDate?: string | null;
     planLabel?: string | null;
     isPaid?: boolean;
@@ -957,6 +960,7 @@ export const packageRegistrationsApi = {
     periodStartsAt?: string | null;
     durationMonths?: number | null;
     sessionsLeft?: number | null;
+    sessionsPerWeek?: number | null;
     nextPaymentDate?: string | null;
     basePriceJod?: number | null;
     amountPaid?: number | null;
@@ -989,6 +993,17 @@ export const packageRegistrationsApi = {
       method: 'POST',
       body: JSON.stringify({ voidReason: voidReason ?? 'Marked as unpaid by staff' }),
     }),
+  updateManualFinancials: (id: string, data: {
+    finalPriceJod?: number | null;
+    collected?: number | null;
+    paymentMethod?: string | null;
+    paymentPeriodKey?: string | null;
+    privateNote?: string | null;
+  }) =>
+    portalDbFetch<PackageRegistrationRow>(`/portal/package-registrations/${id}/manual-financials`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
   getReceipts: (id: string) => portalDbFetch<ReceiptRow[]>(`/portal/package-registrations/${id}/receipts`),
   addSessionAdjustment: (id: string, data: { reason: string }) =>
     portalDbFetch<{ success: boolean; sessionsBonus: number }>(`/portal/package-registrations/${id}/session-adjustment`, { method: 'POST', body: JSON.stringify(data) }),
@@ -1006,6 +1021,7 @@ export const packageRegistrationsApi = {
     }>(`/portal/package-registrations/${id}/history`),
   updateOldMonthHistory: (historyId: string, data: {
     periodStartsAt?: string | null;
+    periodEndsAt?: string | null;
     durationMonths?: number | null;
     sessionsLeft?: number | null;
     basePriceJod?: number | null;

@@ -74,6 +74,7 @@ export function EditRegistrationModal({
   const [isFrozen, setIsFrozen] = useState(false);
   const [durationMonths, setDurationMonths] = useState('');
   const [sessionsLeft, setSessionsLeft] = useState('');
+  const [sessionsPerWeek, setSessionsPerWeek] = useState('');
   const [sessionsUsed, setSessionsUsed] = useState('');
   const [nextPaymentDate, setNextPaymentDate] = useState('');
   const [periodStartsAt, setPeriodStartsAt] = useState('');
@@ -104,6 +105,7 @@ export function EditRegistrationModal({
       getPackageDefaultSessions(registration.packageName, defaultSessionsByPackage) ??
       null;
     setSessionsLeft(initialSessionsLeft != null ? String(initialSessionsLeft) : '');
+    setSessionsPerWeek(registration.sessionsPerWeek != null ? String(registration.sessionsPerWeek) : '');
     setSessionsUsed(String(registration.sessionsUsedOverride ?? currentSessionSummary?.used ?? 0));
     setNextPaymentDate(toDateInputValue(registration.nextPaymentDate));
     setPeriodStartsAt(getStartDateInputValue(registration));
@@ -253,6 +255,13 @@ export function EditRegistrationModal({
     if (!Number.isFinite(parsedSessionsUsed) || parsedSessionsUsed < 0) {
       return setError('Classes finished must be 0 or greater.');
     }
+    const parsedSessionsPerWeek = sessionsPerWeek.trim() ? Number(sessionsPerWeek) : null;
+    if (
+      parsedSessionsPerWeek != null &&
+      (!Number.isFinite(parsedSessionsPerWeek) || parsedSessionsPerWeek < 1)
+    ) {
+      return setError('Sessions per week must be 1 or greater.');
+    }
     const nextSessionsLeft = Math.round(parsedSessionsLeft);
     const nextSessionsUsed = Math.round(parsedSessionsUsed);
     const totalWithBonus = nextSessionsLeft + (Number(registration.sessionsBonus) || 0);
@@ -295,6 +304,8 @@ export function EditRegistrationModal({
         durationMonths: parsedDurationMonths,
         sessionsLeft: nextSessionsLeft,
         sessionsUsedOverride: nextSessionsUsed,
+        sessionsPerWeek:
+          parsedSessionsPerWeek == null ? null : Math.round(parsedSessionsPerWeek),
         nextPaymentDate: nextPaymentDate.trim() || null,
         basePriceJod: baseNumber,
         discountType,
@@ -417,6 +428,14 @@ export function EditRegistrationModal({
               onChange={(e) => setSessionsUsed(e.target.value)}
               required
               hint="How many classes the player already used."
+            />
+            <Input
+              label="Sessions per week"
+              type="number"
+              min={1}
+              value={sessionsPerWeek}
+              onChange={(e) => setSessionsPerWeek(e.target.value)}
+              hint="Leave blank to use the package schedule. Use 1, 2, or 3 for this player only."
             />
           </div>
           <div className="rounded-lg bg-ui-softBg/60 px-3 py-2 text-sm text-ui-textPrimary">

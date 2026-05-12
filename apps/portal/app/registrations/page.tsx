@@ -59,7 +59,7 @@ export default function RegistrationsPage() {
   const [reRegisterRow, setReRegisterRow] = useState<Registration | null>(null);
   const [registerExistingPersonOpen, setRegisterExistingPersonOpen] = useState(false);
   const [addRegistrationInitialPerson, setAddRegistrationInitialPerson] = useState<InitialPerson | null>(null);
-  const [personDetailsPhone, setPersonDetailsPhone] = useState<string | null>(null);
+  const [personDetailsRegistration, setPersonDetailsRegistration] = useState<Registration | null>(null);
   const [registerPersonMultiOpen, setRegisterPersonMultiOpen] = useState(false);
   const [registerPersonMultiInitialPerson, setRegisterPersonMultiInitialPerson] = useState<InitialPerson | null>(null);
   const [bulkCreatedCount, setBulkCreatedCount] = useState<number | null>(null);
@@ -161,6 +161,28 @@ export default function RegistrationsPage() {
     return count;
   }
 
+  function countSessionsByWeeklyRate(start: Date, end: Date, sessionsPerWeek: number) {
+    const s = normalizeDate(start);
+    const e = normalizeDate(end);
+    if (e.getTime() < s.getTime()) return 0;
+    const rate = Math.max(1, Math.min(7, Math.round(Number(sessionsPerWeek) || 1)));
+    let count = 0;
+    let offset = 0;
+    for (let d = new Date(s); d.getTime() <= e.getTime(); d = addDays(d, 1)) {
+      if (offset % 7 < rate) count += 1;
+      offset += 1;
+    }
+    return count;
+  }
+
+  function getEffectiveScheduleDays(row: Registration, schedule: { daysOfWeek: number[] } | null) {
+    if (!schedule) return null;
+    const override = row.sessionsPerWeek;
+    if (override == null) return schedule.daysOfWeek;
+    const count = Math.max(1, Math.min(schedule.daysOfWeek.length, Math.round(Number(override) || 1)));
+    return schedule.daysOfWeek.slice(0, count);
+  }
+
   /** Effective period end: periodEndsAt if set, else cycle start + durationMonths. */
   function getPeriodEnd(r: Registration): Date | null {
     if (r.periodEndsAt) return new Date(r.periodEndsAt);
@@ -211,13 +233,19 @@ export default function RegistrationsPage() {
     const cappedEnd =
       effectiveNow.getTime() < end.getTime() ? effectiveNow : end;
 
-    const scheduledCount = schedule ? countScheduledSessions(start, cappedEnd, schedule.daysOfWeek) : 0;
+    const effectiveDaysOfWeek = getEffectiveScheduleDays(r, schedule);
+    const scheduledCount = effectiveDaysOfWeek
+      ? countScheduledSessions(start, cappedEnd, effectiveDaysOfWeek)
+      : r.sessionsPerWeek
+        ? countSessionsByWeeklyRate(start, cappedEnd, r.sessionsPerWeek)
+        : 0;
     const canceledSet = canceledDatesByPackage[r.packageName];
     let canceledInRange = 0;
-    if (canceledSet && schedule) {
+    if (canceledSet && effectiveDaysOfWeek) {
+      const effectiveDaySet = new Set(effectiveDaysOfWeek);
       for (let d = new Date(start); d.getTime() <= cappedEnd.getTime(); d = addDays(d, 1)) {
         const key = d.toISOString().split('T')[0];
-        if (canceledSet.has(key)) canceledInRange += 1;
+        if (effectiveDaySet.has(d.getDay()) && canceledSet.has(key)) canceledInRange += 1;
       }
     }
     const bonus = Number(r.sessionsBonus) || 0;
@@ -228,7 +256,7 @@ export default function RegistrationsPage() {
         : Math.max(0, Math.round(Number(r.sessionsUsedOverride) || 0));
     const used = Math.min(
       total,
-      manualUsed ?? (schedule ? Math.max(0, scheduledCount - canceledInRange) : 0),
+      manualUsed ?? (scheduledCount ? Math.max(0, scheduledCount - canceledInRange) : 0),
     );
     const remaining = Math.max(0, total - used);
     return { remaining, total, used };
@@ -814,7 +842,7 @@ export default function RegistrationsPage() {
                       <td className="px-5 py-3 min-w-0">
                         <button
                           type="button"
-                          onClick={() => setPersonDetailsPhone(row.customerPhone)}
+                          onClick={() => setPersonDetailsRegistration(row)}
                           className="block truncate text-left w-full text-ui-textPrimary hover:text-brand-blue-primary hover:underline font-medium"
                           title={`View all registrations for ${row.customerName}`}
                         >
@@ -1158,11 +1186,11 @@ export default function RegistrationsPage() {
       />
 
       <PersonDetailsModal
-        open={!!personDetailsPhone}
-        onClose={() => setPersonDetailsPhone(null)}
-        registrations={personDetailsPhone ? rows.filter((r) => r.customerPhone === personDetailsPhone) : []}
+        open={!!personDetailsRegistration}
+        onClose={() => setPersonDetailsRegistration(null)}
+        registrations={personDetailsRegistration ? [personDetailsRegistration] : []}
         onAddPackages={(person) => {
-          setPersonDetailsPhone(null);
+          setPersonDetailsRegistration(null);
           setRegisterPersonMultiInitialPerson(person);
           setRegisterPersonMultiOpen(true);
         }}

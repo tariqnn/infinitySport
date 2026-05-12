@@ -164,6 +164,8 @@ function serializeRegistration(input) {
     playerCode: normalizeNullableText(input.playerCode),
     currentCycle: normalizeInteger(input.currentCycle),
     sessionsLeft: normalizeInteger(input.sessionsLeft),
+    sessionsUsedOverride: normalizeInteger(input.sessionsUsedOverride),
+    sessionsPerWeek: normalizeInteger(input.sessionsPerWeek),
     nextPaymentDate: toTimestamp(input.nextPaymentDate),
     nextPaymentDateIso: toIsoString(input.nextPaymentDate),
     planLabel: normalizeNullableText(input.planLabel),
@@ -173,6 +175,7 @@ function serializeRegistration(input) {
     discountValue: normalizeNumber(input.discountValue),
     discountReason: normalizeNullableText(input.discountReason),
     finalPriceJod: normalizeNumber(input.finalPriceJod) ?? 0,
+    durationMonths: Math.max(1, normalizeInteger(input.durationMonths) ?? 1),
     periodStartsAt: toTimestamp(input.periodStartsAt),
     periodStartsAtIso: toIsoString(input.periodStartsAt),
     periodEndsAt: toTimestamp(input.periodEndsAt),
@@ -280,7 +283,10 @@ async function run() {
 
   const [registrations, packages, canceledSessions] = await Promise.all([
     prisma.packageRegistration.findMany({
-      include: { receipts: { where: { status: "ACTIVE", voidedAt: null } } },
+      include: {
+        receipts: { where: { status: "ACTIVE", voidedAt: null } },
+        RegistrationProfile: true,
+      },
       orderBy: { updatedAt: "desc" },
     }),
     prisma.package.findMany({
@@ -324,40 +330,50 @@ async function run() {
 
   await syncRegistrationRecordsToFirestore({
     firestore,
-    registrations: registrations.map((row) => ({
-      id: row.id,
-      packageName: row.packageName,
-      customerName: row.customerName,
-      customerPhone: row.customerPhone,
-      customerEmail: row.customerEmail,
-      customerAge: row.customerAge,
-      playerCode: null,
-      currentCycle: 1,
-      sessionsLeft: row.sessionsLeft,
-      nextPaymentDate: row.nextPaymentDate,
-      planLabel: row.planLabel,
-      isPaid: row.isPaid,
-      basePriceJod: row.basePriceJod,
-      discountType: row.discountType,
-      discountValue: row.discountValue,
-      discountReason: row.discountReason,
-      finalPriceJod: row.finalPriceJod,
-      periodStartsAt: row.periodStartsAt,
-      periodEndsAt: row.periodEndsAt,
-      isFrozen: row.isFrozen,
-      frozenAt: row.frozenAt,
-      sessionsBonus: row.sessionsBonus,
-      collected: (row.receipts || []).reduce(
-        (runningTotal, receipt) =>
-          runningTotal + Number(receipt.amountPaid || 0),
-        0,
-      ),
-      status: row.status,
-      source: "PORTAL_DB",
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      deleted: false,
-    })),
+    registrations: registrations.map((row) => {
+      const currentCycle = normalizeInteger(row.RegistrationProfile?.currentCycle) ?? 1;
+      const collected = (row.receipts || [])
+        .filter((receipt) => normalizeInteger(receipt.cycleNumber) === currentCycle)
+        .reduce(
+          (runningTotal, receipt) =>
+            runningTotal + Number(receipt.amountPaid || 0),
+          0,
+        );
+
+      return {
+        id: row.id,
+        packageName: row.packageName,
+        customerName: row.customerName,
+        customerPhone: row.customerPhone,
+        customerEmail: row.customerEmail,
+        customerAge: row.customerAge,
+        playerCode: row.RegistrationProfile?.playerCode ?? null,
+        currentCycle,
+        sessionsLeft: row.sessionsLeft,
+        sessionsUsedOverride: row.sessionsUsedOverride,
+        sessionsPerWeek: row.sessionsPerWeek,
+        nextPaymentDate: row.nextPaymentDate,
+        planLabel: row.planLabel,
+        isPaid: collected >= Number(row.finalPriceJod || 0),
+        basePriceJod: row.basePriceJod,
+        discountType: row.discountType,
+        discountValue: row.discountValue,
+        discountReason: row.discountReason,
+        finalPriceJod: row.finalPriceJod,
+        durationMonths: row.durationMonths,
+        periodStartsAt: row.periodStartsAt,
+        periodEndsAt: row.periodEndsAt,
+        isFrozen: row.isFrozen,
+        frozenAt: row.frozenAt,
+        sessionsBonus: row.sessionsBonus,
+        collected,
+        status: row.status,
+        source: "PORTAL_DB",
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        deleted: false,
+      };
+    }),
   });
 
   console.log(

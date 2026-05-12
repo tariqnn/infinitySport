@@ -52,6 +52,7 @@ export function AddRegistrationModal({
   const [customerAge, setCustomerAge] = useState('');
   const [durationMonths, setDurationMonths] = useState('1');
   const [sessionsLeft, setSessionsLeft] = useState('');
+  const [sessionsPerWeek, setSessionsPerWeek] = useState('');
   const [nextPaymentDate, setNextPaymentDate] = useState('');
   const [basePriceJod, setBasePriceJod] = useState('');
   const [discountOpen, setDiscountOpen] = useState(false);
@@ -69,6 +70,7 @@ export function AddRegistrationModal({
     setPackageName('');
     setDurationMonths('1');
     setSessionsLeft('');
+    setSessionsPerWeek('');
     setNextPaymentDate(addDurationMonthsToDateInput(today, 1));
     setBasePriceJod('');
     setDiscountOpen(false);
@@ -156,6 +158,14 @@ export function AddRegistrationModal({
       setError('Next payment date is required.');
       return;
     }
+    const parsedSessionsPerWeek = sessionsPerWeek.trim() ? Number(sessionsPerWeek) : null;
+    if (
+      parsedSessionsPerWeek != null &&
+      (!Number.isFinite(parsedSessionsPerWeek) || parsedSessionsPerWeek < 1)
+    ) {
+      setError('Sessions per week must be 1 or greater.');
+      return;
+    }
 
     const base = Math.max(0, baseNumber);
     const hasDefaultPrice = hasPackageDefaultPrice(packageName.trim(), defaultPricesByPackage);
@@ -178,6 +188,8 @@ export function AddRegistrationModal({
         customerAge: customerAge.trim() ? parseInt(customerAge, 10) : undefined,
         durationMonths: parsedDurationMonths,
         sessionsLeft: Math.max(0, parseInt(sessionsLeft, 10) || 0),
+        sessionsPerWeek:
+          parsedSessionsPerWeek == null ? null : Math.round(parsedSessionsPerWeek),
         nextPaymentDate: nextPaymentDate.trim(),
         basePriceJod: hasDefaultPrice && base === 0 ? undefined : base,
         discountType,
@@ -228,6 +240,15 @@ export function AddRegistrationModal({
           placeholder="e.g. 43"
           hint="Example: 43 sessions over 3 months."
           required
+        />
+        <Input
+          label="Sessions per week"
+          type="number"
+          min={1}
+          value={sessionsPerWeek}
+          onChange={(e) => setSessionsPerWeek(e.target.value)}
+          placeholder="Package default"
+          hint="Optional per-player override. Example: 2 if this player attends twice a week."
         />
         <Input
           label="When they will start"

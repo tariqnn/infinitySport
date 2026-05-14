@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { NextResponse } from "next/server";
@@ -76,6 +76,25 @@ type PackageDefaults = {
   durationMonths: number;
 };
 
+async function resolveActiveCompanyId(): Promise<string> {
+  const pool = getPgPool();
+  const existing = await pool.query<{ id: string }>(
+    'SELECT "id" FROM "Company" WHERE "status" = $1 ORDER BY "createdAt" DESC LIMIT 1',
+    ["ACTIVE"],
+  );
+  if (existing.rows[0]?.id) return existing.rows[0].id;
+
+  const created = await pool.query<{ id: string }>(
+    `
+    INSERT INTO "Company" ("id", "name", "contactName", "contactEmail", "status", "createdAt", "updatedAt")
+    VALUES ($1, 'Infinity Sport', 'Infinity Sport', 'infinitysportsacademyjo@gmail.com', 'ACTIVE', NOW(), NOW())
+    RETURNING "id"
+    `,
+    [randomUUID()],
+  );
+  return created.rows[0].id;
+}
+
 async function getPackageDefaults(packageName: string): Promise<PackageDefaults> {
   const pool = getPgPool();
 
@@ -127,10 +146,23 @@ async function ensureMemberAccount(params: {
   const pool = getPgPool();
 
   try {
+    const companyId = await resolveActiveCompanyId();
     await pool.query(
       `
-      INSERT INTO "User" ("id", "email", "name", "phone", "role", "isActive", "createdAt", "updatedAt")
-      VALUES ($1, $2, $3, $4, 'MEMBER', true, NOW(), NOW())
+      INSERT INTO "User" (
+        "id",
+        "companyId",
+        "fullName",
+        "email",
+        "name",
+        "phone",
+        "password",
+        "role",
+        "isActive",
+        "createdAt",
+        "updatedAt"
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'MEMBER', true, NOW(), NOW())
       ON CONFLICT ("email")
       DO UPDATE SET
         "isActive" = true,
@@ -140,9 +172,12 @@ async function ensureMemberAccount(params: {
       `,
       [
         randomUUID(),
+        companyId,
+        params.customerName.trim() || email,
         email,
         params.customerName.trim() || null,
         params.customerPhone.trim() || null,
+        randomBytes(24).toString("hex"),
       ],
     );
   } catch (error) {
@@ -319,7 +354,7 @@ export async function POST(request: Request) {
         "updatedAt"
       )
       VALUES (
-        $1, $2, $3, $4, $5, $6, false, $7, 'NONE', NULL, NULL, $8, $9, $10, $11, $12, $12, 0, 'ACTIVE', false, NOW(), NOW()
+        $1, $2, $3, $4, $5, $6, false, $7, 'NONE', NULL, NULL, $8, $9, $10, $11, $12, $13, 0, 'ACTIVE', false, NOW(), NOW()
       )
       `,
       [
@@ -334,6 +369,7 @@ export async function POST(request: Request) {
         durationMonths,
         cleanPlanLabel,
         periodStartsAt,
+        periodEndsAt,
         periodEndsAt,
       ],
     );

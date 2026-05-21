@@ -7,10 +7,12 @@ import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 
 export function RegistrationTotalsPanel({
   packageName,
+  excludePackageName,
   startDate,
   endDate,
 }: {
   packageName?: string;
+  excludePackageName?: string;
   startDate?: string;
   endDate?: string;
 }) {
@@ -21,11 +23,11 @@ export function RegistrationTotalsPanel({
   useEffect(() => {
     setLoading(true);
     packageRegistrationsApi
-      .getTotals(packageName || undefined, startDate || undefined, endDate || undefined)
+      .getTotals(packageName || undefined, startDate || undefined, endDate || undefined, excludePackageName || undefined)
       .then(setTotals)
       .catch(() => setTotals(null))
       .finally(() => setLoading(false));
-  }, [packageName, startDate, endDate]);
+  }, [packageName, excludePackageName, startDate, endDate]);
 
   if (loading) return <Card><CardBody><p className="text-ui-textMuted">Loading totals…</p></CardBody></Card>;
   if (!totals) return null;

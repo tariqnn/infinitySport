@@ -4391,12 +4391,15 @@ async function createPackageRegistration(payload: RegistrationInput) {
 async function listPackageRegistrations(request: NextRequest) {
   const packageName =
     request.nextUrl.searchParams.get("packageName") || undefined;
+  const excludePackageName =
+    request.nextUrl.searchParams.get("excludePackageName") || undefined;
   const startDate = request.nextUrl.searchParams.get("startDate") || undefined;
   const endDate = request.nextUrl.searchParams.get("endDate") || undefined;
   const search = normalizeText(request.nextUrl.searchParams.get("search"));
 
   const where: any = {};
   if (packageName) where.packageName = packageName;
+  else if (excludePackageName) where.packageName = { not: excludePackageName };
   if (search) {
     const matchedIds = await searchRegistrationIds(prisma, search);
     if (matchedIds.length === 0) return NextResponse.json([]);
@@ -4428,11 +4431,14 @@ async function listPackageRegistrations(request: NextRequest) {
 async function getRegistrationTotals(request: NextRequest) {
   const packageName =
     request.nextUrl.searchParams.get("packageName") || undefined;
+  const excludePackageName =
+    request.nextUrl.searchParams.get("excludePackageName") || undefined;
   const startDate = request.nextUrl.searchParams.get("startDate") || undefined;
   const endDate = request.nextUrl.searchParams.get("endDate") || undefined;
 
   const where: any = {};
   if (packageName) where.packageName = packageName;
+  else if (excludePackageName) where.packageName = { not: excludePackageName };
   if (startDate || endDate) {
     const range: Record<string, Date> = {};
     if (startDate) range.gte = new Date(startDate);

@@ -67,7 +67,7 @@ export function AddRegistrationModal({
     if (!open) return;
     const today = new Date().toISOString().split('T')[0];
 
-    setPackageName('');
+    setPackageName(packageList.length === 1 ? packageList[0] : '');
     setDurationMonths('1');
     setSessionsLeft('');
     setSessionsPerWeek('');

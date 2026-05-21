@@ -35,7 +35,7 @@ export const translations = {
     booking_kicker: 'Booking',
     booking_title: 'Book Your Court',
     booking_subtitle:
-      "Select your preferred court and time slot. You'll receive a confirmation email after submitting.",
+      "Select your preferred court and time slot. We'll contact you shortly to confirm after submitting.",
 
     // Events
     events_kicker: 'Events',
@@ -64,8 +64,8 @@ export const translations = {
     booking_no_slots_today: 'No available time slots for today. Please select another date.',
     booking_required_error: 'Please fill in all required fields.',
     booking_slot_full: 'This time slot is fully booked. Please select another time.',
-    booking_success_email: 'Booking submitted successfully! We sent a confirmation email.',
-    booking_success_no_email: 'Booking submitted successfully! We will contact you to confirm.',
+    booking_success_email: 'Booking submitted successfully! We will contact you shortly to confirm.',
+    booking_success_no_email: 'Booking submitted successfully! We will contact you shortly to confirm.',
     booking_error_generic: 'Something went wrong. Please try again.',
     booking_submitting: 'Submitting...',
     booking_submit: 'Book Court',
@@ -167,7 +167,7 @@ export const translations = {
     booking_kicker: 'الحجز',
     booking_title: 'احجز ملعبك',
     booking_subtitle:
-      'اختر الملعب والوقت المناسبين. عند إضافة بريدك الإلكتروني ستصلك رسالة تأكيد بالحجز.',
+      'اختر الملعب والوقت المناسبين. سنتواصل معك قريباً لتأكيد الحجز بعد الإرسال.',
 
     // Events
     events_kicker: 'الفعاليات',
@@ -196,8 +196,8 @@ export const translations = {
     booking_no_slots_today: 'لا توجد أوقات متاحة اليوم. يرجى اختيار تاريخ آخر.',
     booking_required_error: 'يرجى تعبئة جميع الحقول المطلوبة.',
     booking_slot_full: 'هذا الوقت ممتلئ بالكامل. يرجى اختيار وقت آخر.',
-    booking_success_email: 'تم إرسال طلب الحجز بنجاح! تحقق من بريدك الإلكتروني للتأكيد.',
-    booking_success_no_email: 'تم إرسال طلب الحجز بنجاح! سنتواصل معك للتأكيد.',
+    booking_success_email: 'تم إرسال طلب الحجز بنجاح! سنتواصل معك قريباً للتأكيد.',
+    booking_success_no_email: 'تم إرسال طلب الحجز بنجاح! سنتواصل معك قريباً للتأكيد.',
     booking_error_generic: 'حدث خطأ ما. يرجى المحاولة مرة أخرى.',
     booking_submitting: 'جاري الإرسال...',
     booking_submit: 'احجز الآن',

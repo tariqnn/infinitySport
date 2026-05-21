@@ -875,12 +875,13 @@ export type OldRegistrationImportResult = {
 };
 
 export const packageRegistrationsApi = {
-  list: (packageName?: string, startDate?: string, endDate?: string, search?: string) => {
+  list: (packageName?: string, startDate?: string, endDate?: string, search?: string, excludePackageName?: string) => {
     const params = new URLSearchParams();
     if (packageName) params.append('packageName', packageName);
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
     if (search) params.append('search', search);
+    if (excludePackageName) params.append('excludePackageName', excludePackageName);
     const query = params.toString() ? `?${params.toString()}` : '';
     return portalDbFetch<PackageRegistrationRow[]>(`/portal/package-registrations${query}`);
   },
@@ -903,11 +904,12 @@ export const packageRegistrationsApi = {
     periodStartsAt?: string | null;
   }) =>
     portalDbFetch<PackageRegistrationRow>('/portal/package-registrations', { method: 'POST', body: JSON.stringify(data) }),
-  getTotals: (packageName?: string, startDate?: string, endDate?: string) => {
+  getTotals: (packageName?: string, startDate?: string, endDate?: string, excludePackageName?: string) => {
     const params = new URLSearchParams();
     if (packageName) params.append('packageName', packageName);
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
+    if (excludePackageName) params.append('excludePackageName', excludePackageName);
     const query = params.toString() ? `?${params.toString()}` : '';
     return portalDbFetch<RegistrationTotals>(`/portal/package-registrations/totals${query}`);
   },
@@ -1331,9 +1333,18 @@ export async function prefetchPortalRouteData(href: string): Promise<void> {
     case '/registrations':
       tasks.push(
         Promise.allSettled([
-          packageRegistrationsApi.list(),
+          packageRegistrationsApi.list(undefined, undefined, undefined, undefined, 'Basketball Summer Camp'),
           packagesApi.list(),
           packageSessionCanceledApi.list(),
+        ]),
+      );
+      break;
+    case '/summer-camp-registrations':
+      tasks.push(
+        Promise.allSettled([
+          packageRegistrationsApi.list('Basketball Summer Camp'),
+          packagesApi.list(),
+          packageSessionCanceledApi.list('Basketball Summer Camp'),
         ]),
       );
       break;

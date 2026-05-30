@@ -33,11 +33,13 @@ const PACKAGES: PackageSeed[] = [
   { name: 'Basketball - Warriors', sportType: 'BASKETBALL', durationMonths: 1, sessionsCount: 12, trackingType: 'SESSIONS', pricingType: 'FIXED', currentPriceJod: 120, showOnWebsite: true, sortOrder: 30 },
   { name: 'Basketball - Private 1v1 Sessions', sportType: 'BASKETBALL', durationMonths: 1, sessionsCount: 0, trackingType: 'SESSIONS', pricingType: 'MANUAL', currentPriceJod: null, showOnWebsite: true, sortOrder: 40 },
   { name: 'Basketball - Small Groups', sportType: 'BASKETBALL', durationMonths: 1, sessionsCount: 0, trackingType: 'SESSIONS', pricingType: 'MANUAL', currentPriceJod: null, showOnWebsite: true, sortOrder: 50 },
+  { name: 'Basketball Summer Camp', sportType: 'BASKETBALL', durationMonths: 1, sessionsCount: 0, trackingType: 'DAYS', pricingType: 'MANUAL', currentPriceJod: null, showOnWebsite: false, sortOrder: 55 },
   { name: 'Gymnastics Package A', sportType: 'GYMNASTICS', durationMonths: 1, sessionsCount: 12, trackingType: 'SESSIONS', pricingType: 'FIXED', currentPriceJod: 120, showOnWebsite: true, sortOrder: 60 },
   { name: 'Gymnastics Package B', sportType: 'GYMNASTICS', durationMonths: 1, sessionsCount: 8, trackingType: 'SESSIONS', pricingType: 'FIXED', currentPriceJod: 100, showOnWebsite: true, sortOrder: 70 },
   { name: 'Gymnastics Package C', sportType: 'GYMNASTICS', durationMonths: 1, sessionsCount: 18, trackingType: 'SESSIONS', pricingType: 'FIXED', currentPriceJod: 140, showOnWebsite: true, sortOrder: 80 },
   { name: 'Gymnastics Package D', sportType: 'GYMNASTICS', durationMonths: 1, sessionsCount: 12, trackingType: 'SESSIONS', pricingType: 'FIXED', currentPriceJod: 120, showOnWebsite: true, sortOrder: 90 },
   { name: 'Volleyball', sportType: 'VOLLEYBALL', durationMonths: 1, sessionsCount: 10, trackingType: 'SESSIONS', pricingType: 'FIXED', currentPriceJod: 100, showOnWebsite: true, sortOrder: 100 },
+  { name: 'Volleyball Summer Camp', sportType: 'VOLLEYBALL', durationMonths: 1, sessionsCount: 0, trackingType: 'DAYS', pricingType: 'MANUAL', currentPriceJod: null, showOnWebsite: false, sortOrder: 105 },
 ];
 
 async function main() {

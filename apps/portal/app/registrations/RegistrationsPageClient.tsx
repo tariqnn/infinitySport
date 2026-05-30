@@ -29,12 +29,20 @@ type Registration = PackageRegistrationRow;
 type SortKey = 'registered' | 'remaining';
 type SortDirection = 'asc' | 'desc';
 
-export const SUMMER_CAMP_PACKAGE_NAME = 'Basketball Summer Camp';
-const EMPTY_EXCLUDED_PACKAGE_NAMES: string[] = [];
+export const BASKETBALL_SUMMER_CAMP_PACKAGE_NAME = 'Basketball Summer Camp';
+export const VOLLEYBALL_SUMMER_CAMP_PACKAGE_NAME = 'Volleyball Summer Camp';
+export const SUMMER_CAMP_PACKAGE_NAME = BASKETBALL_SUMMER_CAMP_PACKAGE_NAME;
+export const SUMMER_CAMP_PACKAGE_NAMES = [
+  BASKETBALL_SUMMER_CAMP_PACKAGE_NAME,
+  VOLLEYBALL_SUMMER_CAMP_PACKAGE_NAME,
+] as const;
+const EMPTY_EXCLUDED_PACKAGE_NAMES: readonly string[] = [];
+const EMPTY_INCLUDED_PACKAGE_NAMES: readonly string[] = [];
 
 type RegistrationsPageClientProps = {
   fixedPackageName?: string;
-  excludedPackageNames?: string[];
+  includedPackageNames?: readonly string[];
+  excludedPackageNames?: readonly string[];
   title?: string;
   subtitle?: string;
   listTitle?: string;
@@ -51,12 +59,13 @@ function isPackageMatch(packageName: string | null | undefined, targetName: stri
   return normalizePackageName(packageName) === normalizePackageName(targetName);
 }
 
-function isExcludedPackage(packageName: string | null | undefined, excludedPackageNames: string[]) {
+function isExcludedPackage(packageName: string | null | undefined, excludedPackageNames: readonly string[]) {
   return excludedPackageNames.some((targetName) => isPackageMatch(packageName, targetName));
 }
 
 export function RegistrationsPageClient({
   fixedPackageName,
+  includedPackageNames = EMPTY_INCLUDED_PACKAGE_NAMES,
   excludedPackageNames = EMPTY_EXCLUDED_PACKAGE_NAMES,
   title = 'Package Registrations',
   subtitle = 'Registrations from Basketball, Gymnastics, and Volleyball packages',
@@ -65,7 +74,7 @@ export function RegistrationsPageClient({
   exportPrefix = 'registrations',
   hideAdminPackageTools = false,
 }: RegistrationsPageClientProps) {
-  const packageIsFixed = Boolean(fixedPackageName);
+  const packageIsFixed = Boolean(fixedPackageName || includedPackageNames.length);
   const [rows, setRows] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [packageFilter, setPackageFilter] = useState<string>(fixedPackageName ?? '');
@@ -337,13 +346,13 @@ export function RegistrationsPageClient({
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const effectivePackageFilter = fixedPackageName || packageFilter;
+      const effectivePackageFilter = fixedPackageName || (includedPackageNames.length ? includedPackageNames : packageFilter);
       const data = await packageRegistrationsApi.list(
         effectivePackageFilter || undefined,
         dateFilters.startDate,
         dateFilters.endDate,
         searchTerm || undefined,
-        !effectivePackageFilter ? excludedPackageNames[0] : undefined,
+        !effectivePackageFilter ? excludedPackageNames : undefined,
       );
       setRows(data.filter((row) => !isExcludedPackage(row.packageName, excludedPackageNames)));
 
@@ -363,7 +372,7 @@ export function RegistrationsPageClient({
     } finally {
       setLoading(false);
     }
-  }, [excludedPackageNames, fixedPackageName, packageFilter, dateFilters, searchTerm]);
+  }, [excludedPackageNames, fixedPackageName, includedPackageNames, packageFilter, dateFilters, searchTerm]);
 
   useEffect(() => {
     load();
@@ -375,13 +384,14 @@ export function RegistrationsPageClient({
       setApiPackages(
         packages.filter((pkg) => {
           if (fixedPackageName) return isPackageMatch(pkg.name, fixedPackageName);
+          if (includedPackageNames.length) return includedPackageNames.some((name) => isPackageMatch(pkg.name, name));
           return !isExcludedPackage(pkg.name, excludedPackageNames);
         }),
       );
     } catch {
       setApiPackages([]);
     }
-  }, [excludedPackageNames, fixedPackageName]);
+  }, [excludedPackageNames, fixedPackageName, includedPackageNames]);
 
   useEffect(() => {
     loadPackages();
@@ -537,6 +547,7 @@ export function RegistrationsPageClient({
       ...apiPackages.map((p) => p.name),
       ...rows.map((r) => r.packageName),
       fixedPackageName || packageFilter,
+      ...includedPackageNames,
     ].filter((value): value is string => Boolean(value))),
   ).sort();
   // Default price per package (from Package.currentPriceJod) for modals
@@ -626,8 +637,8 @@ export function RegistrationsPageClient({
       />
 
       <RegistrationTotalsPanel
-        packageName={packageFilter || undefined}
-        excludePackageName={!packageIsFixed && !packageFilter ? excludedPackageNames[0] : undefined}
+        packageName={fixedPackageName || (includedPackageNames.length ? includedPackageNames : packageFilter || undefined)}
+        excludePackageName={!packageIsFixed && !packageFilter ? excludedPackageNames : undefined}
         startDate={dateFilters.startDate}
         endDate={dateFilters.endDate}
       />
@@ -644,7 +655,7 @@ export function RegistrationsPageClient({
             <div className="flex flex-wrap items-center gap-3">
               {packageIsFixed ? (
                 <div className="rounded-lg border border-ui-border bg-ui-softBg/60 px-3 py-2 text-sm font-semibold text-ui-textPrimary">
-                  {fixedPackageName}
+                  {fixedPackageName || allPackagesLabel}
                 </div>
               ) : (
                 <div className="flex items-center gap-2">

@@ -10,6 +10,11 @@ function isBasketballSummerCamp(title: string) {
   return normalized === 'basketball summer camp' || (normalized.includes('basketball') && normalized.includes('summer camp'));
 }
 
+function isVolleyballSummerCamp(title: string) {
+  const normalized = title.trim().toLowerCase();
+  return normalized === 'volleyball summer camp' || (normalized.includes('volleyball') && normalized.includes('summer camp'));
+}
+
 function isWeekendBasketballCompetition(title: string) {
   const normalized = title.trim().toLowerCase();
   return normalized.includes('weekend') && normalized.includes('basketball') && normalized.includes('competition');
@@ -19,7 +24,9 @@ export function EventsContent({ eventsData }: { eventsData: EventResponse[] }) {
   const { language } = useLanguage();
 
   const events = eventsData.map((event) => {
-    const isSummerCamp = isBasketballSummerCamp(event.title);
+    const isBasketballCamp = isBasketballSummerCamp(event.title);
+    const isVolleyballCamp = isVolleyballSummerCamp(event.title);
+    const isSummerCamp = isBasketballCamp || isVolleyballCamp;
     const isCompetition = event.id === 'weekend-basketball-competitions' || isWeekendBasketballCompetition(event.title);
     return {
       id: event.id,
@@ -27,12 +34,14 @@ export function EventsContent({ eventsData }: { eventsData: EventResponse[] }) {
       date: event.date,
       location: event.location || 'Infinity Sports',
       description: event.description || '',
-      imageUrl: event.imageUrl || (isSummerCamp ? '/hero-basketball.jpg' : '/events.jpeg'),
-      link: isSummerCamp
+      imageUrl: event.imageUrl || (isBasketballCamp ? '/hero-basketball.jpg' : '/events.jpeg'),
+      link: isBasketballCamp
         ? '/events/basketball-summer-camp/register'
-        : isCompetition
-          ? '/events/weekend-competitions/register'
-          : event.link || '/contact',
+        : isVolleyballCamp
+          ? '/events/volleyball-summer-camp/register'
+          : isCompetition
+            ? '/events/weekend-competitions/register'
+            : event.link || '/contact',
       highlight: event.highlight || false,
       isSummerCamp,
       isCompetition,

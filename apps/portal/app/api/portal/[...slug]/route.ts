@@ -4389,17 +4389,25 @@ async function createPackageRegistration(payload: RegistrationInput) {
 }
 
 async function listPackageRegistrations(request: NextRequest) {
-  const packageName =
-    request.nextUrl.searchParams.get("packageName") || undefined;
-  const excludePackageName =
-    request.nextUrl.searchParams.get("excludePackageName") || undefined;
+  const packageNames = request.nextUrl.searchParams
+    .getAll("packageName")
+    .flatMap((value) => value.split(","))
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const excludePackageNames = request.nextUrl.searchParams
+    .getAll("excludePackageName")
+    .flatMap((value) => value.split(","))
+    .map((value) => value.trim())
+    .filter(Boolean);
   const startDate = request.nextUrl.searchParams.get("startDate") || undefined;
   const endDate = request.nextUrl.searchParams.get("endDate") || undefined;
   const search = normalizeText(request.nextUrl.searchParams.get("search"));
 
   const where: any = {};
-  if (packageName) where.packageName = packageName;
-  else if (excludePackageName) where.packageName = { not: excludePackageName };
+  if (packageNames.length === 1) where.packageName = packageNames[0];
+  else if (packageNames.length > 1) where.packageName = { in: packageNames };
+  else if (excludePackageNames.length === 1) where.packageName = { not: excludePackageNames[0] };
+  else if (excludePackageNames.length > 1) where.packageName = { notIn: excludePackageNames };
   if (search) {
     const matchedIds = await searchRegistrationIds(prisma, search);
     if (matchedIds.length === 0) return NextResponse.json([]);
@@ -4429,16 +4437,25 @@ async function listPackageRegistrations(request: NextRequest) {
 }
 
 async function getRegistrationTotals(request: NextRequest) {
-  const packageName =
-    request.nextUrl.searchParams.get("packageName") || undefined;
-  const excludePackageName =
-    request.nextUrl.searchParams.get("excludePackageName") || undefined;
+  const packageNames = request.nextUrl.searchParams
+    .getAll("packageName")
+    .flatMap((value) => value.split(","))
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const excludePackageNames = request.nextUrl.searchParams
+    .getAll("excludePackageName")
+    .flatMap((value) => value.split(","))
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const hasPackageFilter = packageNames.length > 0;
   const startDate = request.nextUrl.searchParams.get("startDate") || undefined;
   const endDate = request.nextUrl.searchParams.get("endDate") || undefined;
 
   const where: any = {};
-  if (packageName) where.packageName = packageName;
-  else if (excludePackageName) where.packageName = { not: excludePackageName };
+  if (packageNames.length === 1) where.packageName = packageNames[0];
+  else if (packageNames.length > 1) where.packageName = { in: packageNames };
+  else if (excludePackageNames.length === 1) where.packageName = { not: excludePackageNames[0] };
+  else if (excludePackageNames.length > 1) where.packageName = { notIn: excludePackageNames };
   if (startDate || endDate) {
     const range: Record<string, Date> = {};
     if (startDate) range.gte = new Date(startDate);
@@ -4507,7 +4524,7 @@ async function getRegistrationTotals(request: NextRequest) {
       if (byMethod[method] != null) byMethod[method] += rec.amountPaid || 0;
     }
 
-    if (!packageName) {
+    if (!hasPackageFilter) {
       const pkg = reg.packageName || "";
       if (!byPackage[pkg])
         byPackage[pkg] = {
@@ -4533,7 +4550,7 @@ async function getRegistrationTotals(request: NextRequest) {
     remainingTotal: expectedTotal - collectedTotal,
     discountsTotal,
     byMethod,
-    byPackage: packageName ? undefined : byPackage,
+    byPackage: hasPackageFilter ? undefined : byPackage,
   });
 }
 

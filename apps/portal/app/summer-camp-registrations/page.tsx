@@ -2,17 +2,17 @@
 
 import {
   RegistrationsPageClient,
-  SUMMER_CAMP_PACKAGE_NAME,
+  SUMMER_CAMP_PACKAGE_NAMES,
 } from '../registrations/RegistrationsPageClient';
 
 export default function SummerCampRegistrationsPage() {
   return (
     <RegistrationsPageClient
-      fixedPackageName={SUMMER_CAMP_PACKAGE_NAME}
+      includedPackageNames={SUMMER_CAMP_PACKAGE_NAMES}
       title="Summer Camp Registrations"
-      subtitle="Registrations for Basketball Summer Camp only"
+      subtitle="Registrations for Basketball and Volleyball Summer Camp"
       listTitle="Summer camp registrations"
-      allPackagesLabel={SUMMER_CAMP_PACKAGE_NAME}
+      allPackagesLabel="All summer camps"
       exportPrefix="summer-camp-registrations"
       hideAdminPackageTools
     />

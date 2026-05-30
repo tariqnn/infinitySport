@@ -81,7 +81,7 @@ function buildOldMonthEditForm(entry: RegistrationRenewalHistoryRow): OldMonthEd
 
 function isSummerCampPackage(packageName: string) {
   const normalized = packageName.trim().toLowerCase();
-  return normalized === 'basketball summer camp' || (normalized.includes('basketball') && normalized.includes('summer camp'));
+  return normalized === 'basketball summer camp' || normalized === 'volleyball summer camp' || normalized.includes('summer camp');
 }
 
 function parseRegistrationNotes(planLabel: string | null | undefined) {

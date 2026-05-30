@@ -11,8 +11,8 @@ export function RegistrationTotalsPanel({
   startDate,
   endDate,
 }: {
-  packageName?: string;
-  excludePackageName?: string;
+  packageName?: string | readonly string[];
+  excludePackageName?: string | readonly string[];
   startDate?: string;
   endDate?: string;
 }) {

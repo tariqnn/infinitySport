@@ -875,13 +875,23 @@ export type OldRegistrationImportResult = {
 };
 
 export const packageRegistrationsApi = {
-  list: (packageName?: string, startDate?: string, endDate?: string, search?: string, excludePackageName?: string) => {
+  list: (
+    packageName?: string | readonly string[],
+    startDate?: string,
+    endDate?: string,
+    search?: string,
+    excludePackageName?: string | readonly string[],
+  ) => {
     const params = new URLSearchParams();
-    if (packageName) params.append('packageName', packageName);
+    for (const name of Array.isArray(packageName) ? packageName : packageName ? [packageName] : []) {
+      params.append('packageName', name);
+    }
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
     if (search) params.append('search', search);
-    if (excludePackageName) params.append('excludePackageName', excludePackageName);
+    for (const name of Array.isArray(excludePackageName) ? excludePackageName : excludePackageName ? [excludePackageName] : []) {
+      params.append('excludePackageName', name);
+    }
     const query = params.toString() ? `?${params.toString()}` : '';
     return portalDbFetch<PackageRegistrationRow[]>(`/portal/package-registrations${query}`);
   },
@@ -904,12 +914,16 @@ export const packageRegistrationsApi = {
     periodStartsAt?: string | null;
   }) =>
     portalDbFetch<PackageRegistrationRow>('/portal/package-registrations', { method: 'POST', body: JSON.stringify(data) }),
-  getTotals: (packageName?: string, startDate?: string, endDate?: string, excludePackageName?: string) => {
+  getTotals: (packageName?: string | readonly string[], startDate?: string, endDate?: string, excludePackageName?: string | readonly string[]) => {
     const params = new URLSearchParams();
-    if (packageName) params.append('packageName', packageName);
+    for (const name of Array.isArray(packageName) ? packageName : packageName ? [packageName] : []) {
+      params.append('packageName', name);
+    }
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
-    if (excludePackageName) params.append('excludePackageName', excludePackageName);
+    for (const name of Array.isArray(excludePackageName) ? excludePackageName : excludePackageName ? [excludePackageName] : []) {
+      params.append('excludePackageName', name);
+    }
     const query = params.toString() ? `?${params.toString()}` : '';
     return portalDbFetch<RegistrationTotals>(`/portal/package-registrations/totals${query}`);
   },
@@ -1333,7 +1347,7 @@ export async function prefetchPortalRouteData(href: string): Promise<void> {
     case '/registrations':
       tasks.push(
         Promise.allSettled([
-          packageRegistrationsApi.list(undefined, undefined, undefined, undefined, 'Basketball Summer Camp'),
+          packageRegistrationsApi.list(undefined, undefined, undefined, undefined, ['Basketball Summer Camp', 'Volleyball Summer Camp']),
           packagesApi.list(),
           packageSessionCanceledApi.list(),
         ]),
@@ -1342,9 +1356,9 @@ export async function prefetchPortalRouteData(href: string): Promise<void> {
     case '/summer-camp-registrations':
       tasks.push(
         Promise.allSettled([
-          packageRegistrationsApi.list('Basketball Summer Camp'),
+          packageRegistrationsApi.list(['Basketball Summer Camp', 'Volleyball Summer Camp']),
           packagesApi.list(),
-          packageSessionCanceledApi.list('Basketball Summer Camp'),
+          packageSessionCanceledApi.list(),
         ]),
       );
       break;

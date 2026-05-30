@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { isValidPhoneNumber } from "../../lib/phoneValidation";
 
-const SUMMER_CAMP_PACKAGE_NAME = "Basketball Summer Camp";
+const DEFAULT_SUMMER_CAMP_PACKAGE_NAME = "Basketball Summer Camp";
 
 const PHONE_COUNTRIES: Array<{ value: string; label: string }> = [
   { value: "+962", label: "Jordan (+962)" },
@@ -118,7 +118,13 @@ function buildCampSummary(form: SummerCampForm, age: string) {
   return lines.join(" | ");
 }
 
-export function SummerCampRegistrationForm() {
+export function SummerCampRegistrationForm({
+  packageName = DEFAULT_SUMMER_CAMP_PACKAGE_NAME,
+  campTitle = packageName,
+}: {
+  packageName?: string;
+  campTitle?: string;
+}) {
   const [form, setForm] = useState<SummerCampForm>(initialForm);
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [error, setError] = useState("");
@@ -165,7 +171,7 @@ export function SummerCampRegistrationForm() {
     const customerAge =
       typeof parsedAge === "number" && Number.isFinite(parsedAge) && parsedAge > 0 ? parsedAge : undefined;
     const payload = {
-      packageName: SUMMER_CAMP_PACKAGE_NAME,
+      packageName,
       planLabel: buildCampSummary(form, age),
       customerName: form.fullName.trim(),
       customerPhone: parentPhone.trim(),
@@ -201,7 +207,7 @@ export function SummerCampRegistrationForm() {
       <div className="mx-auto max-w-2xl rounded-card border border-brand-lightBlue/20 bg-white p-8 text-center shadow-card">
         <h2 className="text-xl font-bold text-brand-black">Registration submitted</h2>
         <p className="mt-2 text-sm text-gray-600">
-          Thank you. The registration was sent to portal registrations under Basketball Summer Camp.
+          Thank you. The registration was sent to portal registrations under {packageName}.
         </p>
         <button
           type="button"
@@ -223,10 +229,10 @@ export function SummerCampRegistrationForm() {
       onSubmit={handleSubmit}
     >
       <div>
-        <h2 className="text-xl font-bold text-brand-black">Register for Basketball Summer Camp</h2>
+        <h2 className="text-xl font-bold text-brand-black">Register for {campTitle}</h2>
         <p className="mt-1 text-sm text-gray-600">Fill in the details. We will contact you to confirm.</p>
         <p className="mt-2 rounded-lg bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-600">
-          Package: {SUMMER_CAMP_PACKAGE_NAME}
+          Package: {packageName}
         </p>
       </div>
 

@@ -8,11 +8,13 @@
  *   Basketball - Warriors                   120 JOD
  *   Basketball - Private 1v1 Sessions        Contact for pricing (manual)
  *   Basketball - Small Groups                Contact for pricing (manual)
+ *   Basketball Summer Camp                   Contact for pricing (manual)
  *   Gymnastics Package A                    120 JOD
  *   Gymnastics Package B                    100 JOD
  *   Gymnastics Package C                    140 JOD
  *   Gymnastics Package D                    120 JOD
  *   Volleyball                              100 JOD
+ *   Volleyball Summer Camp                   Contact for pricing (manual)
  */
 import { PrismaClient } from '@prisma/client';
 import { config } from 'dotenv';
@@ -28,11 +30,13 @@ const PACKAGES: { packageName: string; basePriceJod: number | null }[] = [
   { packageName: 'Basketball - Warriors', basePriceJod: 120 },
   { packageName: 'Basketball - Private 1v1 Sessions', basePriceJod: null },
   { packageName: 'Basketball - Small Groups', basePriceJod: null },
+  { packageName: 'Basketball Summer Camp', basePriceJod: null },
   { packageName: 'Gymnastics Package A', basePriceJod: 120 },
   { packageName: 'Gymnastics Package B', basePriceJod: 100 },
   { packageName: 'Gymnastics Package C', basePriceJod: 140 },
   { packageName: 'Gymnastics Package D', basePriceJod: 120 },
   { packageName: 'Volleyball', basePriceJod: 100 },
+  { packageName: 'Volleyball Summer Camp', basePriceJod: null },
 ];
 
 async function main() {

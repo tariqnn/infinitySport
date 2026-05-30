@@ -5,25 +5,27 @@ import { fetchEvents } from "../../../../lib/apiClient";
 import { SummerCampRegistrationForm } from "../../../_components/SummerCampRegistrationForm";
 
 export const metadata = {
-  title: "Basketball Summer Camp Registration | Infinity Sports",
+  title: "Volleyball Summer Camp Registration | Infinity Sports",
 };
 
 export const dynamic = "force-dynamic";
 
-function isBasketballSummerCamp(title: string) {
+const VOLLEYBALL_SUMMER_CAMP_PACKAGE_NAME = "Volleyball Summer Camp";
+
+function isVolleyballSummerCamp(title: string) {
   const normalized = title.trim().toLowerCase();
-  return normalized === "basketball summer camp" || (normalized.includes("basketball") && normalized.includes("summer camp"));
+  return normalized === "volleyball summer camp" || (normalized.includes("volleyball") && normalized.includes("summer camp"));
 }
 
-export default async function BasketballSummerCampRegisterPage() {
+export default async function VolleyballSummerCampRegisterPage() {
   const events = await fetchEvents();
-  const event = events.find((item) => isBasketballSummerCamp(item.title));
+  const event = events.find((item) => isVolleyballSummerCamp(item.title));
 
   if (!event) {
     notFound();
   }
 
-  const imageUrl = event.imageUrl || "/hero-basketball.jpg";
+  const imageUrl = event.imageUrl || "/events.jpeg";
   const location = event.location || "Infinity Sports Academy";
 
   return (
@@ -61,7 +63,10 @@ export default async function BasketballSummerCampRegisterPage() {
           </div>
 
           <div className="mt-8">
-            <SummerCampRegistrationForm packageName="Basketball Summer Camp" campTitle={event.title} />
+            <SummerCampRegistrationForm
+              packageName={VOLLEYBALL_SUMMER_CAMP_PACKAGE_NAME}
+              campTitle={event.title}
+            />
           </div>
         </div>
       </div>

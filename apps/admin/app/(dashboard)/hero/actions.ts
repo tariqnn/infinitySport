@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { landingHeroSchema, landingHighlightSchema } from '@infinity/types';
+import { landingHeroSchema, landingHighlightSchema, type LandingHighlight } from '@infinity/types';
 import { replaceLandingHighlights, updateLandingHero } from '@infinity/mock-api';
 
 export interface HeroState {
@@ -33,7 +33,7 @@ export async function updateHeroAction(_prev: HeroState, formData: FormData): Pr
         if (!title || !description) return null;
         return landingHighlightSchema.parse({ id, title, description });
       })
-      .filter(Boolean);
+      .filter((highlight): highlight is LandingHighlight => highlight !== null);
 
     if (highlights.length) {
       await replaceLandingHighlights(highlights, 'Admin');

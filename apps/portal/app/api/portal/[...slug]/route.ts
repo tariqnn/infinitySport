@@ -676,7 +676,7 @@ function mapRegistrationRow(row: any) {
   );
   return {
     id: row.id,
-    packageName: row.packageName,
+    packageName: normalizePackageNameForPortal(row.packageName),
     customerName: row.customerName,
     customerPhone: row.customerPhone,
     customerEmail: row.customerEmail ?? null,
@@ -741,6 +741,23 @@ function normalizePaymentPeriodKey(value: unknown): string | null {
   const raw = String(value ?? "").trim();
   if (!raw) return null;
   return /^\d{4}-(0[1-9]|1[0-2])$/.test(raw) ? raw : null;
+}
+
+function normalizePackageNameForPortal(value: string | null | undefined): string {
+  const name = normalizeText(value);
+  return name.toLowerCase() === "basketball - young men"
+    ? "Basketball - Men"
+    : name;
+}
+
+function expandPackageNameAliases(packageNames: string[]): string[] {
+  const out = new Set<string>();
+  for (const name of packageNames) {
+    const normalized = normalizePackageNameForPortal(name);
+    out.add(normalized);
+    if (normalized === "Basketball - Men") out.add("Basketball - Young Men");
+  }
+  return [...out];
 }
 
 async function cancelMatchingRegistrationInboxEntries(params: {
@@ -4404,10 +4421,12 @@ async function listPackageRegistrations(request: NextRequest) {
   const search = normalizeText(request.nextUrl.searchParams.get("search"));
 
   const where: any = {};
-  if (packageNames.length === 1) where.packageName = packageNames[0];
-  else if (packageNames.length > 1) where.packageName = { in: packageNames };
-  else if (excludePackageNames.length === 1) where.packageName = { not: excludePackageNames[0] };
-  else if (excludePackageNames.length > 1) where.packageName = { notIn: excludePackageNames };
+  const expandedPackageNames = expandPackageNameAliases(packageNames);
+  const expandedExcludePackageNames = expandPackageNameAliases(excludePackageNames);
+  if (expandedPackageNames.length === 1) where.packageName = expandedPackageNames[0];
+  else if (expandedPackageNames.length > 1) where.packageName = { in: expandedPackageNames };
+  else if (expandedExcludePackageNames.length === 1) where.packageName = { not: expandedExcludePackageNames[0] };
+  else if (expandedExcludePackageNames.length > 1) where.packageName = { notIn: expandedExcludePackageNames };
   if (search) {
     const matchedIds = await searchRegistrationIds(prisma, search);
     if (matchedIds.length === 0) return NextResponse.json([]);
@@ -4450,12 +4469,17 @@ async function getRegistrationTotals(request: NextRequest) {
   const hasPackageFilter = packageNames.length > 0;
   const startDate = request.nextUrl.searchParams.get("startDate") || undefined;
   const endDate = request.nextUrl.searchParams.get("endDate") || undefined;
+  const paymentMonth =
+    normalizePaymentPeriodKey(request.nextUrl.searchParams.get("paymentMonth")) ||
+    paymentPeriodKeyFromDate(new Date());
 
   const where: any = {};
-  if (packageNames.length === 1) where.packageName = packageNames[0];
-  else if (packageNames.length > 1) where.packageName = { in: packageNames };
-  else if (excludePackageNames.length === 1) where.packageName = { not: excludePackageNames[0] };
-  else if (excludePackageNames.length > 1) where.packageName = { notIn: excludePackageNames };
+  const expandedPackageNames = expandPackageNameAliases(packageNames);
+  const expandedExcludePackageNames = expandPackageNameAliases(excludePackageNames);
+  if (expandedPackageNames.length === 1) where.packageName = expandedPackageNames[0];
+  else if (expandedPackageNames.length > 1) where.packageName = { in: expandedPackageNames };
+  else if (expandedExcludePackageNames.length === 1) where.packageName = { not: expandedExcludePackageNames[0] };
+  else if (expandedExcludePackageNames.length > 1) where.packageName = { notIn: expandedExcludePackageNames };
   if (startDate || endDate) {
     const range: Record<string, Date> = {};
     if (startDate) range.gte = new Date(startDate);
@@ -4481,8 +4505,31 @@ async function getRegistrationTotals(request: NextRequest) {
   let expectedTotal = 0;
   let collectedTotal = 0;
   let discountsTotal = 0;
+  let monthExpectedTotal = 0;
+  let monthCollectedTotal = 0;
+  let monthRemainingTotal = 0;
+  let activeRegistered = 0;
+  let frozenRegistered = 0;
+  let frozenExpectedTotal = 0;
+  let frozenCollectedTotal = 0;
+  let frozenRemainingTotal = 0;
+  let frozenMonthExpectedTotal = 0;
+  let frozenMonthCollectedTotal = 0;
+  let frozenMonthRemainingTotal = 0;
 
   const byMethod: Record<string, number> = {
+    CASH: 0,
+    CARD: 0,
+    TRANSFER: 0,
+    OTHER: 0,
+  };
+  const monthByMethod: Record<string, number> = {
+    CASH: 0,
+    CARD: 0,
+    TRANSFER: 0,
+    OTHER: 0,
+  };
+  const frozenMonthByMethod: Record<string, number> = {
     CASH: 0,
     CARD: 0,
     TRANSFER: 0,
@@ -4505,27 +4552,68 @@ async function getRegistrationTotals(request: NextRequest) {
       (sum, rec) => sum + (rec.amountPaid || 0),
       0,
     );
+    const monthCollected = (reg.receipts || []).reduce((sum, rec) => {
+      const receiptMonth =
+        normalizePaymentPeriodKey(rec.paymentPeriodKey) ||
+        paymentPeriodKeyFromDate(rec.dateTimeIssued);
+      return receiptMonth === paymentMonth ? sum + (rec.amountPaid || 0) : sum;
+    }, 0);
+    const registrationMonth =
+      normalizePaymentPeriodKey(reg.billingPeriodKey) ||
+      paymentPeriodKeyFromDate(reg.periodStartsAt ?? reg.createdAt);
 
-    expectedTotal += finalPrice;
-    collectedTotal += collected;
-    discountsTotal += Math.max(0, basePrice - finalPrice);
+    const isFrozen = Boolean(reg.isFrozen);
 
-    const paymentStatus = getRegistrationPaymentStatus(
-      finalPrice,
-      collected,
-      Boolean(reg.isPaid),
-    );
-    if (paymentStatus === "PAID") paidCount += 1;
-    else if (paymentStatus === "PARTIAL") partialCount += 1;
-    else unpaidCount += 1;
+    if (isFrozen) {
+      frozenRegistered += 1;
+      frozenExpectedTotal += finalPrice;
+      frozenCollectedTotal += collected;
+      frozenRemainingTotal += Math.max(0, finalPrice - collected);
+      frozenMonthCollectedTotal += monthCollected;
+      if (registrationMonth === paymentMonth) {
+        frozenMonthExpectedTotal += finalPrice;
+        frozenMonthRemainingTotal += Math.max(0, finalPrice - monthCollected);
+      }
+    } else {
+      activeRegistered += 1;
+      expectedTotal += finalPrice;
+      collectedTotal += collected;
+      discountsTotal += Math.max(0, basePrice - finalPrice);
+      monthCollectedTotal += monthCollected;
+      if (registrationMonth === paymentMonth) {
+        monthExpectedTotal += finalPrice;
+        monthRemainingTotal += Math.max(0, finalPrice - monthCollected);
+      }
+
+      const paymentStatus = getRegistrationPaymentStatus(
+        finalPrice,
+        collected,
+        Boolean(reg.isPaid),
+      );
+      if (paymentStatus === "PAID") paidCount += 1;
+      else if (paymentStatus === "PARTIAL") partialCount += 1;
+      else unpaidCount += 1;
+    }
 
     for (const rec of reg.receipts || []) {
       const method = (rec.paymentMethod || "CASH").toUpperCase();
-      if (byMethod[method] != null) byMethod[method] += rec.amountPaid || 0;
+      const receiptMonth =
+        normalizePaymentPeriodKey(rec.paymentPeriodKey) ||
+        paymentPeriodKeyFromDate(rec.dateTimeIssued);
+      if (isFrozen) {
+        if (receiptMonth === paymentMonth && frozenMonthByMethod[method] != null) {
+          frozenMonthByMethod[method] += rec.amountPaid || 0;
+        }
+      } else {
+        if (byMethod[method] != null) byMethod[method] += rec.amountPaid || 0;
+        if (receiptMonth === paymentMonth && monthByMethod[method] != null) {
+          monthByMethod[method] += rec.amountPaid || 0;
+        }
+      }
     }
 
-    if (!hasPackageFilter) {
-      const pkg = reg.packageName || "";
+    if (!hasPackageFilter && !isFrozen) {
+      const pkg = normalizePackageNameForPortal(reg.packageName);
       if (!byPackage[pkg])
         byPackage[pkg] = {
           registered: 0,
@@ -4541,7 +4629,7 @@ async function getRegistrationTotals(request: NextRequest) {
   }
 
   return NextResponse.json({
-    totalRegistered: regs.length,
+    totalRegistered: activeRegistered,
     paidCount,
     partialCount,
     unpaidCount,
@@ -4550,6 +4638,19 @@ async function getRegistrationTotals(request: NextRequest) {
     remainingTotal: expectedTotal - collectedTotal,
     discountsTotal,
     byMethod,
+    paymentMonth,
+    monthExpectedTotal,
+    monthCollectedTotal,
+    monthRemainingTotal,
+    monthByMethod,
+    frozenRegistered,
+    frozenExpectedTotal,
+    frozenCollectedTotal,
+    frozenRemainingTotal,
+    frozenMonthExpectedTotal,
+    frozenMonthCollectedTotal,
+    frozenMonthRemainingTotal,
+    frozenMonthByMethod,
     byPackage: hasPackageFilter ? undefined : byPackage,
   });
 }
@@ -8398,7 +8499,7 @@ async function dispatchGet(request: NextRequest, params: Params) {
     });
     return NextResponse.json(
       rows.map((row) => ({
-        packageName: row.packageName,
+        packageName: normalizePackageNameForPortal(row.packageName),
         basePriceJod: row.basePriceJod ?? null,
       })),
     );
@@ -8425,7 +8526,16 @@ async function dispatchGet(request: NextRequest, params: Params) {
         sortOrder: true,
       },
     });
-    return NextResponse.json(rows);
+    return NextResponse.json(
+      rows.map((row) => ({
+        ...row,
+        name: normalizePackageNameForPortal(row.name),
+        description:
+          row.description?.toLowerCase().includes("young men")
+            ? row.description.replace(/young men/gi, "men")
+            : row.description,
+      })),
+    );
   }
 
   if (resource === "competition-registrations" && !id) {

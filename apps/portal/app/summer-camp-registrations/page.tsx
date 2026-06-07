@@ -15,6 +15,7 @@ export default function SummerCampRegistrationsPage() {
       allPackagesLabel="All summer camps"
       exportPrefix="summer-camp-registrations"
       hideAdminPackageTools
+      allowIncludedPackageFilter
     />
   );
 }

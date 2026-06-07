@@ -1,0 +1,39 @@
+
+> infinity-sports@0.1.0 dev:admin
+> npm --workspace apps/admin run dev
+
+
+> admin@0.1.0 dev
+> next dev
+
+   ▲ Next.js 15.1.9
+   - Local:        http://localhost:3000
+   - Network:      http://10.147.73.8:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 5.8s
+ ○ Compiling / ...
+ ✓ Compiled / in 9.3s (1558 modules)
+Admin route client initialized with base URL: (same-origin)
+ ✓ Compiled in 661ms (722 modules)
+ GET / 200 in 13985ms
+ ○ Compiling /bookings ...
+ ✓ Compiled /bookings in 821ms (1663 modules)
+Admin route client initialized with base URL: (same-origin)
+ GET /bookings 200 in 1113ms
+ ✓ Compiled /booking-availability in 321ms (1681 modules)
+Admin route client initialized with base URL: (same-origin)
+ GET /booking-availability 200 in 594ms
+ ○ Compiling /hero ...
+ ✓ Compiled /hero in 669ms (1825 modules)
+Admin route client initialized with base URL: (same-origin)
+ GET /hero 200 in 846ms
+ ○ Compiling /packages ...
+ ✓ Compiled /packages in 667ms (1833 modules)
+Admin route client initialized with base URL: (same-origin)
+ GET /packages 200 in 1106ms
+ ○ Compiling /events ...
+ ✓ Compiled /events in 745ms (1841 modules)
+Admin route client initialized with base URL: (same-origin)
+ GET /events 200 in 1096ms

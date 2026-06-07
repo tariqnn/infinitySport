@@ -843,6 +843,19 @@ export type RegistrationTotals = {
   remainingTotal: number;
   discountsTotal: number;
   byMethod: Record<string, number>;
+  paymentMonth?: string;
+  monthExpectedTotal?: number;
+  monthCollectedTotal?: number;
+  monthRemainingTotal?: number;
+  monthByMethod?: Record<string, number>;
+  frozenRegistered?: number;
+  frozenExpectedTotal?: number;
+  frozenCollectedTotal?: number;
+  frozenRemainingTotal?: number;
+  frozenMonthExpectedTotal?: number;
+  frozenMonthCollectedTotal?: number;
+  frozenMonthRemainingTotal?: number;
+  frozenMonthByMethod?: Record<string, number>;
   byPackage?: Record<string, { registered: number; expected: number; collected: number; remaining: number }>;
 };
 
@@ -914,13 +927,20 @@ export const packageRegistrationsApi = {
     periodStartsAt?: string | null;
   }) =>
     portalDbFetch<PackageRegistrationRow>('/portal/package-registrations', { method: 'POST', body: JSON.stringify(data) }),
-  getTotals: (packageName?: string | readonly string[], startDate?: string, endDate?: string, excludePackageName?: string | readonly string[]) => {
+  getTotals: (
+    packageName?: string | readonly string[],
+    startDate?: string,
+    endDate?: string,
+    excludePackageName?: string | readonly string[],
+    paymentMonth?: string,
+  ) => {
     const params = new URLSearchParams();
     for (const name of Array.isArray(packageName) ? packageName : packageName ? [packageName] : []) {
       params.append('packageName', name);
     }
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
+    if (paymentMonth) params.append('paymentMonth', paymentMonth);
     for (const name of Array.isArray(excludePackageName) ? excludePackageName : excludePackageName ? [excludePackageName] : []) {
       params.append('excludePackageName', name);
     }

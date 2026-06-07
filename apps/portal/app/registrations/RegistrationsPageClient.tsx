@@ -49,6 +49,7 @@ type RegistrationsPageClientProps = {
   allPackagesLabel?: string;
   exportPrefix?: string;
   hideAdminPackageTools?: boolean;
+  allowIncludedPackageFilter?: boolean;
 };
 
 function normalizePackageName(value: string | null | undefined) {
@@ -73,8 +74,9 @@ export function RegistrationsPageClient({
   allPackagesLabel = 'All packages',
   exportPrefix = 'registrations',
   hideAdminPackageTools = false,
+  allowIncludedPackageFilter = false,
 }: RegistrationsPageClientProps) {
-  const packageIsFixed = Boolean(fixedPackageName || includedPackageNames.length);
+  const packageIsFixed = Boolean(fixedPackageName || (includedPackageNames.length && !allowIncludedPackageFilter));
   const [rows, setRows] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [packageFilter, setPackageFilter] = useState<string>(fixedPackageName ?? '');
@@ -343,10 +345,18 @@ export function RegistrationsPageClient({
     setPackageFilter(fixedPackageName);
   }, [fixedPackageName]);
 
+  const effectivePackageFilter = useMemo(
+    () =>
+      fixedPackageName ||
+      (includedPackageNames.length
+        ? packageFilter || includedPackageNames
+        : packageFilter || undefined),
+    [fixedPackageName, includedPackageNames, packageFilter],
+  );
+
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const effectivePackageFilter = fixedPackageName || (includedPackageNames.length ? includedPackageNames : packageFilter);
       const data = await packageRegistrationsApi.list(
         effectivePackageFilter || undefined,
         dateFilters.startDate,
@@ -372,7 +382,7 @@ export function RegistrationsPageClient({
     } finally {
       setLoading(false);
     }
-  }, [excludedPackageNames, fixedPackageName, includedPackageNames, packageFilter, dateFilters, searchTerm]);
+  }, [excludedPackageNames, effectivePackageFilter, dateFilters, searchTerm]);
 
   useEffect(() => {
     load();
@@ -637,7 +647,7 @@ export function RegistrationsPageClient({
       />
 
       <RegistrationTotalsPanel
-        packageName={fixedPackageName || (includedPackageNames.length ? includedPackageNames : packageFilter || undefined)}
+        packageName={effectivePackageFilter}
         excludePackageName={!packageIsFixed && !packageFilter ? excludedPackageNames : undefined}
         startDate={dateFilters.startDate}
         endDate={dateFilters.endDate}

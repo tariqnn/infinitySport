@@ -218,10 +218,10 @@ const FALLBACK_PACKAGES: PackageResponse[] = ([
     sortOrder: 23,
   },
   {
-    id: 'fallback-basketball-young-men',
+    id: 'fallback-basketball-men',
     sportType: 'BASKETBALL',
-    name: 'Basketball - Young Men',
-    description: 'Basketball sessions for young men.',
+    name: 'Basketball - Men',
+    description: 'Basketball sessions for men.',
     descriptionBullets: [
       'Tuesday, Sunday 9–10 PM.',
       'Thursday 6–7 PM.',

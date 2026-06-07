@@ -131,6 +131,10 @@ export async function listBookingsAction(params: BookingListParams = {}) {
     const totalAmount = Math.max(0, Math.round(hours * hourlyRate));
     return {
       ...booking,
+      startTime: booking.startTime.toISOString(),
+      endTime: booking.endTime.toISOString(),
+      createdAt: booking.createdAt.toISOString(),
+      updatedAt: booking.updatedAt.toISOString(),
       hourlyRate,
       totalAmount,
       totalHours: hours,

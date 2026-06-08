@@ -590,6 +590,7 @@ model PackageRegistration {
   priceLockedUntil            DateTime?
   status                      String                        @default("ACTIVE")
   periodStartsAt              DateTime?
+  cycleStartedAt              DateTime?
   sessionsLeft                Int?
   sessionsUsedOverride        Int?
   sessionsPerWeek             Int?
@@ -605,6 +606,7 @@ model PackageRegistration {
   @@index([packageName])
   @@index([isPaid])
   @@index([periodEndsAt])
+  @@index([cycleStartedAt])
   @@index([status])
 }
 

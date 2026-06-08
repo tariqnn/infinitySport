@@ -959,12 +959,18 @@ class FirebasePortalRepository implements PortalRepository {
     Map<String, dynamic> data,
     Map<String, double> courtRates,
   ) {
-    final startIso =
-        _readIsoValue(data['startTime']) ?? readString(data['startTimeIso']);
-    final endIso =
-        _readIsoValue(data['endTime']) ?? readString(data['endTimeIso']);
-    final start = DateTime.tryParse(startIso)?.toLocal();
-    final end = DateTime.tryParse(endIso)?.toLocal();
+    final source = readString(data['source'], fallback: 'APP');
+    final usesAbsoluteTime = source.toUpperCase() == 'APP';
+    final start = _readBookingTime(
+      data['startTime'],
+      data['startTimeIso'],
+      usesAbsoluteTime: usesAbsoluteTime,
+    );
+    final end = _readBookingTime(
+      data['endTime'],
+      data['endTimeIso'],
+      usesAbsoluteTime: usesAbsoluteTime,
+    );
     if (start == null || end == null) return null;
 
     final facilityArea = readNullableString(data['facilityArea']) ??
@@ -999,15 +1005,15 @@ class FirebasePortalRepository implements PortalRepository {
     final row = BookingOverviewRow(
       id: readString(data['id'], fallback: docId),
       companyId: readString(data['companyId']),
-      startTime: start.toUtc().toIso8601String(),
-      endTime: end.toUtc().toIso8601String(),
+      startTime: _localIso(start),
+      endTime: _localIso(end),
       facilityArea: facilityArea,
       status: readString(data['status'], fallback: 'PENDING'),
       customerName: readNullableString(data['customerName']),
       customerPhone: readNullableString(data['customerPhone']),
       customerEmail: readNullableString(data['customerEmail']),
       notes: readNullableString(data['notes']),
-      source: readString(data['source'], fallback: 'APP'),
+      source: source,
       memberFirstName: null,
       memberLastName: null,
       financials: BookingFinancials(
@@ -1301,6 +1307,64 @@ String? _readIsoValue(dynamic value) {
   final text = value.toString().trim();
   return text.isEmpty ? null : text;
 }
+
+DateTime? _readBookingTime(
+  dynamic timestampValue,
+  dynamic isoValue, {
+  required bool usesAbsoluteTime,
+}) {
+  if (usesAbsoluteTime) {
+    return (_parseAbsoluteDateTime(timestampValue) ??
+            _parseAbsoluteDateTime(isoValue))
+        ?.toLocal();
+  }
+  return _parseWallClockDateTime(timestampValue) ??
+      _parseWallClockDateTime(isoValue);
+}
+
+DateTime? _parseAbsoluteDateTime(dynamic value) {
+  if (value == null) return null;
+  if (value is Timestamp) return value.toDate();
+  if (value is DateTime) return value;
+
+  final text = value.toString().trim();
+  if (text.isEmpty) return null;
+  return DateTime.tryParse(text);
+}
+
+DateTime? _parseWallClockDateTime(dynamic value) {
+  if (value == null) return null;
+  if (value is Timestamp) return _asWallClock(value.toDate().toUtc());
+  if (value is DateTime) return _asWallClock(value.toUtc());
+
+  final text = value.toString().trim();
+  if (text.isEmpty) return null;
+  final parsed = DateTime.tryParse(text);
+  if (parsed == null) return null;
+  return _hasTimezoneDesignator(text)
+      ? _asWallClock(parsed.toUtc())
+      : _asWallClock(parsed);
+}
+
+bool _hasTimezoneDesignator(String value) {
+  return RegExp(r'(z|[+-]\d{2}:?\d{2})$', caseSensitive: false)
+      .hasMatch(value.trim());
+}
+
+DateTime _asWallClock(DateTime date) {
+  return DateTime(
+    date.year,
+    date.month,
+    date.day,
+    date.hour,
+    date.minute,
+    date.second,
+    date.millisecond,
+    date.microsecond,
+  );
+}
+
+String _localIso(DateTime date) => _asWallClock(date).toIso8601String();
 
 String? _readNullableIso(dynamic value) {
   final iso = _readIsoValue(value);

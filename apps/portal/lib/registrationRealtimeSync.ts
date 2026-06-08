@@ -37,6 +37,7 @@ export type RegistrationRealtimeRecordInput = {
   finalPriceJod?: number | null;
   durationMonths?: number | null;
   periodStartsAt?: string | Date | admin.firestore.Timestamp | null;
+  cycleStartedAt?: string | Date | admin.firestore.Timestamp | null;
   periodEndsAt?: string | Date | admin.firestore.Timestamp | null;
   isFrozen?: boolean | null;
   frozenAt?: string | Date | admin.firestore.Timestamp | null;
@@ -182,6 +183,8 @@ function serializeRegistration(input: RegistrationRealtimeRecordInput) {
     durationMonths: Math.max(1, normalizeInteger(input.durationMonths) ?? 1),
     periodStartsAt: toTimestamp(input.periodStartsAt),
     periodStartsAtIso: toIsoString(input.periodStartsAt),
+    cycleStartedAt: toTimestamp(input.cycleStartedAt),
+    cycleStartedAtIso: toIsoString(input.cycleStartedAt),
     periodEndsAt: toTimestamp(input.periodEndsAt),
     periodEndsAtIso: toIsoString(input.periodEndsAt),
     isFrozen: normalizeBoolean(input.isFrozen, false),

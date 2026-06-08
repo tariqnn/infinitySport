@@ -243,13 +243,24 @@ export function RegistrationsPageClient({
   }
 
   function getCycleStart(r: Registration): Date | null {
+    if (!r.cycleStartedAt) return null;
     if (r.periodStartsAt) return new Date(r.periodStartsAt);
-    if (r.createdAt) return new Date(r.createdAt);
-    return null;
+    return new Date(r.cycleStartedAt);
+  }
+
+  function isCycleStarted(r: Registration) {
+    return Boolean(r.cycleStartedAt);
+  }
+
+  function getBaseSessionCount(r: Registration) {
+    return r.sessionsLeft != null
+      ? Math.max(0, Number(r.sessionsLeft) || 0)
+      : Math.max(0, Number(defaultSessionsByPackage[r.packageName] ?? 0) || 0);
   }
 
   /** Days remaining (positive) or 0 if expired. Returns null if frozen (countdown paused). */
   function getDaysRemaining(r: Registration): number | null {
+    if (!isCycleStarted(r)) return null;
     if (r.isFrozen) return null;
     const end = getPeriodEnd(r);
     if (!end) return null;
@@ -260,20 +271,32 @@ export function RegistrationsPageClient({
     return Math.max(0, diff);
   }
 
+  function isCycleEnded(r: Registration) {
+    return getDaysRemaining(r) === 0;
+  }
+
   /**
    * Sessions remaining (based on scheduled package days).
    * Canceled session days do NOT decrement. Manual +1 (sessionsBonus) is added to remaining.
    */
   function getSessionsRemaining(r: Registration): { remaining: number; total: number; used: number } | null {
     const schedule = getPackageSchedule(r.packageName);
-    const baseSessions =
-      r.sessionsLeft != null
-        ? Math.max(0, Number(r.sessionsLeft) || 0)
-        : Math.max(0, Number(defaultSessionsByPackage[r.packageName] ?? 0) || 0);
+    const baseSessions = getBaseSessionCount(r);
     if (!baseSessions) return null;
+    if (!isCycleStarted(r)) {
+      const bonus = Number(r.sessionsBonus) || 0;
+      const total = Math.max(0, baseSessions + bonus);
+      return { remaining: total, total, used: 0 };
+    }
     const start = getCycleStart(r);
     const end = getPeriodEnd(r);
     if (!start || !end) return null;
+
+    const bonus = Number(r.sessionsBonus) || 0;
+    const total = Math.max(0, baseSessions + bonus);
+    if (isCycleEnded(r)) {
+      return { remaining: 0, total, used: total };
+    }
 
     const effectiveNow =
       r.isFrozen && r.frozenAt ? new Date(r.frozenAt) : new Date();
@@ -295,8 +318,6 @@ export function RegistrationsPageClient({
         if (effectiveDaySet.has(d.getDay()) && canceledSet.has(key)) canceledInRange += 1;
       }
     }
-    const bonus = Number(r.sessionsBonus) || 0;
-    const total = Math.max(0, baseSessions + bonus);
     const manualUsed =
       r.sessionsUsedOverride == null
         ? null
@@ -469,6 +490,20 @@ export function RegistrationsPageClient({
     }
   }
 
+  async function handleStartCycle(r: Registration) {
+    if (startingCycleId) return;
+    setStartingCycleId(r.id);
+    try {
+      await packageRegistrationsApi.startCycle(r.id);
+      load();
+    } catch (e) {
+      console.error('Failed to start cycle', e);
+      alert('Failed to start the cycle. Please try again.');
+    } finally {
+      setStartingCycleId(null);
+    }
+  }
+
   async function handleStartNewCycle(r: Registration) {
     if (startingCycleId) return;
     if (!confirm(`Start a new cycle for ${r.customerName}? The finished cycle will be archived and the new cycle will be unpaid until payment is recorded.`)) {
@@ -487,11 +522,13 @@ export function RegistrationsPageClient({
   }
 
   function isNewCycleDue(row: Registration) {
+    if (!isCycleStarted(row)) return false;
     if (row.isFrozen) return false;
+    const days = getDaysRemaining(row);
+    if (days === 0) return true;
     const sessions = getSessionsRemaining(row);
     if (sessions) return sessions.remaining <= 0;
-    const days = getDaysRemaining(row);
-    return days === 0;
+    return false;
   }
 
   function getRemainingSortValue(row: Registration) {
@@ -531,7 +568,16 @@ export function RegistrationsPageClient({
     if (row.isFrozen) return <Badge variant="neutral">Frozen</Badge>;
     const end = getPeriodEnd(row);
     const sessions = getSessionsRemaining(row);
+    if (!isCycleStarted(row)) {
+      return (
+        <span className="text-sm text-ui-textPrimary">
+          <Badge variant="neutral">Not started</Badge>
+          {sessions ? <span className="mt-1 block text-xs text-ui-textMuted">{sessions.total} sessions ready</span> : null}
+        </span>
+      );
+    }
     if (sessions) {
+      if (isCycleEnded(row)) return <Badge variant="danger">Cycle ended</Badge>;
       if (sessions.remaining <= 0) return <Badge variant="danger">No sessions</Badge>;
       return (
         <span className="text-sm text-ui-textPrimary">
@@ -915,6 +961,7 @@ export function RegistrationsPageClient({
                   </tr>
                 ) : displayedRows.map((row) => {
                   const collected = row.collected ?? 0;
+                  const cycleStarted = isCycleStarted(row);
                   const renewalDue = isNewCycleDue(row);
                   const paymentStatus = getPaymentStatus(row);
                   return (
@@ -923,14 +970,37 @@ export function RegistrationsPageClient({
                         <span className="block truncate font-semibold text-ui-textPrimary" title={row.packageName}>{row.packageName}</span>
                       </td>
                       <td className="px-5 py-3 min-w-0">
-                        <button
-                          type="button"
-                          onClick={() => setPersonDetailsRegistration(row)}
-                          className="block truncate text-left w-full text-ui-textPrimary hover:text-brand-blue-primary hover:underline font-medium"
-                          title={`View all registrations for ${row.customerName}`}
-                        >
-                          {row.customerName}
-                        </button>
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setPersonDetailsRegistration(row)}
+                            className="min-w-0 truncate text-left text-ui-textPrimary hover:text-brand-blue-primary hover:underline font-medium"
+                            title={`View all registrations for ${row.customerName}`}
+                          >
+                            {row.customerName}
+                          </button>
+                          {!cycleStarted ? (
+                            <button
+                              type="button"
+                              onClick={() => handleStartCycle(row)}
+                              disabled={startingCycleId === row.id}
+                              className="inline-flex min-h-[32px] items-center rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                              aria-label={`Start cycle for ${row.customerName}`}
+                            >
+                              {startingCycleId === row.id ? 'Starting...' : 'Start'}
+                            </button>
+                          ) : renewalDue ? (
+                            <button
+                              type="button"
+                              onClick={() => handleStartNewCycle(row)}
+                              disabled={startingCycleId === row.id}
+                              className="inline-flex min-h-[32px] items-center rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                              aria-label={`Start new cycle for ${row.customerName}`}
+                            >
+                              {startingCycleId === row.id ? 'Starting...' : 'New cycle'}
+                            </button>
+                          ) : null}
+                        </div>
                         <span className="block truncate text-xs text-ui-textMuted">
                           {row.playerCode ? `ID ${row.playerCode}` : 'ID pending'}
                           {` - Cycle ${row.currentCycle ?? 1}`}
@@ -964,7 +1034,7 @@ export function RegistrationsPageClient({
                         <span className="block">{new Date(row.createdAt).toLocaleDateString()}</span>
                         {row.periodStartsAt && row.periodStartsAt.slice(0, 10) !== row.createdAt.slice(0, 10) ? (
                           <span className="block text-xs text-ui-textMuted">
-                            Cycle: {new Date(row.periodStartsAt).toLocaleDateString()}
+                            {cycleStarted ? 'Cycle' : 'Planned'}: {new Date(row.periodStartsAt).toLocaleDateString()}
                           </span>
                         ) : null}
                       </td>
@@ -985,15 +1055,12 @@ export function RegistrationsPageClient({
                               collisionPadding={12}
                               className="z-[60] min-w-[14rem] rounded-lg border border-ui-border bg-white py-1 shadow-lg focus:outline-none"
                             >
-                              <DropdownMenu.Label className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ui-textMuted">
-                                Payment
-                              </DropdownMenu.Label>
                               {!renewalDue && paymentStatus !== 'PAID' && (
                                 <DropdownMenu.Item
                                   className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
                                   onSelect={() => setMarkPaidRegistration(row)}
                                 >
-                                  {paymentStatus === 'PARTIAL' ? 'Add payment' : 'Mark as Paid'}
+                                  {paymentStatus === 'PARTIAL' ? 'Add payment' : 'Mark as paid'}
                                 </DropdownMenu.Item>
                               )}
                               {(paymentStatus === 'PAID' || collected > 0) && (
@@ -1001,10 +1068,10 @@ export function RegistrationsPageClient({
                                   className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
                                   onSelect={() => setViewReceiptsRegistration(row)}
                                 >
-                                  View Receipt(s)
+                                  View receipts
                                 </DropdownMenu.Item>
                               )}
-                              {!renewalDue && (paymentStatus === 'PAID' || paymentStatus === 'PARTIAL') && (
+                              {false && !renewalDue && (paymentStatus === 'PAID' || paymentStatus === 'PARTIAL') && (
                                 <DropdownMenu.Item
                                   className="cursor-pointer px-4 py-2 text-sm text-amber-700 outline-none hover:bg-amber-50 data-[highlighted]:bg-amber-50 disabled:opacity-50"
                                   onSelect={() => handleMarkUnpaid(row)}
@@ -1014,40 +1081,11 @@ export function RegistrationsPageClient({
                                 </DropdownMenu.Item>
                               )}
                               <DropdownMenu.Separator className="my-1 h-px bg-ui-border" />
-                              <DropdownMenu.Label className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ui-textMuted">
-                                Player & registration
-                              </DropdownMenu.Label>
                               <DropdownMenu.Item
                                 className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
                                 onSelect={() => setDetailsModalRow(row)}
                               >
-                                View player details
-                              </DropdownMenu.Item>
-                              {!hideAdminPackageTools && (
-                                <DropdownMenu.Item
-                                  className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
-                                  onSelect={() => { setRegisterPersonMultiInitialPerson({ customerName: row.customerName, customerPhone: row.customerPhone, customerEmail: row.customerEmail ?? undefined, customerAge: row.customerAge ?? undefined }); setRegisterPersonMultiOpen(true); }}
-                                >
-                                  Add package(s)
-                                </DropdownMenu.Item>
-                              )}
-                              <DropdownMenu.Item
-                                className="cursor-pointer px-4 py-2 text-sm font-medium text-emerald-700 outline-none hover:bg-emerald-50 data-[highlighted]:bg-emerald-50 disabled:opacity-50"
-                                onSelect={() => handleStartNewCycle(row)}
-                                disabled={startingCycleId === row.id}
-                              >
-                                {startingCycleId === row.id
-                                  ? 'Starting new cycle...'
-                                  : renewalDue
-                                    ? 'Start new cycle'
-                                    : 'Register again (same package)'}
-                              </DropdownMenu.Item>
-                              <DropdownMenu.Item
-                                className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg disabled:opacity-50"
-                                onSelect={() => setReRegisterRow(row)}
-                                disabled={reRegisterRow?.id === row.id}
-                              >
-                                Add missing month
+                                View details
                               </DropdownMenu.Item>
                               <DropdownMenu.Item
                                 className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
@@ -1055,44 +1093,87 @@ export function RegistrationsPageClient({
                               >
                                 Edit registration
                               </DropdownMenu.Item>
-                              <DropdownMenu.Item
-                                className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg disabled:opacity-50"
-                                onSelect={() => toggleFreeze(row)}
-                                disabled={freezingId === row.id}
-                              >
-                                {row.isFrozen ? 'Unfreeze registration' : 'Freeze registration'}
-                              </DropdownMenu.Item>
-                              <DropdownMenu.Item
-                                className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
-                                onSelect={() => setIncreaseSessionRegistration(row)}
-                              >
-                                Add 1 session
-                              </DropdownMenu.Item>
-                              <DropdownMenu.Item
-                                className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
-                                onSelect={() => setAddPointsRegistration(row)}
-                              >
-                                Add points
-                              </DropdownMenu.Item>
-                              <DropdownMenu.Separator className="my-1 h-px bg-ui-border" />
-                              <DropdownMenu.Label className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ui-textMuted">
-                                Accounts
-                              </DropdownMenu.Label>
-                              <DropdownMenu.Item
-                                className="cursor-pointer px-4 py-2 text-sm text-indigo-700 outline-none hover:bg-indigo-50 data-[highlighted]:bg-indigo-50"
-                                onSelect={() => {
-                                  setTrackerAccountInitialRole('parent');
-                                  setTrackerAccountRegistrations(getTrackerLinkedRegistrations(row));
-                                }}
-                              >
-                                Create account for parents
-                              </DropdownMenu.Item>
-                              <DropdownMenu.Item
-                                className="cursor-pointer px-4 py-2 text-sm text-violet-700 outline-none hover:bg-violet-50 data-[highlighted]:bg-violet-50"
-                                onSelect={() => setPlayerAccountRegistration(row)}
-                              >
-                                Create player account
-                              </DropdownMenu.Item>
+                              <DropdownMenu.Sub>
+                                <DropdownMenu.SubTrigger className="flex cursor-pointer items-center justify-between gap-4 px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg">
+                                  More tools
+                                  <span className="text-ui-textMuted">&gt;</span>
+                                </DropdownMenu.SubTrigger>
+                                <DropdownMenu.Portal>
+                                  <DropdownMenu.SubContent
+                                    sideOffset={8}
+                                    alignOffset={-4}
+                                    className="z-[70] min-w-[13rem] rounded-lg border border-ui-border bg-white py-1 shadow-lg focus:outline-none"
+                                  >
+                                    <DropdownMenu.Item
+                                      className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg disabled:opacity-50"
+                                      onSelect={() => setReRegisterRow(row)}
+                                      disabled={reRegisterRow?.id === row.id}
+                                    >
+                                      Add missing month
+                                    </DropdownMenu.Item>
+                                    <DropdownMenu.Item
+                                      className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg disabled:opacity-50"
+                                      onSelect={() => toggleFreeze(row)}
+                                      disabled={freezingId === row.id}
+                                    >
+                                      {row.isFrozen ? 'Unfreeze' : 'Freeze'}
+                                    </DropdownMenu.Item>
+                                    <DropdownMenu.Item
+                                      className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
+                                      onSelect={() => setIncreaseSessionRegistration(row)}
+                                    >
+                                      Add 1 session
+                                    </DropdownMenu.Item>
+                                    <DropdownMenu.Item
+                                      className="cursor-pointer px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg"
+                                      onSelect={() => setAddPointsRegistration(row)}
+                                    >
+                                      Add points
+                                    </DropdownMenu.Item>
+                                    {!renewalDue && (paymentStatus === 'PAID' || paymentStatus === 'PARTIAL') && (
+                                      <>
+                                        <DropdownMenu.Separator className="my-1 h-px bg-ui-border" />
+                                        <DropdownMenu.Item
+                                          className="cursor-pointer px-4 py-2 text-sm text-amber-700 outline-none hover:bg-amber-50 data-[highlighted]:bg-amber-50 disabled:opacity-50"
+                                          onSelect={() => handleMarkUnpaid(row)}
+                                          disabled={markingUnpaidId === row.id}
+                                        >
+                                          {markingUnpaidId === row.id ? 'Marking unpaid...' : 'Mark as unpaid'}
+                                        </DropdownMenu.Item>
+                                      </>
+                                    )}
+                                  </DropdownMenu.SubContent>
+                                </DropdownMenu.Portal>
+                              </DropdownMenu.Sub>
+                              <DropdownMenu.Sub>
+                                <DropdownMenu.SubTrigger className="flex cursor-pointer items-center justify-between gap-4 px-4 py-2 text-sm text-ui-textPrimary outline-none hover:bg-ui-softBg data-[highlighted]:bg-ui-softBg">
+                                  Accounts
+                                  <span className="text-ui-textMuted">&gt;</span>
+                                </DropdownMenu.SubTrigger>
+                                <DropdownMenu.Portal>
+                                  <DropdownMenu.SubContent
+                                    sideOffset={8}
+                                    alignOffset={-4}
+                                    className="z-[70] min-w-[13rem] rounded-lg border border-ui-border bg-white py-1 shadow-lg focus:outline-none"
+                                  >
+                                    <DropdownMenu.Item
+                                      className="cursor-pointer px-4 py-2 text-sm text-indigo-700 outline-none hover:bg-indigo-50 data-[highlighted]:bg-indigo-50"
+                                      onSelect={() => {
+                                        setTrackerAccountInitialRole('parent');
+                                        setTrackerAccountRegistrations(getTrackerLinkedRegistrations(row));
+                                      }}
+                                    >
+                                      Parent account
+                                    </DropdownMenu.Item>
+                                    <DropdownMenu.Item
+                                      className="cursor-pointer px-4 py-2 text-sm text-violet-700 outline-none hover:bg-violet-50 data-[highlighted]:bg-violet-50"
+                                      onSelect={() => setPlayerAccountRegistration(row)}
+                                    >
+                                      Player account
+                                    </DropdownMenu.Item>
+                                  </DropdownMenu.SubContent>
+                                </DropdownMenu.Portal>
+                              </DropdownMenu.Sub>
                               <DropdownMenu.Separator className="my-1 h-px bg-ui-border" />
                               <DropdownMenu.Item
                                 className="cursor-pointer px-4 py-2 text-sm text-red-600 outline-none hover:bg-red-50 data-[highlighted]:bg-red-50 disabled:opacity-50"

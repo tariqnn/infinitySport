@@ -6,11 +6,20 @@ import {
   UserGroupIcon,
   CalendarIcon,
   CurrencyDollarIcon,
-  ClipboardDocumentCheckIcon
+  ClipboardDocumentCheckIcon,
+  SunIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 
 const DASHBOARD_TIMEZONE = process.env.PORTAL_TIMEZONE || 'Asia/Amman';
+const SUMMER_CAMP_PACKAGE_NAMES = new Set([
+  'basketball summer camp',
+  'volleyball summer camp',
+]);
+
+function isSummerCampRegistration(registration: { packageName?: string | null }) {
+  return SUMMER_CAMP_PACKAGE_NAMES.has((registration.packageName ?? '').trim().toLowerCase());
+}
 
 function toDayKey(value: unknown): string | null {
   const date = value instanceof Date ? value : new Date(String(value ?? ''));
@@ -44,6 +53,8 @@ async function getDashboardData() {
     const invoices = invoicesResult.status === 'fulfilled' && Array.isArray(invoicesResult.value) ? invoicesResult.value : [];
     const registrations =
       registrationsResult.status === 'fulfilled' && Array.isArray(registrationsResult.value) ? registrationsResult.value : [];
+    const summerCampRegistrations = registrations.filter((registration: any) => isSummerCampRegistration(registration));
+    const regularRegistrations = registrations.filter((registration: any) => !isSummerCampRegistration(registration));
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -93,7 +104,8 @@ async function getDashboardData() {
       openTasks,
       outstandingAmount,
       outstandingInvoicesCount: outstandingInvoices.length,
-      activeMembersCount: Array.isArray(registrations) ? registrations.length : 0,
+      activeMembersCount: regularRegistrations.length,
+      summerCampMembersCount: summerCampRegistrations.length,
       bookingsToday,
       bookingsTodayPending,
     };
@@ -108,6 +120,7 @@ async function getDashboardData() {
       outstandingAmount: 0,
       outstandingInvoicesCount: 0,
       activeMembersCount: 0,
+      summerCampMembersCount: 0,
       bookingsToday: 0,
       bookingsTodayPending: 0,
     };
@@ -116,7 +129,7 @@ async function getDashboardData() {
 
 export default async function DashboardPage() {
   const data = await getDashboardData();
-  const { companyId, upcomingBookings, upcomingClasses, lowInventory, openTasks, outstandingAmount, outstandingInvoicesCount, activeMembersCount, bookingsToday, bookingsTodayPending } = data;
+  const { companyId, upcomingBookings, upcomingClasses, lowInventory, openTasks, outstandingAmount, outstandingInvoicesCount, activeMembersCount, summerCampMembersCount, bookingsToday, bookingsTodayPending } = data;
 
   return (
     <div className="space-y-8">
@@ -126,15 +139,20 @@ export default async function DashboardPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-5">
         <KPIStatCard
           label="Active Members"
           value={activeMembersCount.toLocaleString()}
-          caption="Package registrations"
+          caption="Registrations page"
           icon={<UserGroupIcon className="h-6 w-6" />}
           iconTone="blue"
-          badge="+12%"
-          badgeTone="green"
+        />
+        <KPIStatCard
+          label="Summer Camp Members"
+          value={summerCampMembersCount.toLocaleString()}
+          caption="Summer camp page"
+          icon={<SunIcon className="h-6 w-6" />}
+          iconTone="amber"
         />
         <KPIStatCard
           label="Bookings Today"

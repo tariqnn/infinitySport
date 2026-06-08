@@ -25,6 +25,7 @@ type RegistrationLike = {
   status?: string | null;
   isFrozen?: boolean | null;
   periodStartsAt?: string | Date | null;
+  cycleStartedAt?: string | Date | null;
   periodEndsAt?: string | Date | null;
   createdAt: string | Date;
   updatedAt: string | Date;
@@ -69,6 +70,7 @@ export type RegistrationMembershipSummary = {
   nextPaymentDate: string | null;
   planLabel: string | null;
   periodStartsAt: string | null;
+  cycleStartedAt: string | null;
   periodEndsAt: string | null;
   sessionsBonus: number;
   sessionsUsedOverride: number | null;
@@ -122,9 +124,11 @@ function computePaymentStatus(
 function computeDaysLeft(params: {
   periodEndsAt: string | Date | null | undefined;
   periodStartsAt: string | Date | null | undefined;
+  cycleStartedAt: string | Date | null | undefined;
   createdAt: string | Date;
   durationMonths: number;
 }): number {
+  if (!params.cycleStartedAt) return Math.max(1, params.durationMonths) * 30;
   const endsAt = params.periodEndsAt
     ? new Date(params.periodEndsAt)
     : addCalendarMonths(
@@ -144,6 +148,7 @@ function computeDisplayStatus(
 ): string {
   const raw = String(row.status || "ACTIVE").toUpperCase();
   if (raw !== "ACTIVE") return raw;
+  if (!row.cycleStartedAt) return "NOT_STARTED";
   if (row.isFrozen) return "FROZEN";
   if (daysLeft <= 0) return "EXPIRED";
   if (daysLeft <= 7) return "EXPIRING_SOON";
@@ -255,6 +260,7 @@ export async function buildRegistrationMembershipSummaries(
     const daysLeft = computeDaysLeft({
       periodEndsAt: row.periodEndsAt,
       periodStartsAt: row.periodStartsAt,
+      cycleStartedAt: row.cycleStartedAt,
       createdAt: row.createdAt,
       durationMonths,
     });
@@ -275,10 +281,14 @@ export async function buildRegistrationMembershipSummaries(
       row.sessionsUsedOverride == null
         ? null
         : Math.max(0, Math.round(toNumber(row.sessionsUsedOverride, 0)));
-    const consumed = sessionsUsedOverride ?? consumedByPackage.get(String(row.packageName || "").trim()) ?? 0;
+    const consumed = row.cycleStartedAt
+      ? sessionsUsedOverride ?? consumedByPackage.get(String(row.packageName || "").trim()) ?? 0
+      : 0;
     const sessionsRemaining =
       isSessionTracked && baseSessions != null
-        ? Math.max(0, baseSessions + sessionsBonus - consumed)
+        ? row.cycleStartedAt && daysLeft <= 0
+          ? 0
+          : Math.max(0, baseSessions + sessionsBonus - consumed)
         : null;
     const pointsBalance = Math.max(
       0,
@@ -304,6 +314,7 @@ export async function buildRegistrationMembershipSummaries(
       nextPaymentDate: toIsoDateString(row.nextPaymentDate),
       planLabel: String(row.planLabel || "").trim() || null,
       periodStartsAt: toIsoString(row.periodStartsAt),
+      cycleStartedAt: toIsoString(row.cycleStartedAt),
       periodEndsAt: toIsoString(row.periodEndsAt),
       sessionsBonus,
       sessionsUsedOverride,

@@ -201,6 +201,14 @@ function withoutPeriodStartsAt<T extends { periodStartsAt?: unknown }>(
   return next;
 }
 
+function withoutCycleStartedAt<T extends { cycleStartedAt?: unknown }>(
+  data: T,
+): Omit<T, "cycleStartedAt"> {
+  const next = { ...data } as T;
+  delete next.cycleStartedAt;
+  return next;
+}
+
 function withoutSessionsUsedOverride<
   T extends { sessionsUsedOverride?: unknown },
 >(data: T): Omit<T, "sessionsUsedOverride"> {
@@ -454,6 +462,15 @@ async function createPackageRegistrationCompat(
       } as any);
     }
     if (
+      hasUnknownArgument(error, "cycleStartedAt") &&
+      "cycleStartedAt" in args.data
+    ) {
+      return delegate.create({
+        ...args,
+        data: withoutCycleStartedAt(args.data),
+      } as any);
+    }
+    if (
       hasUnknownArgument(error, "periodStartsAt") &&
       "periodStartsAt" in args.data
     ) {
@@ -490,6 +507,15 @@ async function updatePackageRegistrationCompat(args: {
       return prisma.packageRegistration.update({
         ...args,
         data: withoutSessionsPerWeek(args.data),
+      } as any);
+    }
+    if (
+      hasUnknownArgument(error, "cycleStartedAt") &&
+      "cycleStartedAt" in args.data
+    ) {
+      return prisma.packageRegistration.update({
+        ...args,
+        data: withoutCycleStartedAt(args.data),
       } as any);
     }
     if (
@@ -699,6 +725,7 @@ function mapRegistrationRow(row: any) {
     durationMonths: normalizeDurationMonths(row.durationMonths, 1),
     collected,
     periodStartsAt: row.periodStartsAt ?? null,
+    cycleStartedAt: row.cycleStartedAt ?? null,
     periodEndsAt: row.periodEndsAt ?? null,
     isFrozen: row.isFrozen ?? false,
     frozenAt: row.frozenAt ?? null,
@@ -920,6 +947,7 @@ async function syncRegistrationRealtimeById(
         finalPriceJod: serialized.finalPriceJod,
         durationMonths: serialized.durationMonths,
         periodStartsAt: serialized.periodStartsAt,
+        cycleStartedAt: serialized.cycleStartedAt,
         periodEndsAt: serialized.periodEndsAt,
         isFrozen: serialized.isFrozen,
         frozenAt: serialized.frozenAt,
@@ -2376,6 +2404,7 @@ type MemberRegistrationSummary = {
   nextPaymentDate: string | null;
   planLabel: string | null;
   periodStartsAt: string | null;
+  cycleStartedAt: string | null;
   periodEndsAt: string | null;
   sessionsBonus: number;
   sessionsRemaining: number | null;
@@ -4360,6 +4389,7 @@ async function createPackageRegistration(payload: RegistrationInput) {
     priceLockedUntil,
     durationMonths,
     periodEndsAt,
+    cycleStartedAt: null,
     sessionsLeft,
     sessionsUsedOverride,
     sessionsPerWeek,
@@ -4635,7 +4665,8 @@ async function getRegistrationTotals(request: NextRequest) {
     unpaidCount,
     expectedTotal,
     collectedTotal,
-    remainingTotal: expectedTotal - collectedTotal,
+    remainingTotal: Math.max(0, expectedTotal - collectedTotal),
+    overCollectedTotal: Math.max(0, collectedTotal - expectedTotal),
     discountsTotal,
     byMethod,
     paymentMonth,
@@ -5309,6 +5340,7 @@ async function renewExistingRegistrationFromOldImport(
       priceLockedUntil,
       durationMonths,
       periodStartsAt,
+      cycleStartedAt: periodStartsAt,
       periodEndsAt,
       nextPaymentDate,
       sessionsLeft,
@@ -5606,6 +5638,7 @@ async function bulkCreateForPerson(request: NextRequest) {
           priceLockedUntil,
           durationMonths,
           periodEndsAt,
+          cycleStartedAt: null,
           sessionsLeft,
           sessionsUsedOverride,
           nextPaymentDate,
@@ -6204,9 +6237,11 @@ async function reregisterPackage(id: string, request: NextRequest) {
     },
   });
 
+  const defaultNextCycleStart =
+    existing.periodEndsAt ?? existing.nextPaymentDate ?? new Date();
   const periodStartsAt = body.periodStartsAt
     ? new Date(body.periodStartsAt)
-    : new Date();
+    : new Date(defaultNextCycleStart);
   if (Number.isNaN(periodStartsAt.getTime())) {
     return jsonError("Invalid period start date");
   }
@@ -6259,6 +6294,7 @@ async function reregisterPackage(id: string, request: NextRequest) {
       priceLockedUntil,
       durationMonths,
       periodStartsAt,
+      cycleStartedAt: periodStartsAt,
       periodEndsAt,
       nextPaymentDate,
       sessionsLeft,
@@ -6304,9 +6340,65 @@ async function reregisterPackage(id: string, request: NextRequest) {
   return NextResponse.json(serialized);
 }
 
+async function startPackageRegistrationCycle(id: string, request: NextRequest) {
+  const body = (await request.json().catch(() => ({}))) as {
+    startedAt?: string | null;
+  };
+  const existing = (await prisma.packageRegistration.findUnique({
+    where: { id },
+    include: { receipts: { where: ACTIVE_RECEIPT_WHERE } },
+  })) as any;
+  if (!existing) return jsonError("Registration not found", 404);
+
+  if (existing.cycleStartedAt) {
+    const [serialized] = await serializeRegistrationRows([existing]);
+    return NextResponse.json(serialized);
+  }
+
+  const startedAt = body.startedAt ? new Date(body.startedAt) : new Date();
+  if (Number.isNaN(startedAt.getTime())) {
+    return jsonError("Invalid start date");
+  }
+
+  const packageDefaults = await getPackageDefaults(existing.packageName);
+  const durationMonths = normalizeDurationMonths(
+    existing.durationMonths,
+    packageDefaults.durationMonths,
+  );
+  const periodEndsAt = computeCyclePeriodEnd(startedAt, durationMonths);
+  const { billingPeriodKey, priceLockedUntil } = billingPeriodFromDate(startedAt);
+
+  const row = await updatePackageRegistrationCompat({
+    where: { id },
+    data: {
+      periodStartsAt: startedAt,
+      cycleStartedAt: startedAt,
+      periodEndsAt,
+      nextPaymentDate: periodEndsAt,
+      billingPeriodKey,
+      priceLockedUntil,
+      isFrozen: false,
+      frozenAt: null,
+      status: "ACTIVE",
+    },
+    include: { receipts: { where: ACTIVE_RECEIPT_WHERE } },
+  });
+
+  await syncTrackerForRegistrationContact({
+    customerName: row.customerName,
+    customerEmail: row.customerEmail,
+    customerPhone: row.customerPhone,
+  });
+  await syncRegistrationRealtimeById(row.id, "ADMIN");
+
+  const [serialized] = await serializeRegistrationRows([row]);
+  return NextResponse.json(serialized);
+}
+
 async function recordOldRegistrationMonth(id: string, request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as {
     periodStartsAt?: string | null;
+    periodEndsAt?: string | null;
     durationMonths?: number | null;
     sessionsLeft?: number | null;
     basePriceJod?: number | null;
@@ -6453,6 +6545,7 @@ async function loadOldMonthHistoryEntry(historyId: string) {
 async function updateOldMonthHistoryRecord(historyId: string, request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as {
     periodStartsAt?: string | null;
+    periodEndsAt?: string | null;
     durationMonths?: number | null;
     sessionsLeft?: number | null;
     basePriceJod?: number | null;
@@ -8914,6 +9007,10 @@ async function dispatchPost(request: NextRequest, params: Params) {
 
   if (resource === "package-registrations" && action === "reregister") {
     return reregisterPackage(id, request);
+  }
+
+  if (resource === "package-registrations" && action === "start") {
+    return startPackageRegistrationCycle(id, request);
   }
 
   if (resource === "package-registrations" && action === "old-month") {

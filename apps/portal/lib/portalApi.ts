@@ -795,6 +795,7 @@ export type PackageRegistrationRow = {
   finalPriceJod: number;
   durationMonths: number;
   periodStartsAt: string | null;
+  cycleStartedAt: string | null;
   periodEndsAt: string | null;
   isFrozen: boolean;
   frozenAt: string | null;
@@ -841,6 +842,7 @@ export type RegistrationTotals = {
   expectedTotal: number;
   collectedTotal: number;
   remainingTotal: number;
+  overCollectedTotal?: number;
   discountsTotal: number;
   byMethod: Record<string, number>;
   paymentMonth?: string;
@@ -927,6 +929,11 @@ export const packageRegistrationsApi = {
     periodStartsAt?: string | null;
   }) =>
     portalDbFetch<PackageRegistrationRow>('/portal/package-registrations', { method: 'POST', body: JSON.stringify(data) }),
+  startCycle: (id: string, data?: { startedAt?: string | null }) =>
+    portalDbFetch<PackageRegistrationRow>(`/portal/package-registrations/${id}/start`, {
+      method: 'POST',
+      body: JSON.stringify(data ?? {}),
+    }),
   getTotals: (
     packageName?: string | readonly string[],
     startDate?: string,

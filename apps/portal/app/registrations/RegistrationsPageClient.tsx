@@ -31,10 +31,12 @@ type SortDirection = 'asc' | 'desc';
 
 export const BASKETBALL_SUMMER_CAMP_PACKAGE_NAME = 'Basketball Summer Camp';
 export const VOLLEYBALL_SUMMER_CAMP_PACKAGE_NAME = 'Volleyball Summer Camp';
+export const WARRIORS_ASSISTANT_COACH_CAMP_PACKAGE_NAME = 'Warriors Assistant Coach 1-Week Summer Camp';
 export const SUMMER_CAMP_PACKAGE_NAME = BASKETBALL_SUMMER_CAMP_PACKAGE_NAME;
 export const SUMMER_CAMP_PACKAGE_NAMES = [
   BASKETBALL_SUMMER_CAMP_PACKAGE_NAME,
   VOLLEYBALL_SUMMER_CAMP_PACKAGE_NAME,
+  WARRIORS_ASSISTANT_COACH_CAMP_PACKAGE_NAME,
 ] as const;
 const EMPTY_EXCLUDED_PACKAGE_NAMES: readonly string[] = [];
 const EMPTY_INCLUDED_PACKAGE_NAMES: readonly string[] = [];

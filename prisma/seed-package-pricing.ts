@@ -9,6 +9,7 @@
  *   Basketball - Private 1v1 Sessions        Contact for pricing (manual)
  *   Basketball - Small Groups                Contact for pricing (manual)
  *   Basketball Summer Camp                   Contact for pricing (manual)
+ *   Warriors Assistant Coach 1-Week Summer Camp Contact for pricing (manual)
  *   Gymnastics Package A                    120 JOD
  *   Gymnastics Package B                    100 JOD
  *   Gymnastics Package C                    140 JOD
@@ -31,6 +32,7 @@ const PACKAGES: { packageName: string; basePriceJod: number | null }[] = [
   { packageName: 'Basketball - Private 1v1 Sessions', basePriceJod: null },
   { packageName: 'Basketball - Small Groups', basePriceJod: null },
   { packageName: 'Basketball Summer Camp', basePriceJod: null },
+  { packageName: 'Warriors Assistant Coach 1-Week Summer Camp', basePriceJod: null },
   { packageName: 'Gymnastics Package A', basePriceJod: 120 },
   { packageName: 'Gymnastics Package B', basePriceJod: 100 },
   { packageName: 'Gymnastics Package C', basePriceJod: 140 },

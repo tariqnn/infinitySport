@@ -118,6 +118,7 @@ function SummerCampNotes({ planLabel }: { planLabel: string }) {
     .split('/')
     .map((part) => part.trim())
     .filter(Boolean);
+  const hasFullCampDetails = notes.has('allergies') || notes.has('uniform') || notes.has('transportation') || notes.has('media consent');
 
   return (
     <div className="sm:col-span-2">
@@ -133,32 +134,39 @@ function SummerCampNotes({ planLabel }: { planLabel: string }) {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
+          {notes.has('camp') ? <DetailTile label="Camp" value={notes.get('camp')} /> : null}
           <DetailTile label="Medical" value={notes.get('medical')} />
-          <DetailTile label="Allergies" value={notes.get('allergies')} />
-          <DetailTile label="Media Consent" value={notes.get('media consent')} />
-          <DetailTile label="Uniform" value={notes.get('uniform')} />
-          <div className="sm:col-span-2">
-            <DetailTile label="Transportation" value={notes.get('transportation')} />
-          </div>
+          {hasFullCampDetails ? (
+            <>
+              <DetailTile label="Allergies" value={notes.get('allergies')} />
+              <DetailTile label="Media Consent" value={notes.get('media consent')} />
+              <DetailTile label="Uniform" value={notes.get('uniform')} />
+              <div className="sm:col-span-2">
+                <DetailTile label="Transportation" value={notes.get('transportation')} />
+              </div>
+            </>
+          ) : null}
         </div>
 
-        <div className="mt-3 rounded-lg border border-ui-border bg-white p-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ui-textMuted">Emergency contact</p>
-          <div className="mt-2 grid gap-3 sm:grid-cols-3">
-            <div>
-              <p className="text-xs text-ui-textMuted">Name</p>
-              <p className="font-medium text-ui-textPrimary">{emergencyParts[0] || '-'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-ui-textMuted">Relationship</p>
-              <p className="font-medium text-ui-textPrimary">{emergencyParts[1] || '-'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-ui-textMuted">Phone</p>
-              <p className="break-all font-medium text-ui-textPrimary">{emergencyParts[2] || '-'}</p>
+        {emergencyParts.length > 0 ? (
+          <div className="mt-3 rounded-lg border border-ui-border bg-white p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ui-textMuted">Emergency contact</p>
+            <div className="mt-2 grid gap-3 sm:grid-cols-3">
+              <div>
+                <p className="text-xs text-ui-textMuted">Name</p>
+                <p className="font-medium text-ui-textPrimary">{emergencyParts[0] || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-ui-textMuted">Relationship</p>
+                <p className="font-medium text-ui-textPrimary">{emergencyParts[1] || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-ui-textMuted">Phone</p>
+                <p className="break-all font-medium text-ui-textPrimary">{emergencyParts[2] || '-'}</p>
+              </div>
             </div>
           </div>
-        </div>
+        ) : null}
       </div>
     </div>
   );

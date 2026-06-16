@@ -1,5 +1,24 @@
 [
   {
+    "id": "basketball-summer-camp",
+    "title": "Basketball Summer Camp",
+    "date": "2026-07-01T06:00:00.000Z",
+    "location": "Infinity Sports Academy",
+    "description": "Basketball summer camp registration with medical notes, uniform size, transport, media consent, and emergency contact details.",
+    "imageUrl": "/hero-basketball.jpg",
+    "link": "/events/basketball-summer-camp/register",
+    "highlight": true
+  },
+  {
+    "id": "warriors-assistant-coach-camp",
+    "title": "Warriors Assistant Coach 1-Week Camp",
+    "date": "2026-07-21T06:00:00.000Z",
+    "location": "Infinity Sports Academy",
+    "imageUrl": "/warriors-assistant-coach-camp.jpg",
+    "link": "/events/warriors-assistant-coach-camp/register",
+    "highlight": true
+  },
+  {
     "id": "elite-hoops-weekend",
     "title": "Elite Hoops Weekend",
     "date": "2025-12-05T09:00:00.000Z",

@@ -15,6 +15,7 @@ const DASHBOARD_TIMEZONE = process.env.PORTAL_TIMEZONE || 'Asia/Amman';
 const SUMMER_CAMP_PACKAGE_NAMES = new Set([
   'basketball summer camp',
   'volleyball summer camp',
+  'warriors assistant coach 1-week summer camp',
 ]);
 
 function isSummerCampRegistration(registration: { packageName?: string | null }) {

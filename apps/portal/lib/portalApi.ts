@@ -1374,7 +1374,7 @@ export async function prefetchPortalRouteData(href: string): Promise<void> {
     case '/registrations':
       tasks.push(
         Promise.allSettled([
-          packageRegistrationsApi.list(undefined, undefined, undefined, undefined, ['Basketball Summer Camp', 'Volleyball Summer Camp']),
+          packageRegistrationsApi.list(undefined, undefined, undefined, undefined, ['Basketball Summer Camp', 'Volleyball Summer Camp', 'Warriors Assistant Coach 1-Week Summer Camp']),
           packagesApi.list(),
           packageSessionCanceledApi.list(),
         ]),
@@ -1383,7 +1383,7 @@ export async function prefetchPortalRouteData(href: string): Promise<void> {
     case '/summer-camp-registrations':
       tasks.push(
         Promise.allSettled([
-          packageRegistrationsApi.list(['Basketball Summer Camp', 'Volleyball Summer Camp']),
+          packageRegistrationsApi.list(['Basketball Summer Camp', 'Volleyball Summer Camp', 'Warriors Assistant Coach 1-Week Summer Camp']),
           packagesApi.list(),
           packageSessionCanceledApi.list(),
         ]),

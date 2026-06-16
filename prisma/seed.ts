@@ -142,6 +142,25 @@ async function main() {
   const events = await Promise.all([
     prisma.event.create({
       data: {
+        title: 'Basketball Summer Camp',
+        description: 'Basketball summer camp registration with medical notes, uniform size, transport, media consent, and emergency contact details.',
+        date: new Date('2026-07-01T06:00:00.000Z'),
+        location: 'Infinity Sports Academy',
+        imageUrl: '/hero-basketball.jpg',
+        highlight: true,
+      },
+    }),
+    prisma.event.create({
+      data: {
+        title: 'Warriors Assistant Coach 1-Week Camp',
+        date: new Date('2026-07-21T06:00:00.000Z'),
+        location: 'Infinity Sports Academy',
+        imageUrl: '/warriors-assistant-coach-camp.jpg',
+        highlight: true,
+      },
+    }),
+    prisma.event.create({
+      data: {
         title: 'Regional Combine',
         description: 'Scouting combine for U18 athletes with pro metrics.',
         date: new Date('2025-01-24T17:00:00.000Z'),
@@ -318,4 +337,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-

@@ -43,6 +43,84 @@ export type EventResponse = {
   highlight?: boolean;
 };
 
+const BASKETBALL_SUMMER_CAMP_EVENT: EventResponse = {
+  id: 'basketball-summer-camp',
+  title: 'Basketball Summer Camp',
+  date: '2026-07-01T06:00:00.000Z',
+  location: 'Infinity Sports Academy',
+  description:
+    'Basketball summer camp registration with medical notes, uniform size, transport, media consent, and emergency contact details.',
+  imageUrl: '/hero-basketball.jpg',
+  link: '/events/basketball-summer-camp/register',
+  highlight: true,
+};
+
+const WARRIORS_ASSISTANT_COACH_EVENT: EventResponse = {
+  id: 'warriors-assistant-coach-camp',
+  title: 'Warriors Assistant Coach 1-Week Camp',
+  date: '2026-07-21T06:00:00.000Z',
+  location: 'Infinity Sports Academy',
+  imageUrl: '/warriors-assistant-coach-camp.jpg',
+  link: '/events/warriors-assistant-coach-camp/register',
+  highlight: true,
+};
+
+function isBasketballSummerCampEvent(event: Pick<EventResponse, 'title' | 'id'>) {
+  const normalized = event.title.trim().toLowerCase();
+  return (
+    event.id === BASKETBALL_SUMMER_CAMP_EVENT.id ||
+    normalized === 'basketball summer camp' ||
+    (normalized.includes('basketball') && normalized.includes('summer camp'))
+  );
+}
+
+function isWarriorsAssistantCoachCampEvent(event: Pick<EventResponse, 'title' | 'id'>) {
+  const normalized = event.title.trim().toLowerCase();
+  return (
+    event.id === WARRIORS_ASSISTANT_COACH_EVENT.id ||
+    ((normalized.includes('warriors') || normalized.includes('nba')) &&
+      normalized.includes('coach') &&
+      normalized.includes('camp'))
+  );
+}
+
+function mergeRequiredSummerCampEvents(events: EventResponse[]) {
+  let hasBasketballCamp = false;
+  let hasWarriorsCamp = false;
+
+  const merged = events.map((event) => {
+    if (isBasketballSummerCampEvent(event)) {
+      hasBasketballCamp = true;
+      return {
+        ...event,
+        date: BASKETBALL_SUMMER_CAMP_EVENT.date,
+        imageUrl: event.imageUrl || BASKETBALL_SUMMER_CAMP_EVENT.imageUrl,
+        link: BASKETBALL_SUMMER_CAMP_EVENT.link,
+        highlight: event.highlight ?? BASKETBALL_SUMMER_CAMP_EVENT.highlight,
+      };
+    }
+    if (isWarriorsAssistantCoachCampEvent(event)) {
+      hasWarriorsCamp = true;
+      return {
+        ...event,
+        id: WARRIORS_ASSISTANT_COACH_EVENT.id,
+        title: WARRIORS_ASSISTANT_COACH_EVENT.title,
+        date: WARRIORS_ASSISTANT_COACH_EVENT.date,
+        description: event.description || WARRIORS_ASSISTANT_COACH_EVENT.description,
+        imageUrl: event.imageUrl || WARRIORS_ASSISTANT_COACH_EVENT.imageUrl,
+        link: WARRIORS_ASSISTANT_COACH_EVENT.link,
+        highlight: event.highlight ?? WARRIORS_ASSISTANT_COACH_EVENT.highlight,
+      };
+    }
+    return event;
+  });
+
+  if (!hasBasketballCamp) merged.push(BASKETBALL_SUMMER_CAMP_EVENT);
+  if (!hasWarriorsCamp) merged.push(WARRIORS_ASSISTANT_COACH_EVENT);
+
+  return merged.sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
+}
+
 export type CoachResponse = {
   id: string;
   name: string;
@@ -621,20 +699,20 @@ export async function fetchOffers(): Promise<OfferResponse[]> {
 }
 
 export async function fetchEvents(): Promise<EventResponse[]> {
-  if (!canUseDb()) return [];
-  if (!(await canAttemptDatabaseQuery())) return [];
+  if (!canUseDb()) return mergeRequiredSummerCampEvents([]);
+  if (!(await canAttemptDatabaseQuery())) return mergeRequiredSummerCampEvents([]);
   try {
     const sql = getNeonSql();
     const rows = await sql`SELECT "id","title","date","location","description","imageUrl","highlight" FROM "Event" ORDER BY "date" ASC`;
-    return rows.map((row) => ({
+    return mergeRequiredSummerCampEvents(rows.map((row) => ({
       id: row.id as string, title: row.title as string,
       date: typeof row.date === 'string' ? row.date : String(row.date),
       location: (row.location as string) ?? undefined, description: (row.description as string) ?? undefined,
       imageUrl: (row.imageUrl as string) ?? undefined, link: undefined, highlight: row.highlight as boolean,
-    }));
+    })));
   } catch (error) {
     noteDatabaseFailure('fetchEvents', error);
-    return [];
+    return mergeRequiredSummerCampEvents([]);
   }
 }
 
@@ -947,11 +1025,15 @@ async function _fetchLandingContent(): Promise<LandingContent> {
 
     // Map events
     const eventData = Array.isArray(data.events) ? data.events as Record<string, unknown>[] : [];
-    const events = eventData.map((row): LandingEvent => ({
+    const events = mergeRequiredSummerCampEvents(eventData.map((row): EventResponse => ({
       id: row.id as string, title: row.title as string,
       date: typeof row.date === 'string' ? row.date : String(row.date),
       location: (row.location as string) ?? undefined, description: (row.description as string) ?? undefined,
-      link: undefined, isActive: true, imageUrl: (row.imageUrl as string) ?? undefined,
+      link: undefined, imageUrl: (row.imageUrl as string) ?? undefined,
+      highlight: false,
+    }))).map((event): LandingEvent => ({
+      ...event,
+      isActive: true,
     }));
 
     // Map announcements

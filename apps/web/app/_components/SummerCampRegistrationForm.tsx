@@ -4,7 +4,47 @@ import { useMemo, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { isValidPhoneNumber } from "../../lib/phoneValidation";
 
-const DEFAULT_SUMMER_CAMP_PACKAGE_NAME = "Basketball Summer Camp";
+export const BASKETBALL_SUMMER_CAMP_PACKAGE_NAME = "Basketball Summer Camp";
+export const VOLLEYBALL_SUMMER_CAMP_PACKAGE_NAME = "Volleyball Summer Camp";
+export const WARRIORS_ASSISTANT_COACH_CAMP_PACKAGE_NAME = "Warriors Assistant Coach 1-Week Summer Camp";
+const DEFAULT_SUMMER_CAMP_PACKAGE_NAME = BASKETBALL_SUMMER_CAMP_PACKAGE_NAME;
+
+export const SUMMER_CAMP_OPTIONS = [
+  {
+    packageName: BASKETBALL_SUMMER_CAMP_PACKAGE_NAME,
+    label: "Basketball Summer Camp",
+    shortLabel: "Basketball Summer Camp",
+    description: "",
+    heroImageUrl: "/hero-basketball.jpg",
+    variant: "full",
+  },
+  {
+    packageName: VOLLEYBALL_SUMMER_CAMP_PACKAGE_NAME,
+    label: "Volleyball Summer Camp",
+    shortLabel: "Volleyball Summer Camp",
+    description: "",
+    heroImageUrl: "/events.jpeg",
+    variant: "full",
+  },
+  {
+    packageName: WARRIORS_ASSISTANT_COACH_CAMP_PACKAGE_NAME,
+    label: "Warriors Assistant Coach 1-Week Camp",
+    shortLabel: "Warriors Coach Camp",
+    description: "",
+    heroImageUrl: "/warriors-assistant-coach-camp.jpg",
+    variant: "short",
+  },
+] as const;
+
+export type SummerCampOption = (typeof SUMMER_CAMP_OPTIONS)[number];
+export type SummerCampPackageName = SummerCampOption["packageName"];
+
+export function getSummerCampOption(packageName: string) {
+  return (
+    SUMMER_CAMP_OPTIONS.find((option) => option.packageName === packageName) ??
+    SUMMER_CAMP_OPTIONS[0]
+  );
+}
 
 const PHONE_COUNTRIES: Array<{ value: string; label: string }> = [
   { value: "+962", label: "Jordan (+962)" },
@@ -100,8 +140,9 @@ function calculateAge(dateOfBirth: string) {
   return age > 0 ? String(age) : "";
 }
 
-function buildCampSummary(form: SummerCampForm, age: string) {
+function buildCampSummary(form: SummerCampForm, age: string, campLabel: string) {
   const lines = [
+    `Camp: ${campLabel}`,
     `Age: ${age || "-"}`,
     `Medical: ${form.medicalCondition}${form.medicalDetails.trim() ? ` (${form.medicalDetails.trim()})` : ""}`,
     `Allergies: ${form.allergies}${form.allergyDetails.trim() ? ` (${form.allergyDetails.trim()})` : ""}`,
@@ -118,16 +159,35 @@ function buildCampSummary(form: SummerCampForm, age: string) {
   return lines.join(" | ");
 }
 
+function buildShortCampSummary(form: SummerCampForm, campLabel: string) {
+  return [
+    `Camp: ${campLabel}`,
+    `Medical: ${form.medicalCondition}${form.medicalDetails.trim() ? ` (${form.medicalDetails.trim()})` : ""}`,
+  ].join(" | ");
+}
+
 export function SummerCampRegistrationForm({
   packageName = DEFAULT_SUMMER_CAMP_PACKAGE_NAME,
   campTitle = packageName,
+  campOptions,
+  selectedPackageName,
+  onCampChange,
 }: {
   packageName?: string;
   campTitle?: string;
+  campOptions?: readonly SummerCampOption[];
+  selectedPackageName?: string;
+  onCampChange?: (option: SummerCampOption) => void;
 }) {
   const [form, setForm] = useState<SummerCampForm>(initialForm);
+  const [internalPackageName, setInternalPackageName] = useState(packageName);
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [error, setError] = useState("");
+  const activePackageName = selectedPackageName ?? internalPackageName;
+  const selectedCamp = getSummerCampOption(activePackageName);
+  const availableCampOptions =
+    campOptions && campOptions.length > 0 ? campOptions : [getSummerCampOption(packageName)];
+  const isShortCamp = selectedCamp.variant === "short";
   const age = useMemo(() => calculateAge(form.dateOfBirth), [form.dateOfBirth]);
   const parentPhoneDigits = form.phoneLocal.replace(/[^\d]/g, "");
   const parentPhone = `${form.phoneCountry}${parentPhoneDigits}`;
@@ -154,6 +214,14 @@ export function SummerCampRegistrationForm({
       });
     };
 
+  const updateCamp = (event: ChangeEvent<HTMLSelectElement>) => {
+    const nextCamp = getSummerCampOption(event.target.value);
+    setInternalPackageName(nextCamp.packageName);
+    setStatus("idle");
+    setError("");
+    onCampChange?.(nextCamp);
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formElement = event.currentTarget;
@@ -171,12 +239,14 @@ export function SummerCampRegistrationForm({
     const customerAge =
       typeof parsedAge === "number" && Number.isFinite(parsedAge) && parsedAge > 0 ? parsedAge : undefined;
     const payload = {
-      packageName,
-      planLabel: buildCampSummary(form, age),
+      packageName: selectedCamp.packageName,
+      planLabel: isShortCamp
+        ? buildShortCampSummary(form, selectedCamp.label)
+        : buildCampSummary(form, age, selectedCamp.label),
       customerName: form.fullName.trim(),
       customerPhone: parentPhone.trim(),
       customerEmail: form.email.trim(),
-      customerAge,
+      customerAge: isShortCamp ? undefined : customerAge,
     };
 
     try {
@@ -207,7 +277,7 @@ export function SummerCampRegistrationForm({
       <div className="mx-auto max-w-2xl rounded-card border border-brand-lightBlue/20 bg-white p-8 text-center shadow-card">
         <h2 className="text-xl font-bold text-brand-black">Registration submitted</h2>
         <p className="mt-2 text-sm text-gray-600">
-          Thank you. The registration was sent to portal registrations under {packageName}.
+          Thank you. The registration was sent to portal registrations under {selectedCamp.packageName}.
         </p>
         <button
           type="button"
@@ -231,15 +301,42 @@ export function SummerCampRegistrationForm({
       <div>
         <h2 className="text-xl font-bold text-brand-black">Register for {campTitle}</h2>
         <p className="mt-1 text-sm text-gray-600">Fill in the details. We will contact you to confirm.</p>
-        <p className="mt-2 rounded-lg bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-600">
-          Package: {packageName}
-        </p>
+        <div className="mt-4">
+          {availableCampOptions.length > 1 ? (
+            <>
+              <label className={labelClass} htmlFor="camp-package">
+                Registering for *
+              </label>
+              <select
+                id="camp-package"
+                className={inputClass}
+                value={selectedCamp.packageName}
+                onChange={updateCamp}
+              >
+                {availableCampOptions.map((option) => (
+                  <option key={option.packageName} value={option.packageName}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </>
+          ) : (
+            <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-semibold text-gray-700">
+              {selectedCamp.label}
+            </p>
+          )}
+          {selectedCamp.description ? (
+            <p className="mt-2 rounded-lg bg-gray-50 px-3 py-2 text-xs font-semibold leading-relaxed text-gray-600">
+              {selectedCamp.description}
+            </p>
+          ) : null}
+        </div>
       </div>
 
       <div className="grid gap-5 md:grid-cols-2">
         <div>
           <label className={labelClass} htmlFor="camp-full-name">
-            Player Name *
+            {isShortCamp ? "Name *" : "Player Name *"}
           </label>
           <input
             id="camp-full-name"
@@ -252,28 +349,30 @@ export function SummerCampRegistrationForm({
           />
         </div>
 
-        <div>
-          <label className={labelClass} htmlFor="camp-date-of-birth">
-            Date of Birth *
-          </label>
-          <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
-            <input
-              id="camp-date-of-birth"
-              className={inputClass}
-              type="date"
-              value={form.dateOfBirth}
-              onChange={updateField("dateOfBirth")}
-              required
-            />
-            <div className="rounded-lg border border-gray-300 bg-gray-50 px-3 py-2.5 text-sm font-semibold text-gray-700 sm:min-w-24">
-              Age: {age || "-"}
+        {!isShortCamp ? (
+          <div>
+            <label className={labelClass} htmlFor="camp-date-of-birth">
+              Date of Birth *
+            </label>
+            <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+              <input
+                id="camp-date-of-birth"
+                className={inputClass}
+                type="date"
+                value={form.dateOfBirth}
+                onChange={updateField("dateOfBirth")}
+                required
+              />
+              <div className="rounded-lg border border-gray-300 bg-gray-50 px-3 py-2.5 text-sm font-semibold text-gray-700 sm:min-w-24">
+                Age: {age || "-"}
+              </div>
             </div>
           </div>
-        </div>
+        ) : null}
 
         <div>
           <label className={labelClass} htmlFor="camp-phone">
-            Parent Phone *
+            Phone Number *
           </label>
           <div className="flex gap-2">
             <select
@@ -320,7 +419,7 @@ export function SummerCampRegistrationForm({
         </div>
       </div>
 
-      <div className="grid gap-5 md:grid-cols-2">
+      {isShortCamp ? (
         <div>
           <label className={labelClass} htmlFor="camp-medical-condition">
             Medical Condition
@@ -348,216 +447,248 @@ export function SummerCampRegistrationForm({
             />
           ) : null}
         </div>
-
-        <div>
-          <label className={labelClass} htmlFor="camp-allergies">
-            Allergies
-          </label>
-          <select
-            id="camp-allergies"
-            className={inputClass}
-            value={form.allergies}
-            onChange={updateField("allergies")}
-          >
-            {allergyOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-          {form.allergies !== "None" ? (
-            <input
-              className={`mt-2 ${inputClass}`}
-              type="text"
-              value={form.allergyDetails}
-              onChange={updateField("allergyDetails")}
-              placeholder="Short note"
-              required={form.allergies === "Other"}
-            />
-          ) : null}
-        </div>
-      </div>
-
-      <div className="grid gap-5 md:grid-cols-2">
-        <fieldset className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-          <p className="text-sm font-semibold text-gray-700">Media Consent</p>
-          <p className="mt-1 text-xs leading-relaxed text-gray-500">
-            Allow photos or videos for Infinity Sports website and social media.
-          </p>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            {["Yes", "No"].map((option) => (
-              <label
-                key={option}
-                className={`inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-semibold transition ${
-                  form.mediaConsent === option
-                    ? "border-brand-blue-primary bg-brand-blue-primary/5 text-brand-blue-primary ring-1 ring-brand-blue-primary/20"
-                    : "border-gray-300 bg-white text-gray-700 hover:border-brand-green-primary"
-                }`}
-              >
-                <input
-                  className="h-4 w-4 accent-brand-blue-primary"
-                  type="radio"
-                  name="mediaConsent"
-                  value={option}
-                  checked={form.mediaConsent === option}
-                  onChange={updateField("mediaConsent")}
-                />
-                {option}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-
-        <div>
-          <label className={labelClass} htmlFor="camp-uniform-size">
-            Uniform Size
-          </label>
-          <select
-            id="camp-uniform-size"
-            className={inputClass}
-            value={form.uniformSize}
-            onChange={updateField("uniformSize")}
-            required
-          >
-            <option value="">Select size</option>
-            {uniformSizes.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <fieldset className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-        <p className="text-sm font-semibold text-gray-700">Transportation</p>
-        <p className="mt-1 text-xs leading-relaxed text-gray-500">
-          Door-to-door bus service can be arranged if available in your area.
-        </p>
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          {["No", "Yes"].map((option) => (
-            <label
-              key={option}
-              className={`inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-semibold transition ${
-                form.needsTransportation === option
-                  ? "border-brand-blue-primary bg-brand-blue-primary/5 text-brand-blue-primary ring-1 ring-brand-blue-primary/20"
-                  : "border-gray-300 bg-white text-gray-700 hover:border-brand-green-primary"
-              }`}
-            >
-              <input
-                className="h-4 w-4 accent-brand-blue-primary"
-                type="radio"
-                name="needsTransportation"
-                value={option}
-                checked={form.needsTransportation === option}
-                onChange={updateField("needsTransportation")}
-              />
-              {option}
-            </label>
-          ))}
-        </div>
-        {form.needsTransportation === "Yes" ? (
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
+      ) : (
+        <>
+          <div className="grid gap-5 md:grid-cols-2">
             <div>
-              <label className={labelClass} htmlFor="camp-transport-area">
-                Area
+              <label className={labelClass} htmlFor="camp-medical-condition">
+                Medical Condition
               </label>
               <select
-                id="camp-transport-area"
+                id="camp-medical-condition"
                 className={inputClass}
-                value={form.transportArea}
-                onChange={updateField("transportArea")}
+                value={form.medicalCondition}
+                onChange={updateField("medicalCondition")}
+              >
+                {medicalOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+              {form.medicalCondition !== "None" ? (
+                <textarea
+                  className={`mt-2 ${inputClass}`}
+                  rows={2}
+                  value={form.medicalDetails}
+                  onChange={updateField("medicalDetails")}
+                  placeholder="Short note"
+                  required={form.medicalCondition === "Other"}
+                />
+              ) : null}
+            </div>
+
+            <div>
+              <label className={labelClass} htmlFor="camp-allergies">
+                Allergies
+              </label>
+              <select
+                id="camp-allergies"
+                className={inputClass}
+                value={form.allergies}
+                onChange={updateField("allergies")}
+              >
+                {allergyOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+              {form.allergies !== "None" ? (
+                <input
+                  className={`mt-2 ${inputClass}`}
+                  type="text"
+                  value={form.allergyDetails}
+                  onChange={updateField("allergyDetails")}
+                  placeholder="Short note"
+                  required={form.allergies === "Other"}
+                />
+              ) : null}
+            </div>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            <fieldset className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <p className="text-sm font-semibold text-gray-700">Media Consent</p>
+              <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                Allow photos or videos for Infinity Sports website and social media.
+              </p>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                {["Yes", "No"].map((option) => (
+                  <label
+                    key={option}
+                    className={`inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-semibold transition ${
+                      form.mediaConsent === option
+                        ? "border-brand-blue-primary bg-brand-blue-primary/5 text-brand-blue-primary ring-1 ring-brand-blue-primary/20"
+                        : "border-gray-300 bg-white text-gray-700 hover:border-brand-green-primary"
+                    }`}
+                  >
+                    <input
+                      className="h-4 w-4 accent-brand-blue-primary"
+                      type="radio"
+                      name="mediaConsent"
+                      value={option}
+                      checked={form.mediaConsent === option}
+                      onChange={updateField("mediaConsent")}
+                    />
+                    {option}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            <div>
+              <label className={labelClass} htmlFor="camp-uniform-size">
+                Uniform Size
+              </label>
+              <select
+                id="camp-uniform-size"
+                className={inputClass}
+                value={form.uniformSize}
+                onChange={updateField("uniformSize")}
                 required
               >
-                <option value="">Select area</option>
-                {transportAreas.map((area) => (
-                  <option key={area} value={area}>
-                    {area}
+                <option value="">Select size</option>
+                {uniformSizes.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
                   </option>
                 ))}
               </select>
             </div>
-            <div>
-              <label className={labelClass} htmlFor="camp-transport-location">
-                Landmark
-              </label>
-              <input
-                id="camp-transport-location"
-                className={inputClass}
-                type="text"
-                value={form.transportationLocation}
-                onChange={updateField("transportationLocation")}
-                placeholder="Building or nearby landmark"
-                required
-              />
-            </div>
           </div>
-        ) : null}
-      </fieldset>
 
-      <fieldset className="rounded-card border border-brand-lightBlue/20 bg-white p-5">
-        <legend className="px-2 text-sm font-semibold text-gray-700">
-          Emergency Contact
-        </legend>
-        <div className="grid gap-4 sm:gap-5 md:grid-cols-3">
-          <div>
-            <label className={labelClass} htmlFor="camp-emergency-name">
-              Name
-            </label>
-            <input
-              id="camp-emergency-name"
-              className={inputClass}
-              type="text"
-              value={form.emergencyName}
-              onChange={updateField("emergencyName")}
-              required
-            />
-          </div>
-          <div>
-            <label className={labelClass} htmlFor="camp-emergency-relationship">
-              Relationship
-            </label>
-            <select
-              id="camp-emergency-relationship"
-              className={inputClass}
-              value={form.emergencyRelationship}
-              onChange={updateField("emergencyRelationship")}
-              required
-            >
-              <option value="">Select</option>
-              {relationships.map((relationship) => (
-                <option key={relationship} value={relationship}>
-                  {relationship}
-                </option>
+          <fieldset className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <p className="text-sm font-semibold text-gray-700">Transportation</p>
+            <p className="mt-1 text-xs leading-relaxed text-gray-500">
+              Door-to-door bus service can be arranged if available in your area.
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              {["No", "Yes"].map((option) => (
+                <label
+                  key={option}
+                  className={`inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-semibold transition ${
+                    form.needsTransportation === option
+                      ? "border-brand-blue-primary bg-brand-blue-primary/5 text-brand-blue-primary ring-1 ring-brand-blue-primary/20"
+                      : "border-gray-300 bg-white text-gray-700 hover:border-brand-green-primary"
+                  }`}
+                >
+                  <input
+                    className="h-4 w-4 accent-brand-blue-primary"
+                    type="radio"
+                    name="needsTransportation"
+                    value={option}
+                    checked={form.needsTransportation === option}
+                    onChange={updateField("needsTransportation")}
+                  />
+                  {option}
+                </label>
               ))}
-            </select>
-          </div>
-          <div>
-            <label className={labelClass} htmlFor="camp-emergency-phone">
-              Phone
-            </label>
-            <input
-              id="camp-emergency-phone"
-              className={inputClass}
-              type="tel"
-              value={form.emergencyPhone}
-              onChange={updateField("emergencyPhone")}
-              disabled={form.sameEmergencyPhone}
-              required
-            />
-            <label className="mt-3 flex items-center gap-2 text-xs font-bold text-gray-600">
-              <input
-                className="h-4 w-4 accent-brand-blue-primary"
-                type="checkbox"
-                checked={form.sameEmergencyPhone}
-                onChange={updateField("sameEmergencyPhone")}
-                disabled={!parentPhoneDigits}
-              />
-              Same as parent phone
-            </label>
-          </div>
-        </div>
-      </fieldset>
+            </div>
+            {form.needsTransportation === "Yes" ? (
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className={labelClass} htmlFor="camp-transport-area">
+                    Area
+                  </label>
+                  <select
+                    id="camp-transport-area"
+                    className={inputClass}
+                    value={form.transportArea}
+                    onChange={updateField("transportArea")}
+                    required
+                  >
+                    <option value="">Select area</option>
+                    {transportAreas.map((area) => (
+                      <option key={area} value={area}>
+                        {area}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass} htmlFor="camp-transport-location">
+                    Landmark
+                  </label>
+                  <input
+                    id="camp-transport-location"
+                    className={inputClass}
+                    type="text"
+                    value={form.transportationLocation}
+                    onChange={updateField("transportationLocation")}
+                    placeholder="Building or nearby landmark"
+                    required
+                  />
+                </div>
+              </div>
+            ) : null}
+          </fieldset>
+
+          <fieldset className="rounded-card border border-brand-lightBlue/20 bg-white p-5">
+            <legend className="px-2 text-sm font-semibold text-gray-700">
+              Emergency Contact
+            </legend>
+            <div className="grid gap-4 sm:gap-5 md:grid-cols-3">
+              <div>
+                <label className={labelClass} htmlFor="camp-emergency-name">
+                  Name
+                </label>
+                <input
+                  id="camp-emergency-name"
+                  className={inputClass}
+                  type="text"
+                  value={form.emergencyName}
+                  onChange={updateField("emergencyName")}
+                  required
+                />
+              </div>
+              <div>
+                <label className={labelClass} htmlFor="camp-emergency-relationship">
+                  Relationship
+                </label>
+                <select
+                  id="camp-emergency-relationship"
+                  className={inputClass}
+                  value={form.emergencyRelationship}
+                  onChange={updateField("emergencyRelationship")}
+                  required
+                >
+                  <option value="">Select</option>
+                  {relationships.map((relationship) => (
+                    <option key={relationship} value={relationship}>
+                      {relationship}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelClass} htmlFor="camp-emergency-phone">
+                  Phone
+                </label>
+                <input
+                  id="camp-emergency-phone"
+                  className={inputClass}
+                  type="tel"
+                  value={form.emergencyPhone}
+                  onChange={updateField("emergencyPhone")}
+                  disabled={form.sameEmergencyPhone}
+                  required
+                />
+                <label className="mt-3 flex items-center gap-2 text-xs font-bold text-gray-600">
+                  <input
+                    className="h-4 w-4 accent-brand-blue-primary"
+                    type="checkbox"
+                    checked={form.sameEmergencyPhone}
+                    onChange={updateField("sameEmergencyPhone")}
+                    disabled={!parentPhoneDigits}
+                  />
+                  Same as parent phone
+                </label>
+              </div>
+            </div>
+          </fieldset>
+        </>
+      )}
 
       <button
         type="submit"

@@ -15,6 +15,15 @@ function isVolleyballSummerCamp(title: string) {
   return normalized === 'volleyball summer camp' || (normalized.includes('volleyball') && normalized.includes('summer camp'));
 }
 
+function isWarriorsAssistantCoachCamp(title: string) {
+  const normalized = title.trim().toLowerCase();
+  return (
+    ((normalized.includes('warriors') || normalized.includes('nba')) &&
+      normalized.includes('coach') &&
+      normalized.includes('camp'))
+  );
+}
+
 function isWeekendBasketballCompetition(title: string) {
   const normalized = title.trim().toLowerCase();
   return normalized.includes('weekend') && normalized.includes('basketball') && normalized.includes('competition');
@@ -26,7 +35,8 @@ export function EventsContent({ eventsData }: { eventsData: EventResponse[] }) {
   const events = eventsData.map((event) => {
     const isBasketballCamp = isBasketballSummerCamp(event.title);
     const isVolleyballCamp = isVolleyballSummerCamp(event.title);
-    const isSummerCamp = isBasketballCamp || isVolleyballCamp;
+    const isWarriorsCamp = isWarriorsAssistantCoachCamp(event.title);
+    const isSummerCamp = isBasketballCamp || isVolleyballCamp || isWarriorsCamp;
     const isCompetition = event.id === 'weekend-basketball-competitions' || isWeekendBasketballCompetition(event.title);
     return {
       id: event.id,
@@ -34,14 +44,16 @@ export function EventsContent({ eventsData }: { eventsData: EventResponse[] }) {
       date: event.date,
       location: event.location || 'Infinity Sports',
       description: event.description || '',
-      imageUrl: event.imageUrl || (isBasketballCamp ? '/hero-basketball.jpg' : '/events.jpeg'),
+      imageUrl: event.imageUrl || (isWarriorsCamp ? '/warriors-assistant-coach-camp.jpg' : isBasketballCamp ? '/hero-basketball.jpg' : '/events.jpeg'),
       link: isBasketballCamp
         ? '/events/basketball-summer-camp/register'
-        : isVolleyballCamp
-          ? '/events/volleyball-summer-camp/register'
-          : isCompetition
-            ? '/events/weekend-competitions/register'
-            : event.link || '/contact',
+        : isWarriorsCamp
+          ? '/events/warriors-assistant-coach-camp/register'
+          : isVolleyballCamp
+            ? '/events/volleyball-summer-camp/register'
+            : isCompetition
+              ? '/events/weekend-competitions/register'
+              : event.link || '/contact',
       highlight: event.highlight || false,
       isSummerCamp,
       isCompetition,

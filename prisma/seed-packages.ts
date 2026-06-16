@@ -34,6 +34,7 @@ const PACKAGES: PackageSeed[] = [
   { name: 'Basketball - Private 1v1 Sessions', sportType: 'BASKETBALL', durationMonths: 1, sessionsCount: 0, trackingType: 'SESSIONS', pricingType: 'MANUAL', currentPriceJod: null, showOnWebsite: true, sortOrder: 40 },
   { name: 'Basketball - Small Groups', sportType: 'BASKETBALL', durationMonths: 1, sessionsCount: 0, trackingType: 'SESSIONS', pricingType: 'MANUAL', currentPriceJod: null, showOnWebsite: true, sortOrder: 50 },
   { name: 'Basketball Summer Camp', sportType: 'BASKETBALL', durationMonths: 1, sessionsCount: 0, trackingType: 'DAYS', pricingType: 'MANUAL', currentPriceJod: null, showOnWebsite: false, sortOrder: 55 },
+  { name: 'Warriors Assistant Coach 1-Week Summer Camp', sportType: 'BASKETBALL', durationMonths: 1, sessionsCount: 0, trackingType: 'DAYS', pricingType: 'MANUAL', currentPriceJod: null, showOnWebsite: false, sortOrder: 56 },
   { name: 'Gymnastics Package A', sportType: 'GYMNASTICS', durationMonths: 1, sessionsCount: 12, trackingType: 'SESSIONS', pricingType: 'FIXED', currentPriceJod: 120, showOnWebsite: true, sortOrder: 60 },
   { name: 'Gymnastics Package B', sportType: 'GYMNASTICS', durationMonths: 1, sessionsCount: 8, trackingType: 'SESSIONS', pricingType: 'FIXED', currentPriceJod: 100, showOnWebsite: true, sortOrder: 70 },
   { name: 'Gymnastics Package C', sportType: 'GYMNASTICS', durationMonths: 1, sessionsCount: 18, trackingType: 'SESSIONS', pricingType: 'FIXED', currentPriceJod: 140, showOnWebsite: true, sortOrder: 80 },

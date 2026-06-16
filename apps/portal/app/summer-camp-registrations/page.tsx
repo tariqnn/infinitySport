@@ -10,7 +10,7 @@ export default function SummerCampRegistrationsPage() {
     <RegistrationsPageClient
       includedPackageNames={SUMMER_CAMP_PACKAGE_NAMES}
       title="Summer Camp Registrations"
-      subtitle="Registrations for Basketball and Volleyball Summer Camp"
+      subtitle="Registrations for Basketball, Volleyball, and Warriors Assistant Coach camps"
       listTitle="Summer camp registrations"
       allPackagesLabel="All summer camps"
       exportPrefix="summer-camp-registrations"

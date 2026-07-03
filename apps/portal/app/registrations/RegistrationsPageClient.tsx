@@ -2,10 +2,18 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageHeader, Card, CardHeader, CardBody, Badge, Select, Input, Button } from '../_components/ui';
-import { packageRegistrationsApi, packageSessionCanceledApi, packagesApi, type PackageOption, type PackageRegistrationRow } from '../../lib/portalApi';
+import {
+  financeApi,
+  getFirstCompany,
+  packageRegistrationsApi,
+  packageSessionCanceledApi,
+  packagesApi,
+  type PackageOption,
+  type PackageRegistrationRow,
+} from '../../lib/portalApi';
 import { ExportCsvButton } from '../_components/ActionButtons';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { PlusCircleIcon, EllipsisVerticalIcon, ArrowPathIcon, ClipboardDocumentListIcon } from '@heroicons/react/24/outline';
+import { PlusCircleIcon, EllipsisVerticalIcon, ArrowPathIcon, ClipboardDocumentListIcon, BanknotesIcon } from '@heroicons/react/24/outline';
 import { MarkAsPaidModal } from './_components/MarkAsPaidModal';
 import { ViewReceiptsModal } from './_components/ViewReceiptsModal';
 import { BulkAddPeopleModal } from './_components/BulkAddPeopleModal';
@@ -117,6 +125,10 @@ export function RegistrationsPageClient({
   const [trackerAccountInitialRole, setTrackerAccountInitialRole] = useState<'parent' | 'coach'>('parent');
   const [trackerCoachOnlyOpen, setTrackerCoachOnlyOpen] = useState(false);
   const [playerAccountRegistration, setPlayerAccountRegistration] = useState<Registration | null>(null);
+  const [selectedRegistrationIds, setSelectedRegistrationIds] = useState<Set<string>>(() => new Set());
+  const [sendingToCashBook, setSendingToCashBook] = useState(false);
+  const [cashBookCopyMessage, setCashBookCopyMessage] = useState<string | null>(null);
+  const [cashBookCopyError, setCashBookCopyError] = useState<string | null>(null);
 
   /**
    * Package schedule catalog.
@@ -436,6 +448,150 @@ export function RegistrationsPageClient({
     return () => clearTimeout(t);
   }, [bulkCreatedCount]);
 
+  useEffect(() => {
+    setSelectedRegistrationIds((current) => {
+      const availableIds = new Set(rows.map((row) => row.id));
+      const next = new Set(Array.from(current).filter((id) => availableIds.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [rows]);
+
+  function getCashBookCopyCategoryName() {
+    return includedPackageNames.length > 0 ? 'Summer Camp Registrations' : 'Package Registrations';
+  }
+
+  function getCashBookCopyAmount(row: Registration) {
+    const collected = Number(row.collected ?? 0);
+    if (collected > 0) return Math.round(collected);
+    const finalPrice = Number(row.finalPriceJod ?? 0);
+    return finalPrice > 0 ? Math.round(finalPrice) : 0;
+  }
+
+  function getCashBookCopyDate(row: Registration) {
+    const parsed = new Date(row.createdAt);
+    if (Number.isNaN(parsed.getTime())) return new Date().toISOString().slice(0, 10);
+    return parsed.toISOString().slice(0, 10);
+  }
+
+  function buildCashBookCopyNote(row: Registration, amount: number) {
+    const paymentStatus = getPaymentStatus(row);
+    const sourceAmount = Number(row.collected ?? 0) > 0 ? 'collected' : 'final price';
+    return [
+      `Registration copy for ${row.customerName}`,
+      `Package: ${row.packageName}`,
+      `Phone: ${row.customerPhone || '-'}`,
+      `Player ID: ${row.playerCode || 'pending'}`,
+      `Payment: ${paymentStatus}`,
+      `Amount source: ${sourceAmount} (${amount} JOD)`,
+      `Registration ID: ${row.id}`,
+    ].join(' | ');
+  }
+
+  function toggleRegistrationSelection(rowId: string) {
+    setSelectedRegistrationIds((current) => {
+      const next = new Set(current);
+      if (next.has(rowId)) next.delete(rowId);
+      else next.add(rowId);
+      return next;
+    });
+    setCashBookCopyMessage(null);
+    setCashBookCopyError(null);
+  }
+
+  function toggleVisibleSelection() {
+    setSelectedRegistrationIds((current) => {
+      const visibleIds = displayedRows.map((row) => row.id);
+      const next = new Set(current);
+      const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => next.has(id));
+      if (allVisibleSelected) {
+        visibleIds.forEach((id) => next.delete(id));
+      } else {
+        visibleIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+    setCashBookCopyMessage(null);
+    setCashBookCopyError(null);
+  }
+
+  async function handleCopySelectedToCashBook() {
+    if (sendingToCashBook) return;
+
+    const selectedRows = rows.filter((row) => selectedRegistrationIds.has(row.id));
+    if (selectedRows.length === 0) {
+      setCashBookCopyError('Select at least one player to copy to the cash book.');
+      setCashBookCopyMessage(null);
+      return;
+    }
+
+    const rowsWithAmounts = selectedRows
+      .map((row) => ({ row, amount: getCashBookCopyAmount(row) }))
+      .filter((entry) => entry.amount > 0);
+    const skippedNoAmountCount = selectedRows.length - rowsWithAmounts.length;
+
+    if (rowsWithAmounts.length === 0) {
+      setCashBookCopyError('Selected players do not have a collected amount or final price to copy.');
+      setCashBookCopyMessage(null);
+      return;
+    }
+
+    setSendingToCashBook(true);
+    setCashBookCopyError(null);
+    setCashBookCopyMessage(null);
+
+    try {
+      const company = await getFirstCompany();
+      if (!company?.id) throw new Error('No company found for the cash book.');
+
+      const category = await financeApi.cashBookCategories.create({
+        companyId: company.id,
+        type: 'INCOME',
+        name: getCashBookCopyCategoryName(),
+      });
+
+      const existingTransactions = await financeApi.cashBookTransactions.list({
+        companyId: company.id,
+        type: 'INCOME',
+      });
+      const alreadyCopiedIds = new Set(
+        existingTransactions
+          .map((transaction) => transaction.note?.match(/Registration ID: ([^|]+)/)?.[1]?.trim())
+          .filter((id): id is string => Boolean(id)),
+      );
+      const entriesToCreate = rowsWithAmounts.filter(({ row }) => !alreadyCopiedIds.has(row.id));
+      const skippedDuplicateCount = rowsWithAmounts.length - entriesToCreate.length;
+
+      await Promise.all(
+        entriesToCreate.map(({ row, amount }) =>
+          financeApi.cashBookTransactions.create({
+            companyId: company.id,
+            type: 'INCOME',
+            amount,
+            categoryId: category.id,
+            date: getCashBookCopyDate(row),
+            note: buildCashBookCopyNote(row, amount),
+          }),
+        ),
+      );
+
+      setSelectedRegistrationIds(new Set());
+      const details = [
+        skippedNoAmountCount ? `${skippedNoAmountCount} skipped with no amount` : null,
+        skippedDuplicateCount ? `${skippedDuplicateCount} already in cash book` : null,
+      ].filter(Boolean);
+      setCashBookCopyMessage(
+        `Copied ${entriesToCreate.length} player${entriesToCreate.length === 1 ? '' : 's'} to Finance > Cash Book.${
+          details.length ? ` ${details.join('; ')}.` : ''
+        }`,
+      );
+    } catch (error) {
+      console.error('Failed to copy registrations to cash book', error);
+      setCashBookCopyError(error instanceof Error ? error.message : 'Failed to copy selected players to the cash book.');
+    } finally {
+      setSendingToCashBook(false);
+    }
+  }
+
   async function toggleFreeze(r: Registration) {
     if (freezingId) return;
     setFreezingId(r.id);
@@ -645,6 +801,11 @@ export function RegistrationsPageClient({
       return (safeLeft - safeRight) * directionMultiplier;
     });
   }, [rows, sortConfig, canceledDatesByPackage, defaultSessionsByPackage]);
+  const selectedCount = selectedRegistrationIds.size;
+  const allDisplayedSelected =
+    displayedRows.length > 0 && displayedRows.every((row) => selectedRegistrationIds.has(row.id));
+  const someDisplayedSelected =
+    displayedRows.some((row) => selectedRegistrationIds.has(row.id)) && !allDisplayedSelected;
 
   if (loading && rows.length === 0) {
     return <div className="py-12 text-center text-ui-textMuted">Loading registrations...</div>;
@@ -786,6 +947,16 @@ export function RegistrationsPageClient({
                 <PlusCircleIcon className="h-4 w-4" />
                 Bulk add players
               </Button>
+              <Button
+                variant="secondary"
+                onClick={handleCopySelectedToCashBook}
+                isLoading={sendingToCashBook}
+                disabled={selectedCount === 0 || sendingToCashBook}
+                leadingIcon={<BanknotesIcon className="h-4 w-4" />}
+                className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+              >
+                Copy selected to Cash Book{selectedCount ? ` (${selectedCount})` : ''}
+              </Button>
               <ExportCsvButton
                 rows={displayedRows.map(r => {
                   const createdAt = new Date(r.createdAt);
@@ -917,10 +1088,34 @@ export function RegistrationsPageClient({
           </div>
         </CardHeader>
         <CardBody className="p-0">
+          {(cashBookCopyMessage || cashBookCopyError) && (
+            <div
+              className={`mx-5 mb-4 rounded-xl border px-4 py-3 text-sm font-medium ${
+                cashBookCopyError
+                  ? 'border-red-200 bg-red-50 text-red-700'
+                  : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              }`}
+              role="status"
+            >
+              {cashBookCopyError || cashBookCopyMessage}
+            </div>
+          )}
           <div className="max-h-[65vh] overflow-auto">
-            <table className="min-w-[1120px] w-full border-collapse text-left table-fixed" style={{ tableLayout: 'fixed' }}>
+            <table className="min-w-[1180px] w-full border-collapse text-left table-fixed" style={{ tableLayout: 'fixed' }}>
               <thead className="sticky top-0 z-10 border-b border-ui-border bg-slate-50 shadow-sm">
                 <tr>
+                  <th className="w-[52px] min-w-[52px] px-4 py-3 text-center text-sm font-semibold text-ui-textPrimary whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      checked={allDisplayedSelected}
+                      ref={(element) => {
+                        if (element) element.indeterminate = someDisplayedSelected;
+                      }}
+                      onChange={toggleVisibleSelection}
+                      className="h-4 w-4 cursor-pointer rounded border-ui-border text-brand-blue-primary focus:ring-brand-blue-primary"
+                      aria-label="Select all visible players"
+                    />
+                  </th>
                   <th className="w-[18%] min-w-0 px-5 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">Package</th>
                   <th className="w-[15%] min-w-0 px-5 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">Player</th>
                   <th className="w-[17%] min-w-0 px-5 py-3 text-sm font-semibold text-ui-textPrimary whitespace-nowrap">Contact</th>
@@ -953,7 +1148,7 @@ export function RegistrationsPageClient({
               <tbody className="divide-y divide-ui-border">
                 {displayedRows.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-10 text-center text-sm text-ui-textMuted">
+                    <td colSpan={10} className="px-4 py-10 text-center text-sm text-ui-textMuted">
                       {loading
                         ? 'Loading registrations...'
                         : searchTerm
@@ -968,6 +1163,15 @@ export function RegistrationsPageClient({
                   const paymentStatus = getPaymentStatus(row);
                   return (
                     <tr key={row.id} className="group hover:bg-slate-50/70">
+                      <td className="px-4 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedRegistrationIds.has(row.id)}
+                          onChange={() => toggleRegistrationSelection(row.id)}
+                          className="h-4 w-4 cursor-pointer rounded border-ui-border text-brand-blue-primary focus:ring-brand-blue-primary"
+                          aria-label={`Select ${row.customerName} for cash book copy`}
+                        />
+                      </td>
                       <td className="px-5 py-3 min-w-0">
                         <span className="block truncate font-semibold text-ui-textPrimary" title={row.packageName}>{row.packageName}</span>
                       </td>

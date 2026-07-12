@@ -146,6 +146,9 @@ class _CreateRegistrationScreenState extends State<CreateRegistrationScreen> {
   @override
   Widget build(BuildContext context) {
     final bottomSpacing = MediaQuery.of(context).padding.bottom + 118;
+    final selectedPrice = _selectedPackage == null
+        ? null
+        : registrationPriceSnapshot(_selectedPackage!);
     return ListView(
       padding: EdgeInsets.fromLTRB(20, 18, 20, bottomSpacing),
       children: [
@@ -220,9 +223,9 @@ class _CreateRegistrationScreenState extends State<CreateRegistrationScreen> {
                       ),
                       DetailLine(
                         label: 'Price snapshot',
-                        value: _selectedPackage!.currentPriceJod == null
+                        value: selectedPrice == null
                             ? 'Manual pricing'
-                            : 'JOD ${_selectedPackage!.currentPriceJod!.toStringAsFixed(0)}',
+                            : 'JOD ${selectedPrice.toStringAsFixed(0)}',
                       ),
                     ],
                   ),

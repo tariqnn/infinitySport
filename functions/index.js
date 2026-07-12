@@ -25,6 +25,7 @@ const APP_NOTIFICATION_TOPIC = "infinity_portal_all";
 const APP_NOTIFICATION_CHANNEL_ID = "infinity_portal_high_priority";
 const BOOKING_NOTIFICATION_DELIVERIES = "bookingNotificationDeliveries";
 const BOOKING_NOTIFICATION_STATE = "bookingNotificationState";
+const REGISTRATION_NOTIFICATION_STATE = "registrationNotificationState";
 const COMPETITION_NOTIFICATION_STATE = "competitionNotificationState";
 
 if (!admin.apps.length) admin.initializeApp();
@@ -439,6 +440,204 @@ async function mirrorDatabaseBookingToFirestore(row) {
   );
 }
 
+function nullableInteger(value) {
+  if (value == null) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.round(parsed) : null;
+}
+
+function nullableNumber(value) {
+  if (value == null) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function timestampOrNull(value) {
+  const date = toDate(value);
+  return date ? admin.firestore.Timestamp.fromDate(date) : null;
+}
+
+function isoOrNull(value) {
+  const date = toDate(value);
+  return date ? date.toISOString() : null;
+}
+
+function isPackageRegistrationPaid(row) {
+  const finalPrice = Math.max(0, Math.round(Number(row.finalPriceJod) || 0));
+  const collected = Math.max(0, Math.round(Number(row.collected) || 0));
+  if (finalPrice <= 0) return row.isPaid === true || collected > 0;
+  return row.isPaid === true || collected >= finalPrice;
+}
+
+async function pollDatabasePackageRegistrations() {
+  const databaseUrl = DATABASE_URL_SECRET.value();
+  if (!databaseUrl) {
+    console.log("[registration-db-sync] Missing DATABASE_URL secret");
+    return;
+  }
+
+  const firestore = admin.firestore();
+  const stateRef = firestore
+    .collection(REGISTRATION_NOTIFICATION_STATE)
+    .doc("dbRegistrationPoller");
+  const now = new Date();
+  const stateSnapshot = await stateRef.get();
+  const lastCheckedAt = stateSnapshot.exists
+    ? toDate(stateSnapshot.data()?.lastCheckedAt)
+    : null;
+  const initialLookbackMs = 30 * 60 * 1000;
+  const overlapMs = 2 * 60 * 1000;
+  const since = new Date(
+    (lastCheckedAt?.getTime() ?? now.getTime() - initialLookbackMs) - overlapMs,
+  );
+
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    const result = await client.query(
+      `
+        SELECT
+          r."id",
+          r."packageName",
+          r."customerName",
+          r."customerPhone",
+          r."customerEmail",
+          r."customerAge",
+          r."sessionsLeft",
+          r."sessionsUsedOverride",
+          r."sessionsPerWeek",
+          r."nextPaymentDate",
+          r."planLabel",
+          r."isPaid",
+          r."basePriceJod",
+          r."discountType",
+          r."discountValue",
+          r."discountReason",
+          r."finalPriceJod",
+          r."durationMonths",
+          r."periodStartsAt",
+          r."periodEndsAt",
+          r."isFrozen",
+          r."frozenAt",
+          r."sessionsBonus",
+          r."status",
+          r."createdAt",
+          r."updatedAt",
+          COALESCE(
+            SUM(
+              CASE
+                WHEN rc."status" = 'ACTIVE' AND rc."voidedAt" IS NULL
+                THEN rc."amountPaid"
+                ELSE 0
+              END
+            ),
+            0
+          ) AS "collected"
+        FROM "PackageRegistration" r
+        LEFT JOIN "Receipt" rc ON rc."registrationId" = r."id"
+        WHERE (
+            r."createdAt" > $1
+            AND r."createdAt" <= $2
+          )
+          OR (
+            r."updatedAt" > $1
+            AND r."updatedAt" <= $2
+          )
+        GROUP BY r."id"
+        ORDER BY r."createdAt" ASC
+        LIMIT 200
+      `,
+      [since, now],
+    );
+
+    let mirroredCount = 0;
+    for (const row of result.rows) {
+      await mirrorDatabasePackageRegistrationToFirestore(row);
+      mirroredCount += 1;
+    }
+
+    await stateRef.set(
+      {
+        lastCheckedAt: now,
+        lastRunAt: admin.firestore.FieldValue.serverTimestamp(),
+        checkedCount: result.rows.length,
+        mirroredCount,
+      },
+      { merge: true },
+    );
+    console.log(
+      "[registration-db-sync] checked database package registrations",
+      result.rows.length,
+      "mirrored",
+      mirroredCount,
+    );
+  } finally {
+    await client.end();
+  }
+}
+
+async function mirrorDatabasePackageRegistrationToFirestore(row) {
+  const registrationId = normalizeText(row.id);
+  if (!registrationId) return;
+
+  const createdAt = toDate(row.createdAt) || new Date();
+  const updatedAt = toDate(row.updatedAt) || createdAt;
+
+  await admin
+    .firestore()
+    .collection("portalRegistrations")
+    .doc(registrationId)
+    .set(
+      {
+        id: registrationId,
+        packageName: normalizeText(row.packageName),
+        customerName: normalizeText(row.customerName),
+        customerPhone: normalizeText(row.customerPhone),
+        customerEmail: normalizeText(row.customerEmail) || null,
+        customerAge: nullableInteger(row.customerAge),
+        playerCode: null,
+        currentCycle: 1,
+        sessionsLeft: nullableInteger(row.sessionsLeft),
+        sessionsUsedOverride: nullableInteger(row.sessionsUsedOverride),
+        sessionsPerWeek: nullableInteger(row.sessionsPerWeek),
+        nextPaymentDate: timestampOrNull(row.nextPaymentDate),
+        nextPaymentDateIso: isoOrNull(row.nextPaymentDate),
+        planLabel: normalizeText(row.planLabel) || null,
+        isPaid: isPackageRegistrationPaid(row),
+        basePriceJod: Math.max(0, Math.round(Number(row.basePriceJod) || 0)),
+        discountType: normalizeText(row.discountType || "NONE"),
+        discountValue: nullableNumber(row.discountValue),
+        discountReason: normalizeText(row.discountReason) || null,
+        finalPriceJod: Math.max(0, Math.round(Number(row.finalPriceJod) || 0)),
+        durationMonths: Math.max(1, Math.round(Number(row.durationMonths) || 1)),
+        periodStartsAt: timestampOrNull(row.periodStartsAt),
+        periodStartsAtIso: isoOrNull(row.periodStartsAt),
+        periodEndsAt: timestampOrNull(row.periodEndsAt),
+        periodEndsAtIso: isoOrNull(row.periodEndsAt),
+        isFrozen: row.isFrozen === true,
+        frozenAt: timestampOrNull(row.frozenAt),
+        frozenAtIso: isoOrNull(row.frozenAt),
+        sessionsBonus: Math.max(0, Math.round(Number(row.sessionsBonus) || 0)),
+        collected: Math.max(0, Number(row.collected) || 0),
+        status: normalizeText(row.status || "ACTIVE"),
+        source: "PORTAL_DB",
+        deleted: false,
+        createdAt: admin.firestore.Timestamp.fromDate(createdAt),
+        createdAtIso: createdAt.toISOString(),
+        updatedAt: admin.firestore.Timestamp.fromDate(updatedAt),
+        updatedAtIso: updatedAt.toISOString(),
+        syncedAt: admin.firestore.FieldValue.serverTimestamp(),
+        mirroredBy: "checkDatabasePackageRegistrations",
+      },
+      { merge: true },
+    );
+
+  console.log(
+    "[registration-db-sync] mirrored package registration to portalRegistrations",
+    registrationId,
+  );
+}
+
 async function pollDatabaseCompetitionRegistrations() {
   const databaseUrl = DATABASE_URL_SECRET.value();
   if (!databaseUrl) {
@@ -736,6 +935,16 @@ exports.checkDatabaseBookingsForOwnerNotification = onSchedule(
     secrets: bookingInboxSecrets,
   },
   pollDatabaseBookingsForOwnerNotifications,
+);
+
+exports.checkDatabasePackageRegistrations = onSchedule(
+  {
+    schedule: "every 1 minutes",
+    timeZone: "Asia/Amman",
+    region: "us-central1",
+    secrets: databaseSecrets,
+  },
+  pollDatabasePackageRegistrations,
 );
 
 exports.checkDatabaseCompetitionRegistrations = onSchedule(

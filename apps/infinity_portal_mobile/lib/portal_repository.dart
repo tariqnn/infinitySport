@@ -55,6 +55,16 @@ abstract class PortalRepository {
   Future<List<CompetitionRegistrationRow>> fetchCompetitions(
       CompetitionFilters filters);
 
+  Future<List<PackageRegistrationRow>> fetchSummerCampRegistrations({
+    String search = '',
+  });
+
+  Future<List<GuestAccountRow>> fetchGuestAccounts({
+    String search = '',
+  });
+
+  Future<List<CoachRow>> fetchCoaches();
+
   Future<void> createRegistration({
     required PackageOption package,
     required String customerName,
@@ -470,6 +480,68 @@ class HttpPortalRepository implements PortalRepository {
   }
 
   @override
+  Future<List<PackageRegistrationRow>> fetchSummerCampRegistrations({
+    String search = '',
+  }) async {
+    final rows = await fetchRegistrations(RegistrationFilters.initial());
+    final term = search.trim().toLowerCase();
+    return rows.where((row) {
+      if (!isSummerCampPackageName(row.packageName)) return false;
+      if (term.isEmpty) return true;
+      final haystack = [
+        row.id,
+        row.packageName,
+        row.customerName,
+        row.customerPhone,
+        row.customerEmail ?? '',
+        row.playerCode ?? '',
+        row.planLabel ?? '',
+      ].join(' ').toLowerCase();
+      return haystack.contains(term);
+    }).toList(growable: false);
+  }
+
+  @override
+  Future<List<GuestAccountRow>> fetchGuestAccounts({
+    String search = '',
+  }) async {
+    final payload = await _request(
+      'GET',
+      '/api/portal/guest-accounts',
+      queryParameters: search.trim().isEmpty ? null : {'search': search.trim()},
+    );
+    return asJsonList(payload)
+        .map((item) => GuestAccountRow.fromJson(asJsonMap(item)))
+        .where((item) => item.email.isNotEmpty || item.displayName.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<List<CoachRow>> fetchCoaches() async {
+    dynamic payload;
+    try {
+      payload = await _request('GET', '/api/portal/landing-coaches');
+    } catch (_) {
+      final companyId = await resolveCompanyId();
+      payload = await _request(
+        'GET',
+        '/api/portal/coaches',
+        queryParameters: companyId == null || companyId.isEmpty
+            ? null
+            : {'companyId': companyId},
+      );
+    }
+    return asJsonList(payload)
+        .map((item) => CoachRow.fromJson(asJsonMap(item)))
+        .where((item) => item.name.trim().isNotEmpty)
+        .toList(growable: false)
+      ..sort((a, b) {
+        final order = a.order.compareTo(b.order);
+        return order != 0 ? order : a.name.compareTo(b.name);
+      });
+  }
+
+  @override
   Future<void> createRegistration({
     required PackageOption package,
     required String customerName,
@@ -478,6 +550,7 @@ class HttpPortalRepository implements PortalRepository {
     int? customerAge,
     DateTime? periodStartsAt,
   }) async {
+    final priceSnapshot = registrationPriceSnapshot(package);
     await _request(
       'POST',
       '/api/portal/package-registrations',
@@ -490,7 +563,7 @@ class HttpPortalRepository implements PortalRepository {
         'sessionsLeft':
             package.sessionsCount > 0 ? package.sessionsCount : null,
         'planLabel': package.name,
-        'basePriceJod': package.currentPriceJod,
+        'basePriceJod': priceSnapshot,
         'periodStartsAt': periodStartsAt?.toUtc().toIso8601String(),
       },
     );

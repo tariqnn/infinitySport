@@ -662,6 +662,108 @@ class FirebasePortalRepository implements PortalRepository {
   }
 
   @override
+  Future<List<PackageRegistrationRow>> fetchSummerCampRegistrations({
+    String search = '',
+  }) async {
+    final rows = await _loadRegistrationRows();
+    final term = search.trim().toLowerCase();
+    final filtered = rows.where((row) {
+      if (!isSummerCampPackageName(row.packageName)) return false;
+      if (term.isEmpty) return true;
+      final haystack = [
+        row.id,
+        row.packageName,
+        row.customerName,
+        row.customerPhone,
+        row.customerEmail ?? '',
+        row.playerCode ?? '',
+        row.planLabel ?? '',
+      ].join(' ').toLowerCase();
+      return haystack.contains(term);
+    }).toList(growable: false);
+    filtered.sort((a, b) {
+      final aDate = DateTime.tryParse(a.periodStartsAt ?? a.createdAt) ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      final bDate = DateTime.tryParse(b.periodStartsAt ?? b.createdAt) ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      return bDate.compareTo(aDate);
+    });
+    return filtered;
+  }
+
+  @override
+  Future<List<GuestAccountRow>> fetchGuestAccounts({
+    String search = '',
+  }) async {
+    final snapshot = await _firestore.collection('guestAccess').get();
+    final term = search.trim().toLowerCase();
+    final rows = snapshot.docs.map((doc) {
+      final data = Map<String, dynamic>.from(doc.data());
+      data['firestoreDocId'] = doc.id;
+      data['guestAccessCollection'] = 'guestAccess';
+      if (readString(data['email']).isEmpty && doc.id.contains('@')) {
+        data['email'] = doc.id;
+      }
+      return GuestAccountRow.fromJson(data);
+    }).where((row) {
+      if (row.email.isEmpty && row.displayName.isEmpty) return false;
+      if (term.isEmpty) return true;
+      return [
+        row.email,
+        row.name ?? '',
+        row.lastCourt ?? '',
+      ].join(' ').toLowerCase().contains(term);
+    }).toList(growable: false);
+
+    rows.sort((a, b) {
+      final points = b.totalPoints.compareTo(a.totalPoints);
+      return points != 0 ? points : a.displayName.compareTo(b.displayName);
+    });
+    return rows;
+  }
+
+  @override
+  Future<List<CoachRow>> fetchCoaches() async {
+    final rowsById = <String, CoachRow>{};
+
+    for (final collectionId in const [
+      'landingCoaches',
+      'portalLandingCoaches',
+      'coaches',
+    ]) {
+      final docs = await _readCollectionDocs(collectionId);
+      for (final doc in docs) {
+        final data = Map<String, dynamic>.from(doc.data());
+        data['id'] = readString(data['id'], fallback: doc.id);
+        final coach = CoachRow.fromJson(data);
+        if (coach.name.trim().isNotEmpty) rowsById[coach.id] = coach;
+      }
+    }
+
+    final userDocs = await _readCollectionDocs(
+      'users',
+      field: 'role',
+      isEqualTo: 'coach',
+    );
+    for (final doc in userDocs) {
+      final data = Map<String, dynamic>.from(doc.data());
+      data['id'] = readString(data['id'], fallback: doc.id);
+      data['status'] = readString(data['status'], fallback: 'ACTIVE');
+      final coach = CoachRow.fromJson(data);
+      if (coach.name.trim().isNotEmpty) rowsById[coach.id] = coach;
+    }
+
+    final rows = rowsById.values.toList(growable: false)
+      ..sort((a, b) {
+        final active = (b.isActive ? 1 : 0).compareTo(a.isActive ? 1 : 0);
+        if (active != 0) return active;
+        final order = a.order.compareTo(b.order);
+        return order != 0 ? order : a.name.compareTo(b.name);
+      });
+    return rows;
+  }
+
+  @override
   Future<void> createRegistration({
     required PackageOption package,
     required String customerName,
@@ -700,7 +802,7 @@ class FirebasePortalRepository implements PortalRepository {
       payload['sessionsLeft'] = package.sessionsCount;
     }
     payload['durationMonths'] = package.durationMonths;
-    final currentPriceJod = package.currentPriceJod;
+    final currentPriceJod = registrationPriceSnapshot(package);
     if (currentPriceJod != null) {
       payload['basePriceJod'] = currentPriceJod;
       payload['finalPriceJod'] = currentPriceJod;
@@ -789,6 +891,27 @@ class FirebasePortalRepository implements PortalRepository {
       throw Exception('Booking update could not be completed.');
     } on TimeoutException {
       return queuedMessage;
+    }
+  }
+
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _readCollectionDocs(
+    String collectionId, {
+    String? field,
+    Object? isEqualTo,
+  }) async {
+    try {
+      final QuerySnapshot<Map<String, dynamic>> snapshot;
+      if (field == null) {
+        snapshot = await _firestore.collection(collectionId).get();
+      } else {
+        snapshot = await _firestore
+            .collection(collectionId)
+            .where(field, isEqualTo: isEqualTo)
+            .get();
+      }
+      return snapshot.docs;
+    } catch (_) {
+      return const [];
     }
   }
 
@@ -960,16 +1083,13 @@ class FirebasePortalRepository implements PortalRepository {
     Map<String, double> courtRates,
   ) {
     final source = readString(data['source'], fallback: 'APP');
-    final usesAbsoluteTime = source.toUpperCase() == 'APP';
     final start = _readBookingTime(
       data['startTime'],
       data['startTimeIso'],
-      usesAbsoluteTime: usesAbsoluteTime,
     );
     final end = _readBookingTime(
       data['endTime'],
       data['endTimeIso'],
-      usesAbsoluteTime: usesAbsoluteTime,
     );
     if (start == null || end == null) return null;
 
@@ -1310,16 +1430,11 @@ String? _readIsoValue(dynamic value) {
 
 DateTime? _readBookingTime(
   dynamic timestampValue,
-  dynamic isoValue, {
-  required bool usesAbsoluteTime,
-}) {
-  if (usesAbsoluteTime) {
-    return (_parseAbsoluteDateTime(timestampValue) ??
-            _parseAbsoluteDateTime(isoValue))
-        ?.toLocal();
-  }
-  return _parseWallClockDateTime(timestampValue) ??
-      _parseWallClockDateTime(isoValue);
+  dynamic isoValue,
+) {
+  return (_parseAbsoluteDateTime(timestampValue) ??
+          _parseAbsoluteDateTime(isoValue))
+      ?.toLocal();
 }
 
 DateTime? _parseAbsoluteDateTime(dynamic value) {
@@ -1330,25 +1445,6 @@ DateTime? _parseAbsoluteDateTime(dynamic value) {
   final text = value.toString().trim();
   if (text.isEmpty) return null;
   return DateTime.tryParse(text);
-}
-
-DateTime? _parseWallClockDateTime(dynamic value) {
-  if (value == null) return null;
-  if (value is Timestamp) return _asWallClock(value.toDate().toUtc());
-  if (value is DateTime) return _asWallClock(value.toUtc());
-
-  final text = value.toString().trim();
-  if (text.isEmpty) return null;
-  final parsed = DateTime.tryParse(text);
-  if (parsed == null) return null;
-  return _hasTimezoneDesignator(text)
-      ? _asWallClock(parsed.toUtc())
-      : _asWallClock(parsed);
-}
-
-bool _hasTimezoneDesignator(String value) {
-  return RegExp(r'(z|[+-]\d{2}:?\d{2})$', caseSensitive: false)
-      .hasMatch(value.trim());
 }
 
 DateTime _asWallClock(DateTime date) {

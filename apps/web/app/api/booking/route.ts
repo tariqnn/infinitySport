@@ -84,12 +84,18 @@ function ensureDatabaseUrl(): boolean {
 }
 
 const courtTypeForId = (courtId: string): CourtType | null => {
+  if (courtId === 'basketball-volleyball') return 'Basketball AC';
   if (courtId === 'basketball-ac') return 'Basketball AC';
   if (courtId === 'basketball-3x3') return 'Basketball 3x3';
   if (courtId === 'padel') return 'Padel';
   if (courtId === 'volleyball') return 'Volleyball';
   return null;
 };
+
+const sharedCourtNames = (courtType: CourtType): CourtType[] =>
+  courtType === 'Basketball AC' || courtType === 'Volleyball'
+    ? ['Basketball AC', 'Volleyball']
+    : [courtType];
 
 async function syncLandingBookingToFirestore(input: {
   id: string;
@@ -146,7 +152,7 @@ function parseFirestoreDateValue(value: unknown): Date | null {
 }
 
 async function hasPendingMobileBookingOverlap(input: {
-  courtName: string;
+  courtNames: readonly string[];
   startTime: Date;
   endTime: Date;
 }) {
@@ -168,7 +174,7 @@ async function hasPendingMobileBookingOverlap(input: {
       const startTime = parseFirestoreDateValue(data.startTime ?? data.startTimeIso);
       const endTime = parseFirestoreDateValue(data.endTime ?? data.endTimeIso);
       if (!courtName || !startTime || !endTime) continue;
-      if (courtName !== input.courtName) continue;
+      if (!input.courtNames.includes(courtName)) continue;
       if (startTime.getTime() < input.endTime.getTime() && endTime.getTime() > input.startTime.getTime()) {
         return true;
       }
@@ -237,9 +243,12 @@ export async function POST(request: Request) {
 
     const courtType = courtTypeForId(courtId);
     if (courtType) {
+      const linkedCourtTypes = sharedCourtNames(courtType);
       const blockedMap = await fetchBlockedMapFromDb();
       const day = ammanWeekdayKey(String(date));
-      const fullTimes = blockedMap[day]?.[courtType] ?? [];
+      const fullTimes = linkedCourtTypes.flatMap(
+        (type) => blockedMap[day]?.[type] ?? [],
+      );
       const slotCount = Math.ceil(durationHours);
 
       for (let i = 0; i < slotCount; i += 1) {
@@ -267,7 +276,7 @@ export async function POST(request: Request) {
 
     if (courtType) {
       const pendingOverlap = await hasPendingMobileBookingOverlap({
-        courtName: courtType,
+        courtNames: sharedCourtNames(courtType),
         startTime,
         endTime,
       });
@@ -288,7 +297,7 @@ export async function POST(request: Request) {
           AND "facilityArea" = ANY($3::text[])
         LIMIT 1
         `,
-        [endTime, startTime, [courtType, courtName]],
+        [endTime, startTime, [...new Set([...sharedCourtNames(courtType), courtName])]],
       );
       if ((overlap.rowCount ?? 0) > 0) {
         return NextResponse.json(

@@ -2,17 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppPalette {
-  static const midnight = Color(0xFF07132A);
-  static const ink = Color(0xFF10213D);
-  static const cobalt = Color(0xFF003DA5);
-  static const electric = Color(0xFF235DFF);
-  static const sky = Color(0xFF6BA5E8);
+  static const midnight = Color(0xFF111827);
+  static const ink = Color(0xFF24324A);
+  static const cobalt = Color(0xFF2563EB);
+  static const electric = Color(0xFFE11D48);
+  static const sky = Color(0xFF38BDF8);
   static const mint = Color(0xFF60D066);
   static const forest = Color(0xFF1A4D3A);
-  static const paper = Color(0xFFF5F7FB);
-  static const shell = Color(0xFFEEF3FF);
+  static const amber = Color(0xFFF59E0B);
+  static const paper = Color(0xFFFFF7ED);
+  static const shell = Color(0xFFFFE4E6);
   static const card = Color(0xFFFDFEFF);
-  static const border = Color(0xFFD8E3FF);
+  static const border = Color(0xFFE5E7EB);
   static const danger = Color(0xFFD9485A);
   static const warning = Color(0xFFF0A329);
   static const success = Color(0xFF29A867);
@@ -33,20 +34,20 @@ class AppTheme {
         displaySmall: TextStyle(
           fontSize: 34,
           fontWeight: FontWeight.w700,
-          letterSpacing: -1.2,
+          letterSpacing: 0,
           color: AppPalette.midnight,
           height: 1.08,
         ),
         headlineMedium: TextStyle(
           fontSize: 24,
           fontWeight: FontWeight.w700,
-          letterSpacing: -0.7,
+          letterSpacing: 0,
           color: AppPalette.midnight,
         ),
         titleLarge: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w700,
-          letterSpacing: -0.4,
+          letterSpacing: 0,
           color: AppPalette.midnight,
         ),
         titleMedium: TextStyle(
@@ -119,12 +120,12 @@ class AppTheme {
           minimumSize: const Size(0, 54),
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(8),
           ),
           textStyle: const TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w700,
-            letterSpacing: -0.2,
+            letterSpacing: 0,
           ),
         ),
       ),
@@ -136,7 +137,7 @@ class AppTheme {
           backgroundColor: Colors.white.withValues(alpha: 0.72),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(8),
           ),
           textStyle: const TextStyle(
             fontSize: 14,
@@ -149,7 +150,7 @@ class AppTheme {
         color: Colors.white.withValues(alpha: 0.88),
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(8),
           side: const BorderSide(color: AppPalette.border),
         ),
       ),

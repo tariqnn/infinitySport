@@ -7,6 +7,16 @@ import { tr } from '../../lib/translations';
 
 type CourtType = 'Basketball AC' | 'Basketball 3x3' | 'Padel' | 'Volleyball';
 
+// Basketball AC and volleyball use the same physical court. Keep both legacy
+// storage names in availability checks while presenting one booking option.
+const SHARED_COURT_GROUPS: CourtType[][] = [
+  ['Basketball AC', 'Volleyball'],
+];
+
+const getSharedCourtTypes = (type: CourtType): CourtType[] => {
+  return SHARED_COURT_GROUPS.find((group) => group.includes(type)) ?? [type];
+};
+
 const PHONE_COUNTRIES: Array<{ value: string; label: string }> = [
   { value: '+962', label: 'Jordan (+962)' },
   { value: '+966', label: 'Saudi Arabia (+966)' },
@@ -95,8 +105,9 @@ const isBlockedSlot = (
   const court = opts.courts.find((c) => c.id === opts.courtId);
   if (!court) return false;
   const day = dayKey(opts.date);
-  const times = blocked[day]?.[court.type] ?? [];
-  return times.includes(opts.time);
+  return getSharedCourtTypes(court.type).some((type) =>
+    (blocked[day]?.[type] ?? []).includes(opts.time)
+  );
 };
 
 // Booked slots: existing (non‑cancelled) bookings; keyed by YYYY‑MM‑DD
@@ -106,8 +117,9 @@ const isBookedSlot = (
 ) => {
   const court = opts.courts.find((c) => c.id === opts.courtId);
   if (!court) return false;
-  const times = booked[opts.date]?.[court.type] ?? [];
-  return times.includes(opts.time);
+  return getSharedCourtTypes(court.type).some((type) =>
+    (booked[opts.date]?.[type] ?? []).includes(opts.time)
+  );
 };
 
 /** True if any slot in [startTime, startTime + duration] is blocked or booked. */
@@ -179,10 +191,9 @@ export function BookingForm() {
   }, [selectedDate, selectedCourt]);
 
   const COURTS: Array<{ id: string; name: string; type: CourtType }> = [
-    { id: 'basketball-ac', name: tr(language, 'booking_court_basketball'), type: 'Basketball AC' },
+    { id: 'basketball-volleyball', name: tr(language, 'booking_court_basketball_volleyball'), type: 'Basketball AC' },
     { id: 'basketball-3x3', name: tr(language, 'booking_court_basketball_3x3'), type: 'Basketball 3x3' },
     { id: 'padel', name: tr(language, 'booking_court_padel'), type: 'Padel' },
-    { id: 'volleyball', name: tr(language, 'booking_court_volleyball'), type: 'Volleyball' },
   ];
 
   // Get today's date in YYYY-MM-DD format

@@ -37,6 +37,9 @@ enum PortalNotificationDestination {
   bookings,
   registrations,
   competitions,
+  summerCamp,
+  guests,
+  coaches,
 }
 
 class PortalNotificationSelection {
@@ -52,10 +55,30 @@ class PortalNotificationSelection {
     switch (destination) {
       case PortalNotificationDestination.bookings:
         return 0;
-      case PortalNotificationDestination.registrations:
+      case PortalNotificationDestination.summerCamp:
         return 1;
-      case PortalNotificationDestination.competitions:
+      case PortalNotificationDestination.registrations:
         return 2;
+      case PortalNotificationDestination.competitions:
+        return 3;
+      case PortalNotificationDestination.guests:
+      case PortalNotificationDestination.coaches:
+        return 4;
+    }
+  }
+
+  String? get moreSection {
+    switch (destination) {
+      case PortalNotificationDestination.summerCamp:
+        return null;
+      case PortalNotificationDestination.guests:
+        return 'guests';
+      case PortalNotificationDestination.coaches:
+        return 'coaches';
+      case PortalNotificationDestination.bookings:
+      case PortalNotificationDestination.registrations:
+      case PortalNotificationDestination.competitions:
+        return null;
     }
   }
 
@@ -72,6 +95,12 @@ class PortalNotificationSelection {
         return 'New registration';
       case PortalNotificationDestination.competitions:
         return 'New competition registration';
+      case PortalNotificationDestination.summerCamp:
+        return 'New summer camp registration';
+      case PortalNotificationDestination.guests:
+        return 'Guest account updated';
+      case PortalNotificationDestination.coaches:
+        return 'Coach update';
     }
   }
 
@@ -83,6 +112,12 @@ class PortalNotificationSelection {
         return 'A new player registration was added to Infinity Portal.';
       case PortalNotificationDestination.competitions:
         return 'A new competition registration was added to Infinity Portal.';
+      case PortalNotificationDestination.summerCamp:
+        return 'A summer camp signup was added to Infinity Portal.';
+      case PortalNotificationDestination.guests:
+        return 'A guest account needs attention in Infinity Portal.';
+      case PortalNotificationDestination.coaches:
+        return 'A coach profile was updated in Infinity Portal.';
     }
   }
 
@@ -107,6 +142,27 @@ class PortalNotificationSelection {
       return PortalNotificationSelection(
         destination: PortalNotificationDestination.competitions,
         entityId: _nullableValue(data['competitionRegistrationId']),
+      );
+    }
+    if (type == 'SUMMER_CAMP_REGISTRATION_CREATED' ||
+        _normalizeValue(data['summerCampRegistrationId']).isNotEmpty) {
+      return PortalNotificationSelection(
+        destination: PortalNotificationDestination.summerCamp,
+        entityId: _nullableValue(data['summerCampRegistrationId']),
+      );
+    }
+    if (type == 'GUEST_ACCOUNT_UPDATED' ||
+        _normalizeValue(data['guestEmail']).isNotEmpty) {
+      return PortalNotificationSelection(
+        destination: PortalNotificationDestination.guests,
+        entityId: _nullableValue(data['guestEmail']),
+      );
+    }
+    if (type == 'COACH_UPDATED' ||
+        _normalizeValue(data['coachId']).isNotEmpty) {
+      return PortalNotificationSelection(
+        destination: PortalNotificationDestination.coaches,
+        entityId: _nullableValue(data['coachId']),
       );
     }
     return null;
@@ -134,6 +190,22 @@ class PortalNotificationSelection {
         case 'COMPETITIONS':
           return PortalNotificationSelection(
             destination: PortalNotificationDestination.competitions,
+            entityId: _nullableValue(decoded['entityId']),
+          );
+        case 'SUMMERCAMP':
+        case 'SUMMER_CAMP':
+          return PortalNotificationSelection(
+            destination: PortalNotificationDestination.summerCamp,
+            entityId: _nullableValue(decoded['entityId']),
+          );
+        case 'GUESTS':
+          return PortalNotificationSelection(
+            destination: PortalNotificationDestination.guests,
+            entityId: _nullableValue(decoded['entityId']),
+          );
+        case 'COACHES':
+          return PortalNotificationSelection(
+            destination: PortalNotificationDestination.coaches,
             entityId: _nullableValue(decoded['entityId']),
           );
       }

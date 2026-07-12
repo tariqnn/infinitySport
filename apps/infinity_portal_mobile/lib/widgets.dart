@@ -15,77 +15,16 @@ class PortalBackground extends StatelessWidget {
     return DecoratedBox(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
           colors: [
-            Color(0xFFF3F7FF),
-            Color(0xFFF8FBFF),
-            Color(0xFFFDFEFF),
+            Color(0xFFFFFBF7),
+            Color(0xFFF8FAFC),
+            Color(0xFFFFF1F2),
           ],
         ),
       ),
-      child: Stack(
-        children: [
-          Positioned(
-            top: -90,
-            left: -40,
-            child: _GlowOrb(
-              diameter: 220,
-              colors: [
-                AppPalette.sky.withValues(alpha: 0.38),
-                AppPalette.electric.withValues(alpha: 0.04),
-              ],
-            ),
-          ),
-          Positioned(
-            top: 160,
-            right: -60,
-            child: _GlowOrb(
-              diameter: 210,
-              colors: [
-                AppPalette.mint.withValues(alpha: 0.16),
-                Colors.white.withValues(alpha: 0.02),
-              ],
-            ),
-          ),
-          Positioned(
-            bottom: -90,
-            left: -20,
-            child: _GlowOrb(
-              diameter: 260,
-              colors: [
-                AppPalette.shell.withValues(alpha: 0.85),
-                Colors.white.withValues(alpha: 0.02),
-              ],
-            ),
-          ),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class _GlowOrb extends StatelessWidget {
-  const _GlowOrb({
-    required this.diameter,
-    required this.colors,
-  });
-
-  final double diameter;
-  final List<Color> colors;
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Container(
-        width: diameter,
-        height: diameter,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(colors: colors),
-        ),
-      ),
+      child: child,
     );
   }
 }
@@ -105,7 +44,7 @@ class GlassCard extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.84),
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppPalette.border),
         boxShadow: const [
           BoxShadow(
@@ -152,7 +91,7 @@ class MetricCard extends StatelessWidget {
             height: 40,
             decoration: BoxDecoration(
               color: tint.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, color: tint),
           ),
@@ -210,7 +149,7 @@ class StatusBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         label,
@@ -252,7 +191,7 @@ class EmptyStateView extends StatelessWidget {
             height: 56,
             decoration: BoxDecoration(
               color: AppPalette.shell,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, color: AppPalette.cobalt, size: 28),
           ),

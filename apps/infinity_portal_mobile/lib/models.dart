@@ -40,6 +40,30 @@ bool readBool(dynamic value) {
   return text == 'true' || text == '1';
 }
 
+const List<String> summerCampPackageNames = [
+  'Basketball Summer Camp',
+  'Volleyball Summer Camp',
+  'Warriors Assistant Coach 1-Week Summer Camp',
+];
+
+const double kManualRegistrationPriceJod = 130;
+
+bool isSummerCampPackageName(String value) {
+  final normalized = value.trim().toLowerCase();
+  return summerCampPackageNames
+      .map((item) => item.toLowerCase())
+      .contains(normalized);
+}
+
+double? registrationPriceSnapshot(PackageOption package) {
+  if (package.currentPriceJod != null) return package.currentPriceJod;
+  if (package.pricingType.trim().toUpperCase() == 'MANUAL' ||
+      isSummerCampPackageName(package.name)) {
+    return kManualRegistrationPriceJod;
+  }
+  return null;
+}
+
 String localDateInput(DateTime date) {
   final local = date.toLocal();
   final year = local.year.toString().padLeft(4, '0');
@@ -972,4 +996,152 @@ class CompetitionRegistrationRow {
           .map((item) => item.trim())
           .where((item) => item.isNotEmpty)
           .toList(growable: false);
+}
+
+class GuestAccountRow {
+  const GuestAccountRow({
+    required this.email,
+    required this.firestoreDocId,
+    required this.guestAccessCollection,
+    required this.name,
+    required this.bookingsCount,
+    required this.lastBookingAt,
+    required this.lastCourt,
+    required this.rewardPoints,
+    required this.manualPoints,
+    required this.totalPoints,
+    required this.linkedPlayersCount,
+    required this.parentUid,
+    required this.hasGuestAccess,
+  });
+
+  factory GuestAccountRow.fromJson(JsonMap json) {
+    final rewardPoints =
+        readDouble(json['rewardPoints'] ?? json['bookingPointsBalance']);
+    final manualPoints =
+        readDouble(json['manualPoints'] ?? json['manualPointsBalance']);
+    final explicitTotal = json['totalPoints'] ?? json['pointsBalance'];
+    return GuestAccountRow(
+      email: readString(
+        json['email'] ??
+            json['Email'] ??
+            json['userEmail'] ??
+            json['contactEmail'] ??
+            json['customerEmail'],
+      ),
+      firestoreDocId: readNullableString(json['firestoreDocId']),
+      guestAccessCollection: readNullableString(json['guestAccessCollection']),
+      name: readNullableString(
+        json['name'] ??
+            json['Name'] ??
+            json['displayName'] ??
+            json['fullName'] ??
+            json['customerName'],
+      ),
+      bookingsCount: readInt(
+          json['bookingsCount'] ?? json['bookingCount'] ?? json['bookings']),
+      lastBookingAt:
+          readNullableString(json['lastBookingAt'] ?? json['lastBookedAt']),
+      lastCourt: readNullableString(json['lastCourt'] ?? json['lastCourtName']),
+      rewardPoints: rewardPoints.round(),
+      manualPoints: manualPoints.round(),
+      totalPoints: explicitTotal == null
+          ? (rewardPoints + manualPoints).round()
+          : readDouble(explicitTotal).round(),
+      linkedPlayersCount: _readLinkedPlayersCount(json),
+      parentUid: readNullableString(json['parentUid']),
+      hasGuestAccess: json['hasGuestAccess'] == null
+          ? true
+          : readBool(json['hasGuestAccess']),
+    );
+  }
+
+  final String email;
+  final String? firestoreDocId;
+  final String? guestAccessCollection;
+  final String? name;
+  final int bookingsCount;
+  final String? lastBookingAt;
+  final String? lastCourt;
+  final int rewardPoints;
+  final int manualPoints;
+  final int totalPoints;
+  final int linkedPlayersCount;
+  final String? parentUid;
+  final bool hasGuestAccess;
+
+  String get displayName {
+    final value = name?.trim() ?? '';
+    if (value.isNotEmpty) return value;
+    return email.isEmpty ? 'Guest account' : email;
+  }
+}
+
+class CoachRow {
+  const CoachRow({
+    required this.id,
+    required this.name,
+    required this.sport,
+    required this.description,
+    required this.quote,
+    required this.achievements,
+    required this.email,
+    required this.phone,
+    required this.status,
+    required this.isActive,
+    required this.order,
+  });
+
+  factory CoachRow.fromJson(JsonMap json) {
+    final firstName = readString(json['firstName']);
+    final lastName = readString(json['lastName']);
+    final name = readString(
+      json['name'] ??
+          json['displayName'] ??
+          [firstName, lastName].where((item) => item.isNotEmpty).join(' '),
+      fallback: 'Coach',
+    );
+    final status = readString(json['status'], fallback: 'ACTIVE');
+    return CoachRow(
+      id: readString(json['id']),
+      name: name,
+      sport: readString(
+        json['sport'] ?? json['specialty'] ?? json['role'],
+        fallback: 'Coach',
+      ),
+      description: readString(json['description'] ?? json['bio'], fallback: ''),
+      quote: readNullableString(json['quote']),
+      achievements: asJsonList(json['achievements'])
+          .map(readString)
+          .where((item) => item.isNotEmpty)
+          .toList(growable: false),
+      email: readNullableString(json['email']),
+      phone: readNullableString(json['phone']),
+      status: status,
+      isActive: json['isActive'] == null
+          ? status.toUpperCase() != 'INACTIVE'
+          : readBool(json['isActive']),
+      order: readInt(json['order'] ?? json['sortOrder']),
+    );
+  }
+
+  final String id;
+  final String name;
+  final String sport;
+  final String description;
+  final String? quote;
+  final List<String> achievements;
+  final String? email;
+  final String? phone;
+  final String status;
+  final bool isActive;
+  final int order;
+}
+
+int _readLinkedPlayersCount(JsonMap json) {
+  final explicit = json['linkedPlayersCount'];
+  if (explicit != null) return readInt(explicit);
+  final players = json['players'] ?? json['linkedPlayers'] ?? json['playerIds'];
+  if (players is List) return players.length;
+  return 0;
 }

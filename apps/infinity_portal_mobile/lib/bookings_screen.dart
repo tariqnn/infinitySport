@@ -105,6 +105,15 @@ class _BookingsScreenState extends State<BookingsScreen> {
     unawaited(_loadOverview());
   }
 
+  void _changeCourtCategory(String value) {
+    final court = value == 'ALL' ? '' : value;
+    if (court == _filters.court) return;
+    setState(() {
+      _filters = _filters.copyWith(court: court);
+    });
+    unawaited(_loadOverview());
+  }
+
   Future<void> _openFiltersSheet() async {
     final result = await showModalBottomSheet<BookingFilters>(
       context: context,
@@ -176,6 +185,13 @@ class _BookingsScreenState extends State<BookingsScreen> {
         .toList();
     labels.sort();
     return ['ALL', ...labels];
+  }
+
+  List<String> get _bookingCategoryOptions {
+    final courts = _courtOptions
+        .where((item) => item != 'ALL' && item.trim().isNotEmpty)
+        .toList(growable: false);
+    return ['ALL', ...courts];
   }
 
   @override
@@ -265,6 +281,31 @@ class _BookingsScreenState extends State<BookingsScreen> {
                       ? 'Filters'
                       : 'Filters (${_filters.activeFilterCount})'),
                 ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final category in _bookingCategoryOptions)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: ChoiceChip(
+                      label: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 170),
+                        child: Text(
+                          category == 'ALL' ? 'All categories' : category,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      selected: category == 'ALL'
+                          ? _filters.court.isEmpty
+                          : _filters.court == category,
+                      onSelected: (_) => _changeCourtCategory(category),
+                    ),
+                  ),
               ],
             ),
           ),

@@ -4,8 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'bookings_screen.dart';
 import 'competitions_screen.dart';
-import 'create_booking_screen.dart';
-import 'create_registration_screen.dart';
+import 'more_screen.dart';
 import 'notifications.dart';
 import 'portal_repository.dart';
 import 'registrations_screen.dart';
@@ -25,6 +24,7 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+  String? _moreSection;
   StreamSubscription<PortalNotificationSelection>? _notificationSubscription;
 
   @override
@@ -35,12 +35,16 @@ class _HomeShellState extends State<HomeShell> {
         PortalNotifications.instance.consumePendingSelection();
     if (pendingSelection != null) {
       _index = pendingSelection.tabIndex;
+      _moreSection = pendingSelection.moreSection;
     }
 
     _notificationSubscription =
         PortalNotifications.instance.selections.listen((selection) {
-      if (!mounted || selection.tabIndex == _index) return;
-      setState(() => _index = selection.tabIndex);
+      if (!mounted) return;
+      setState(() {
+        _index = selection.tabIndex;
+        _moreSection = selection.moreSection;
+      });
     });
   }
 
@@ -54,10 +58,20 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     final pages = [
       BookingsScreen(repository: widget.repository),
+      SummerCampScreen(repository: widget.repository),
       RegistrationsScreen(repository: widget.repository),
       CompetitionsScreen(repository: widget.repository),
-      CreateBookingScreen(repository: widget.repository),
-      CreateRegistrationScreen(repository: widget.repository),
+      MoreScreen(
+        repository: widget.repository,
+        initialSection: _moreSection,
+        onSectionHandled: () {
+          if (mounted) {
+            setState(() {
+              _moreSection = null;
+            });
+          }
+        },
+      ),
     ];
 
     return Scaffold(
@@ -65,9 +79,27 @@ class _HomeShellState extends State<HomeShell> {
       body: PortalBackground(
         child: SafeArea(
           bottom: false,
-          child: IndexedStack(
-            index: _index,
-            children: pages,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 260),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) {
+              final offsetAnimation = Tween<Offset>(
+                begin: const Offset(0.04, 0),
+                end: Offset.zero,
+              ).animate(animation);
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: offsetAnimation,
+                  child: child,
+                ),
+              );
+            },
+            child: KeyedSubtree(
+              key: ValueKey<int>(_index),
+              child: pages[_index],
+            ),
           ),
         ),
       ),
@@ -98,6 +130,11 @@ class _HomeShellState extends State<HomeShell> {
                   label: 'Bookings',
                 ),
                 NavigationDestination(
+                  icon: Icon(Icons.wb_sunny_outlined),
+                  selectedIcon: Icon(Icons.wb_sunny_rounded),
+                  label: 'Summer',
+                ),
+                NavigationDestination(
                   icon: Icon(Icons.groups_2_outlined),
                   selectedIcon: Icon(Icons.groups_2),
                   label: 'Registrations',
@@ -108,14 +145,9 @@ class _HomeShellState extends State<HomeShell> {
                   label: 'Competitions',
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.add_box_outlined),
-                  selectedIcon: Icon(Icons.add_box),
-                  label: 'New Booking',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.app_registration_outlined),
-                  selectedIcon: Icon(Icons.app_registration),
-                  label: 'Enroll',
+                  icon: Icon(Icons.more_horiz_rounded),
+                  selectedIcon: Icon(Icons.more_rounded),
+                  label: 'More',
                 ),
               ],
             ),

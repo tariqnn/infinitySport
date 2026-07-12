@@ -29,6 +29,7 @@ class _RegistrationsScreenState extends State<RegistrationsScreen> {
   Timer? _searchDebounce;
   bool _loading = true;
   String? _error;
+  String _categoryFilter = 'ALL';
 
   @override
   void initState() {
@@ -128,6 +129,9 @@ class _RegistrationsScreenState extends State<RegistrationsScreen> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final bottomSpacing = MediaQuery.of(context).padding.bottom + 118;
+    final visibleRows = _filteredRows;
+    final visiblePackages = _filteredPackages;
+    final visibleTotals = _totalsForRows(visibleRows);
 
     return RefreshIndicator.adaptive(
       onRefresh: _loadRegistrations,
@@ -153,6 +157,10 @@ class _RegistrationsScreenState extends State<RegistrationsScreen> {
                   spacing: 10,
                   runSpacing: 10,
                   children: [
+                    _RegistrationPill(
+                      icon: Icons.category_rounded,
+                      label: _categoryLabel(_categoryFilter),
+                    ),
                     _RegistrationPill(
                       icon: Icons.sports_basketball_rounded,
                       label: _filters.packageName.isEmpty
@@ -231,6 +239,29 @@ class _RegistrationsScreenState extends State<RegistrationsScreen> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
+                for (final category in _registrationCategories)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: ChoiceChip(
+                      label: Text(_categoryLabel(category)),
+                      selected: _categoryFilter == category,
+                      onSelected: (_) {
+                        setState(() {
+                          _categoryFilter = category;
+                          _filters = _filters.copyWith(packageName: '');
+                        });
+                        unawaited(_loadRegistrations());
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
                 Padding(
                   padding: const EdgeInsets.only(right: 10),
                   child: ChoiceChip(
@@ -244,7 +275,7 @@ class _RegistrationsScreenState extends State<RegistrationsScreen> {
                     },
                   ),
                 ),
-                for (final package in _packages)
+                for (final package in visiblePackages)
                   Padding(
                     padding: const EdgeInsets.only(right: 10),
                     child: ChoiceChip(
@@ -278,7 +309,7 @@ class _RegistrationsScreenState extends State<RegistrationsScreen> {
                   width: 168,
                   child: MetricCard(
                     label: 'Registered',
-                    value: '${_totals?.totalRegistered ?? 0}',
+                    value: '${visibleTotals.totalRegistered}',
                     icon: Icons.groups_rounded,
                     tint: AppPalette.cobalt,
                     subtle: 'Rows in current selection',
@@ -289,10 +320,10 @@ class _RegistrationsScreenState extends State<RegistrationsScreen> {
                   width: 168,
                   child: MetricCard(
                     label: 'Collected',
-                    value: _registrationMoney(_totals?.collectedTotal ?? 0),
+                    value: _registrationMoney(visibleTotals.collectedTotal),
                     icon: Icons.account_balance_wallet_rounded,
                     tint: AppPalette.success,
-                    subtle: '${_totals?.paidCount ?? 0} fully paid',
+                    subtle: '${visibleTotals.paidCount} fully paid',
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -300,11 +331,11 @@ class _RegistrationsScreenState extends State<RegistrationsScreen> {
                   width: 168,
                   child: MetricCard(
                     label: 'Remaining',
-                    value: _registrationMoney(_totals?.remainingTotal ?? 0),
+                    value: _registrationMoney(visibleTotals.remainingTotal),
                     icon: Icons.timelapse_rounded,
                     tint: AppPalette.warning,
                     subtle:
-                        '${_totals?.partialCount ?? 0} partial / ${_totals?.unpaidCount ?? 0} unpaid',
+                        '${visibleTotals.partialCount} partial / ${visibleTotals.unpaidCount} unpaid',
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -312,7 +343,7 @@ class _RegistrationsScreenState extends State<RegistrationsScreen> {
                   width: 168,
                   child: MetricCard(
                     label: 'Expected',
-                    value: _registrationMoney(_totals?.expectedTotal ?? 0),
+                    value: _registrationMoney(visibleTotals.expectedTotal),
                     icon: Icons.pie_chart_rounded,
                     tint: AppPalette.electric,
                     subtle: 'Live package total',
@@ -333,18 +364,17 @@ class _RegistrationsScreenState extends State<RegistrationsScreen> {
               onAction: () => unawaited(_loadRegistrations()),
             )
           else
-            _buildRegistrationsList(),
+            _buildRegistrationsList(visibleRows),
         ],
       ),
     );
   }
 
-  Widget _buildRegistrationsList() {
-    if (_rows.isEmpty) {
+  Widget _buildRegistrationsList(List<PackageRegistrationRow> rows) {
+    if (rows.isEmpty) {
       return EmptyStateView(
         title: 'No registrations matched',
-        message:
-            'Try a different package or wider date window to surface active registrations.',
+        message: 'Try a different category, package, or wider date window.',
         icon: Icons.app_registration_rounded,
         actionLabel: 'Clear search',
         onAction: () {
@@ -355,16 +385,90 @@ class _RegistrationsScreenState extends State<RegistrationsScreen> {
 
     return Column(
       children: [
-        for (var index = 0; index < _rows.length; index++) ...[
+        for (var index = 0; index < rows.length; index++) ...[
           _RegistrationCard(
-            row: _rows[index],
-            remainingSummary:
-                _remainingSummary(_rows[index], _canceledSessions),
-            onTap: () => _showRegistrationDetails(_rows[index]),
+            row: rows[index],
+            remainingSummary: _remainingSummary(rows[index], _canceledSessions),
+            onTap: () => _showRegistrationDetails(rows[index]),
           ),
-          if (index != _rows.length - 1) const SizedBox(height: 12),
+          if (index != rows.length - 1) const SizedBox(height: 12),
         ],
       ],
+    );
+  }
+
+  List<PackageRegistrationRow> get _filteredRows {
+    if (_categoryFilter == 'ALL') return _rows;
+    return _rows
+        .where((row) => _packageNameMatchesCategory(row.packageName))
+        .toList(growable: false);
+  }
+
+  List<PackageOption> get _filteredPackages {
+    if (_categoryFilter == 'ALL') return _packages;
+    return _packages.where(_packageMatchesCategory).toList(growable: false);
+  }
+
+  bool _packageMatchesCategory(PackageOption package) {
+    if (_categoryFilter == 'SUMMER_CAMP') {
+      return isSummerCampPackageName(package.name);
+    }
+    if (isSummerCampPackageName(package.name)) return false;
+    final sportType = package.sportType.trim().toUpperCase();
+    final packageName = package.name.trim().toUpperCase();
+    return sportType == _categoryFilter ||
+        packageName.contains(_categoryFilter);
+  }
+
+  bool _packageNameMatchesCategory(String packageName) {
+    if (_categoryFilter == 'SUMMER_CAMP') {
+      return isSummerCampPackageName(packageName);
+    }
+    if (isSummerCampPackageName(packageName)) return false;
+    return packageName.trim().toUpperCase().contains(_categoryFilter);
+  }
+
+  _VisibleRegistrationTotals _totalsForRows(List<PackageRegistrationRow> rows) {
+    if (_categoryFilter == 'ALL') {
+      final totals = _totals;
+      if (totals != null) {
+        return _VisibleRegistrationTotals(
+          totalRegistered: totals.totalRegistered,
+          paidCount: totals.paidCount,
+          partialCount: totals.partialCount,
+          unpaidCount: totals.unpaidCount,
+          expectedTotal: totals.expectedTotal,
+          collectedTotal: totals.collectedTotal,
+          remainingTotal: totals.remainingTotal,
+        );
+      }
+    }
+
+    var paid = 0;
+    var partial = 0;
+    var unpaid = 0;
+    var expected = 0.0;
+    var collected = 0.0;
+    for (final row in rows) {
+      expected += row.finalPriceJod;
+      collected += row.collected;
+      if (row.isPaid && row.finalPriceJod > 0) {
+        paid += 1;
+      } else if (row.collected > 0) {
+        partial += 1;
+      } else {
+        unpaid += 1;
+      }
+    }
+
+    return _VisibleRegistrationTotals(
+      totalRegistered: rows.length,
+      paidCount: paid,
+      partialCount: partial,
+      unpaidCount: unpaid,
+      expectedTotal: expected,
+      collectedTotal: collected,
+      remainingTotal: (expected - collected).clamp(0, 999999).toDouble(),
     );
   }
 
@@ -802,6 +906,26 @@ class _RegistrationFiltersSheetState extends State<_RegistrationFiltersSheet> {
   }
 }
 
+class _VisibleRegistrationTotals {
+  const _VisibleRegistrationTotals({
+    required this.totalRegistered,
+    required this.paidCount,
+    required this.partialCount,
+    required this.unpaidCount,
+    required this.expectedTotal,
+    required this.collectedTotal,
+    required this.remainingTotal,
+  });
+
+  final int totalRegistered;
+  final int paidCount;
+  final int partialCount;
+  final int unpaidCount;
+  final double expectedTotal;
+  final double collectedTotal;
+  final double remainingTotal;
+}
+
 class _RemainingSummary {
   const _RemainingSummary({
     required this.primary,
@@ -996,6 +1120,31 @@ Color _paymentStatusColor(String label) {
       return AppPalette.warning;
     default:
       return AppPalette.danger;
+  }
+}
+
+const List<String> _registrationCategories = [
+  'ALL',
+  'BASKETBALL',
+  'GYMNASTICS',
+  'VOLLEYBALL',
+  'SUMMER_CAMP',
+];
+
+String _categoryLabel(String value) {
+  switch (value) {
+    case 'ALL':
+      return 'All categories';
+    case 'BASKETBALL':
+      return 'Basketball';
+    case 'GYMNASTICS':
+      return 'Gymnastics';
+    case 'VOLLEYBALL':
+      return 'Volleyball';
+    case 'SUMMER_CAMP':
+      return 'Summer Camp';
+    default:
+      return value;
   }
 }
 

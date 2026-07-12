@@ -21,6 +21,10 @@ void main() {
       findsOneWidget,
     );
     expect(
+      find.descendant(of: navigationBar, matching: find.text('Summer')),
+      findsOneWidget,
+    );
+    expect(
       find.descendant(of: navigationBar, matching: find.text('Registrations')),
       findsOneWidget,
     );
@@ -29,11 +33,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.descendant(of: navigationBar, matching: find.text('New Booking')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: navigationBar, matching: find.text('Enroll')),
+      find.descendant(of: navigationBar, matching: find.text('More')),
       findsOneWidget,
     );
   });
@@ -156,6 +156,23 @@ class _FakePortalRepository implements PortalRepository {
   @override
   Future<List<CompetitionRegistrationRow>> fetchCompetitions(
       CompetitionFilters filters) async {
+    return const [];
+  }
+
+  @override
+  Future<List<CoachRow>> fetchCoaches() async {
+    return const [];
+  }
+
+  @override
+  Future<List<GuestAccountRow>> fetchGuestAccounts({String search = ''}) async {
+    return const [];
+  }
+
+  @override
+  Future<List<PackageRegistrationRow>> fetchSummerCampRegistrations({
+    String search = '',
+  }) async {
     return const [];
   }
 

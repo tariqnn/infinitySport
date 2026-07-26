@@ -62,6 +62,7 @@ import {
   stampSessionAdjustmentCycle,
   updateRegistrationCurrentCycle,
 } from "../../../../lib/registrationLifecycle";
+import { sendRegistrationWhatsAppBroadcast } from "../../../../lib/registrationWhatsApp";
 import crypto from "crypto";
 
 const ACTIVE_RECEIPT_WHERE = {
@@ -4483,6 +4484,90 @@ async function listPackageRegistrations(request: NextRequest) {
   });
 
   return NextResponse.json(await serializeRegistrationRows(rows));
+}
+
+async function sendPackageRegistrationWhatsApp(request: NextRequest) {
+  const body = (await request.json()) as {
+    audienceType?: string;
+    registrationIds?: unknown;
+    packageName?: unknown;
+    message?: unknown;
+  };
+  const audienceType = normalizeText(body.audienceType).toLowerCase();
+  const message = normalizeText(body.message);
+
+  if (!message) return jsonError("Message is required.");
+  if (message.length > 1600) {
+    return jsonError("Message must be 1600 characters or fewer.");
+  }
+
+  const select = {
+    id: true,
+    customerName: true,
+    customerPhone: true,
+    packageName: true,
+  } as const;
+
+  let registrations: Array<{
+    id: string;
+    customerName: string;
+    customerPhone: string;
+    packageName: string;
+  }> = [];
+
+  if (audienceType === "selected") {
+    const registrationIds = Array.isArray(body.registrationIds)
+      ? Array.from(
+          new Set(
+            body.registrationIds
+              .map((value) => normalizeText(value))
+              .filter(Boolean),
+          ),
+        )
+      : [];
+    if (!registrationIds.length) {
+      return jsonError("Select at least one player.");
+    }
+    if (registrationIds.length > 500) {
+      return jsonError("A maximum of 500 players can be messaged at once.");
+    }
+    registrations = await prisma.packageRegistration.findMany({
+      where: { id: { in: registrationIds } },
+      select,
+      orderBy: { createdAt: "desc" },
+    });
+  } else if (audienceType === "package") {
+    const packageName = normalizeText(body.packageName);
+    if (!packageName) return jsonError("Package name is required.");
+    const expandedPackageNames = expandPackageNameAliases([packageName]);
+    registrations = await prisma.packageRegistration.findMany({
+      where: {
+        packageName:
+          expandedPackageNames.length > 1
+            ? { in: expandedPackageNames }
+            : expandedPackageNames[0] || packageName,
+        status: "ACTIVE",
+      },
+      select,
+      orderBy: { createdAt: "desc" },
+    });
+  } else {
+    return jsonError("Choose selected players or an entire package.");
+  }
+
+  if (!registrations.length) {
+    return jsonError("No matching player registrations were found.", 404);
+  }
+
+  try {
+    const result = await sendRegistrationWhatsAppBroadcast(
+      registrations,
+      message,
+    );
+    return NextResponse.json(result);
+  } catch (error) {
+    return jsonError(getErrorMessage(error), 502);
+  }
 }
 
 async function getRegistrationTotals(request: NextRequest) {
@@ -8911,6 +8996,10 @@ async function dispatchPost(request: NextRequest, params: Params) {
 
   if (resource === "package-registrations" && id === "old-import") {
     return importOldPackageRegistrations(request);
+  }
+
+  if (resource === "package-registrations" && id === "whatsapp") {
+    return sendPackageRegistrationWhatsApp(request);
   }
 
   if (resource === "packages" && !id) {

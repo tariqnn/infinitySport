@@ -13,7 +13,7 @@ import {
 } from '../../lib/portalApi';
 import { ExportCsvButton } from '../_components/ActionButtons';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { PlusCircleIcon, EllipsisVerticalIcon, ArrowPathIcon, ClipboardDocumentListIcon, BanknotesIcon } from '@heroicons/react/24/outline';
+import { PlusCircleIcon, EllipsisVerticalIcon, ArrowPathIcon, ClipboardDocumentListIcon, BanknotesIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 import { MarkAsPaidModal } from './_components/MarkAsPaidModal';
 import { ViewReceiptsModal } from './_components/ViewReceiptsModal';
 import { BulkAddPeopleModal } from './_components/BulkAddPeopleModal';
@@ -32,6 +32,7 @@ import { CreateTrackerAccountModal } from './_components/CreateTrackerAccountMod
 import { CreatePlayerAccountModal } from './_components/CreatePlayerAccountModal';
 import { ManagePackageSessionsModal } from './_components/ManagePackageSessionsModal';
 import { OldRegistrationImportModal } from './_components/OldRegistrationImportModal';
+import { BulkWhatsAppModal } from './_components/BulkWhatsAppModal';
 
 type Registration = PackageRegistrationRow;
 type SortKey = 'registered' | 'remaining';
@@ -129,6 +130,7 @@ export function RegistrationsPageClient({
   const [sendingToCashBook, setSendingToCashBook] = useState(false);
   const [cashBookCopyMessage, setCashBookCopyMessage] = useState<string | null>(null);
   const [cashBookCopyError, setCashBookCopyError] = useState<string | null>(null);
+  const [whatsAppModalOpen, setWhatsAppModalOpen] = useState(false);
 
   /**
    * Package schedule catalog.
@@ -756,14 +758,18 @@ export function RegistrationsPageClient({
   }
 
   // Package list: from API when available, else from rows (so filter dropdown and modals have full list)
-  const packageOpts = Array.from(
-    new Set([
-      ...apiPackages.map((p) => p.name),
-      ...rows.map((r) => r.packageName),
-      fixedPackageName || packageFilter,
-      ...includedPackageNames,
-    ].filter((value): value is string => Boolean(value))),
-  ).sort();
+  const packageOpts = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...apiPackages.map((p) => p.name),
+          ...rows.map((r) => r.packageName),
+          fixedPackageName || packageFilter,
+          ...includedPackageNames,
+        ].filter((value): value is string => Boolean(value))),
+      ).sort(),
+    [apiPackages, fixedPackageName, includedPackageNames, packageFilter, rows],
+  );
   // Default price per package (from Package.currentPriceJod) for modals
   const defaultPricesByPackage: Record<string, number> = Object.fromEntries(
     apiPackages.filter((p) => p.currentPriceJod != null).map((p) => [p.name, p.currentPriceJod as number]),
@@ -946,6 +952,14 @@ export function RegistrationsPageClient({
               <Button variant="primary" onClick={() => setBulkAddOpen(true)} className="inline-flex items-center gap-1">
                 <PlusCircleIcon className="h-4 w-4" />
                 Bulk add players
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setWhatsAppModalOpen(true)}
+                leadingIcon={<ChatBubbleLeftRightIcon className="h-4 w-4" />}
+                className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+              >
+                Message players{selectedCount ? ` (${selectedCount} selected)` : ''}
               </Button>
               <Button
                 variant="secondary"
@@ -1169,7 +1183,7 @@ export function RegistrationsPageClient({
                           checked={selectedRegistrationIds.has(row.id)}
                           onChange={() => toggleRegistrationSelection(row.id)}
                           className="h-4 w-4 cursor-pointer rounded border-ui-border text-brand-blue-primary focus:ring-brand-blue-primary"
-                          aria-label={`Select ${row.customerName} for cash book copy`}
+                          aria-label={`Select ${row.customerName} for bulk actions`}
                         />
                       </td>
                       <td className="px-5 py-3 min-w-0">
@@ -1597,6 +1611,15 @@ export function RegistrationsPageClient({
         open={!!playerAccountRegistration}
         onClose={() => setPlayerAccountRegistration(null)}
         registration={playerAccountRegistration}
+      />
+
+      <BulkWhatsAppModal
+        open={whatsAppModalOpen}
+        onClose={() => setWhatsAppModalOpen(false)}
+        rows={rows}
+        selectedRegistrationIds={selectedRegistrationIds}
+        packageOptions={packageOpts}
+        defaultPackageName={fixedPackageName || packageFilter || packageOpts[0]}
       />
 
       {bulkCreatedCount != null && bulkCreatedCount > 0 && (

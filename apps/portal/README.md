@@ -18,6 +18,24 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## WhatsApp registration broadcasts
+
+The Registrations page can send one WhatsApp message to manually selected
+players or every active player in a package. Configure these server-side
+environment variables for the Portal app:
+
+```bash
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=your_auth_token
+TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
+WHATSAPP_DEFAULT_COUNTRY_CODE=+962
+WHATSAPP_SEND_CONCURRENCY=4
+```
+
+`WHATSAPP_DEFAULT_COUNTRY_CODE` and `WHATSAPP_SEND_CONCURRENCY` are optional.
+The sender removes duplicate phone numbers and reports invalid numbers or
+delivery-request failures after each broadcast.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More

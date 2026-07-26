@@ -65,15 +65,21 @@ model Offer {
 }
 
 model Event {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  date        DateTime
-  location    String
-  highlight   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  imageUrl    String?
+  id              String   @id @default(cuid())
+  title           String
+  slug            String?  @unique
+  description     String?
+  date            DateTime
+  endAt           DateTime?
+  location        String
+  highlight       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  imageUrl        String?
+  videoUrl        String?
+  galleryUrls     Json?
+  contentType     String   @default("GALLERY")
+  registrationUrl String?
 }
 
 model Announcement {

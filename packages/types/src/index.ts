@@ -206,6 +206,12 @@ export const landingEventSchema = eventItemSchema.extend({
   link: z.string().optional(),
   isActive: z.boolean().optional(),
   imageUrl: z.string().optional(),
+  slug: z.string().optional(),
+  endAt: z.string().optional(),
+  videoUrl: z.string().optional(),
+  galleryUrls: z.array(z.string()).optional(),
+  contentType: z.enum(['GALLERY', 'VIDEO']).optional(),
+  registrationUrl: z.string().optional(),
 });
 export type LandingEvent = z.infer<typeof landingEventSchema>;
 

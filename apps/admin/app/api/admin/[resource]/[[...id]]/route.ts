@@ -106,6 +106,10 @@ function slugify(input: string): string {
     .replace(/-+/g, '-');
 }
 
+function toEventContentType(value: unknown): 'GALLERY' | 'VIDEO' {
+  return value === 'VIDEO' ? 'VIDEO' : 'GALLERY';
+}
+
 async function handleGet(resource: string, id: string | null) {
   if (resource === 'hero') {
     const hero = await prisma.heroSection.findFirst({ orderBy: { updatedAt: 'desc' } });
@@ -246,18 +250,35 @@ async function handlePost(resource: string, body: JsonBody) {
     const imageUrl = toTrimmedString(body.imageUrl);
     if (!imageUrl) return jsonError('Event image is required');
 
+    const slug = slugify(toTrimmedString(body.slug) || title);
+    if (!slug) return jsonError('A valid event page URL is required');
+    const duplicateSlug = await prisma.event.findFirst({ where: { slug } });
+    if (duplicateSlug) return jsonError('This event page URL is already in use', 409);
+
     const startAt = toDate(body.date) || new Date();
     const endAt = hasOwn(body, 'endAt') ? toDate(body.endAt) : null;
     const published = toBoolean(body.highlight ?? body.published, true);
+    const contentType = toEventContentType(body.contentType);
+    const videoUrl = toOptionalString(body.videoUrl);
+    const galleryUrls = toStringArray(body.galleryUrls);
+    const registrationUrl = toOptionalString(body.registrationUrl);
+    if (contentType === 'VIDEO' && !videoUrl) {
+      return jsonError('Upload a featured video before saving this event');
+    }
 
     const firestoreId = await createAcademyEvent({
       title,
+      slug,
       location: toTrimmedString(body.location) || 'Infinity Sports',
       startAt,
       endAt,
       description: toOptionalString(body.description),
       published,
       imageUrl,
+      videoUrl,
+      galleryUrls,
+      contentType,
+      registrationUrl,
     });
 
     try {
@@ -265,10 +286,16 @@ async function handlePost(resource: string, body: JsonBody) {
         data: {
           id: firestoreId,
           title,
+          slug,
           description: toOptionalString(body.description),
           date: startAt,
+          endAt,
           location: toTrimmedString(body.location) || 'Infinity Sports',
           imageUrl,
+          videoUrl,
+          galleryUrls,
+          contentType,
+          registrationUrl,
           highlight: published,
         },
       });
@@ -452,6 +479,16 @@ async function handlePatch(resource: string, id: string | null, body: JsonBody) 
 
     const patchFs: Parameters<typeof updateAcademyEvent>[1] = {};
     if (hasOwn(body, 'title')) patchFs.title = toTrimmedString(body.title) || '';
+    if (hasOwn(body, 'slug')) {
+      const slug = slugify(toTrimmedString(body.slug) || '');
+      if (!slug) return jsonError('A valid event page URL is required');
+      const duplicateSlug = await prisma.event.findFirst({
+        where: { slug, NOT: { id } },
+        select: { id: true },
+      });
+      if (duplicateSlug) return jsonError('This event page URL is already in use', 409);
+      patchFs.slug = slug;
+    }
     if (hasOwn(body, 'description')) patchFs.description = toOptionalString(body.description);
     if (hasOwn(body, 'date')) patchFs.startAt = toDate(body.date) || new Date();
     if (hasOwn(body, 'location')) patchFs.location = toTrimmedString(body.location) || 'Infinity Sports';
@@ -460,6 +497,20 @@ async function handlePatch(resource: string, id: string | null, body: JsonBody) 
       const imageUrl = toTrimmedString(body.imageUrl);
       if (!imageUrl) return jsonError('Event image is required');
       patchFs.imageUrl = imageUrl;
+    }
+    if (hasOwn(body, 'videoUrl')) patchFs.videoUrl = toOptionalString(body.videoUrl);
+    if (hasOwn(body, 'galleryUrls')) patchFs.galleryUrls = toStringArray(body.galleryUrls);
+    if (hasOwn(body, 'contentType')) {
+      patchFs.contentType = toEventContentType(body.contentType);
+      const nextVideoUrl = hasOwn(body, 'videoUrl')
+        ? toOptionalString(body.videoUrl)
+        : existing.videoUrl;
+      if (patchFs.contentType === 'VIDEO' && !nextVideoUrl) {
+        return jsonError('Upload a featured video before saving this event');
+      }
+    }
+    if (hasOwn(body, 'registrationUrl')) {
+      patchFs.registrationUrl = toOptionalString(body.registrationUrl);
     }
     if (hasOwn(body, 'highlight') || hasOwn(body, 'published')) {
       patchFs.published = toBoolean(body.highlight ?? body.published, true);
@@ -475,18 +526,30 @@ async function handlePatch(resource: string, id: string | null, body: JsonBody) 
       create: {
         id: fresh.id,
         title: fresh.title,
+        slug: fresh.slug,
         description: fresh.description,
         date: fresh.startAt ?? new Date(),
+        endAt: fresh.endAt,
         location: fresh.location || 'Infinity Sports',
         imageUrl: fresh.imageUrl,
+        videoUrl: fresh.videoUrl,
+        galleryUrls: fresh.galleryUrls,
+        contentType: fresh.contentType,
+        registrationUrl: fresh.registrationUrl,
         highlight: fresh.published,
       },
       update: {
         title: fresh.title,
+        slug: fresh.slug,
         description: fresh.description,
         date: fresh.startAt ?? new Date(),
+        endAt: fresh.endAt,
         location: fresh.location || 'Infinity Sports',
         imageUrl: fresh.imageUrl,
+        videoUrl: fresh.videoUrl,
+        galleryUrls: fresh.galleryUrls,
+        contentType: fresh.contentType,
+        registrationUrl: fresh.registrationUrl,
         highlight: fresh.published,
       },
     });

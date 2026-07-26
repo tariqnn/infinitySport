@@ -16,6 +16,7 @@ export const ACADEMY_EVENTS_COLLECTION = "academyEvents";
 export type AcademyEventRecord = {
   id: string;
   title: string;
+  slug: string | null;
   location: string;
   startAt: Date | null;
   endAt: Date | null;
@@ -23,6 +24,10 @@ export type AcademyEventRecord = {
   published: boolean;
   /** Extra field for website / admin; mobile app may ignore. */
   imageUrl: string | null;
+  videoUrl: string | null;
+  galleryUrls: string[];
+  contentType: "GALLERY" | "VIDEO";
+  registrationUrl: string | null;
   createdAt: Date | null;
   updatedAt: Date | null;
 };
@@ -46,15 +51,26 @@ export function docToAcademyEvent(
   data: DocumentData | undefined,
 ): AcademyEventRecord {
   const d = data ?? {};
+  const contentType = d.contentType === "VIDEO" ? "VIDEO" : "GALLERY";
   return {
     id,
     title: String(d.title ?? ""),
+    slug: d.slug != null ? String(d.slug) : null,
     location: String(d.location ?? ""),
     startAt: firestoreTimestampToDate(d.startAt),
     endAt: firestoreTimestampToDate(d.endAt),
     description: d.description != null ? String(d.description) : null,
     published: Boolean(d.published),
     imageUrl: d.imageUrl != null ? String(d.imageUrl) : null,
+    videoUrl: d.videoUrl != null ? String(d.videoUrl) : null,
+    galleryUrls: Array.isArray(d.galleryUrls)
+      ? d.galleryUrls
+          .map((value: unknown) => (typeof value === "string" ? value.trim() : ""))
+          .filter(Boolean)
+      : [],
+    contentType,
+    registrationUrl:
+      d.registrationUrl != null ? String(d.registrationUrl) : null,
     createdAt: firestoreTimestampToDate(d.createdAt),
     updatedAt: firestoreTimestampToDate(d.updatedAt),
   };
@@ -83,24 +99,34 @@ export async function getAcademyEvent(
 
 export async function createAcademyEvent(input: {
   title: string;
+  slug?: string | null;
   location?: string;
   startAt: Date;
   endAt?: Date | null;
   description?: string | null;
   published: boolean;
   imageUrl?: string | null;
+  videoUrl?: string | null;
+  galleryUrls?: string[];
+  contentType?: "GALLERY" | "VIDEO";
+  registrationUrl?: string | null;
 }): Promise<string> {
   const db = getFirestore();
   const id = randomUUID();
   const ref = db.collection(ACADEMY_EVENTS_COLLECTION).doc(id);
   await ref.set({
     title: input.title,
+    slug: input.slug ?? null,
     location: input.location ?? "",
     startAt: Timestamp.fromDate(input.startAt),
     endAt: input.endAt ? Timestamp.fromDate(input.endAt) : null,
     description: input.description ?? "",
     published: input.published,
     imageUrl: input.imageUrl ?? null,
+    videoUrl: input.videoUrl ?? null,
+    galleryUrls: input.galleryUrls ?? [],
+    contentType: input.contentType ?? "GALLERY",
+    registrationUrl: input.registrationUrl ?? null,
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   });
@@ -111,12 +137,17 @@ export async function updateAcademyEvent(
   id: string,
   patch: {
     title?: string;
+    slug?: string | null;
     location?: string;
     startAt?: Date;
     endAt?: Date | null;
     description?: string | null;
     published?: boolean;
     imageUrl?: string | null;
+    videoUrl?: string | null;
+    galleryUrls?: string[];
+    contentType?: "GALLERY" | "VIDEO";
+    registrationUrl?: string | null;
   },
 ): Promise<void> {
   const db = getFirestore();
@@ -125,6 +156,7 @@ export async function updateAcademyEvent(
     updatedAt: FieldValue.serverTimestamp(),
   };
   if (patch.title !== undefined) data.title = patch.title;
+  if (patch.slug !== undefined) data.slug = patch.slug;
   if (patch.location !== undefined) data.location = patch.location;
   if (patch.startAt !== undefined) data.startAt = Timestamp.fromDate(patch.startAt);
   if (patch.endAt !== undefined) {
@@ -133,6 +165,12 @@ export async function updateAcademyEvent(
   if (patch.description !== undefined) data.description = patch.description ?? "";
   if (patch.published !== undefined) data.published = patch.published;
   if (patch.imageUrl !== undefined) data.imageUrl = patch.imageUrl;
+  if (patch.videoUrl !== undefined) data.videoUrl = patch.videoUrl;
+  if (patch.galleryUrls !== undefined) data.galleryUrls = patch.galleryUrls;
+  if (patch.contentType !== undefined) data.contentType = patch.contentType;
+  if (patch.registrationUrl !== undefined) {
+    data.registrationUrl = patch.registrationUrl;
+  }
   await ref.update(data);
 }
 
@@ -146,11 +184,16 @@ export function academyEventToAdminApi(row: AcademyEventRecord) {
   return {
     id: row.id,
     title: row.title,
+    slug: row.slug ?? undefined,
     date: (row.startAt ?? new Date()).toISOString(),
     endAt: row.endAt ? row.endAt.toISOString() : null,
     location: row.location || "Infinity Sports",
     description: row.description ?? undefined,
     imageUrl: row.imageUrl ?? "",
+    videoUrl: row.videoUrl ?? "",
+    galleryUrls: row.galleryUrls,
+    contentType: row.contentType,
+    registrationUrl: row.registrationUrl ?? "",
     highlight: row.published,
     published: row.published,
   };

@@ -36,9 +36,15 @@ export type EventResponse = {
   id: string;
   title: string;
   date: string;
+  endAt?: string;
   location?: string;
   description?: string;
   imageUrl?: string;
+  slug?: string;
+  videoUrl?: string;
+  galleryUrls?: string[];
+  contentType?: 'GALLERY' | 'VIDEO';
+  registrationUrl?: string;
   link?: string;
   highlight?: boolean;
 };
@@ -51,7 +57,10 @@ const BASKETBALL_SUMMER_CAMP_EVENT: EventResponse = {
   description:
     'Basketball summer camp registration with medical notes, uniform size, transport, media consent, and emergency contact details.',
   imageUrl: '/hero-basketball.jpg',
+  slug: 'basketball-summer-camp',
+  contentType: 'GALLERY',
   link: '/events/basketball-summer-camp/register',
+  registrationUrl: '/events/basketball-summer-camp/register',
   highlight: true,
 };
 
@@ -61,7 +70,10 @@ const WARRIORS_ASSISTANT_COACH_EVENT: EventResponse = {
   date: '2026-07-21T06:00:00.000Z',
   location: 'Infinity Sports Academy',
   imageUrl: '/warriors-assistant-coach-camp.jpg',
+  slug: 'warriors-assistant-coach-camp',
+  contentType: 'GALLERY',
   link: '/events/warriors-assistant-coach-camp/register',
+  registrationUrl: '/events/warriors-assistant-coach-camp/register',
   highlight: true,
 };
 
@@ -93,9 +105,11 @@ function mergeRequiredSummerCampEvents(events: EventResponse[]) {
       hasBasketballCamp = true;
       return {
         ...event,
+        slug: BASKETBALL_SUMMER_CAMP_EVENT.slug,
         date: BASKETBALL_SUMMER_CAMP_EVENT.date,
         imageUrl: event.imageUrl || BASKETBALL_SUMMER_CAMP_EVENT.imageUrl,
         link: BASKETBALL_SUMMER_CAMP_EVENT.link,
+        registrationUrl: BASKETBALL_SUMMER_CAMP_EVENT.registrationUrl,
         highlight: event.highlight ?? BASKETBALL_SUMMER_CAMP_EVENT.highlight,
       };
     }
@@ -104,11 +118,13 @@ function mergeRequiredSummerCampEvents(events: EventResponse[]) {
       return {
         ...event,
         id: WARRIORS_ASSISTANT_COACH_EVENT.id,
+        slug: WARRIORS_ASSISTANT_COACH_EVENT.slug,
         title: WARRIORS_ASSISTANT_COACH_EVENT.title,
         date: WARRIORS_ASSISTANT_COACH_EVENT.date,
         description: event.description || WARRIORS_ASSISTANT_COACH_EVENT.description,
         imageUrl: event.imageUrl || WARRIORS_ASSISTANT_COACH_EVENT.imageUrl,
         link: WARRIORS_ASSISTANT_COACH_EVENT.link,
+        registrationUrl: WARRIORS_ASSISTANT_COACH_EVENT.registrationUrl,
         highlight: event.highlight ?? WARRIORS_ASSISTANT_COACH_EVENT.highlight,
       };
     }
@@ -703,17 +719,38 @@ export async function fetchEvents(): Promise<EventResponse[]> {
   if (!(await canAttemptDatabaseQuery())) return mergeRequiredSummerCampEvents([]);
   try {
     const sql = getNeonSql();
-    const rows = await sql`SELECT "id","title","date","location","description","imageUrl","highlight" FROM "Event" ORDER BY "date" ASC`;
+    const rows = await sql`
+      SELECT
+        "id", "title", "slug", "date", "endAt", "location", "description",
+        "imageUrl", "videoUrl", "galleryUrls", "contentType",
+        "registrationUrl", "highlight"
+      FROM "Event"
+      WHERE "highlight" = true
+      ORDER BY "date" ASC
+    `;
     return mergeRequiredSummerCampEvents(rows.map((row) => ({
       id: row.id as string, title: row.title as string,
       date: typeof row.date === 'string' ? row.date : String(row.date),
+      endAt: row.endAt ? (typeof row.endAt === 'string' ? row.endAt : String(row.endAt)) : undefined,
       location: (row.location as string) ?? undefined, description: (row.description as string) ?? undefined,
-      imageUrl: (row.imageUrl as string) ?? undefined, link: undefined, highlight: row.highlight as boolean,
+      imageUrl: (row.imageUrl as string) ?? undefined,
+      slug: (row.slug as string) ?? undefined,
+      videoUrl: (row.videoUrl as string) ?? undefined,
+      galleryUrls: Array.isArray(row.galleryUrls) ? row.galleryUrls as string[] : [],
+      contentType: row.contentType === 'VIDEO' ? 'VIDEO' : 'GALLERY',
+      registrationUrl: (row.registrationUrl as string) ?? undefined,
+      link: (row.registrationUrl as string) ?? undefined,
+      highlight: row.highlight as boolean,
     })));
   } catch (error) {
     noteDatabaseFailure('fetchEvents', error);
     return mergeRequiredSummerCampEvents([]);
   }
+}
+
+export async function fetchEventBySlug(slugOrId: string): Promise<EventResponse | null> {
+  const events = await fetchEvents();
+  return events.find((event) => event.slug === slugOrId || event.id === slugOrId) ?? null;
 }
 
 export async function fetchCoaches(): Promise<CoachResponse[]> {
@@ -980,7 +1017,7 @@ async function _fetchLandingContent(): Promise<LandingContent> {
         (SELECT row_to_json(h) FROM (SELECT * FROM "HeroSection" ORDER BY "updatedAt" DESC LIMIT 1) h) AS hero,
         (SELECT COALESCE(json_agg(c ORDER BY c."order" ASC, c."createdAt" ASC), '[]'::json) FROM (SELECT * FROM "LandingCoach" WHERE "isActive" = true) c) AS coaches,
         (SELECT COALESCE(json_agg(o ORDER BY o."order" ASC, o."createdAt" ASC), '[]'::json) FROM (SELECT * FROM "Offer") o) AS offers,
-        (SELECT COALESCE(json_agg(e ORDER BY e."date" ASC), '[]'::json) FROM (SELECT * FROM "Event") e) AS events,
+        (SELECT COALESCE(json_agg(e ORDER BY e."date" ASC), '[]'::json) FROM (SELECT * FROM "Event" WHERE "highlight" = true) e) AS events,
         (SELECT COALESCE(json_agg(a ORDER BY a."isPinned" DESC, a."publishedAt" DESC), '[]'::json) FROM (SELECT * FROM "Announcement") a) AS announcements,
         (SELECT COALESCE(json_agg(f ORDER BY f."order" ASC, f."createdAt" ASC), '[]'::json) FROM (SELECT * FROM "FacilityHighlight") f) AS facilities,
         (SELECT row_to_json(fs) FROM (SELECT * FROM "FooterSettings" ORDER BY "updatedAt" DESC LIMIT 1) fs) AS footer
@@ -1028,9 +1065,16 @@ async function _fetchLandingContent(): Promise<LandingContent> {
     const events = mergeRequiredSummerCampEvents(eventData.map((row): EventResponse => ({
       id: row.id as string, title: row.title as string,
       date: typeof row.date === 'string' ? row.date : String(row.date),
+      endAt: row.endAt ? (typeof row.endAt === 'string' ? row.endAt : String(row.endAt)) : undefined,
       location: (row.location as string) ?? undefined, description: (row.description as string) ?? undefined,
-      link: undefined, imageUrl: (row.imageUrl as string) ?? undefined,
-      highlight: false,
+      slug: (row.slug as string) ?? undefined,
+      videoUrl: (row.videoUrl as string) ?? undefined,
+      galleryUrls: Array.isArray(row.galleryUrls) ? row.galleryUrls as string[] : [],
+      contentType: row.contentType === 'VIDEO' ? 'VIDEO' : 'GALLERY',
+      registrationUrl: (row.registrationUrl as string) ?? undefined,
+      link: (row.registrationUrl as string) ?? undefined,
+      imageUrl: (row.imageUrl as string) ?? undefined,
+      highlight: Boolean(row.highlight),
     }))).map((event): LandingEvent => ({
       ...event,
       isActive: true,

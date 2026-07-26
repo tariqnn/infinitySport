@@ -861,6 +861,22 @@ export type RegistrationTotals = {
   byPackage?: Record<string, { registered: number; expected: number; collected: number; remaining: number }>;
 };
 
+export type RegistrationWhatsAppBroadcastResult = {
+  requestedRegistrations: number;
+  uniqueRecipients: number;
+  sent: number;
+  failed: number;
+  skipped: number;
+  invalidPhoneCount: number;
+  duplicatePhoneCount: number;
+  failures: Array<{
+    registrationId: string;
+    customerName: string;
+    customerPhone: string;
+    message: string;
+  }>;
+};
+
 export type OldRegistrationImportRow = {
   row?: number;
   packageName: string;
@@ -975,6 +991,15 @@ export const packageRegistrationsApi = {
     }>;
   }) =>
     portalDbFetch<{ created: number; registrations: PackageRegistrationRow[] }>('/portal/package-registrations/bulk-for-person', { method: 'POST', body: JSON.stringify(data) }),
+  sendWhatsAppBroadcast: (
+    data:
+      | { audienceType: 'selected'; registrationIds: string[]; message: string }
+      | { audienceType: 'package'; packageName: string; message: string },
+  ) =>
+    portalDbFetch<RegistrationWhatsAppBroadcastResult>('/portal/package-registrations/whatsapp', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   update: (id: string, data: {
     packageName?: string;
     customerName?: string;

@@ -13,7 +13,7 @@ import {
 } from '../../lib/portalApi';
 import { ExportCsvButton } from '../_components/ActionButtons';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { PlusCircleIcon, EllipsisVerticalIcon, ArrowPathIcon, ClipboardDocumentListIcon, BanknotesIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
+import { PlusCircleIcon, EllipsisVerticalIcon, ArrowPathIcon, ClipboardDocumentListIcon, BanknotesIcon, ChatBubbleLeftRightIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { MarkAsPaidModal } from './_components/MarkAsPaidModal';
 import { ViewReceiptsModal } from './_components/ViewReceiptsModal';
 import { BulkAddPeopleModal } from './_components/BulkAddPeopleModal';
@@ -33,6 +33,7 @@ import { CreatePlayerAccountModal } from './_components/CreatePlayerAccountModal
 import { ManagePackageSessionsModal } from './_components/ManagePackageSessionsModal';
 import { OldRegistrationImportModal } from './_components/OldRegistrationImportModal';
 import { BulkWhatsAppModal } from './_components/BulkWhatsAppModal';
+import { ExportPlayerContactsModal } from './_components/ExportPlayerContactsModal';
 
 type Registration = PackageRegistrationRow;
 type SortKey = 'registered' | 'remaining';
@@ -131,6 +132,7 @@ export function RegistrationsPageClient({
   const [cashBookCopyMessage, setCashBookCopyMessage] = useState<string | null>(null);
   const [cashBookCopyError, setCashBookCopyError] = useState<string | null>(null);
   const [whatsAppModalOpen, setWhatsAppModalOpen] = useState(false);
+  const [contactExportModalOpen, setContactExportModalOpen] = useState(false);
 
   /**
    * Package schedule catalog.
@@ -963,6 +965,13 @@ export function RegistrationsPageClient({
               </Button>
               <Button
                 variant="secondary"
+                onClick={() => setContactExportModalOpen(true)}
+                leadingIcon={<ArrowDownTrayIcon className="h-4 w-4" />}
+              >
+                Export contacts{selectedCount ? ` (${selectedCount} selected)` : ''}
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={handleCopySelectedToCashBook}
                 isLoading={sendingToCashBook}
                 disabled={selectedCount === 0 || sendingToCashBook}
@@ -1616,6 +1625,15 @@ export function RegistrationsPageClient({
       <BulkWhatsAppModal
         open={whatsAppModalOpen}
         onClose={() => setWhatsAppModalOpen(false)}
+        rows={rows}
+        selectedRegistrationIds={selectedRegistrationIds}
+        packageOptions={packageOpts}
+        defaultPackageName={fixedPackageName || packageFilter || packageOpts[0]}
+      />
+
+      <ExportPlayerContactsModal
+        open={contactExportModalOpen}
+        onClose={() => setContactExportModalOpen(false)}
         rows={rows}
         selectedRegistrationIds={selectedRegistrationIds}
         packageOptions={packageOpts}

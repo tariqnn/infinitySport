@@ -2,17 +2,22 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
+  ArrowDownTrayIcon,
   CheckCircleIcon,
   ChatBubbleLeftRightIcon,
   ExclamationTriangleIcon,
   UserGroupIcon,
 } from '@heroicons/react/24/outline';
-import { Button, Modal, Select, Textarea } from '../../_components/ui';
+import { Button, Modal, Select } from '../../_components/ui';
 import {
   packageRegistrationsApi,
   type PackageRegistrationRow,
-  type RegistrationWhatsAppBroadcastResult,
 } from '../../../lib/portalApi';
+import {
+  buildContacts,
+  createVCardFile,
+  safeFilenamePart,
+} from './whatsappContactExport';
 
 type AudienceType = 'selected' | 'package';
 
@@ -24,21 +29,6 @@ type BulkWhatsAppModalProps = {
   packageOptions: string[];
   defaultPackageName?: string;
 };
-
-function phoneKey(value: string | null | undefined) {
-  const raw = String(value || '').trim();
-  let digits = raw.replace(/\D/g, '');
-  if (!digits) return null;
-  if (digits.startsWith('00')) digits = digits.slice(2);
-  else if (!raw.startsWith('+') && !digits.startsWith('962')) {
-    digits = digits.startsWith('0') ? `962${digits.slice(1)}` : `962${digits}`;
-  }
-  return /^[1-9]\d{7,14}$/.test(digits) ? digits : null;
-}
-
-function uniquePhoneCount(rows: PackageRegistrationRow[]) {
-  return new Set(rows.map((row) => phoneKey(row.customerPhone)).filter(Boolean)).size;
-}
 
 export function BulkWhatsAppModal({
   open,
@@ -57,25 +47,16 @@ export function BulkWhatsAppModal({
   const [packageRows, setPackageRows] = useState<PackageRegistrationRow[]>([]);
   const [loadingPackageCount, setLoadingPackageCount] = useState(false);
   const [packageCountError, setPackageCountError] = useState<string | null>(null);
-  const [message, setMessage] = useState('');
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<RegistrationWhatsAppBroadcastResult | null>(null);
+  const [downloadedCount, setDownloadedCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setAudience(selectedRegistrationIds.size > 0 ? 'selected' : 'package');
     setPackageName(defaultPackageName || packageOptions[0] || '');
     setPackageRows([]);
-    setMessage('');
-    setError(null);
-    setResult(null);
-  }, [
-    defaultPackageName,
-    open,
-    packageOptions,
-    selectedRegistrationIds.size,
-  ]);
+    setPackageCountError(null);
+    setDownloadedCount(null);
+  }, [defaultPackageName, open, packageOptions, selectedRegistrationIds.size]);
 
   useEffect(() => {
     if (!open || audience !== 'package' || !packageName) {
@@ -102,7 +83,7 @@ export function BulkWhatsAppModal({
         setPackageCountError(
           loadError instanceof Error
             ? loadError.message
-            : 'Could not load the package recipients.',
+            : 'Could not load the package contacts.',
         );
       })
       .finally(() => {
@@ -114,67 +95,46 @@ export function BulkWhatsAppModal({
     };
   }, [audience, open, packageName]);
 
-  const selectedRecipientCount = uniquePhoneCount(selectedRows);
-  const packageRecipientCount = uniquePhoneCount(packageRows);
-  const recipientCount =
-    audience === 'selected' ? selectedRecipientCount : packageRecipientCount;
-  const audienceReady =
-    audience === 'selected'
-      ? selectedRecipientCount > 0
-      : Boolean(packageName) &&
-        packageRecipientCount > 0 &&
-        !loadingPackageCount &&
-        !packageCountError;
-  const canSend =
-    audienceReady && message.trim().length > 0 && !sending && !result;
+  const sourceRows = audience === 'selected' ? selectedRows : packageRows;
+  const exportSummary = useMemo(() => buildContacts(sourceRows), [sourceRows]);
+  const canExport =
+    exportSummary.contacts.length > 0 &&
+    !loadingPackageCount &&
+    !packageCountError;
 
-  async function handleSend() {
-    if (!canSend) return;
-    setSending(true);
-    setError(null);
-    setResult(null);
+  function handleExport() {
+    if (!canExport) return;
 
-    try {
-      const response = await packageRegistrationsApi.sendWhatsAppBroadcast(
-        audience === 'selected'
-          ? {
-              audienceType: 'selected',
-              registrationIds: selectedRows.map((row) => row.id),
-              message: message.trim(),
-            }
-          : {
-              audienceType: 'package',
-              packageName,
-              message: message.trim(),
-            },
-      );
-      setResult(response);
-    } catch (sendError) {
-      setError(
-        sendError instanceof Error
-          ? sendError.message
-          : 'The WhatsApp broadcast could not be sent.',
-      );
-    } finally {
-      setSending(false);
-    }
+    const vCard = createVCardFile(exportSummary.contacts);
+    const blob = new Blob([vCard], { type: 'text/vcard;charset=utf-8' });
+    const downloadUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    const scope =
+      audience === 'package'
+        ? safeFilenamePart(packageName) || 'package'
+        : 'selected-players';
+    anchor.href = downloadUrl;
+    anchor.download = `infinity-sports-whatsapp-${scope}-${new Date()
+      .toISOString()
+      .slice(0, 10)}.vcf`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1_000);
+    setDownloadedCount(exportSummary.contacts.length);
   }
-
-  const handleClose = () => {
-    if (!sending) onClose();
-  };
 
   return (
     <Modal
       open={open}
-      onClose={handleClose}
-      title="Message players on WhatsApp"
-      description="Send one message to selected players or everyone in a package."
+      onClose={onClose}
+      title="Export WhatsApp contacts"
+      description="Create an Android-ready contact file from selected players or an entire package."
       size="lg"
     >
       <div className="space-y-6">
         <fieldset>
-          <legend className="mb-3 text-sm font-bold text-ui-textPrimary">Choose recipients</legend>
+          <legend className="mb-3 text-sm font-bold text-ui-textPrimary">Choose contacts</legend>
           <div className="grid gap-3 sm:grid-cols-2">
             <label
               className={`cursor-pointer rounded-xl border-2 p-4 transition ${
@@ -186,13 +146,12 @@ export function BulkWhatsAppModal({
               <span className="flex items-start gap-3">
                 <input
                   type="radio"
-                  name="whatsapp-audience"
+                  name="whatsapp-export-audience"
                   value="selected"
                   checked={audience === 'selected'}
                   onChange={() => {
                     setAudience('selected');
-                    setError(null);
-                    setResult(null);
+                    setDownloadedCount(null);
                   }}
                   className="mt-1 h-4 w-4 border-ui-border text-emerald-600 focus:ring-emerald-600"
                 />
@@ -202,8 +161,8 @@ export function BulkWhatsAppModal({
                     Selected players
                   </span>
                   <span className="mt-1 block text-sm text-ui-textMuted">
-                    {selectedRecipientCount
-                      ? `${selectedRecipientCount} unique WhatsApp recipient${selectedRecipientCount === 1 ? '' : 's'} selected`
+                    {selectedRows.length
+                      ? `${selectedRows.length} selected registration${selectedRows.length === 1 ? '' : 's'}`
                       : 'Select players using the table checkboxes first'}
                   </span>
                 </span>
@@ -220,13 +179,12 @@ export function BulkWhatsAppModal({
               <span className="flex items-start gap-3">
                 <input
                   type="radio"
-                  name="whatsapp-audience"
+                  name="whatsapp-export-audience"
                   value="package"
                   checked={audience === 'package'}
                   onChange={() => {
                     setAudience('package');
-                    setError(null);
-                    setResult(null);
+                    setDownloadedCount(null);
                   }}
                   className="mt-1 h-4 w-4 border-ui-border text-emerald-600 focus:ring-emerald-600"
                 />
@@ -236,7 +194,7 @@ export function BulkWhatsAppModal({
                     Entire package
                   </span>
                   <span className="mt-1 block text-sm text-ui-textMuted">
-                    Message every active player in one package
+                    Export every active player in one package
                   </span>
                 </span>
               </span>
@@ -251,10 +209,9 @@ export function BulkWhatsAppModal({
               value={packageName}
               onChange={(event) => {
                 setPackageName(event.target.value);
-                setError(null);
-                setResult(null);
+                setDownloadedCount(null);
               }}
-              disabled={sending}
+              disabled={loadingPackageCount}
             >
               <option value="">Choose a package</option>
               {packageOptions.map((option) => (
@@ -263,108 +220,76 @@ export function BulkWhatsAppModal({
                 </option>
               ))}
             </Select>
-            <div className="mt-2 min-h-6 text-sm" aria-live="polite">
-              {loadingPackageCount ? (
-                <span className="text-ui-textMuted">Counting package recipients...</span>
-              ) : packageCountError ? (
-                <span className="font-medium text-red-700">{packageCountError}</span>
-              ) : packageName ? (
-                <span className="font-medium text-emerald-700">
-                  {packageRecipientCount} unique WhatsApp recipient
-                  {packageRecipientCount === 1 ? '' : 's'}
-                </span>
+          </div>
+        ) : null}
+
+        <div className="rounded-xl border border-ui-border bg-ui-softBg px-4 py-4 text-sm">
+          {loadingPackageCount ? (
+            <p className="text-ui-textMuted">Preparing package contacts...</p>
+          ) : packageCountError ? (
+            <p className="font-medium text-red-700">{packageCountError}</p>
+          ) : (
+            <div className="space-y-1">
+              <p className="font-bold text-ui-textPrimary">
+                {exportSummary.contacts.length} valid WhatsApp contact
+                {exportSummary.contacts.length === 1 ? '' : 's'} ready
+              </p>
+              <p className="text-ui-textMuted">
+                Phone numbers will be saved in international format, for example +9627XXXXXXXX.
+              </p>
+              {exportSummary.invalidPhoneCount > 0 ? (
+                <p className="font-medium text-amber-700">
+                  {exportSummary.invalidPhoneCount} invalid or missing phone number
+                  {exportSummary.invalidPhoneCount === 1 ? '' : 's'} will be skipped.
+                </p>
+              ) : null}
+              {exportSummary.duplicatePhoneCount > 0 ? (
+                <p className="text-ui-textMuted">
+                  {exportSummary.duplicatePhoneCount} duplicate registration
+                  {exportSummary.duplicatePhoneCount === 1 ? '' : 's'} consolidated by phone number.
+                </p>
               ) : null}
             </div>
-          </div>
-        ) : null}
-
-        <Textarea
-          label="Message"
-          value={message}
-          onChange={(event) => {
-            setMessage(event.target.value);
-            setError(null);
-            setResult(null);
-          }}
-          placeholder="Type the message that every player will receive..."
-          maxLength={1600}
-          rows={7}
-          disabled={sending}
-          hint={`${message.length}/1600 characters. The same message is sent separately to each WhatsApp number.`}
-          className="resize-y"
-        />
-
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <div className="flex items-start gap-2">
-            <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 shrink-0" />
-            <p>
-              Review the audience and message before sending. WhatsApp may require an approved
-              Twilio template when a player has not contacted the academy recently.
-            </p>
-          </div>
+          )}
         </div>
 
-        {error ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700" role="alert">
-            {error}
+        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          <p className="font-bold">How to use the file on Android</p>
+          <ol className="mt-2 list-decimal space-y-1 pl-5">
+            <li>Download the VCF file and transfer it to the Android phone.</li>
+            <li>Open Contacts, choose Import from file, and select the VCF file.</li>
+            <li>Open WhatsApp and use the imported contacts for messages or a broadcast list.</li>
+          </ol>
+        </div>
+
+        {exportSummary.invalidPhoneCount > 0 ? (
+          <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 shrink-0" />
+            <p>Review the skipped players and correct their phone numbers before exporting again.</p>
           </div>
         ) : null}
 
-        {result ? (
-          <div
-            className={`rounded-xl border px-4 py-4 ${
-              result.failed || result.sent === 0
-                ? 'border-amber-200 bg-amber-50'
-                : 'border-emerald-200 bg-emerald-50'
-            }`}
-            aria-live="polite"
-          >
-            <div className="flex items-start gap-3">
-              <CheckCircleIcon
-                className={`h-6 w-6 shrink-0 ${
-                  result.failed || result.sent === 0 ? 'text-amber-700' : 'text-emerald-700'
-                }`}
-              />
-              <div>
-                <p className="font-bold text-ui-textPrimary">
-                  Sent to {result.sent} of {result.uniqueRecipients} recipients
-                </p>
-                <p className="mt-1 text-sm text-ui-textMuted">
-                  {result.failed ? `${result.failed} failed. ` : ''}
-                  {result.invalidPhoneCount
-                    ? `${result.invalidPhoneCount} invalid phone number${result.invalidPhoneCount === 1 ? '' : 's'} skipped. `
-                    : ''}
-                  {result.duplicatePhoneCount
-                    ? `${result.duplicatePhoneCount} duplicate registration${result.duplicatePhoneCount === 1 ? '' : 's'} skipped.`
-                    : ''}
-                </p>
-                {result.failures.length ? (
-                  <ul className="mt-3 max-h-32 space-y-1 overflow-y-auto text-sm text-red-700">
-                    {result.failures.map((failure) => (
-                      <li key={`${failure.registrationId}-${failure.customerPhone}`}>
-                        <strong>{failure.customerName}:</strong> {failure.message}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
-            </div>
+        {downloadedCount != null ? (
+          <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            <CheckCircleIcon className="h-5 w-5 shrink-0" />
+            <p className="font-medium">
+              Downloaded {downloadedCount} contact{downloadedCount === 1 ? '' : 's'} in Android VCF format.
+            </p>
           </div>
         ) : null}
 
         <div className="flex flex-col-reverse gap-3 border-t border-ui-border pt-5 sm:flex-row sm:justify-end">
-          <Button variant="secondary" onClick={handleClose} disabled={sending}>
-            {result ? 'Close' : 'Cancel'}
+          <Button variant="secondary" onClick={onClose}>
+            Close
           </Button>
           <Button
-            onClick={handleSend}
-            disabled={!canSend}
-            isLoading={sending}
-            loadingLabel="Sending messages..."
-            leadingIcon={<ChatBubbleLeftRightIcon className="h-5 w-5" />}
+            onClick={handleExport}
+            disabled={!canExport}
+            leadingIcon={<ArrowDownTrayIcon className="h-5 w-5" />}
             className="border-emerald-700 bg-emerald-700 hover:bg-emerald-800"
           >
-            Send to {recipientCount} player{recipientCount === 1 ? '' : 's'}
+            Download {exportSummary.contacts.length} contact
+            {exportSummary.contacts.length === 1 ? '' : 's'} (.vcf)
           </Button>
         </div>
       </div>

@@ -959,7 +959,7 @@ export function RegistrationsPageClient({
                 leadingIcon={<ChatBubbleLeftRightIcon className="h-4 w-4" />}
                 className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
               >
-                Message players{selectedCount ? ` (${selectedCount} selected)` : ''}
+                Export WhatsApp contacts{selectedCount ? ` (${selectedCount} selected)` : ''}
               </Button>
               <Button
                 variant="secondary"

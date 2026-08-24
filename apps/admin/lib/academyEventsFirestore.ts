@@ -28,6 +28,9 @@ export type AcademyEventRecord = {
   galleryUrls: string[];
   contentType: "GALLERY" | "VIDEO";
   registrationUrl: string | null;
+  registrationEnabled: boolean;
+  tournamentOptions: string[];
+  jerseySizes: string[];
   createdAt: Date | null;
   updatedAt: Date | null;
 };
@@ -71,6 +74,17 @@ export function docToAcademyEvent(
     contentType,
     registrationUrl:
       d.registrationUrl != null ? String(d.registrationUrl) : null,
+    registrationEnabled: Boolean(d.registrationEnabled),
+    tournamentOptions: Array.isArray(d.tournamentOptions)
+      ? d.tournamentOptions
+          .map((value: unknown) => (typeof value === "string" ? value.trim() : ""))
+          .filter(Boolean)
+      : [],
+    jerseySizes: Array.isArray(d.jerseySizes)
+      ? d.jerseySizes
+          .map((value: unknown) => (typeof value === "string" ? value.trim() : ""))
+          .filter(Boolean)
+      : [],
     createdAt: firestoreTimestampToDate(d.createdAt),
     updatedAt: firestoreTimestampToDate(d.updatedAt),
   };
@@ -110,6 +124,9 @@ export async function createAcademyEvent(input: {
   galleryUrls?: string[];
   contentType?: "GALLERY" | "VIDEO";
   registrationUrl?: string | null;
+  registrationEnabled?: boolean;
+  tournamentOptions?: string[];
+  jerseySizes?: string[];
 }): Promise<string> {
   const db = getFirestore();
   const id = randomUUID();
@@ -127,6 +144,9 @@ export async function createAcademyEvent(input: {
     galleryUrls: input.galleryUrls ?? [],
     contentType: input.contentType ?? "GALLERY",
     registrationUrl: input.registrationUrl ?? null,
+    registrationEnabled: input.registrationEnabled ?? false,
+    tournamentOptions: input.tournamentOptions ?? [],
+    jerseySizes: input.jerseySizes ?? [],
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   });
@@ -148,6 +168,9 @@ export async function updateAcademyEvent(
     galleryUrls?: string[];
     contentType?: "GALLERY" | "VIDEO";
     registrationUrl?: string | null;
+    registrationEnabled?: boolean;
+    tournamentOptions?: string[];
+    jerseySizes?: string[];
   },
 ): Promise<void> {
   const db = getFirestore();
@@ -171,6 +194,13 @@ export async function updateAcademyEvent(
   if (patch.registrationUrl !== undefined) {
     data.registrationUrl = patch.registrationUrl;
   }
+  if (patch.registrationEnabled !== undefined) {
+    data.registrationEnabled = patch.registrationEnabled;
+  }
+  if (patch.tournamentOptions !== undefined) {
+    data.tournamentOptions = patch.tournamentOptions;
+  }
+  if (patch.jerseySizes !== undefined) data.jerseySizes = patch.jerseySizes;
   await ref.update(data);
 }
 
@@ -194,6 +224,9 @@ export function academyEventToAdminApi(row: AcademyEventRecord) {
     galleryUrls: row.galleryUrls,
     contentType: row.contentType,
     registrationUrl: row.registrationUrl ?? "",
+    registrationEnabled: row.registrationEnabled,
+    tournamentOptions: row.tournamentOptions,
+    jerseySizes: row.jerseySizes,
     highlight: row.published,
     published: row.published,
   };

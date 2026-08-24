@@ -45,6 +45,9 @@ export type EventResponse = {
   galleryUrls?: string[];
   contentType?: 'GALLERY' | 'VIDEO';
   registrationUrl?: string;
+  registrationEnabled?: boolean;
+  tournamentOptions?: string[];
+  jerseySizes?: string[];
   link?: string;
   highlight?: boolean;
 };
@@ -77,6 +80,23 @@ const WARRIORS_ASSISTANT_COACH_EVENT: EventResponse = {
   highlight: true,
 };
 
+const INFINITY_3X3_EVENT: EventResponse = {
+  id: 'infinity-3x3-championship',
+  title: 'Infinity 3x3 Championship',
+  date: '2026-10-09T14:00:00.000Z',
+  endAt: '2026-10-10T20:00:00.000Z',
+  location: 'Infinity Sports Academy · FIBA 3x3 Court',
+  description:
+    'Register for the Infinity Sports 3x3 Championship. Divisions are available for men, women, boys, and girls.',
+  imageUrl: '/hero-basketball.jpg',
+  slug: 'infinity-3x3-championship',
+  contentType: 'GALLERY',
+  registrationEnabled: true,
+  tournamentOptions: ['Men', 'Women', 'Boys U18', 'Girls U18', 'Boys U16', 'Girls U16'],
+  jerseySizes: ['Youth S', 'Youth M', 'Youth L', 'XS', 'S', 'M', 'L', 'XL', '2XL'],
+  highlight: true,
+};
+
 function isBasketballSummerCampEvent(event: Pick<EventResponse, 'title' | 'id'>) {
   const normalized = event.title.trim().toLowerCase();
   return (
@@ -96,9 +116,18 @@ function isWarriorsAssistantCoachCampEvent(event: Pick<EventResponse, 'title' | 
   );
 }
 
-function mergeRequiredSummerCampEvents(events: EventResponse[]) {
+function is3x3RegistrationEvent(event: EventResponse) {
+  return (
+    event.id === INFINITY_3X3_EVENT.id ||
+    event.slug === INFINITY_3X3_EVENT.slug ||
+    (event.title.toLowerCase().includes('3x3') && Boolean(event.registrationEnabled))
+  );
+}
+
+function mergeRequiredSummerCampEvents(events: EventResponse[], include3x3Fallback = false) {
   let hasBasketballCamp = false;
   let hasWarriorsCamp = false;
+  let has3x3Event = false;
 
   const merged = events.map((event) => {
     if (isBasketballSummerCampEvent(event)) {
@@ -128,11 +157,15 @@ function mergeRequiredSummerCampEvents(events: EventResponse[]) {
         highlight: event.highlight ?? WARRIORS_ASSISTANT_COACH_EVENT.highlight,
       };
     }
+    if (is3x3RegistrationEvent(event)) {
+      has3x3Event = true;
+    }
     return event;
   });
 
   if (!hasBasketballCamp) merged.push(BASKETBALL_SUMMER_CAMP_EVENT);
   if (!hasWarriorsCamp) merged.push(WARRIORS_ASSISTANT_COACH_EVENT);
+  if (!has3x3Event && include3x3Fallback) merged.push(INFINITY_3X3_EVENT);
 
   return merged.sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
 }
@@ -715,20 +748,19 @@ export async function fetchOffers(): Promise<OfferResponse[]> {
 }
 
 export async function fetchEvents(): Promise<EventResponse[]> {
-  if (!canUseDb()) return mergeRequiredSummerCampEvents([]);
-  if (!(await canAttemptDatabaseQuery())) return mergeRequiredSummerCampEvents([]);
+  if (!canUseDb()) return mergeRequiredSummerCampEvents([], true);
+  if (!(await canAttemptDatabaseQuery())) return mergeRequiredSummerCampEvents([], true);
   try {
     const sql = getNeonSql();
     const rows = await sql`
       SELECT
         "id", "title", "slug", "date", "endAt", "location", "description",
         "imageUrl", "videoUrl", "galleryUrls", "contentType",
-        "registrationUrl", "highlight"
+        "registrationUrl", "registrationEnabled", "tournamentOptions", "jerseySizes", "highlight"
       FROM "Event"
-      WHERE "highlight" = true
       ORDER BY "date" ASC
     `;
-    return mergeRequiredSummerCampEvents(rows.map((row) => ({
+    const mappedEvents = rows.map((row): EventResponse => ({
       id: row.id as string, title: row.title as string,
       date: typeof row.date === 'string' ? row.date : String(row.date),
       endAt: row.endAt ? (typeof row.endAt === 'string' ? row.endAt : String(row.endAt)) : undefined,
@@ -739,12 +771,20 @@ export async function fetchEvents(): Promise<EventResponse[]> {
       galleryUrls: Array.isArray(row.galleryUrls) ? row.galleryUrls as string[] : [],
       contentType: row.contentType === 'VIDEO' ? 'VIDEO' : 'GALLERY',
       registrationUrl: (row.registrationUrl as string) ?? undefined,
+      registrationEnabled: Boolean(row.registrationEnabled),
+      tournamentOptions: Array.isArray(row.tournamentOptions) ? row.tournamentOptions as string[] : [],
+      jerseySizes: Array.isArray(row.jerseySizes) ? row.jerseySizes as string[] : [],
       link: (row.registrationUrl as string) ?? undefined,
       highlight: row.highlight as boolean,
-    })));
+    }));
+    const hasConfigured3x3Event = mappedEvents.some(is3x3RegistrationEvent);
+    return mergeRequiredSummerCampEvents(
+      mappedEvents.filter((event) => event.highlight !== false),
+      !hasConfigured3x3Event,
+    );
   } catch (error) {
     noteDatabaseFailure('fetchEvents', error);
-    return mergeRequiredSummerCampEvents([]);
+    return mergeRequiredSummerCampEvents([], true);
   }
 }
 
@@ -1072,6 +1112,9 @@ async function _fetchLandingContent(): Promise<LandingContent> {
       galleryUrls: Array.isArray(row.galleryUrls) ? row.galleryUrls as string[] : [],
       contentType: row.contentType === 'VIDEO' ? 'VIDEO' : 'GALLERY',
       registrationUrl: (row.registrationUrl as string) ?? undefined,
+      registrationEnabled: Boolean(row.registrationEnabled),
+      tournamentOptions: Array.isArray(row.tournamentOptions) ? row.tournamentOptions as string[] : [],
+      jerseySizes: Array.isArray(row.jerseySizes) ? row.jerseySizes as string[] : [],
       link: (row.registrationUrl as string) ?? undefined,
       imageUrl: (row.imageUrl as string) ?? undefined,
       highlight: Boolean(row.highlight),

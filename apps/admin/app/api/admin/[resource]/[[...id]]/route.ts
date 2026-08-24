@@ -7,7 +7,12 @@ import {
   listAcademyEvents,
   updateAcademyEvent,
 } from '../../../../../lib/academyEventsFirestore';
+import { getFirestore } from '../../../../../lib/firebase-admin';
 import { prisma } from '../../../../../lib/db';
+import {
+  markCompetitionDeletedInFirestore,
+  syncCompetitionRecordToFirestore,
+} from '../../../../../../portal/lib/competitionRealtimeSync';
 
 type RouteParams = {
   resource: string;
@@ -78,6 +83,27 @@ function toStringArray(value: unknown): string[] {
     .filter((entry) => entry.length > 0);
 }
 
+type TeamPlayer = {
+  name: string;
+  age: number;
+  jerseySize: string;
+};
+
+function toTeamPlayers(value: unknown): TeamPlayer[] | null {
+  if (!Array.isArray(value) || value.length < 3 || value.length > 4) return null;
+  const players: TeamPlayer[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+    const player = entry as Record<string, unknown>;
+    const name = toTrimmedString(player.name);
+    const age = toInteger(player.age, 0);
+    const jerseySize = toTrimmedString(player.jerseySize);
+    if (!name || age < 5 || age > 99 || !jerseySize) return null;
+    players.push({ name, age, jerseySize });
+  }
+  return players;
+}
+
 function hasOwn(obj: JsonBody, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(obj, key);
 }
@@ -110,7 +136,7 @@ function toEventContentType(value: unknown): 'GALLERY' | 'VIDEO' {
   return value === 'VIDEO' ? 'VIDEO' : 'GALLERY';
 }
 
-async function handleGet(resource: string, id: string | null) {
+async function handleGet(resource: string, id: string | null, request: NextRequest) {
   if (resource === 'hero') {
     const hero = await prisma.heroSection.findFirst({ orderBy: { updatedAt: 'desc' } });
     return NextResponse.json(hero);
@@ -154,6 +180,27 @@ async function handleGet(resource: string, id: string | null) {
     }
     const rows = await listAcademyEvents();
     return NextResponse.json(rows.map(academyEventToAdminApi));
+  }
+
+  if (resource === 'event-registrations') {
+    if (id) {
+      const row = await prisma.competitionRegistration.findUnique({ where: { id } });
+      if (!row) return jsonError('Event registration not found', 404);
+      return NextResponse.json(row);
+    }
+    const eventId = request.nextUrl.searchParams.get('eventId')?.trim();
+    try {
+      const rows = await prisma.competitionRegistration.findMany({
+        where: eventId ? { eventId } : undefined,
+        orderBy: { createdAt: 'desc' },
+      });
+      return NextResponse.json(rows);
+    } catch (error) {
+      if ((error as { code?: string })?.code === 'P2022') {
+        return NextResponse.json([]);
+      }
+      throw error;
+    }
   }
 
   if (resource === 'announcements') {
@@ -262,6 +309,15 @@ async function handlePost(resource: string, body: JsonBody) {
     const videoUrl = toOptionalString(body.videoUrl);
     const galleryUrls = toStringArray(body.galleryUrls);
     const registrationUrl = toOptionalString(body.registrationUrl);
+    const registrationEnabled = toBoolean(body.registrationEnabled, false);
+    const tournamentOptions = toStringArray(body.tournamentOptions);
+    const jerseySizes = toStringArray(body.jerseySizes);
+    if (registrationEnabled && tournamentOptions.length === 0) {
+      return jsonError('Add at least one 3x3 tournament division');
+    }
+    if (registrationEnabled && jerseySizes.length === 0) {
+      return jsonError('Add at least one jersey size');
+    }
     if (contentType === 'VIDEO' && !videoUrl) {
       return jsonError('Upload a featured video before saving this event');
     }
@@ -279,6 +335,9 @@ async function handlePost(resource: string, body: JsonBody) {
       galleryUrls,
       contentType,
       registrationUrl,
+      registrationEnabled,
+      tournamentOptions,
+      jerseySizes,
     });
 
     try {
@@ -296,6 +355,9 @@ async function handlePost(resource: string, body: JsonBody) {
           galleryUrls,
           contentType,
           registrationUrl,
+          registrationEnabled,
+          tournamentOptions,
+          jerseySizes,
           highlight: published,
         },
       });
@@ -512,6 +574,24 @@ async function handlePatch(resource: string, id: string | null, body: JsonBody) 
     if (hasOwn(body, 'registrationUrl')) {
       patchFs.registrationUrl = toOptionalString(body.registrationUrl);
     }
+    if (hasOwn(body, 'registrationEnabled')) {
+      patchFs.registrationEnabled = toBoolean(body.registrationEnabled, false);
+    }
+    if (hasOwn(body, 'tournamentOptions')) {
+      patchFs.tournamentOptions = toStringArray(body.tournamentOptions);
+    }
+    if (hasOwn(body, 'jerseySizes')) {
+      patchFs.jerseySizes = toStringArray(body.jerseySizes);
+    }
+    const nextRegistrationEnabled = patchFs.registrationEnabled ?? existing.registrationEnabled;
+    const nextTournamentOptions = patchFs.tournamentOptions ?? existing.tournamentOptions;
+    const nextJerseySizes = patchFs.jerseySizes ?? existing.jerseySizes;
+    if (nextRegistrationEnabled && nextTournamentOptions.length === 0) {
+      return jsonError('Add at least one 3x3 tournament division');
+    }
+    if (nextRegistrationEnabled && nextJerseySizes.length === 0) {
+      return jsonError('Add at least one jersey size');
+    }
     if (hasOwn(body, 'highlight') || hasOwn(body, 'published')) {
       patchFs.published = toBoolean(body.highlight ?? body.published, true);
     }
@@ -536,6 +616,9 @@ async function handlePatch(resource: string, id: string | null, body: JsonBody) 
         galleryUrls: fresh.galleryUrls,
         contentType: fresh.contentType,
         registrationUrl: fresh.registrationUrl,
+        registrationEnabled: fresh.registrationEnabled,
+        tournamentOptions: fresh.tournamentOptions,
+        jerseySizes: fresh.jerseySizes,
         highlight: fresh.published,
       },
       update: {
@@ -550,10 +633,73 @@ async function handlePatch(resource: string, id: string | null, body: JsonBody) 
         galleryUrls: fresh.galleryUrls,
         contentType: fresh.contentType,
         registrationUrl: fresh.registrationUrl,
+        registrationEnabled: fresh.registrationEnabled,
+        tournamentOptions: fresh.tournamentOptions,
+        jerseySizes: fresh.jerseySizes,
         highlight: fresh.published,
       },
     });
     const row = await prisma.event.findUnique({ where: { id } });
+    return NextResponse.json(row);
+  }
+
+  if (resource === 'event-registrations') {
+    if (!id) return jsonError('Event registration id is required', 400);
+    const existing = await prisma.competitionRegistration.findUnique({ where: { id } });
+    if (!existing) return jsonError('Event registration not found', 404);
+
+    const data: JsonBody = {};
+    if (hasOwn(body, 'teamName')) {
+      const teamName = toTrimmedString(body.teamName);
+      if (!teamName) return jsonError('Team name is required');
+      data.teamName = teamName;
+    }
+    if (hasOwn(body, 'players')) {
+      const players = toTeamPlayers(body.players);
+      if (!players) return jsonError('Add 3 or 4 players with a valid name, age, and jersey size');
+      data.players = players;
+      data.playerOne = players[0].name;
+      data.playerTwo = players[1].name;
+      data.playerThree = players[2].name;
+      data.playerFour = players[3]?.name ?? null;
+    }
+    if (hasOwn(body, 'participantName')) {
+      const participantName = toTrimmedString(body.participantName);
+      if (!participantName) return jsonError('Player name is required');
+      data.participantName = participantName;
+    }
+    if (hasOwn(body, 'age')) {
+      const age = toInteger(body.age, 0);
+      if (age < 5 || age > 99) return jsonError('Age must be between 5 and 99');
+      data.age = age;
+    }
+    if (hasOwn(body, 'customerPhone')) {
+      const customerPhone = toTrimmedString(body.customerPhone);
+      if (!customerPhone) return jsonError('Phone number is required');
+      data.customerPhone = customerPhone;
+    }
+    if (hasOwn(body, 'competitionType')) {
+      const competitionType = toTrimmedString(body.competitionType);
+      if (!competitionType) return jsonError('Tournament division is required');
+      data.competitionType = competitionType;
+    }
+    if (hasOwn(body, 'jerseySize')) {
+      const jerseySize = toTrimmedString(body.jerseySize);
+      if (!jerseySize) return jsonError('Jersey size is required');
+      data.jerseySize = jerseySize;
+    }
+    if (hasOwn(body, 'status')) {
+      data.status = (toTrimmedString(body.status) || 'NEW').toUpperCase();
+    }
+
+    const row = await prisma.competitionRegistration.update({
+      where: { id },
+      data: data as never,
+    });
+    await syncCompetitionRecordToFirestore({
+      firestore: getFirestore(),
+      registration: row,
+    }).catch((error) => console.warn('[admin-api] event registration sync skipped', error));
     return NextResponse.json(row);
   }
 
@@ -723,6 +869,15 @@ async function handleDelete(resource: string, id: string | null) {
     return new NextResponse(null, { status: 204 });
   }
 
+  if (resource === 'event-registrations') {
+    await prisma.competitionRegistration.delete({ where: { id } });
+    await markCompetitionDeletedInFirestore({
+      firestore: getFirestore(),
+      registrationId: id,
+    }).catch((error) => console.warn('[admin-api] event registration delete sync skipped', error));
+    return new NextResponse(null, { status: 204 });
+  }
+
   if (resource === 'coaches') {
     await prisma.landingCoach.delete({ where: { id } });
     return new NextResponse(null, { status: 204 });
@@ -767,12 +922,12 @@ async function withErrorBoundary(handler: () => Promise<NextResponse>) {
   }
 }
 
-export async function GET(_request: NextRequest, context: RouteContext) {
+export async function GET(request: NextRequest, context: RouteContext) {
   return withErrorBoundary(async () => {
     const params = await resolveParams(context);
     const resource = params.resource;
     const id = getId(params);
-    return handleGet(resource, id);
+    return handleGet(resource, id, request);
   });
 }
 

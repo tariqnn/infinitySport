@@ -8720,11 +8720,53 @@ async function dispatchGet(request: NextRequest, params: Params) {
     const competitionType = normalizeText(
       request.nextUrl.searchParams.get("competitionType"),
     ).toUpperCase();
-    const rows = await prisma.competitionRegistration.findMany({
-      where: competitionType ? { competitionType } : undefined,
-      orderBy: { createdAt: "desc" },
-    });
-    return NextResponse.json(rows);
+    const eventOnly = request.nextUrl.searchParams.get("eventOnly") === "1";
+    const excludeEventTeams = request.nextUrl.searchParams.get("excludeEventTeams") === "1";
+    try {
+      const rows = await prisma.competitionRegistration.findMany({
+        where:
+          competitionType || eventOnly || excludeEventTeams
+            ? {
+                ...(competitionType ? { competitionType } : {}),
+                ...(eventOnly ? { eventId: { not: null } } : {}),
+                ...(excludeEventTeams ? { eventId: null } : {}),
+              }
+            : undefined,
+        orderBy: { createdAt: "desc" },
+      });
+      return NextResponse.json(rows);
+    } catch (error) {
+      if ((error as { code?: string })?.code !== "P2022") throw error;
+      if (eventOnly) return NextResponse.json([]);
+
+      const legacyRows = competitionType
+        ? await prisma.$queryRaw<Array<Record<string, unknown>>>`
+            SELECT
+              "id", "competitionType", "participantName", "age", "gender", "customerPhone",
+              "teamName", "playerOne", "playerTwo", "playerThree", "playerFour", "isPaid",
+              "amountDue", "amountPaid", "paymentMethod", "paidAt", "source", "status",
+              "createdAt", "updatedAt"
+            FROM "CompetitionRegistration"
+            WHERE "competitionType" = ${competitionType}
+            ORDER BY "createdAt" DESC
+          `
+        : await prisma.$queryRaw<Array<Record<string, unknown>>>`
+            SELECT
+              "id", "competitionType", "participantName", "age", "gender", "customerPhone",
+              "teamName", "playerOne", "playerTwo", "playerThree", "playerFour", "isPaid",
+              "amountDue", "amountPaid", "paymentMethod", "paidAt", "source", "status",
+              "createdAt", "updatedAt"
+            FROM "CompetitionRegistration"
+            ORDER BY "createdAt" DESC
+          `;
+      return NextResponse.json(legacyRows.map((row) => ({
+        ...row,
+        eventId: null,
+        eventTitle: null,
+        jerseySize: null,
+        players: null,
+      })));
+    }
   }
 
   if (resource === "package-registrations" && id === "totals") {

@@ -6,6 +6,9 @@ import { useLanguage } from '../_components/LanguageProvider';
 import { tr } from '../../lib/translations';
 
 function registrationLinkFor(event: EventResponse): string | undefined {
+  if (event.registrationEnabled) {
+    return `/events/${encodeURIComponent(event.slug || event.id)}#register`;
+  }
   const title = event.title.trim().toLowerCase();
   if (title.includes('basketball') && title.includes('summer camp')) {
     return '/events/basketball-summer-camp/register';

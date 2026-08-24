@@ -1129,16 +1129,20 @@ export const packagePricingApi = {
 
 export type CompetitionRegistrationRow = {
   id: string;
+  eventId: string | null;
+  eventTitle: string | null;
   competitionType: string;
   participantName: string | null;
   age: number | null;
   gender: string | null;
   customerPhone: string | null;
+  jerseySize: string | null;
   teamName: string | null;
   playerOne: string | null;
   playerTwo: string | null;
   playerThree: string | null;
   playerFour: string | null;
+  players: Array<{ name: string; age: number; jerseySize: string }> | null;
   isPaid: boolean;
   amountDue: number | null;
   amountPaid: number | null;
@@ -1151,9 +1155,10 @@ export type CompetitionRegistrationRow = {
 };
 
 export const competitionRegistrationsApi = {
-  list: (competitionType?: string) => {
+  list: (competitionType?: string, options?: { eventOnly?: boolean }) => {
     const params = new URLSearchParams();
     if (competitionType && competitionType !== 'ALL') params.append('competitionType', competitionType);
+    params.append(options?.eventOnly ? 'eventOnly' : 'excludeEventTeams', '1');
     const query = params.toString() ? `?${params.toString()}` : '';
     return portalDbFetch<CompetitionRegistrationRow[]>(`/portal/competition-registrations${query}`);
   },
@@ -1168,6 +1173,7 @@ export const competitionRegistrationsApi = {
     playerTwo: string | null;
       playerThree: string | null;
       playerFour: string | null;
+      players: Array<{ name: string; age: number; jerseySize: string }>;
       isPaid: boolean;
       amountDue: number | null;
       amountPaid: number | null;
@@ -1413,6 +1419,12 @@ export async function prefetchPortalRouteData(href: string): Promise<void> {
           packageSessionCanceledApi.list(),
         ]),
       );
+      break;
+    case '/event-teams':
+      tasks.push(competitionRegistrationsApi.list('ALL', { eventOnly: true }));
+      break;
+    case '/competitions':
+      tasks.push(competitionRegistrationsApi.list('ALL'));
       break;
     case '/guests':
       tasks.push(guestAccountsApi.list());

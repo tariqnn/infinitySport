@@ -65,21 +65,24 @@ model Offer {
 }
 
 model Event {
-  id              String   @id @default(cuid())
-  title           String
-  slug            String?  @unique
-  description     String?
-  date            DateTime
-  endAt           DateTime?
-  location        String
-  highlight       Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  imageUrl        String?
-  videoUrl        String?
-  galleryUrls     Json?
-  contentType     String   @default("GALLERY")
-  registrationUrl String?
+  id                  String    @id @default(cuid())
+  title               String
+  slug                String?   @unique
+  description         String?
+  date                DateTime
+  endAt               DateTime?
+  location            String
+  highlight           Boolean   @default(false)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  imageUrl            String?
+  videoUrl            String?
+  galleryUrls         Json?
+  contentType         String    @default("GALLERY")
+  registrationUrl     String?
+  registrationEnabled Boolean   @default(false)
+  tournamentOptions   Json?
+  jerseySizes         Json?
 }
 
 model Announcement {
@@ -673,28 +676,33 @@ model PackageSessionCanceled {
 }
 
 model CompetitionRegistration {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
+  eventId         String?
+  eventTitle      String?
   competitionType String
   participantName String?
   age             Int?
   gender          String?
   customerPhone   String?
+  jerseySize      String?
   teamName        String?
   playerOne       String?
   playerTwo       String?
   playerThree     String?
-    playerFour      String?
-    isPaid          Boolean  @default(false)
-    amountDue       Int?
-    amountPaid      Int?
-    paymentMethod   String?
+  playerFour      String?
+  players         Json?
+  isPaid          Boolean   @default(false)
+  amountDue       Int?
+  amountPaid      Int?
+  paymentMethod   String?
   paidAt          DateTime?
-  source          String   @default("WEBSITE")
-  status          String   @default("NEW")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  source          String    @default("WEBSITE")
+  status          String    @default("NEW")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([competitionType])
+  @@index([eventId])
   @@index([createdAt])
   @@index([isPaid])
   @@index([status])

@@ -16,11 +16,13 @@ import {
   Save,
   Search,
   Trash2,
+  Trophy,
   X,
 } from 'lucide-react';
 import { FileUpload } from '../../_components/FileUpload';
 import { useActionToast } from '../../_components/useActionToast';
 import { apiClient } from '../../../lib/apiClient';
+import { EventRegistrationsManager } from './EventRegistrationsManager';
 
 type EventState = {
   status: 'idle' | 'success' | 'error';
@@ -42,6 +44,9 @@ type AdminApiEvent = {
   galleryUrls?: string[];
   contentType?: ContentType;
   registrationUrl?: string | null;
+  registrationEnabled?: boolean;
+  tournamentOptions?: string[];
+  jerseySizes?: string[];
   highlight?: boolean;
 };
 
@@ -57,10 +62,15 @@ type EventForm = {
   galleryUrls: string[];
   contentType: ContentType;
   registrationUrl: string;
+  registrationEnabled: boolean;
+  tournamentOptions: string[];
+  jerseySizes: string[];
   published: boolean;
 };
 
 const initialState: EventState = { status: 'idle' };
+const DEFAULT_3X3_DIVISIONS = ['Men', 'Women', 'Boys U18', 'Girls U18', 'Boys U16', 'Girls U16'];
+const DEFAULT_JERSEY_SIZES = ['Youth S', 'Youth M', 'Youth L', 'XS', 'S', 'M', 'L', 'XL', '2XL'];
 const appBaseUrl = (process.env.NEXT_PUBLIC_APP_BASE_URL || '').replace(/\/$/, '');
 const websiteBaseUrl = (process.env.NEXT_PUBLIC_WEBSITE_URL || 'http://localhost:3000').replace(/\/$/, '');
 
@@ -100,6 +110,9 @@ function emptyForm(): EventForm {
     galleryUrls: [],
     contentType: 'GALLERY',
     registrationUrl: '',
+    registrationEnabled: false,
+    tournamentOptions: DEFAULT_3X3_DIVISIONS,
+    jerseySizes: DEFAULT_JERSEY_SIZES,
     published: false,
   };
 }
@@ -117,6 +130,15 @@ function eventToForm(event: AdminApiEvent): EventForm {
     galleryUrls: Array.isArray(event.galleryUrls) ? event.galleryUrls : [],
     contentType: event.contentType === 'VIDEO' ? 'VIDEO' : 'GALLERY',
     registrationUrl: event.registrationUrl || '',
+    registrationEnabled: Boolean(event.registrationEnabled),
+    tournamentOptions:
+      Array.isArray(event.tournamentOptions) && event.tournamentOptions.length > 0
+        ? event.tournamentOptions
+        : DEFAULT_3X3_DIVISIONS,
+    jerseySizes:
+      Array.isArray(event.jerseySizes) && event.jerseySizes.length > 0
+        ? event.jerseySizes
+        : DEFAULT_JERSEY_SIZES,
     published: event.highlight !== false,
   };
 }
@@ -126,6 +148,106 @@ const inputClass =
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return <span className="text-sm font-semibold text-slate-700">{children}</span>;
+}
+
+function OptionListEditor({
+  title,
+  itemLabel,
+  items,
+  onChange,
+}: {
+  title: string;
+  itemLabel: string;
+  items: string[];
+  onChange: (items: string[]) => void;
+}) {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [adding, setAdding] = useState(false);
+  const [newValue, setNewValue] = useState('');
+
+  useEffect(() => {
+    if (selectedIndex >= items.length) setSelectedIndex(Math.max(0, items.length - 1));
+  }, [items.length, selectedIndex]);
+
+  const selectedItem = items[selectedIndex] || '';
+
+  function updateSelected(value: string) {
+    if (!items[selectedIndex]) return;
+    const next = [...items];
+    next[selectedIndex] = value;
+    onChange(next);
+  }
+
+  function removeSelected() {
+    if (!items[selectedIndex]) return;
+    onChange(items.filter((_, index) => index !== selectedIndex));
+  }
+
+  function addItem() {
+    const value = newValue.trim();
+    if (!value || items.some((item) => item.toLowerCase() === value.toLowerCase())) return;
+    onChange([...items, value]);
+    setSelectedIndex(items.length);
+    setNewValue('');
+    setAdding(false);
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <p className="text-sm font-bold text-slate-900">{title} *</p>
+      {items.length > 0 ? (
+        <div className="mt-3 space-y-3">
+          <label className="block text-xs font-semibold text-slate-500">
+            Choose {itemLabel} to edit
+            <select
+              value={selectedIndex}
+              onChange={(event) => setSelectedIndex(Number(event.target.value))}
+              className={inputClass}
+            >
+              {items.map((item, index) => <option key={`${item}-${index}`} value={index}>{item}</option>)}
+            </select>
+          </label>
+          <label className="block text-xs font-semibold text-slate-500">
+            {itemLabel.charAt(0).toUpperCase() + itemLabel.slice(1)} name
+            <input value={selectedItem} onChange={(event) => updateSelected(event.target.value)} className={inputClass} />
+          </label>
+          <button type="button" onClick={removeSelected} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-sm font-bold text-red-600 hover:bg-red-50">
+            <Trash2 className="h-4 w-4" /> Remove selected
+          </button>
+        </div>
+      ) : (
+        <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">No {title.toLowerCase()} added yet.</p>
+      )}
+
+      {adding ? (
+        <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-3">
+          <label className="block text-xs font-semibold text-slate-600">
+            New {itemLabel} name
+            <input
+              value={newValue}
+              onChange={(event) => setNewValue(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  addItem();
+                }
+              }}
+              className={inputClass}
+              autoFocus
+            />
+          </label>
+          <div className="mt-3 flex gap-2">
+            <button type="button" onClick={addItem} className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg bg-[#003DA5] px-3 text-sm font-bold text-white">Add</button>
+            <button type="button" onClick={() => { setAdding(false); setNewValue(''); }} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-600">Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" onClick={() => setAdding(true)} className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#003DA5]/40 bg-blue-50/50 px-3 text-sm font-bold text-[#003DA5] hover:border-[#003DA5] hover:bg-blue-50">
+          <Plus className="h-4 w-4" /> Add new {itemLabel}
+        </button>
+      )}
+    </div>
+  );
 }
 
 function ProductionPreview({ form }: { form: EventForm }) {
@@ -196,7 +318,7 @@ function ProductionPreview({ form }: { form: EventForm }) {
           ) : null}
           <div className="flex gap-2">
             <span className="rounded-lg bg-[#60D394] px-3 py-2 text-xs font-bold text-slate-950">Event details</span>
-            {form.registrationUrl ? (
+            {form.registrationEnabled || form.registrationUrl ? (
               <span className="rounded-lg border border-white/20 px-3 py-2 text-xs font-semibold">Register</span>
             ) : null}
           </div>
@@ -271,6 +393,28 @@ export function EventsManager() {
     setGalleryUploadKey((value) => value + 1);
   }
 
+  function start3x3Event() {
+    setEditingId(null);
+    setForm({
+      ...emptyForm(),
+      title: 'Infinity 3x3 Championship',
+      slug: 'infinity-3x3-championship',
+      description:
+        'Register for the Infinity Sports 3x3 Championship. Divisions are available for men, women, boys, and girls.',
+      date: toDatetimeLocalValue('2026-10-09T14:00:00.000Z'),
+      endAt: toDatetimeLocalValue('2026-10-10T20:00:00.000Z'),
+      location: 'Infinity Sports Academy · FIBA 3x3 Court',
+      imageUrl: '/hero-basketball.jpg',
+      registrationEnabled: true,
+      tournamentOptions: DEFAULT_3X3_DIVISIONS,
+      jerseySizes: DEFAULT_JERSEY_SIZES,
+    });
+    setSlugTouched(true);
+    setActionState(initialState);
+    setGalleryUploadKey((value) => value + 1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   function selectEvent(event: AdminApiEvent) {
     setEditingId(event.id);
     setForm(eventToForm(event));
@@ -302,6 +446,8 @@ export function EventsManager() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const tournamentOptions = form.tournamentOptions.map((value) => value.trim()).filter(Boolean);
+    const jerseySizes = form.jerseySizes.map((value) => value.trim()).filter(Boolean);
     if (!form.title.trim() || !form.slug.trim() || !form.date || !form.imageUrl) {
       setActionState({ status: 'error', message: 'Title, page URL, start date, and cover image are required.' });
       return;
@@ -312,6 +458,14 @@ export function EventsManager() {
     }
     if (form.contentType === 'VIDEO' && !form.videoUrl) {
       setActionState({ status: 'error', message: 'Upload a featured video or switch to Gallery.' });
+      return;
+    }
+    if (form.registrationEnabled && tournamentOptions.length === 0) {
+      setActionState({ status: 'error', message: 'Add at least one 3x3 tournament division.' });
+      return;
+    }
+    if (form.registrationEnabled && jerseySizes.length === 0) {
+      setActionState({ status: 'error', message: 'Add at least one jersey size.' });
       return;
     }
 
@@ -329,6 +483,9 @@ export function EventsManager() {
       galleryUrls: form.galleryUrls,
       contentType: form.contentType,
       registrationUrl: form.registrationUrl.trim() || null,
+      registrationEnabled: form.registrationEnabled,
+      tournamentOptions,
+      jerseySizes,
       highlight: form.published,
     };
 
@@ -400,14 +557,24 @@ export function EventsManager() {
             Create the public event page, choose its media, and check the production layout before publishing.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={startNewEvent}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#003DA5] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#002d7a] focus:outline-none focus:ring-2 focus:ring-[#003DA5]/30"
-        >
-          <Plus className="h-4 w-4" />
-          New event
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={start3x3Event}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#003DA5]/20 bg-blue-50 px-4 py-2.5 text-sm font-bold text-[#003DA5] transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-[#003DA5]/20"
+          >
+            <Trophy className="h-4 w-4" />
+            Use 3x3 template
+          </button>
+          <button
+            type="button"
+            onClick={startNewEvent}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#003DA5] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#002d7a] focus:outline-none focus:ring-2 focus:ring-[#003DA5]/30"
+          >
+            <Plus className="h-4 w-4" />
+            New event
+          </button>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -721,19 +888,51 @@ export function EventsManager() {
             <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
               <p className="text-xs font-bold uppercase tracking-wider text-[#003DA5]">4 · Publishing</p>
               <h3 className="mt-1 font-display text-xl font-bold text-slate-950">Registration and visibility</h3>
-              <label className="mt-5 block">
-                <FieldLabel>Registration link</FieldLabel>
-                <div className="relative">
-                  <Link2 className="pointer-events-none absolute left-3 top-1/2 mt-0.5 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    value={form.registrationUrl}
-                    onChange={(event) => updateForm('registrationUrl', event.target.value)}
-                    placeholder="https://… or /events/your-event/register"
-                    className={`${inputClass} pl-9`}
+              <label className="mt-5 flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-blue-200 bg-blue-50/60 p-4">
+                <span>
+                  <span className="block text-sm font-bold text-slate-900">Enable built-in 3x3 registration</span>
+                  <span className="mt-0.5 block text-xs leading-5 text-slate-600">
+                    Adds the 3–4 player team form to this event page and stores every submission for editing below.
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={form.registrationEnabled}
+                  onChange={(event) => updateForm('registrationEnabled', event.target.checked)}
+                  className="mt-1 h-5 w-5 rounded border-slate-300 text-[#003DA5] focus:ring-[#003DA5]"
+                />
+              </label>
+
+              {form.registrationEnabled ? (
+                <div className="mt-4 grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2">
+                  <OptionListEditor
+                    title="Tournament divisions"
+                    itemLabel="division"
+                    items={form.tournamentOptions}
+                    onChange={(items) => updateForm('tournamentOptions', items)}
+                  />
+                  <OptionListEditor
+                    title="Jersey sizes"
+                    itemLabel="size"
+                    items={form.jerseySizes}
+                    onChange={(items) => updateForm('jerseySizes', items)}
                   />
                 </div>
-              </label>
+              ) : (
+                <label className="mt-5 block">
+                  <FieldLabel>External registration link</FieldLabel>
+                  <div className="relative">
+                    <Link2 className="pointer-events-none absolute left-3 top-1/2 mt-0.5 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={form.registrationUrl}
+                      onChange={(event) => updateForm('registrationUrl', event.target.value)}
+                      placeholder="https://… or /events/your-event/register"
+                      className={`${inputClass} pl-9`}
+                    />
+                  </div>
+                </label>
+              )}
               <label className="mt-5 flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-slate-200 p-4">
                 <span>
                   <span className="block text-sm font-bold text-slate-900">Publish event</span>
@@ -796,6 +995,15 @@ export function EventsManager() {
           </aside>
         </form>
       </div>
+
+      {editingId && form.registrationEnabled ? (
+        <EventRegistrationsManager
+          eventId={editingId}
+          eventTitle={form.title}
+          tournamentOptions={form.tournamentOptions}
+          jerseySizes={form.jerseySizes}
+        />
+      ) : null}
     </div>
   );
 }

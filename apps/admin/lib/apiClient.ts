@@ -262,6 +262,23 @@ class ApiClient {
     });
   }
 
+  async getEventRegistrations(eventId: string) {
+    return this.request(`/api/admin/event-registrations?eventId=${encodeURIComponent(eventId)}`);
+  }
+
+  async updateEventRegistration(id: string, data: any) {
+    return this.request(`/api/admin/event-registrations/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteEventRegistration(id: string) {
+    return this.request(`/api/admin/event-registrations/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Announcements
   async getAnnouncements() {
     return this.request('/api/admin/announcements');

@@ -37,6 +37,31 @@ function parseAge(value: unknown): number | null {
   return Math.round(parsed);
 }
 
+type TeamPlayer = {
+  name: string;
+  age: number;
+  jerseySize: string;
+};
+
+function parseTeamPlayers(value: unknown, configuredJerseySizes: string[]): TeamPlayer[] | null {
+  if (!Array.isArray(value) || value.length < 3 || value.length > 4) return null;
+
+  const players: TeamPlayer[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+    const player = entry as Record<string, unknown>;
+    const name = cleanText(player.name);
+    const age = parseAge(player.age);
+    const selectedSize = cleanText(player.jerseySize);
+    const jerseySize = configuredJerseySizes.find(
+      (size) => size.toUpperCase() === selectedSize.toUpperCase(),
+    );
+    if (!name || !age || age < 5 || !jerseySize) return null;
+    players.push({ name, age, jerseySize });
+  }
+  return players;
+}
+
 function defaultCompetitionRate(competitionType: string): number {
   return competitionType === "3X3" ||
     competitionType === "3X3_MEN" ||
@@ -47,16 +72,20 @@ function defaultCompetitionRate(competitionType: string): number {
 
 async function syncLandingCompetitionToFirestore(input: {
   id: string;
+  eventId: string | null;
+  eventTitle: string | null;
   competitionType: string;
   participantName: string | null;
   age: number | null;
   gender: string | null;
   customerPhone: string;
+  jerseySize: string | null;
   teamName: string | null;
   playerOne: string | null;
   playerTwo: string | null;
   playerThree: string | null;
   playerFour: string | null;
+  players: TeamPlayer[];
   amountDue: number;
 }) {
   try {
@@ -86,8 +115,48 @@ async function syncLandingCompetitionToFirestore(input: {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Record<string, unknown>;
-    const competitionType = cleanText(body.competitionType).toUpperCase();
-    if (!COMPETITIONS.has(competitionType)) {
+    const eventId = optionalText(body.eventId);
+    let competitionType = cleanText(body.competitionType).toUpperCase();
+    let eventTitle: string | null = null;
+    let jerseySize: string | null = null;
+    let configuredTournamentOptions: string[] = [];
+    let configuredJerseySizes: string[] = [];
+
+    if (eventId) {
+      const eventResult = await getPgPool().query(
+        `
+        SELECT "title", "registrationEnabled", "tournamentOptions", "jerseySizes"
+        FROM "Event"
+        WHERE "id" = $1 AND "highlight" = true
+        LIMIT 1
+        `,
+        [eventId],
+      );
+      const configuredEvent = eventResult.rows[0] as Record<string, unknown> | undefined;
+      if (!configuredEvent || configuredEvent.registrationEnabled !== true) {
+        return NextResponse.json(
+          { error: "Registration is not open for this event." },
+          { status: 400 },
+        );
+      }
+      eventTitle = cleanText(configuredEvent.title);
+      configuredTournamentOptions = Array.isArray(configuredEvent.tournamentOptions)
+        ? configuredEvent.tournamentOptions.map(cleanText).filter(Boolean)
+        : [];
+      configuredJerseySizes = Array.isArray(configuredEvent.jerseySizes)
+        ? configuredEvent.jerseySizes.map(cleanText).filter(Boolean)
+        : [];
+      const selectedTournament = configuredTournamentOptions.find(
+        (option) => option.toUpperCase() === competitionType,
+      );
+      if (!selectedTournament) {
+        return NextResponse.json(
+          { error: "Please choose an available 3x3 tournament division." },
+          { status: 400 },
+        );
+      }
+      competitionType = selectedTournament;
+    } else if (!COMPETITIONS.has(competitionType)) {
       return NextResponse.json(
         { error: "Please choose a competition." },
         { status: 400 },
@@ -112,8 +181,29 @@ export async function POST(request: Request) {
     let playerTwo: string | null = null;
     let playerThree: string | null = null;
     let playerFour: string | null = null;
+    let players: TeamPlayer[] = [];
 
-    if (competitionType === "3X3_MEN" || competitionType === "3X3_WOMEN") {
+    if (eventId) {
+      teamName = optionalText(body.teamName);
+      const parsedPlayers = parseTeamPlayers(body.players, configuredJerseySizes);
+      if (!teamName) {
+        return NextResponse.json(
+          { error: "Team name is required." },
+          { status: 400 },
+        );
+      }
+      if (!parsedPlayers) {
+        return NextResponse.json(
+          { error: "Add 3 or 4 players with a valid name, age, and jersey size for each player." },
+          { status: 400 },
+        );
+      }
+      players = parsedPlayers;
+      [playerOne, playerTwo, playerThree, playerFour = null] = players.map((player) => player.name);
+      const normalizedDivision = competitionType.toUpperCase();
+      if (/WOMEN|GIRL|FEMALE/.test(normalizedDivision)) gender = "FEMALE";
+      else if (/MEN|BOY|MALE/.test(normalizedDivision)) gender = "MALE";
+    } else if (competitionType === "3X3_MEN" || competitionType === "3X3_WOMEN") {
       teamName = optionalText(body.teamName);
       playerOne = optionalText(body.playerOne);
       playerTwo = optionalText(body.playerTwo);
@@ -158,57 +248,69 @@ export async function POST(request: Request) {
     }
 
     const id = randomUUID();
-    const amountDue = defaultCompetitionRate(competitionType);
+    const amountDue = eventId ? 50 : defaultCompetitionRate(competitionType);
     await getPgPool().query(
       `
       INSERT INTO "CompetitionRegistration" (
         "id",
+        "eventId",
+        "eventTitle",
         "competitionType",
         "participantName",
         "age",
         "gender",
         "customerPhone",
+        "jerseySize",
         "teamName",
         "playerOne",
         "playerTwo",
         "playerThree",
         "playerFour",
+        "players",
         "amountDue",
         "source",
         "status",
         "createdAt",
         "updatedAt"
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'WEBSITE', 'NEW', NOW(), NOW())
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'WEBSITE', 'NEW', NOW(), NOW())
       `,
       [
         id,
+        eventId,
+        eventTitle,
         competitionType,
         participantName,
         age,
         gender,
         customerPhone,
+        jerseySize,
         teamName,
         playerOne,
         playerTwo,
         playerThree,
         playerFour,
+        JSON.stringify(players),
         amountDue,
       ],
     );
 
     await syncLandingCompetitionToFirestore({
       id,
+      eventId,
+      eventTitle,
       competitionType,
       participantName,
       age,
       gender,
       customerPhone,
+      jerseySize,
       teamName,
       playerOne,
       playerTwo,
       playerThree,
       playerFour,
+      players,
       amountDue,
     });
 

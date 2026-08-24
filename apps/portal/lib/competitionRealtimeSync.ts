@@ -2,16 +2,20 @@ import * as admin from "firebase-admin";
 
 export type CompetitionRealtimeRecordInput = {
   id: string;
+  eventId?: string | null;
+  eventTitle?: string | null;
   competitionType: string;
   participantName?: string | null;
   age?: number | null;
   gender?: string | null;
   customerPhone?: string | null;
+  jerseySize?: string | null;
   teamName?: string | null;
   playerOne?: string | null;
   playerTwo?: string | null;
   playerThree?: string | null;
   playerFour?: string | null;
+  players?: unknown;
   isPaid?: boolean | null;
   amountDue?: number | null;
   amountPaid?: number | null;
@@ -52,6 +56,21 @@ function normalizeBoolean(value: unknown, fallback = false): boolean {
     if (lowered === "false") return false;
   }
   return fallback;
+}
+
+function normalizePlayers(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+      const player = entry as Record<string, unknown>;
+      const name = normalizeText(player.name);
+      const age = normalizeInteger(player.age);
+      const jerseySize = normalizeText(player.jerseySize).toUpperCase();
+      if (!name || !age || !jerseySize) return null;
+      return { name, age, jerseySize };
+    })
+    .filter((player): player is { name: string; age: number; jerseySize: string } => Boolean(player));
 }
 
 function defaultCompetitionRate(competitionType: string): number {
@@ -96,16 +115,20 @@ function serializeCompetition(input: CompetitionRealtimeRecordInput) {
 
   return {
     id: normalizeText(input.id),
+    eventId: normalizeNullableText(input.eventId),
+    eventTitle: normalizeNullableText(input.eventTitle),
     competitionType: normalizeText(input.competitionType).toUpperCase(),
     participantName: normalizeNullableText(input.participantName),
     age: normalizeInteger(input.age),
     gender: normalizeNullableText(input.gender)?.toUpperCase() ?? null,
     customerPhone: normalizeNullableText(input.customerPhone),
+    jerseySize: normalizeNullableText(input.jerseySize)?.toUpperCase() ?? null,
     teamName: normalizeNullableText(input.teamName),
     playerOne: normalizeNullableText(input.playerOne),
     playerTwo: normalizeNullableText(input.playerTwo),
     playerThree: normalizeNullableText(input.playerThree),
     playerFour: normalizeNullableText(input.playerFour),
+    players: normalizePlayers(input.players),
     isPaid: normalizeBoolean(input.isPaid, false),
     amountDue:
       normalizeNumber(input.amountDue) ??

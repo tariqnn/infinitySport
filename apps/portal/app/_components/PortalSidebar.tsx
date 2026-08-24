@@ -28,6 +28,7 @@ const NAV_SECTIONS = [
       { label: "Bookings", href: "/bookings", icon: CalendarIcon },
       { label: "Registrations", href: "/registrations", icon: ClipboardDocumentListIcon },
       { label: "Summer Camp", href: "/summer-camp-registrations", icon: SunIcon },
+      { label: "3x3 Teams", href: "/event-teams", icon: TrophyIcon },
       { label: "Competitions", href: "/competitions", icon: TrophyIcon },
       { label: "Guest Accounts", href: "/guests", icon: UserGroupIcon },
     ],

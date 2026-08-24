@@ -47,6 +47,32 @@ if (!copyIfExists(rootStandaloneDir, hostingerOutputDir)) {
   process.exit(0);
 }
 
+// Hostinger's custom-output validator looks for a standalone server inside the
+// configured output directory. Keep the deployable server at the output root,
+// and provide lightweight compatibility entrypoints for both layouts used by
+// its Next.js detector.
+const hostingerCompatibilityEntrypoints = [
+  {
+    file: path.join(hostingerOutputDir, "standalone", "server.js"),
+    rootExpression: "path.resolve(__dirname, '..')",
+    serverPath: "../server.js",
+  },
+  {
+    file: path.join(hostingerOutputDir, ".next", "standalone", "server.js"),
+    rootExpression: "path.resolve(__dirname, '..', '..')",
+    serverPath: "../../server.js",
+  },
+];
+for (const entrypoint of hostingerCompatibilityEntrypoints) {
+  fs.mkdirSync(path.dirname(entrypoint.file), { recursive: true });
+  fs.writeFileSync(
+    entrypoint.file,
+    `const path=require('path');\nprocess.chdir(${entrypoint.rootExpression});\nrequire('${entrypoint.serverPath}');\n`,
+    "utf8",
+  );
+  console.log(`[sync-web-next-output] Wrote Hostinger compatibility entrypoint: ${entrypoint.file}`);
+}
+
 copyIfExists(path.join(rootNextDir, "static"), path.join(hostingerOutputDir, ".next", "static"));
 copyIfExists(path.join(webDir, "public"), path.join(hostingerOutputDir, "public"));
 // Prisma removed — using @neondatabase/serverless (pure HTTP, no binary engine)

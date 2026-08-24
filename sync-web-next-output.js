@@ -8,6 +8,108 @@ function copyIfExists(from, to) {
   return true;
 }
 
+function resolveInstalledPackageDir(packageName, fromDir, installRoot) {
+  let currentDir = fromDir;
+  while (true) {
+    const packageDir = path.join(currentDir, "node_modules", packageName);
+    if (fs.existsSync(path.join(packageDir, "package.json"))) return packageDir;
+    if (currentDir === installRoot) return null;
+
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir || !parentDir.startsWith(installRoot)) return null;
+    currentDir = parentDir;
+  }
+}
+
+function copyRuntimePackageTrees(packageNames, installRoot, targetNodeModulesDir) {
+  const queue = packageNames.map((packageName) => ({ packageName, fromDir: installRoot }));
+  const copied = new Set();
+
+  while (queue.length > 0) {
+    const { packageName, fromDir } = queue.shift();
+    if (copied.has(packageName)) continue;
+
+    const packageDir = resolveInstalledPackageDir(packageName, fromDir, installRoot);
+    if (!packageDir) continue;
+
+    const packageJson = JSON.parse(
+      fs.readFileSync(path.join(packageDir, "package.json"), "utf8"),
+    );
+    copyIfExists(packageDir, path.join(targetNodeModulesDir, packageName));
+    copied.add(packageName);
+
+    const dependencies = {
+      ...packageJson.dependencies,
+      ...packageJson.optionalDependencies,
+    };
+    for (const dependencyName of Object.keys(dependencies)) {
+      queue.push({ packageName: dependencyName, fromDir: packageDir });
+    }
+  }
+}
+
+function renameRuntimeModuleDirs(root) {
+  const moduleDirs = [];
+
+  function collect(currentDir) {
+    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+
+      const entryPath = path.join(currentDir, entry.name);
+      collect(entryPath);
+      if (entry.name === "node_modules") moduleDirs.push(entryPath);
+    }
+  }
+
+  collect(root);
+  for (const moduleDir of moduleDirs) {
+    const runtimeDir = path.join(path.dirname(moduleDir), "runtime_modules");
+    fs.renameSync(moduleDir, runtimeDir);
+  }
+}
+
+function makeStandaloneModulesPortable(standaloneDir) {
+  const serverFile = path.join(standaloneDir, "server.js");
+  const nodeModulesDir = path.join(standaloneDir, "node_modules");
+
+  if (!fs.existsSync(serverFile) || !fs.existsSync(nodeModulesDir)) return false;
+
+  // Hostinger intentionally excludes directories named `node_modules` while
+  // copying a build output into /nodejs. Preserve Next's traced standalone
+  // dependencies under a deploy-safe name and add them to Node's lookup path.
+  renameRuntimeModuleDirs(standaloneDir);
+
+  const serverSource = fs.readFileSync(serverFile, "utf8");
+  const nextRequire = "require('next')";
+  if (!serverSource.includes(nextRequire)) {
+    throw new Error(`[sync-web-next-output] Could not patch Next entrypoint: ${serverFile}`);
+  }
+
+  const runtimeLoader =
+    "const fs = require('fs')\n" +
+    "const runtimeModuleDirs = []\n" +
+    "function collectRuntimeModuleDirs(currentDir) {\n" +
+    "  for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {\n" +
+    "    if (!entry.isDirectory() || entry.name === '.next') continue\n" +
+    "    const entryPath = path.join(currentDir, entry.name)\n" +
+    "    collectRuntimeModuleDirs(entryPath)\n" +
+    "    if (entry.name === 'runtime_modules') runtimeModuleDirs.push(entryPath)\n" +
+    "  }\n" +
+    "}\n" +
+    "collectRuntimeModuleDirs(__dirname)\n" +
+    "for (const runtimeDir of runtimeModuleDirs) {\n" +
+    "  const nodeModulesDir = path.join(path.dirname(runtimeDir), 'node_modules')\n" +
+    "  if (!fs.existsSync(nodeModulesDir)) fs.renameSync(runtimeDir, nodeModulesDir)\n" +
+    "}\n\n";
+
+  fs.writeFileSync(
+    serverFile,
+    serverSource.replace(nextRequire, `${runtimeLoader}${nextRequire}`),
+    "utf8",
+  );
+  return true;
+}
+
 const rootDir = process.cwd();
 const webDir = path.join(rootDir, "apps", "web");
 const webNextDir = path.join(webDir, ".next");
@@ -26,6 +128,28 @@ if (fs.existsSync(rootNextDir)) {
 }
 copyIfExists(webNextDir, rootNextDir);
 console.log(`[sync-web-next-output] Synced ${webNextDir} -> ${rootNextDir}`);
+
+// The monorepo install is hoisted, so Next's file trace can omit packages that
+// are resolved above apps/web. Copy the small runtime set that the server and
+// API routes load directly before making the standalone artifact portable.
+copyRuntimePackageTrees(
+  [
+    "react",
+    "react-dom",
+    "styled-jsx",
+    "pg",
+    "@neondatabase/serverless",
+    "firebase-admin",
+  ],
+  rootDir,
+  path.join(rootStandaloneDir, "node_modules"),
+);
+
+if (makeStandaloneModulesPortable(rootStandaloneDir)) {
+  console.log(
+    `[sync-web-next-output] Preserved standalone runtime modules for Hostinger: ${rootStandaloneDir}`,
+  );
+}
 
 // Guarantee .next/server.js exists for hosts that deploy ".next" as output.
 if (fs.existsSync(rootStandaloneDir)) {
@@ -75,24 +199,6 @@ for (const entrypoint of hostingerCompatibilityEntrypoints) {
 
 copyIfExists(path.join(rootNextDir, "static"), path.join(hostingerOutputDir, ".next", "static"));
 copyIfExists(path.join(webDir, "public"), path.join(hostingerOutputDir, "public"));
-// Prisma removed — using @neondatabase/serverless (pure HTTP, no binary engine)
-// pg pool is used by the landing page for lightweight DB queries
-copyIfExists(path.join(rootDir, "node_modules", "pg"), path.join(hostingerOutputDir, "node_modules", "pg"));
-copyIfExists(path.join(rootDir, "node_modules", "pg-pool"), path.join(hostingerOutputDir, "node_modules", "pg-pool"));
-copyIfExists(path.join(rootDir, "node_modules", "pg-protocol"), path.join(hostingerOutputDir, "node_modules", "pg-protocol"));
-copyIfExists(path.join(rootDir, "node_modules", "pg-types"), path.join(hostingerOutputDir, "node_modules", "pg-types"));
-copyIfExists(path.join(rootDir, "node_modules", "pg-connection-string"), path.join(hostingerOutputDir, "node_modules", "pg-connection-string"));
-copyIfExists(path.join(rootDir, "node_modules", "pgpass"), path.join(hostingerOutputDir, "node_modules", "pgpass"));
-copyIfExists(path.join(rootDir, "node_modules", "pg-cloudflare"), path.join(hostingerOutputDir, "node_modules", "pg-cloudflare"));
-copyIfExists(path.join(rootDir, "node_modules", "pg-int8"), path.join(hostingerOutputDir, "node_modules", "pg-int8"));
-copyIfExists(path.join(rootDir, "node_modules", "postgres-array"), path.join(hostingerOutputDir, "node_modules", "postgres-array"));
-copyIfExists(path.join(rootDir, "node_modules", "postgres-bytea"), path.join(hostingerOutputDir, "node_modules", "postgres-bytea"));
-copyIfExists(path.join(rootDir, "node_modules", "postgres-date"), path.join(hostingerOutputDir, "node_modules", "postgres-date"));
-copyIfExists(path.join(rootDir, "node_modules", "postgres-interval"), path.join(hostingerOutputDir, "node_modules", "postgres-interval"));
-copyIfExists(path.join(rootDir, "node_modules", "postgres-range"), path.join(hostingerOutputDir, "node_modules", "postgres-range"));
-copyIfExists(path.join(rootDir, "node_modules", "split2"), path.join(hostingerOutputDir, "node_modules", "split2"));
-copyIfExists(path.join(rootDir, "node_modules", "obuf"), path.join(hostingerOutputDir, "node_modules", "obuf"));
-copyIfExists(path.join(rootDir, "node_modules", "packet-reader"), path.join(hostingerOutputDir, "node_modules", "packet-reader"));
 
 const buildDbUrl =
   process.env.DATABASE_URL ||

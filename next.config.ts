@@ -6,6 +6,7 @@ interface WebpackConfigWithResolve {
 }
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   transpilePackages: ['@infinity/types', '@infinity/mock-api'],
   webpack: (config: unknown) => {
     const c = config as WebpackConfigWithResolve;

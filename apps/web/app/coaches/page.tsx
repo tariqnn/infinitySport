@@ -8,7 +8,10 @@ export const metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function CoachesPage() {
-  const coaches = await fetchCoaches();
+  const coaches = (await fetchCoaches()).filter((coach) => {
+    const text = `${coach.sport} ${coach.name} ${coach.description}`.toLowerCase();
+    return !text.includes('gymnast');
+  });
   return <CoachesSection coaches={coaches} />;
 }
 

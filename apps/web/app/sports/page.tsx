@@ -9,7 +9,7 @@ export const revalidate = 0;
 
 type PackageItem = Awaited<ReturnType<typeof fetchPackages>>[number];
 
-const SPORT_ORDER = ['VOLLEYBALL', 'BOXING', 'BASKETBALL', 'GYMNASTICS'];
+const SPORT_ORDER = ['VOLLEYBALL', 'BOXING', 'BASKETBALL'];
 
 /* ── Sport-specific config ── */
 const SPORT_META: Record<string, {
@@ -45,27 +45,6 @@ const SPORT_META: Record<string, {
       </svg>
     ),
   },
-  GYMNASTICS: {
-    tagline: 'Powered by Phoenix Academy',
-    accent: '#60D066',
-    accentSecondary: '#4DD4C4',
-    iconSvg: (
-      <svg viewBox="0 0 48 48" fill="none" className="h-full w-full" strokeLinecap="round" strokeLinejoin="round">
-        {/* Head */}
-        <circle cx="24" cy="8" r="4.5" stroke="currentColor" strokeWidth="2.5"/>
-        {/* Body doing a Y-pose / star pose */}
-        <path d="M24 12.5V26" stroke="currentColor" strokeWidth="2.5"/>
-        {/* Arms reaching up and out like a gymnastics pose */}
-        <path d="M24 18L14 10" stroke="currentColor" strokeWidth="2.5"/>
-        <path d="M24 18L34 10" stroke="currentColor" strokeWidth="2.5"/>
-        {/* Legs in a split / dynamic pose */}
-        <path d="M24 26L16 40" stroke="currentColor" strokeWidth="2.5"/>
-        <path d="M24 26L32 40" stroke="currentColor" strokeWidth="2.5"/>
-        {/* Balance beam */}
-        <line x1="10" y1="42" x2="38" y2="42" stroke="currentColor" strokeWidth="2" opacity="0.4"/>
-      </svg>
-    ),
-  },
   BOXING: {
     tagline: 'Train like a champion',
     accent: '#141AFF',
@@ -95,7 +74,6 @@ function displaySport(value: string): string {
   const normalized = normalizeSport(value);
   if (normalized === 'BASKETBALL') return 'Basketball';
   if (normalized === 'BOXING') return 'Boxing';
-  if (normalized === 'GYMNASTICS') return 'Gymnastics';
   if (normalized === 'VOLLEYBALL') return 'Volleyball';
   return value || 'Other';
 }
@@ -144,6 +122,7 @@ export default async function SportsPage() {
   const groups = new Map<string, PackageItem[]>();
   for (const program of programsData) {
     const key = normalizeSport(program.sportType);
+    if (key.includes('GYMNAST') || program.name.toUpperCase().includes('GYMNAST')) continue;
     const list = groups.get(key) || [];
     list.push(program);
     groups.set(key, list);

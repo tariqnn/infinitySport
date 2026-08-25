@@ -9,7 +9,7 @@ export const revalidate = 0;
 
 type PackageItem = Awaited<ReturnType<typeof fetchPackages>>[number];
 
-const SPORT_ORDER = ['BASKETBALL', 'GYMNASTICS', 'VOLLEYBALL'];
+const SPORT_ORDER = ['BASKETBALL', 'VOLLEYBALL'];
 
 function normalizeSport(value: string): string {
   return (value || 'OTHER').trim().toUpperCase();
@@ -18,7 +18,6 @@ function normalizeSport(value: string): string {
 function displaySport(value: string): string {
   const normalized = normalizeSport(value);
   if (normalized === 'BASKETBALL') return 'Basketball';
-  if (normalized === 'GYMNASTICS') return 'Gymnastics';
   if (normalized === 'VOLLEYBALL') return 'Volleyball';
   return value || 'Other';
 }
@@ -68,6 +67,7 @@ export default async function SportsPage() {
   const groups = new Map<string, PackageItem[]>();
   for (const program of programsData) {
     const key = normalizeSport(program.sportType);
+    if (key.includes('GYMNAST') || program.name.toUpperCase().includes('GYMNAST')) continue;
     const list = groups.get(key) || [];
     list.push(program);
     groups.set(key, list);

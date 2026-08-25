@@ -22,7 +22,6 @@ function academyBySport(sport: string): string | null {
   const normalized = sport.trim().toLowerCase();
   if (normalized === "basketball") return "Infinity Sports Basketball Academy";
   if (normalized === "volleyball") return "Powered by Spikers Academy";
-  if (normalized === "gymnastics") return "Powered by Phoenix Academy";
   return null;
 }
 

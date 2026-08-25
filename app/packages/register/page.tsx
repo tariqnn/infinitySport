@@ -13,7 +13,7 @@ export default function PackageRegisterPage() {
         <p className="text-sm uppercase tracking-[0.3em] text-brand-green-dark">Packages</p>
         <h1 className="mt-4 text-4xl font-bold text-brand-black">Register now</h1>
         <p className="mt-2 text-gray-600">
-          Register for Basketball, Gymnastics, or Volleyball. We will contact you to confirm.
+          Register for Basketball or Volleyball. We will contact you to confirm.
         </p>
         <Link href="/sports" className="mt-4 inline-block text-sm font-semibold text-brand-blue-primary hover:text-brand-green-primary">
           ← Back to Sports & packages

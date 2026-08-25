@@ -9,7 +9,10 @@ export const metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function FacilitiesPage() {
-  const facilitiesData = await fetchFacilities();
+  const facilitiesData = (await fetchFacilities()).filter((facility) => {
+    const text = `${facility.id} ${facility.name} ${facility.description || ''}`.toLowerCase();
+    return !text.includes('gymnast');
+  });
   
   // Transform API data to match UI structure
   const facilities = facilitiesData.map((facility) => ({
@@ -63,10 +66,6 @@ export default async function FacilitiesPage() {
               <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
               Official Volleyball Court
             </li>
-            <li className="flex items-center gap-2">
-              <span className="block h-1.5 w-1.5 rounded-full bg-brand-green-primary" />
-              Official Gymnastics Training Facility
-            </li>
           </ul>
         </div>
       </div>
@@ -76,5 +75,4 @@ export default async function FacilitiesPage() {
     </div>
   );
 }
-
 

@@ -89,7 +89,6 @@ const FALLBACK_FACILITIES: { id: string; name: string; description: string }[] =
   { id: 'multipurpose-hall', name: 'Multipurpose Hall', description: 'Suitable for Yoga, Pilates, Ballet, Kickboxing, and more.' },
   { id: 'padel-merry', name: 'Padel Court by Merry Sports', description: 'Professional padel court by Merry Sports.' },
   { id: 'volleyball', name: 'Official Volleyball Court', description: 'Full-size official volleyball court.' },
-  { id: 'gymnastics', name: 'Official Gymnastics Training Facility', description: 'Dedicated gymnastics training facility meeting official standards.' },
 ];
 
 function canUseDb() {

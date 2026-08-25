@@ -93,9 +93,6 @@ export const translations = {
     home_programs_desc: 'All basketball programs include 12 sessions over three weeks.',
     home_view_all_programs: 'View All Programs',
     home_packages: 'Packages',
-    home_gymnastics_packages: 'Gymnastics Packages',
-    home_gymnastics_programs: 'Gymnastics Programs',
-    home_gymnastics_programs_desc: 'Age-appropriate programs that build flexibility, balance, strength, and confidence.',
     home_volleyball: 'Volleyball',
     home_volleyball_desc: '100 JOD for 10 sessions • 7+ years • 10% sibling discount • Special group rates',
     home_game_ready: 'Game-ready coaching',
@@ -225,9 +222,6 @@ export const translations = {
     home_programs_desc: 'جميع برامج كرة السلة تشمل 12 جلسة على مدى ثلاثة أسابيع.',
     home_view_all_programs: 'عرض جميع البرامج',
     home_packages: 'الباقات',
-    home_gymnastics_packages: 'باقات الجمباز',
-    home_gymnastics_programs: 'برامج الجمباز',
-    home_gymnastics_programs_desc: 'برامج مناسبة للعمر تبني المرونة والتوازن والقوة والثقة.',
     home_volleyball: 'الكرة الطائرة',
     home_volleyball_desc: '100 د.أ لـ 10 جلسات • 7 سنوات فما فوق • خصم 10% للإخوة • أسعار خاصة للمجموعات',
     home_game_ready: 'تدريب جاهز للمباريات',
@@ -278,4 +272,3 @@ export function tr(lang: Language, key: TranslationKey): string {
   const value = langMap[key];
   return value ?? (translations.en[key] as string) ?? String(key);
 }
-

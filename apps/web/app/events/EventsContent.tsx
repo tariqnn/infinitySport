@@ -35,6 +35,7 @@ function EventCard({
   const detailUrl = `/events/${encodeURIComponent(event.slug || event.id)}`;
   const registrationUrl = registrationLinkFor(event);
   const imageUrl = event.imageUrl || '/events.jpeg';
+  const isLive = event.contentType === 'LIVE';
 
   return (
     <article className="group flex h-full flex-col overflow-hidden rounded-2xl border border-brand-lightBlue/20 bg-white shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition duration-300 hover:-translate-y-1 hover:border-brand-green-primary/60 hover:shadow-[0_16px_42px_rgba(20,26,255,0.14)]">
@@ -46,12 +47,15 @@ function EventCard({
           className={`h-full w-full object-cover transition duration-500 group-hover:scale-105 ${past ? 'opacity-80' : ''}`}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
-        <span className="absolute left-4 top-4 rounded-full bg-white/95 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-[#003DA5] shadow">
-          {past ? 'Event recap' : registrationUrl ? 'Registration open' : 'Upcoming event'}
+        <span className={`absolute left-4 top-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider shadow ${
+          isLive ? 'bg-red-600 text-white' : 'bg-white/95 text-[#003DA5]'
+        }`}>
+          {isLive ? <span className="h-2 w-2 rounded-full bg-white" aria-hidden="true" /> : null}
+          {isLive ? 'Live now' : past ? 'Event recap' : registrationUrl ? 'Registration open' : 'Upcoming event'}
         </span>
-        {event.contentType === 'VIDEO' ? (
+        {event.contentType === 'VIDEO' || isLive ? (
           <span className="absolute bottom-4 right-4 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white">
-            Video
+            {isLive ? 'Live stream' : 'Video'}
           </span>
         ) : null}
       </Link>
@@ -96,9 +100,14 @@ function EventCard({
 export function EventsContent({ eventsData }: { eventsData: EventResponse[] }) {
   const { language } = useLanguage();
   const now = Date.now();
-  const upcoming = eventsData.filter((event) => new Date(event.date).getTime() >= now);
-  const past = eventsData.filter((event) => new Date(event.date).getTime() < now);
+  const upcoming = eventsData.filter(
+    (event) => event.contentType === 'LIVE' || new Date(event.endAt || event.date).getTime() >= now,
+  );
+  const past = eventsData.filter(
+    (event) => event.contentType !== 'LIVE' && new Date(event.endAt || event.date).getTime() < now,
+  );
   const featured = upcoming[0] || eventsData[0];
+  const featuredIsLive = featured?.contentType === 'LIVE';
 
   return (
     <div className="bg-white pb-24">
@@ -129,9 +138,14 @@ export function EventsContent({ eventsData }: { eventsData: EventResponse[] }) {
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link
                   href={`/events/${encodeURIComponent(featured.slug || featured.id)}`}
-                  className="inline-flex min-h-12 items-center justify-center rounded-xl bg-[#60D394] px-6 text-sm font-black text-slate-950 transition hover:bg-[#79e2a9]"
+                  className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-6 text-sm font-black transition ${
+                    featuredIsLive
+                      ? 'bg-red-600 text-white hover:bg-red-500'
+                      : 'bg-[#60D394] text-slate-950 hover:bg-[#79e2a9]'
+                  }`}
                 >
-                  Explore event
+                  {featuredIsLive ? <span className="h-2 w-2 rounded-full bg-white" aria-hidden="true" /> : null}
+                  {featuredIsLive ? 'Watch live' : 'Explore event'}
                 </Link>
                 {registrationLinkFor(featured) ? (
                   <Link

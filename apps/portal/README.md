@@ -36,6 +36,19 @@ WHATSAPP_SEND_CONCURRENCY=4
 The sender removes duplicate phone numbers and reports invalid numbers or
 delivery-request failures after each broadcast.
 
+The example `+14155238886` is the shared testing sandbox and must not be used
+for production. To send from the academy's own number, register that number as
+an approved WhatsApp Business sender first, then replace
+`TWILIO_WHATSAPP_FROM` with the approved number in E.164 format, for example:
+
+```bash
+TWILIO_WHATSAPP_FROM=whatsapp:+9627XXXXXXXX
+```
+
+The name players see is the WhatsApp Business display name approved for that
+sender. It is configured in the sender's business profile, not in this
+application. Player-facing Portal messages use provider-neutral wording.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More

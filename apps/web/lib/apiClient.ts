@@ -43,7 +43,7 @@ export type EventResponse = {
   slug?: string;
   videoUrl?: string;
   galleryUrls?: string[];
-  contentType?: 'GALLERY' | 'VIDEO';
+  contentType?: 'GALLERY' | 'VIDEO' | 'LIVE';
   registrationUrl?: string;
   registrationEnabled?: boolean;
   tournamentOptions?: string[];
@@ -688,7 +688,7 @@ export async function fetchEvents(): Promise<EventResponse[]> {
       slug: (row.slug as string) ?? undefined,
       videoUrl: (row.videoUrl as string) ?? undefined,
       galleryUrls: Array.isArray(row.galleryUrls) ? row.galleryUrls as string[] : [],
-      contentType: row.contentType === 'VIDEO' ? 'VIDEO' : 'GALLERY',
+      contentType: row.contentType === 'LIVE' ? 'LIVE' : row.contentType === 'VIDEO' ? 'VIDEO' : 'GALLERY',
       registrationUrl: (row.registrationUrl as string) ?? undefined,
       registrationEnabled: Boolean(row.registrationEnabled),
       tournamentOptions: Array.isArray(row.tournamentOptions) ? row.tournamentOptions as string[] : [],
@@ -1029,7 +1029,7 @@ async function _fetchLandingContent(): Promise<LandingContent> {
       slug: (row.slug as string) ?? undefined,
       videoUrl: (row.videoUrl as string) ?? undefined,
       galleryUrls: Array.isArray(row.galleryUrls) ? row.galleryUrls as string[] : [],
-      contentType: row.contentType === 'VIDEO' ? 'VIDEO' : 'GALLERY',
+      contentType: row.contentType === 'LIVE' ? 'LIVE' : row.contentType === 'VIDEO' ? 'VIDEO' : 'GALLERY',
       registrationUrl: (row.registrationUrl as string) ?? undefined,
       registrationEnabled: Boolean(row.registrationEnabled),
       tournamentOptions: Array.isArray(row.tournamentOptions) ? row.tournamentOptions as string[] : [],

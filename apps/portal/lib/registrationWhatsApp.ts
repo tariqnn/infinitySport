@@ -69,7 +69,7 @@ function getTwilioConfiguration() {
 
   if (!accountSid || !authToken || !from) {
     throw new Error(
-      "WhatsApp is not configured. Add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_WHATSAPP_FROM to the Portal environment.",
+      "WhatsApp Business messaging is not configured. Ask the server administrator to finish the sender setup.",
     );
   }
 
@@ -77,13 +77,15 @@ function getTwilioConfiguration() {
 }
 
 async function readTwilioError(response: Response) {
-  const fallback = `Twilio rejected the message (${response.status}).`;
+  const fallback = `The WhatsApp messaging provider rejected the message (${response.status}).`;
   try {
     const payload = (await response.json()) as {
       message?: string;
       code?: number | string;
     };
-    const detail = String(payload.message || "").trim();
+    const detail = String(payload.message || "")
+      .replace(/\bTwilio\b/gi, "WhatsApp provider")
+      .trim();
     const code = payload.code ? ` [${payload.code}]` : "";
     return detail ? `${detail}${code}` : fallback;
   } catch {

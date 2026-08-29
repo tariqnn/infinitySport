@@ -9,6 +9,7 @@ import {
 } from '../../../../../lib/academyEventsFirestore';
 import { getFirestore } from '../../../../../lib/firebase-admin';
 import { prisma } from '../../../../../lib/db';
+import { getYouTubeEmbedUrl } from '../../../../../lib/youtube';
 import {
   markCompetitionDeletedInFirestore,
   syncCompetitionRecordToFirestore,
@@ -132,8 +133,8 @@ function slugify(input: string): string {
     .replace(/-+/g, '-');
 }
 
-function toEventContentType(value: unknown): 'GALLERY' | 'VIDEO' {
-  return value === 'VIDEO' ? 'VIDEO' : 'GALLERY';
+function toEventContentType(value: unknown): 'GALLERY' | 'VIDEO' | 'LIVE' {
+  return value === 'LIVE' ? 'LIVE' : value === 'VIDEO' ? 'VIDEO' : 'GALLERY';
 }
 
 async function handleGet(resource: string, id: string | null, request: NextRequest) {
@@ -320,6 +321,9 @@ async function handlePost(resource: string, body: JsonBody) {
     }
     if (contentType === 'VIDEO' && !videoUrl) {
       return jsonError('Upload a featured video before saving this event');
+    }
+    if (contentType === 'LIVE' && !getYouTubeEmbedUrl(videoUrl)) {
+      return jsonError('Paste a valid YouTube video or live-stream link');
     }
 
     const firestoreId = await createAcademyEvent({
@@ -569,6 +573,9 @@ async function handlePatch(resource: string, id: string | null, body: JsonBody) 
         : existing.videoUrl;
       if (patchFs.contentType === 'VIDEO' && !nextVideoUrl) {
         return jsonError('Upload a featured video before saving this event');
+      }
+      if (patchFs.contentType === 'LIVE' && !getYouTubeEmbedUrl(nextVideoUrl)) {
+        return jsonError('Paste a valid YouTube video or live-stream link');
       }
     }
     if (hasOwn(body, 'registrationUrl')) {

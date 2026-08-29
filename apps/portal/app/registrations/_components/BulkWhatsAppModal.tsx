@@ -299,7 +299,7 @@ export function BulkWhatsAppModal({
             <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 shrink-0" />
             <p>
               Review the audience and message before sending. WhatsApp may require an approved
-              Twilio template when a player has not contacted the academy recently.
+              business message template when a player has not contacted the academy recently.
             </p>
           </div>
         </div>

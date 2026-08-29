@@ -13,6 +13,7 @@ import {
   Link2,
   MapPin,
   Plus,
+  Radio,
   Save,
   Search,
   Trash2,
@@ -22,6 +23,7 @@ import {
 import { FileUpload } from '../../_components/FileUpload';
 import { useActionToast } from '../../_components/useActionToast';
 import { apiClient } from '../../../lib/apiClient';
+import { getYouTubeEmbedUrl } from '../../../lib/youtube';
 import { EventRegistrationsManager } from './EventRegistrationsManager';
 
 type EventState = {
@@ -29,7 +31,7 @@ type EventState = {
   message?: string;
 };
 
-type ContentType = 'GALLERY' | 'VIDEO';
+type ContentType = 'GALLERY' | 'VIDEO' | 'LIVE';
 
 type AdminApiEvent = {
   id: string;
@@ -128,7 +130,7 @@ function eventToForm(event: AdminApiEvent): EventForm {
     imageUrl: event.imageUrl || '',
     videoUrl: event.videoUrl || '',
     galleryUrls: Array.isArray(event.galleryUrls) ? event.galleryUrls : [],
-    contentType: event.contentType === 'VIDEO' ? 'VIDEO' : 'GALLERY',
+    contentType: event.contentType === 'LIVE' ? 'LIVE' : event.contentType === 'VIDEO' ? 'VIDEO' : 'GALLERY',
     registrationUrl: event.registrationUrl || '',
     registrationEnabled: Boolean(event.registrationEnabled),
     tournamentOptions:
@@ -254,6 +256,7 @@ function ProductionPreview({ form }: { form: EventForm }) {
   const previewDate = form.date ? new Date(form.date) : null;
   const image = resolveMediaUrl(form.imageUrl);
   const video = resolveMediaUrl(form.videoUrl);
+  const liveEmbedUrl = form.contentType === 'LIVE' ? getYouTubeEmbedUrl(form.videoUrl) : null;
   const gallery = form.galleryUrls.map(resolveMediaUrl);
 
   return (
@@ -268,7 +271,16 @@ function ProductionPreview({ form }: { form: EventForm }) {
       </div>
       <div className="bg-slate-950">
         <div className="relative aspect-[16/10] overflow-hidden">
-          {form.contentType === 'VIDEO' && video ? (
+          {form.contentType === 'LIVE' && liveEmbedUrl ? (
+            <iframe
+              src={liveEmbedUrl}
+              title="Live-stream preview"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              loading="lazy"
+              className="h-full w-full focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#60D394]"
+            />
+          ) : form.contentType === 'VIDEO' && video ? (
             <video src={video} poster={image || undefined} controls className="h-full w-full object-cover" />
           ) : image ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -318,6 +330,11 @@ function ProductionPreview({ form }: { form: EventForm }) {
           ) : null}
           <div className="flex gap-2">
             <span className="rounded-lg bg-[#60D394] px-3 py-2 text-xs font-bold text-slate-950">Event details</span>
+            {form.contentType === 'LIVE' ? (
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-xs font-bold text-white">
+                <span className="h-1.5 w-1.5 rounded-full bg-white" /> Live
+              </span>
+            ) : null}
             {form.registrationEnabled || form.registrationUrl ? (
               <span className="rounded-lg border border-white/20 px-3 py-2 text-xs font-semibold">Register</span>
             ) : null}
@@ -366,12 +383,13 @@ export function EventsManager() {
         !query ||
         event.title.toLowerCase().includes(query) ||
         (event.location || '').toLowerCase().includes(query);
-      const eventTime = new Date(event.date).getTime();
+      const eventTime = new Date(event.endAt || event.date).getTime();
+      const isLive = event.contentType === 'LIVE';
       const matchesFilter =
         filter === 'ALL' ||
         (filter === 'DRAFT' && event.highlight === false) ||
-        (filter === 'UPCOMING' && event.highlight !== false && eventTime >= now) ||
-        (filter === 'PAST' && eventTime < now);
+        (filter === 'UPCOMING' && event.highlight !== false && (isLive || eventTime >= now)) ||
+        (filter === 'PAST' && !isLive && eventTime < now);
       return matchesSearch && matchesFilter;
     });
   }, [events, filter, search]);
@@ -380,7 +398,11 @@ export function EventsManager() {
     const now = Date.now();
     return {
       total: events.length,
-      upcoming: events.filter((event) => event.highlight !== false && new Date(event.date).getTime() >= now).length,
+      upcoming: events.filter(
+        (event) =>
+          event.highlight !== false &&
+          (event.contentType === 'LIVE' || new Date(event.endAt || event.date).getTime() >= now),
+      ).length,
       drafts: events.filter((event) => event.highlight === false).length,
     };
   }, [events]);
@@ -458,6 +480,10 @@ export function EventsManager() {
     }
     if (form.contentType === 'VIDEO' && !form.videoUrl) {
       setActionState({ status: 'error', message: 'Upload a featured video or switch to Gallery.' });
+      return;
+    }
+    if (form.contentType === 'LIVE' && !getYouTubeEmbedUrl(form.videoUrl)) {
+      setActionState({ status: 'error', message: 'Paste a valid YouTube video or live-stream link.' });
       return;
     }
     if (form.registrationEnabled && tournamentOptions.length === 0) {
@@ -641,7 +667,11 @@ export function EventsManager() {
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
                       <span className="truncate text-sm font-bold text-slate-900">{event.title}</span>
-                      {event.contentType === 'VIDEO' ? <Film className="h-3.5 w-3.5 shrink-0 text-[#003DA5]" /> : null}
+                      {event.contentType === 'LIVE' ? (
+                        <Radio className="h-3.5 w-3.5 shrink-0 text-red-600" />
+                      ) : event.contentType === 'VIDEO' ? (
+                        <Film className="h-3.5 w-3.5 shrink-0 text-[#003DA5]" />
+                      ) : null}
                     </span>
                     <span className="mt-1 block text-xs text-slate-500">
                       {new Date(event.date).toLocaleDateString()} · {event.location || 'Infinity Sports'}
@@ -782,15 +812,26 @@ export function EventsManager() {
               </div>
               <fieldset className="mt-6">
                 <legend className="text-sm font-semibold text-slate-700">Main event content</legend>
-                <div className="mt-2 grid grid-cols-2 gap-2">
+                <div className="mt-2 grid gap-2 sm:grid-cols-3">
                   {([
                     ['GALLERY', ImageIcon, 'Photo gallery'],
                     ['VIDEO', Film, 'Featured video'],
+                    ['LIVE', Radio, 'YouTube Live'],
                   ] as const).map(([value, Icon, label]) => (
                     <button
                       key={value}
                       type="button"
-                      onClick={() => updateForm('contentType', value)}
+                      onClick={() => {
+                        setForm((current) => ({
+                          ...current,
+                          contentType: value,
+                          videoUrl:
+                            (value === 'LIVE' && current.contentType === 'VIDEO') ||
+                            (value === 'VIDEO' && current.contentType === 'LIVE')
+                              ? ''
+                              : current.videoUrl,
+                        }));
+                      }}
                       className={`flex min-h-12 items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-bold transition ${
                         form.contentType === value
                           ? 'border-[#003DA5] bg-blue-50 text-[#003DA5]'
@@ -804,7 +845,28 @@ export function EventsManager() {
                 </div>
               </fieldset>
 
-              {form.contentType === 'VIDEO' ? (
+              {form.contentType === 'LIVE' ? (
+                <div className="mt-5 rounded-xl border border-red-200 bg-red-50/60 p-4">
+                  <label className="block">
+                    <FieldLabel>YouTube live link *</FieldLabel>
+                    <div className="relative">
+                      <Radio className="pointer-events-none absolute left-3 top-1/2 mt-0.5 h-4 w-4 -translate-y-1/2 text-red-600" />
+                      <input
+                        type="url"
+                        value={form.videoUrl}
+                        onChange={(event) => updateForm('videoUrl', event.target.value)}
+                        placeholder="https://www.youtube.com/watch?v=..."
+                        className={`${inputClass} pl-9`}
+                        aria-describedby="youtube-live-help"
+                        required
+                      />
+                    </div>
+                  </label>
+                  <p id="youtube-live-help" className="mt-2 text-xs leading-5 text-slate-600">
+                    In YouTube Studio, create the live event, then paste its Share link here. No API key is needed.
+                  </p>
+                </div>
+              ) : form.contentType === 'VIDEO' ? (
                 <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50/50 p-4">
                   <FileUpload
                     label="Featured video *"

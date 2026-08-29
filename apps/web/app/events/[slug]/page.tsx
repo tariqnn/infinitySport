@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { fetchEventBySlug } from '../../../lib/apiClient';
+import { getYouTubeEmbedUrl } from '../../../lib/youtube';
 import { EventGallery } from './EventGallery';
 import { EventRegistrationForm } from './EventRegistrationForm';
 
@@ -56,6 +57,8 @@ export default async function EventPage({ params }: EventPageProps) {
   const imageUrl = event.imageUrl || '/events.jpeg';
   const galleryImages = (event.galleryUrls || []).filter(Boolean);
   const isVideo = event.contentType === 'VIDEO' && Boolean(event.videoUrl);
+  const liveEmbedUrl = event.contentType === 'LIVE' ? getYouTubeEmbedUrl(event.videoUrl) : null;
+  const isLive = Boolean(liveEmbedUrl);
   const tournamentOptions = (event.tournamentOptions || []).filter(Boolean);
   const jerseySizes = (event.jerseySizes || []).filter(Boolean);
   const usesBuiltInRegistration = Boolean(
@@ -95,7 +98,23 @@ export default async function EventPage({ params }: EventPageProps) {
           </div>
 
           <div className="mt-8 min-w-0 overflow-hidden rounded-xl border border-white/10 bg-slate-900">
-            {isVideo ? (
+            {isLive ? (
+              <div>
+                <div className="flex items-center gap-2 border-b border-white/10 bg-red-600 px-4 py-3 text-sm font-black uppercase tracking-[0.18em] text-white">
+                  <span className="h-2.5 w-2.5 rounded-full bg-white" aria-hidden="true" />
+                  Live now
+                </div>
+                <iframe
+                  src={liveEmbedUrl!}
+                  title={`${event.title} live stream`}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  loading="lazy"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  className="aspect-video w-full focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#60D394]"
+                />
+              </div>
+            ) : isVideo ? (
               <video
                 src={event.videoUrl}
                 poster={imageUrl}
@@ -131,7 +150,7 @@ export default async function EventPage({ params }: EventPageProps) {
         </section>
       ) : null}
 
-      {!isVideo && galleryImages.length > 0 ? (
+      {!isVideo && !isLive && galleryImages.length > 0 ? (
         <main className="mx-auto max-w-7xl px-6 py-16 lg:px-8 lg:py-20">
           <p className="text-sm font-black uppercase tracking-[0.25em] text-brand-green-dark">Gallery</p>
           <h2 className="mb-6 mt-2 text-3xl font-black text-brand-black">Inside the event</h2>

@@ -26,7 +26,7 @@ export type AcademyEventRecord = {
   imageUrl: string | null;
   videoUrl: string | null;
   galleryUrls: string[];
-  contentType: "GALLERY" | "VIDEO";
+  contentType: "GALLERY" | "VIDEO" | "LIVE";
   registrationUrl: string | null;
   registrationEnabled: boolean;
   tournamentOptions: string[];
@@ -54,7 +54,7 @@ export function docToAcademyEvent(
   data: DocumentData | undefined,
 ): AcademyEventRecord {
   const d = data ?? {};
-  const contentType = d.contentType === "VIDEO" ? "VIDEO" : "GALLERY";
+  const contentType = d.contentType === "LIVE" ? "LIVE" : d.contentType === "VIDEO" ? "VIDEO" : "GALLERY";
   return {
     id,
     title: String(d.title ?? ""),
@@ -122,7 +122,7 @@ export async function createAcademyEvent(input: {
   imageUrl?: string | null;
   videoUrl?: string | null;
   galleryUrls?: string[];
-  contentType?: "GALLERY" | "VIDEO";
+  contentType?: "GALLERY" | "VIDEO" | "LIVE";
   registrationUrl?: string | null;
   registrationEnabled?: boolean;
   tournamentOptions?: string[];
@@ -166,7 +166,7 @@ export async function updateAcademyEvent(
     imageUrl?: string | null;
     videoUrl?: string | null;
     galleryUrls?: string[];
-    contentType?: "GALLERY" | "VIDEO";
+    contentType?: "GALLERY" | "VIDEO" | "LIVE";
     registrationUrl?: string | null;
     registrationEnabled?: boolean;
     tournamentOptions?: string[];

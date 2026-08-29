@@ -71,13 +71,16 @@ function renameRuntimeModuleDirs(root) {
 function makeStandaloneModulesPortable(standaloneDir) {
   const serverFile = path.join(standaloneDir, "server.js");
   const nodeModulesDir = path.join(standaloneDir, "node_modules");
+  const portableModulesDir = path.join(standaloneDir, ".next", "hostinger_modules");
 
   if (!fs.existsSync(serverFile) || !fs.existsSync(nodeModulesDir)) return false;
 
-  // Hostinger intentionally excludes directories named `node_modules` while
-  // copying a build output into /nodejs. Preserve Next's traced standalone
-  // dependencies under a deploy-safe name and add them to Node's lookup path.
-  renameRuntimeModuleDirs(standaloneDir);
+  // Hostinger filters some framework packages from the standalone
+  // `node_modules` directory. Keep the complete traced runtime inside `.next`,
+  // which Hostinger copies intact, and link the packages back during startup.
+  renameRuntimeModuleDirs(nodeModulesDir);
+  fs.mkdirSync(path.dirname(portableModulesDir), { recursive: true });
+  fs.renameSync(nodeModulesDir, portableModulesDir);
 
   const serverSource = fs.readFileSync(serverFile, "utf8");
   const nextRequire = "require('next')";
@@ -87,19 +90,50 @@ function makeStandaloneModulesPortable(standaloneDir) {
 
   const runtimeLoader =
     "const fs = require('fs')\n" +
+    "const portableModulesDir = path.join(__dirname, '.next', 'hostinger_modules')\n" +
     "const runtimeModuleDirs = []\n" +
     "function collectRuntimeModuleDirs(currentDir) {\n" +
     "  for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {\n" +
-    "    if (!entry.isDirectory() || entry.name === '.next') continue\n" +
+    "    if (!entry.isDirectory()) continue\n" +
     "    const entryPath = path.join(currentDir, entry.name)\n" +
     "    collectRuntimeModuleDirs(entryPath)\n" +
     "    if (entry.name === 'runtime_modules') runtimeModuleDirs.push(entryPath)\n" +
     "  }\n" +
     "}\n" +
-    "collectRuntimeModuleDirs(__dirname)\n" +
-    "for (const runtimeDir of runtimeModuleDirs) {\n" +
-    "  const nodeModulesDir = path.join(path.dirname(runtimeDir), 'node_modules')\n" +
-    "  if (!fs.existsSync(nodeModulesDir)) fs.renameSync(runtimeDir, nodeModulesDir)\n" +
+    "function linkPackage(source, target) {\n" +
+    "  if (fs.existsSync(target)) return\n" +
+    "  try {\n" +
+    "    fs.symlinkSync(source, target, process.platform === 'win32' ? 'junction' : 'dir')\n" +
+    "  } catch (error) {\n" +
+    "    if (error.code !== 'EEXIST') throw error\n" +
+    "  }\n" +
+    "}\n" +
+    "if (fs.existsSync(portableModulesDir)) {\n" +
+    "  collectRuntimeModuleDirs(portableModulesDir)\n" +
+    "  for (const runtimeDir of runtimeModuleDirs) {\n" +
+    "    const nodeModulesDir = path.join(path.dirname(runtimeDir), 'node_modules')\n" +
+    "    if (!fs.existsSync(runtimeDir) || fs.existsSync(nodeModulesDir)) continue\n" +
+    "    try { fs.renameSync(runtimeDir, nodeModulesDir) } catch (error) {\n" +
+    "      if (error.code !== 'EEXIST' && error.code !== 'ENOENT') throw error\n" +
+    "    }\n" +
+    "  }\n" +
+    "  const targetModulesDir = path.join(__dirname, 'node_modules')\n" +
+    "  fs.mkdirSync(targetModulesDir, { recursive: true })\n" +
+    "  for (const entry of fs.readdirSync(portableModulesDir, { withFileTypes: true })) {\n" +
+    "    if (!entry.isDirectory()) continue\n" +
+    "    const sourcePath = path.join(portableModulesDir, entry.name)\n" +
+    "    if (!entry.name.startsWith('@')) {\n" +
+    "      linkPackage(sourcePath, path.join(targetModulesDir, entry.name))\n" +
+    "      continue\n" +
+    "    }\n" +
+    "    const targetScopeDir = path.join(targetModulesDir, entry.name)\n" +
+    "    fs.mkdirSync(targetScopeDir, { recursive: true })\n" +
+    "    for (const packageEntry of fs.readdirSync(sourcePath, { withFileTypes: true })) {\n" +
+    "      if (packageEntry.isDirectory()) {\n" +
+    "        linkPackage(path.join(sourcePath, packageEntry.name), path.join(targetScopeDir, packageEntry.name))\n" +
+    "      }\n" +
+    "    }\n" +
+    "  }\n" +
     "}\n\n";
 
   fs.writeFileSync(

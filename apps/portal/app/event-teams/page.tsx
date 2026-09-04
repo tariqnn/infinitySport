@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowPathIcon,
+  DocumentArrowDownIcon,
   MagnifyingGlassIcon,
   TrophyIcon,
   UserGroupIcon,
@@ -12,6 +13,7 @@ import {
   competitionRegistrationsApi,
   type CompetitionRegistrationRow,
 } from "../../lib/portalApi";
+import { downloadStyledWorkbook } from "../../lib/excelExport";
 
 type TeamPlayer = {
   name: string;
@@ -42,12 +44,68 @@ function statusClass(status: string) {
   return "bg-blue-100 text-blue-800";
 }
 
+function exportEventTeamsExcel(rows: CompetitionRegistrationRow[]) {
+  const teamRows = rows.map((row) => [
+    row.eventTitle || "Untitled event",
+    row.teamName || "Unnamed team",
+    row.competitionType,
+    teamPlayers(row).length,
+    row.customerPhone || "",
+    row.status,
+    formatDate(row.createdAt),
+  ]);
+
+  const playerRows = rows.flatMap((row) =>
+    teamPlayers(row).map((player) => [
+      row.eventTitle || "Untitled event",
+      row.teamName || "Unnamed team",
+      row.competitionType,
+      player.name,
+      player.age,
+      player.jerseySize,
+      row.customerPhone || "",
+      row.status,
+    ]),
+  );
+
+  return downloadStyledWorkbook("3x3-teams-and-players.xlsx", [
+    {
+      name: "Teams",
+      headers: [
+        "Event",
+        "Team",
+        "Division",
+        "Players",
+        "Contact",
+        "Status",
+        "Registered",
+      ],
+      rows: teamRows,
+    },
+    {
+      name: "Players",
+      headers: [
+        "Event",
+        "Team",
+        "Division",
+        "Player",
+        "Age",
+        "Jersey size",
+        "Contact",
+        "Status",
+      ],
+      rows: playerRows,
+    },
+  ]);
+}
+
 export default function EventTeamsPage() {
   const [rows, setRows] = useState<CompetitionRegistrationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [eventFilter, setEventFilter] = useState("ALL");
+  const [exporting, setExporting] = useState(false);
 
   const loadRows = useCallback(async () => {
     setLoading(true);
@@ -88,6 +146,17 @@ export default function EventTeamsPage() {
   const playerCount = rows.reduce((total, row) => total + teamPlayers(row).length, 0);
   const confirmedCount = rows.filter((row) => row.status === "CONFIRMED").length;
 
+  async function handleExportExcel() {
+    setExporting(true);
+    try {
+      await exportEventTeamsExcel(filteredRows);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to export teams.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-6 pb-10">
       <div className="flex flex-col gap-4 border-b border-ui-border pb-5 lg:flex-row lg:items-end lg:justify-between">
@@ -96,15 +165,27 @@ export default function EventTeamsPage() {
           <h1 className="mt-1 text-[30px] font-extrabold tracking-tight text-ui-textPrimary">3x3 Teams</h1>
           <p className="mt-1 text-sm text-ui-textMuted">Team registrations from event pages. Academy registrations remain in their own section.</p>
         </div>
-        <Button
-          variant="secondary"
-          onClick={() => void loadRows()}
-          isLoading={loading}
-          loadingLabel="Refreshing"
-          leadingIcon={<ArrowPathIcon className="h-4 w-4" />}
-        >
-          Refresh
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => void handleExportExcel()}
+            isLoading={exporting}
+            loadingLabel="Exporting"
+            leadingIcon={<DocumentArrowDownIcon className="h-4 w-4" />}
+            disabled={filteredRows.length === 0}
+          >
+            Export Excel
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => void loadRows()}
+            isLoading={loading}
+            loadingLabel="Refreshing"
+            leadingIcon={<ArrowPathIcon className="h-4 w-4" />}
+          >
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">

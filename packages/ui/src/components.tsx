@@ -662,7 +662,7 @@ export function Footer() {
             <p className="text-sm text-gray-500">
               Created by{' '}
               <a
-                href="https://creative-networks.tech/"
+                href="https://www.creativnetworks.com/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-semibold text-black transition-colors hover:text-brand-blue-primary"

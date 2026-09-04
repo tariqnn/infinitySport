@@ -16,7 +16,11 @@ import {
   type CompetitionRegistrationRow,
 } from "../../lib/portalApi";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { EllipsisVerticalIcon } from "@heroicons/react/24/outline";
+import {
+  EllipsisVerticalIcon,
+  DocumentArrowDownIcon,
+} from "@heroicons/react/24/outline";
+import { downloadStyledWorkbook } from "../../lib/excelExport";
 
 const COMPETITION_LABELS: Record<string, string> = {
   "3X3": "3x3 Tournament (Legacy)",
@@ -268,6 +272,25 @@ function exportRegistrationsPdf(
   openPdfTable(title, registrationHeaders(), registrationRows(rows, filter));
 }
 
+function exportRegistrationsExcel(
+  rows: CompetitionRegistrationRow[],
+  filter: string,
+) {
+  const title =
+    filter === "ALL"
+      ? "all-competitions"
+      : filter.toLowerCase().replace(/_/g, "-");
+  const sheetName =
+    filter === "ALL" ? "All competitions" : competitionLabel(filter);
+  return downloadStyledWorkbook(`${title}-registrations.xlsx`, [
+    {
+      name: sheetName,
+      headers: registrationHeaders(),
+      rows: registrationRows(rows, filter),
+    },
+  ]);
+}
+
 function exportGroupsCsv(groups: GroupSchedule[]) {
   downloadCsv("3x3-shuffled-groups.csv", [
     [
@@ -348,6 +371,25 @@ function exportGroupsPdf(groups: GroupSchedule[]) {
     ],
     groupScheduleRows(groups),
   );
+}
+
+function exportGroupsExcel(groups: GroupSchedule[]) {
+  return downloadStyledWorkbook("3x3-shuffled-groups.xlsx", [
+    {
+      name: "Shuffled groups",
+      headers: [
+        "Division",
+        "Group",
+        "Group teams",
+        "Game",
+        "Team A",
+        "Team B",
+        "Team A players",
+        "Team B players",
+      ],
+      rows: groupScheduleRows(groups),
+    },
+  ]);
 }
 
 function shuffleArray<T>(items: T[]) {
@@ -711,6 +753,8 @@ export default function CompetitionsPage() {
   const [groupSchedules, setGroupSchedules] = useState<GroupSchedule[]>([]);
   const [savingPaymentId, setSavingPaymentId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [exportingRegistrations, setExportingRegistrations] = useState(false);
+  const [exportingGroups, setExportingGroups] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -844,23 +888,39 @@ export default function CompetitionsPage() {
     return competitionRegistrationsApi.list(exportFilter);
   }
 
-  async function handleRegistrationExport(format: "csv" | "pdf") {
+  async function handleRegistrationExport(format: "csv" | "pdf" | "excel") {
+    setExportingRegistrations(true);
     try {
       const exportRows = await rowsForExport(filter);
       if (format === "csv") {
         exportRegistrationsCsv(exportRows, filter);
-      } else {
+      } else if (format === "pdf") {
         exportRegistrationsPdf(exportRows, filter);
+      } else {
+        await exportRegistrationsExcel(exportRows, filter);
       }
     } catch (err) {
       alert(
         err instanceof Error ? err.message : "Failed to export registrations.",
       );
+    } finally {
+      setExportingRegistrations(false);
     }
   }
 
   function shuffleGroups() {
     setGroupSchedules(build3x3Groups(rows, filter, groupSize));
+  }
+
+  async function handleGroupsExportExcel() {
+    setExportingGroups(true);
+    try {
+      await exportGroupsExcel(groupSchedules);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to export groups.");
+    } finally {
+      setExportingGroups(false);
+    }
   }
 
   async function deleteRegistration(row: CompetitionRegistrationRow) {
@@ -1031,6 +1091,15 @@ export default function CompetitionsPage() {
                 <Button
                   type="button"
                   variant="secondary"
+                  leadingIcon={<DocumentArrowDownIcon className="h-4 w-4" />}
+                  onClick={handleGroupsExportExcel}
+                  isLoading={exportingGroups}
+                >
+                  Export Excel
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
                   onClick={() => exportGroupsCsv(groupSchedules)}
                 >
                   Export CSV
@@ -1122,6 +1191,17 @@ export default function CompetitionsPage() {
                 </Select>
               </div>
               <div className="flex flex-wrap justify-end gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  leadingIcon={<DocumentArrowDownIcon className="h-4 w-4" />}
+                  onClick={() => handleRegistrationExport("excel")}
+                  isLoading={exportingRegistrations}
+                  disabled={rows.length === 0}
+                >
+                  Export Excel
+                </Button>
                 <Button
                   type="button"
                   size="sm"

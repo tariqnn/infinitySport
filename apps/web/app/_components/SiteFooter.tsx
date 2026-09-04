@@ -125,7 +125,7 @@ export async function SiteFooter() {
             <p className="text-sm text-gray-500">
               {tr(lang, 'footer_created_by')}{' '}
               <a
-                href="https://creative-networks.tech/"
+                href="https://www.creativnetworks.com/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-semibold text-black transition-colors hover:text-brand-blue-primary"

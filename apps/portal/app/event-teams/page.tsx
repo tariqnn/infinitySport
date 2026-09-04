@@ -50,6 +50,9 @@ function exportEventTeamsExcel(rows: CompetitionRegistrationRow[]) {
     row.eventTitle || "Untitled event",
     row.teamName || "Unnamed team",
     row.competitionType,
+    teamPlayers(row)
+      .map((player) => `${player.name} (Age ${player.age})`)
+      .join(", "),
     teamPlayers(row).length,
     row.customerPhone || "",
     row.status,
@@ -77,6 +80,7 @@ function exportEventTeamsExcel(rows: CompetitionRegistrationRow[]) {
         "Team",
         "Division",
         "Players",
+        "Player count",
         "Contact",
         "Status",
         "Registered",

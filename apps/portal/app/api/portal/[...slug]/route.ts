@@ -9397,6 +9397,29 @@ async function dispatchPatch(request: NextRequest, params: Params) {
       data.playerThree = normalizeText(body.playerThree) || null;
     if (body.playerFour !== undefined)
       data.playerFour = normalizeText(body.playerFour) || null;
+    if (body.players !== undefined) {
+      if (body.players === null) {
+        data.players = null;
+      } else if (Array.isArray(body.players)) {
+        data.players = body.players
+          .map((player) => {
+            if (!player || typeof player !== "object") return null;
+            const record = player as Record<string, unknown>;
+            const name = normalizeText(record.name);
+            if (!name) return null;
+            const ageText = normalizeText(record.age);
+            const age = ageText === "" ? null : Math.round(Number(ageText));
+            return {
+              name,
+              age: Number.isFinite(age) ? age : null,
+              jerseySize: normalizeText(record.jerseySize) || null,
+            };
+          })
+          .filter((player): player is { name: string; age: number | null; jerseySize: string | null } => player !== null);
+      } else {
+        return jsonError("players must be an array");
+      }
+    }
     if (body.status !== undefined)
       data.status = normalizeText(body.status).toUpperCase() || "NEW";
     if (body.isPaid !== undefined) {
@@ -9434,19 +9457,34 @@ async function dispatchPatch(request: NextRequest, params: Params) {
     const nextCompetitionType = String(
       data.competitionType ?? existing.competitionType,
     ).toUpperCase();
+    // Event-page team registrations (existing.eventId set) use an arbitrary
+    // division label rather than the fixed 3X3_MEN/3X3_WOMEN enum, and store
+    // their roster in `players` rather than playerOne..Four - treat either
+    // shape as a team competition for validation.
     const isTeamCompetition =
       nextCompetitionType === "3X3" ||
       nextCompetitionType === "3X3_MEN" ||
-      nextCompetitionType === "3X3_WOMEN";
+      nextCompetitionType === "3X3_WOMEN" ||
+      Boolean(existing.eventId) ||
+      Boolean(normalizeText(data.teamName ?? existing.teamName));
     if (isTeamCompetition) {
       const teamName = normalizeText(data.teamName ?? existing.teamName);
+      if (!teamName) return jsonError("Team name is required");
+
       const playerOne = normalizeText(data.playerOne ?? existing.playerOne);
       const playerTwo = normalizeText(data.playerTwo ?? existing.playerTwo);
       const playerThree = normalizeText(
         data.playerThree ?? existing.playerThree,
       );
-      if (!teamName || !playerOne || !playerTwo || !playerThree) {
-        return jsonError("Team name and first 3 players are required");
+      const hasLegacyPlayers = Boolean(playerOne && playerTwo && playerThree);
+
+      const nextPlayers =
+        data.players !== undefined ? data.players : existing.players;
+      const hasPlayersArray =
+        Array.isArray(nextPlayers) && nextPlayers.length > 0;
+
+      if (!hasLegacyPlayers && !hasPlayersArray) {
+        return jsonError("At least one player is required");
       }
     } else {
       const participantName = normalizeText(

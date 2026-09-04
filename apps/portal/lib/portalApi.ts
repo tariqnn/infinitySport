@@ -1173,7 +1173,7 @@ export const competitionRegistrationsApi = {
     playerTwo: string | null;
       playerThree: string | null;
       playerFour: string | null;
-      players: Array<{ name: string; age: number; jerseySize: string }>;
+      players: Array<{ name: string; age: number | null; jerseySize: string }>;
       isPaid: boolean;
       amountDue: number | null;
       amountPaid: number | null;

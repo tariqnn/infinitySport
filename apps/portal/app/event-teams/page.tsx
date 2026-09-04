@@ -14,6 +14,7 @@ import {
   type CompetitionRegistrationRow,
 } from "../../lib/portalApi";
 import { downloadStyledWorkbook } from "../../lib/excelExport";
+import { openPdfTable } from "../../lib/pdfExport";
 
 type TeamPlayer = {
   name: string;
@@ -99,13 +100,35 @@ function exportEventTeamsExcel(rows: CompetitionRegistrationRow[]) {
   ]);
 }
 
+function exportEventTeamsPdf(rows: CompetitionRegistrationRow[]) {
+  const tableRows = rows.map((row) => [
+    row.eventTitle || "Untitled event",
+    row.teamName || "Unnamed team",
+    row.competitionType,
+    teamPlayers(row)
+      .map((player) => `${player.name} (Age ${player.age})`)
+      .join(", "),
+    row.customerPhone || "",
+    row.status,
+    formatDate(row.createdAt),
+  ]);
+
+  openPdfTable(
+    "3x3 teams and players",
+    ["Event", "Team", "Division", "Players", "Contact", "Status", "Registered"],
+    tableRows,
+  );
+}
+
 export default function EventTeamsPage() {
   const [rows, setRows] = useState<CompetitionRegistrationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [eventFilter, setEventFilter] = useState("ALL");
+  const [divisionFilter, setDivisionFilter] = useState("ALL");
   const [exporting, setExporting] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const loadRows = useCallback(async () => {
     setLoading(true);
@@ -127,10 +150,15 @@ export default function EventTeamsPage() {
     rows.map((row) => row.eventTitle || "Untitled event"),
   )).sort(), [rows]);
 
+  const divisionOptions = useMemo(() => Array.from(new Set(
+    rows.map((row) => row.competitionType),
+  )).sort(), [rows]);
+
   const filteredRows = useMemo(() => {
     const query = search.trim().toLowerCase();
     return rows.filter((row) => {
       const matchesEvent = eventFilter === "ALL" || (row.eventTitle || "Untitled event") === eventFilter;
+      const matchesDivision = divisionFilter === "ALL" || row.competitionType === divisionFilter;
       const searchText = [
         row.eventTitle,
         row.teamName,
@@ -139,9 +167,9 @@ export default function EventTeamsPage() {
         row.status,
         ...teamPlayers(row).map((player) => player.name),
       ].filter(Boolean).join(" ").toLowerCase();
-      return matchesEvent && (!query || searchText.includes(query));
+      return matchesEvent && matchesDivision && (!query || searchText.includes(query));
     });
-  }, [eventFilter, rows, search]);
+  }, [divisionFilter, eventFilter, rows, search]);
 
   const playerCount = rows.reduce((total, row) => total + teamPlayers(row).length, 0);
   const confirmedCount = rows.filter((row) => row.status === "CONFIRMED").length;
@@ -154,6 +182,17 @@ export default function EventTeamsPage() {
       alert(err instanceof Error ? err.message : "Failed to export teams.");
     } finally {
       setExporting(false);
+    }
+  }
+
+  function handleExportPdf() {
+    setExportingPdf(true);
+    try {
+      exportEventTeamsPdf(filteredRows);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to export teams.");
+    } finally {
+      setExportingPdf(false);
     }
   }
 
@@ -178,6 +217,16 @@ export default function EventTeamsPage() {
           </Button>
           <Button
             variant="secondary"
+            onClick={handleExportPdf}
+            isLoading={exportingPdf}
+            loadingLabel="Exporting"
+            leadingIcon={<DocumentArrowDownIcon className="h-4 w-4" />}
+            disabled={filteredRows.length === 0}
+          >
+            Export PDF
+          </Button>
+          <Button
+            variant="secondary"
             onClick={() => void loadRows()}
             isLoading={loading}
             loadingLabel="Refreshing"
@@ -196,7 +245,7 @@ export default function EventTeamsPage() {
 
       <Card>
         <CardBody className="p-5 sm:p-6">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px_240px]">
             <label className="block text-sm font-bold text-ui-textPrimary">
               Search teams
               <div className="relative mt-1.5">
@@ -214,6 +263,13 @@ export default function EventTeamsPage() {
               <select value={eventFilter} onChange={(event) => setEventFilter(event.target.value)} className="mt-1.5 min-h-12 w-full rounded-xl border-2 border-ui-border bg-white px-4 text-base outline-none focus:border-brand-primaryBlue/40">
                 <option value="ALL">All 3x3 events</option>
                 {eventOptions.map((eventTitle) => <option key={eventTitle} value={eventTitle}>{eventTitle}</option>)}
+              </select>
+            </label>
+            <label className="block text-sm font-bold text-ui-textPrimary">
+              Division
+              <select value={divisionFilter} onChange={(event) => setDivisionFilter(event.target.value)} className="mt-1.5 min-h-12 w-full rounded-xl border-2 border-ui-border bg-white px-4 text-base outline-none focus:border-brand-primaryBlue/40">
+                <option value="ALL">All divisions</option>
+                {divisionOptions.map((division) => <option key={division} value={division}>{division}</option>)}
               </select>
             </label>
           </div>

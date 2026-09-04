@@ -82,12 +82,17 @@ try {
     cwd: rootDir,
   });
 
-  // Create a non-hidden deploy directory for platforms that ignore dot-folders like ".next".
-  if (fs.existsSync(hostingerOutputDir)) {
-    fs.rmSync(hostingerOutputDir, { recursive: true, force: true });
+  // NOTE: sync-web-next-output.js already builds `hostinger-output` above,
+  // from the root-level standalone copy it patches (portable node_modules +
+  // public-dir self-heal for Hostinger). Do NOT recreate it here from the
+  // unpatched apps/web/.next/standalone - that silently discards those
+  // patches and was the reason they never took effect in production.
+  if (!fs.existsSync(hostingerOutputDir)) {
+    throw new Error(
+      `Expected sync-web-next-output.js to create ${hostingerOutputDir}`,
+    );
   }
-  fs.cpSync(standaloneDir, hostingerOutputDir, { recursive: true });
-  console.log(`[hostinger-build] Created deploy output: ${hostingerOutputDir}`);
+  console.log(`[hostinger-build] Deploy output ready: ${hostingerOutputDir}`);
 
   console.log("[hostinger-build] Done");
   console.log(

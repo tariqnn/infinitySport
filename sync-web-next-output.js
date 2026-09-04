@@ -72,6 +72,8 @@ function makeStandaloneModulesPortable(standaloneDir) {
   const serverFile = path.join(standaloneDir, "server.js");
   const nodeModulesDir = path.join(standaloneDir, "node_modules");
   const portableModulesDir = path.join(standaloneDir, ".next", "hostinger_modules");
+  const publicDir = path.join(standaloneDir, "public");
+  const portablePublicDir = path.join(standaloneDir, ".next", "hostinger_public");
 
   if (!fs.existsSync(serverFile) || !fs.existsSync(nodeModulesDir)) return false;
 
@@ -81,6 +83,14 @@ function makeStandaloneModulesPortable(standaloneDir) {
   renameRuntimeModuleDirs(nodeModulesDir);
   fs.mkdirSync(path.dirname(portableModulesDir), { recursive: true });
   fs.renameSync(nodeModulesDir, portableModulesDir);
+
+  // Hostinger's deploy sync has also been observed dropping the top-level
+  // `public` folder next to server.js (images/video 404 while pages still
+  // render). Keep a backup copy inside `.next`, alongside the module
+  // snapshot above, and restore it at boot if it goes missing.
+  if (fs.existsSync(publicDir)) {
+    copyIfExists(publicDir, portablePublicDir);
+  }
 
   const serverSource = fs.readFileSync(serverFile, "utf8");
   const nextRequire = "require('next')";
@@ -134,6 +144,18 @@ function makeStandaloneModulesPortable(standaloneDir) {
     "      }\n" +
     "    }\n" +
     "  }\n" +
+    "}\n" +
+    "const publicDir = path.join(__dirname, 'public')\n" +
+    "const portablePublicDir = path.join(__dirname, '.next', 'hostinger_public')\n" +
+    "try {\n" +
+    "  const publicIsEmpty = !fs.existsSync(publicDir) || fs.readdirSync(publicDir).length === 0\n" +
+    "  if (publicIsEmpty && fs.existsSync(portablePublicDir)) {\n" +
+    "    fs.rmSync(publicDir, { recursive: true, force: true })\n" +
+    "    fs.cpSync(portablePublicDir, publicDir, { recursive: true })\n" +
+    "    console.log('Restored missing public dir from ' + portablePublicDir)\n" +
+    "  }\n" +
+    "} catch (error) {\n" +
+    "  console.error('Failed to restore public dir:', error)\n" +
     "}\n\n";
 
   fs.writeFileSync(
